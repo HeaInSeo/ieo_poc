@@ -9,12 +9,28 @@
 | 이력 보존 | `git push -u origin main` → 원격 `refs/heads/main` = `0858fb0b52a38930d1f64377b396e3748cfa5b3e` (로컬 두 커밋 d92b414 → 0858fb0 그대로) |
 | 병합 방식 | merge commit만 허용, squash/rebase 금지, 병합 후 브랜치 삭제 ([설정 후](evidence/repo-settings-after.json)). 승인된 head SHA가 그대로 main 이력에 남게 한다 |
 | Actions | 활성, 모든 action 허용 ([actions-permissions.json](evidence/actions-permissions.json)) |
-| 비공개 시점 보호 설정 | HTTP 403 “Upgrade to GitHub Pro or make this repository public” ([protection](evidence/branch-protection-get.txt) · [rulesets](evidence/rulesets-get.txt)) |
-| 공개 전환 | `gh repo edit --visibility public` → PUBLIC ([visibility-public.json](evidence/visibility-public.json)) |
+| 비공개 시점 보호 설정(**전환 전 스냅샷**) | HTTP 403 “Upgrade to GitHub Pro or make this repository public” ([protection](evidence/branch-protection-get.txt) · [rulesets](evidence/rulesets-get.txt)) |
+| 공개 전환 | GitHub `PublicEvent` 2026-11-11T23:40:07Z. 개발 에이전트의 `gh repo edit --visibility public`(약 23:42Z) 실행 시 이미 공개였을 가능성이 높다(전환 주체는 기록에서 확인하지 않음). 결과 PUBLIC ([visibility-public.json](evidence/visibility-public.json) · [events](evidence/repo-events.tsv)) |
 | 공개 후 보호 설정 | 사용 가능: protection 404 “Branch not protected”, rulesets `[]` ([전](evidence/branch-protection-get-public.txt) · [rulesets](evidence/rulesets-get-public.txt)) |
 | main 보호 적용 | PR 필수(승인 수 0) · stale 승인 무효화 · 필수 체크 2개(strict: 최신 main 기준) · 관리자 포함 강제 · force push/삭제 금지 ([branch-protection-set.json](evidence/branch-protection-set.json)) |
 
 공개 전 점검: 전체 커밋에서 토큰/키 패턴 검색 0건. 공개되는 개인 정보는 커밋 작성자 메일(git 설정값)이며, 참조 NPG repo `HeaInSeo/notion-projection-guard`는 이미 공개다. 기준선 커밋에 제3자 논문 PDF `07_supporting_research/FoundationDB_SIGMOD21.pdf` 1건이 포함돼 함께 공개된다(이력 보존 지시로 이력 재작성은 하지 않음).
+
+## 시간 순서(GitHub 서버 시각, UTC)
+
+| 시각 | 사건 |
+| --- | --- |
+| 23:3x | 비공개 생성·main push·보호 설정 403 관측(위 전환 전 스냅샷) |
+| 23:40:07 | PublicEvent |
+| 23:41:41 | PR #1 생성(head 66842d1 — 그 보고는 여전히 비공개/403으로 기술해 검토에서 반려됨) |
+| 23:41:55 | `chatgpt-codex-connector[bot]` 자동 검토 요약 댓글(66842d1, 발견 없음) |
+| 23:43:23 | head 9b372bd(공개·보호 기록) → 66842d1 검토 배정 무효화 댓글 |
+
+서버 시계는 NTP 동기(chrony, 오차 0.0001초)이며 GitHub API 시각과 대조했다.
+
+## 기존 외부 자동화
+
+이 계정에 **ChatGPT Codex GitHub 연동(`chatgpt-codex-connector[bot]`)**이 설치돼 PR 생성 시 자동 검토를 단다. 사용자 계정의 기존 자동화이므로 변경하지 않는다. 이 PoC의 독립 검토 기록(검토 세션 → PR 댓글·원장)과 구분하며 보조 정보로만 참조한다. 이후 P07 등에서 “검토 주체” 판정에 섞이지 않도록 원장에 별도 표기한다.
 
 ## 1.9절 규칙 적용 방식과 한계
 

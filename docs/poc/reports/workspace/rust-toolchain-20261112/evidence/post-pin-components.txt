@@ -1,0 +1,12 @@
+## post-pin (2026-11-12, after removing stable)
+/home/heain/.rustup
+1.99.1-x86_64-unknown-linux-gnu (default)
+1.99.1-x86_64-unknown-linux-gnu (active, default)
+cargo-x86_64-unknown-linux-gnu
+clippy-x86_64-unknown-linux-gnu
+rust-std-x86_64-unknown-linux-gnu
+rustc-x86_64-unknown-linux-gnu
+rustfmt-x86_64-unknown-linux-gnu
+RUSTUP_HOME/CARGO_HOME not set in environment (resolved via ~/.rustup, ~/.cargo symlinks)
+/opt/rust/rustup
+/opt/rust/cargo
