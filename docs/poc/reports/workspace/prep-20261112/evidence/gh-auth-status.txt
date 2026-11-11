@@ -1,0 +1,7 @@
+github.com
+  ✓ Logged in to github.com account HeaInSeo (/home/heain/.config/gh/hosts.yml)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: [REDACTED]
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+exit=0

@@ -1,0 +1,2 @@
+ls: cannot access '/home/heain/.cargo/bin': No such file or directory
+/bin/bash: rustup: command not found

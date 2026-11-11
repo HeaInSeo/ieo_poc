@@ -1,0 +1,1 @@
+{"ok": true, "mode": "check", "files": ["STATUS.md", "TASKS.md", "RESULTS.md", "RESUME.md", "events.jsonl"]}
