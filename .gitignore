@@ -1,0 +1,9 @@
+# 원본 전달 ZIP은 루트에 보존하되 저장소에는 넣지 않는다 (SHA-256은 docs/poc/reports/workspace에 기록)
+/Console_Coordinator_v1.3.3.zip
+# 프로젝트 전용 Python 환경
+/.venv-poc/
+# Rust 빌드 산출물
+/target/
+# 대용량 참고 원문(PDF)은 작업공간에 두고 소스 이력에는 넣지 않는다
+/docs/poc/03_paper_repo_pairs/**/*.pdf
+__pycache__/

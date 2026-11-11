@@ -1,0 +1,2 @@
+{"event_id":"SCOPE-01-01-20261112","event_revision":1,"task_id":"01-01","observed_at":"2026-11-12T07:18:49+09:00","state":"검수 완료","evidence":["reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md","validation/review_v1.3.3.md"]}
+{"event_id":"RUNTIME-CHOICE-20261112","event_revision":1,"task_id":"01-02","observed_at":"2026-11-12T07:18:49+09:00","state":"사람 결정 대기","evidence":["reports/tasks/01-02/runtime-comparison-20261112/REPORT.md"]}

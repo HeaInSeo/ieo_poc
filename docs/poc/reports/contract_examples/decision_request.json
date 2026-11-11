@@ -1,0 +1,76 @@
+{
+  "schema_version": "console.report.v0",
+  "contract_revision": 4,
+  "event_id": "FIXTURE-decision_request",
+  "event_revision": 1,
+  "sprint_id": "FIXTURE-SPRINT",
+  "sprint_revision": 4,
+  "task_id": "FIXTURE-TASK",
+  "repo_id": "fixture-repo",
+  "assignment_id": "fixture-assignment",
+  "generation": 1,
+  "actor": {
+    "role": "coordinator",
+    "name": "fixture-decision_request"
+  },
+  "observed_at": "2026-11-12T00:00:00+09:00",
+  "channel": "coordinator_to_client",
+  "evidence_level": "verified",
+  "phase": "개발",
+  "operational_state": "사람 결정 대기",
+  "reason_code": null,
+  "evidence": [],
+  "unknown_facts": [
+    "설명용 fixture이며 실제 실행 증거가 아니다."
+  ],
+  "affected_tasks": [],
+  "next_action": "설명용 다음 행동",
+  "next_owner": "fixture-owner",
+  "resume_condition": null,
+  "next_check_at": null,
+  "decision": {
+    "question": "설명용 범위를 채택할까?",
+    "recommendation": "유지",
+    "deadline_at": null,
+    "default_action": "현재 승인 범위 유지",
+    "required": true,
+    "options": [
+      "유지: 기존 범위 유지",
+      "변경: 새 범위 검토 필요"
+    ]
+  },
+  "schedule": {
+    "deadline_state": "undecided",
+    "deadline_at": null,
+    "status": "unassessed",
+    "remaining_tasks": null,
+    "remaining_reason": "설명용 표본",
+    "delay_reasons": [],
+    "affected_tasks": [],
+    "forecast": {
+      "state": "unestimated",
+      "completion_range": null,
+      "evidence": [],
+      "reason": "과거 실측 없음"
+    }
+  },
+  "report_type": "decision_request",
+  "body": {
+    "question": "설명용 범위를 채택할까?",
+    "options": [
+      {
+        "label": "유지",
+        "impact": "기존 범위 유지"
+      },
+      {
+        "label": "변경",
+        "impact": "새 범위 검토 필요"
+      }
+    ],
+    "recommendation": "유지",
+    "rationale": "현재 승인 범위 안",
+    "deadline_at": null,
+    "no_deadline_reason": "설명용이며 실제 시한 없음",
+    "default_action": "현재 승인 범위 유지"
+  }
+}

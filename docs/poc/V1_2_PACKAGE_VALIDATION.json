@@ -1,0 +1,25 @@
+{
+  "plan_original_bytes_preserved": true,
+  "review_original_bytes_preserved": true,
+  "paper_repo_id_matches": 4,
+  "research_pdf_open_checks": 4,
+  "research_pdf_versions": [
+    "2610.14224v1",
+    "2603.25158v5",
+    "2605.23904v2",
+    "2605.13716v1"
+  ],
+  "checksums_verified": 52,
+  "new_experiments_executed": false,
+  "source_only_gaps": [
+    "NPG current server state",
+    "runtime capability probes",
+    "Graphify execution",
+    "research reproductions"
+  ],
+  "supporting_pdf_not_attached": [
+    "Anvil (USENIX HTTP 403)",
+    "Sieve (USENIX HTTP 403)"
+  ],
+  "zip_crc_validation": "PASS"
+}

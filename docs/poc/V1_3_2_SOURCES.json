@@ -1,0 +1,477 @@
+{
+  "version": "v1.3.2",
+  "prior_source_manifest": "V1_3_1_SOURCES.json",
+  "revision_reason": "provided v1.3.1 independent review: U3, S0 isolation, review head changes, derived reporting, P26 prerequisites, version alignment",
+  "files": [
+    {
+      "path": "00_READ_FIRST.md",
+      "size_bytes": 3193,
+      "sha256": "236037fafdfb440be3f589a8db7b0b556da6c681deef429e9de4de604127d7c4"
+    },
+    {
+      "path": "01_plan_and_review/Console_Coordinator_PoC_Validation_Plan_v1.2.md",
+      "size_bytes": 226358,
+      "sha256": "d0defe7ad23de4de0a595399db2b4e731344b95e5259c8ee38c57bda5dbaa464"
+    },
+    {
+      "path": "01_plan_and_review/Independent_Review_Recheck_18_28.md",
+      "size_bytes": 34054,
+      "sha256": "ceec446d51bf06378d39c4030a2c49f890accdb2dba6fb5fec9708d2e09efc1f"
+    },
+    {
+      "path": "01_plan_and_review/Independent_Review_v1.2_and_v1.3_Instructions.md",
+      "size_bytes": 21641,
+      "sha256": "0a00beea2a8bf9e27e26e5222ef05cdd8161dbd2ce424a0d8dab381a74dea633"
+    },
+    {
+      "path": "01_plan_and_review/Independent_Review_v1.3.1_and_v1.3.2_Instructions.md",
+      "size_bytes": 14407,
+      "sha256": "357bccc23b454f41bcbd0c0e69f97b6acb4ef87967f2d8386a2d57fef9c6d2ed"
+    },
+    {
+      "path": "01_plan_and_review/Plan_Sections_5.2_5.3_8_Excerpts.md",
+      "size_bytes": 16883,
+      "sha256": "dc9ce447e629e3427e6b40ea5503a1a7e164818b0134f2aaacd6faa9a9d9c8d6"
+    },
+    {
+      "path": "01_plan_and_review/V1_2_Revision_History_Sections_8.md",
+      "size_bytes": 7674,
+      "sha256": "c994e9fd744701e24edfca673b9d4b632958464421fb2941621145871b2fe981"
+    },
+    {
+      "path": "02_design_sources/Console_Automation_Design_Log.md",
+      "size_bytes": 56975,
+      "sha256": "0719b992ccc10d752df6744d4c7df25becb7b4c5a5f153d4fa082122a91d10ae"
+    },
+    {
+      "path": "02_design_sources/Console_Coordinator_Architecture.png",
+      "size_bytes": 475282,
+      "sha256": "c8c2caa949fd0397a65dd055309f8d937342a71cdba2ebb6b55cdd78be6cd66b"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/Harness2_2610.14224v1.pdf",
+      "size_bytes": 8101889,
+      "sha256": "440be1f694f3b0fdfb8e612e9b2288ff0d8ab38641cfd1064fd77052ba360282"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/PAIRING.md",
+      "size_bytes": 778,
+      "sha256": "8cf4b11436568eacb2b438ce6fe83535caaa078a46646690d8e72c31c67d701e"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/repo/LICENSE",
+      "size_bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/repo/README.md",
+      "size_bytes": 9374,
+      "sha256": "17639ac4194bb5c042cbf645430a772ae9be81baee95ab41eaea73cafa138f23"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/repo/pyproject.toml",
+      "size_bytes": 1195,
+      "sha256": "c78fd0d09d2f92bf796871c168b548dd4d33e21566dbb582e343266e24a0bada"
+    },
+    {
+      "path": "03_paper_repo_pairs/R02_Trace2Skill/PAIRING.md",
+      "size_bytes": 1016,
+      "sha256": "02e616c896603a6911088d56b597bfac6f24ffbbc3c6d90420422b636cbcf938"
+    },
+    {
+      "path": "03_paper_repo_pairs/R02_Trace2Skill/Trace2Skill_2603.25158v5.pdf",
+      "size_bytes": 1991654,
+      "sha256": "9f3f43101583a993b9a82905d790fb2dd57c60b37897187a0706c047bd0b58b0"
+    },
+    {
+      "path": "03_paper_repo_pairs/R02_Trace2Skill/repo/README.md",
+      "size_bytes": 15500,
+      "sha256": "3ece774d67f85ca88576475fb4efedca044e19bbeaf396089273052fd5365005"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/PAIRING.md",
+      "size_bytes": 765,
+      "sha256": "3d32008ea458953723d8aa99ff93edf4c814193e4b5e877b884f65f092a161ce"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/SkillOpt_2605.23904v2.pdf",
+      "size_bytes": 879864,
+      "sha256": "87f7f0f323b1671e9202b3ebb1596e909e507c71ecd1b360b0075a5ee1727fe3"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/repo/LICENSE",
+      "size_bytes": 1078,
+      "sha256": "9515a04280cf50ce154eb3ab8fa375c7cc5e6b45ea5cb23b7ff3830737020c15"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/repo/README.md",
+      "size_bytes": 9394,
+      "sha256": "24fc195fcbd4e7de67726abfc9691460d06f1ad00609e31a17842f952b87641e"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/repo/pyproject.toml",
+      "size_bytes": 3259,
+      "sha256": "b6fe3c8ceea566ae8c28e94a3e33807e7681baf981db5fa4c580b2a4630a2056"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/PAIRING.md",
+      "size_bytes": 759,
+      "sha256": "49d1539dce69c537bd2b1d5349b320561f53b04ae215b77a2b3105bd381ef060"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/SkillOps_2605.13716v1.pdf",
+      "size_bytes": 1594213,
+      "sha256": "b56e5f031d1ee2a480e2b21d840755ad894cf7d10936d8bf0ac7f384cbdefbfc"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/repo/LICENSE",
+      "size_bytes": 1073,
+      "sha256": "2d7d534755621c604be93c2d189ccc85fbcdebb0bfcd5f4c7a0c3b07c2c6d075"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/repo/README.md",
+      "size_bytes": 8777,
+      "sha256": "e122c32db1647fe108f2323c30f0631cc84028f5b082bea05552f44340fb38dd"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/repo/pyproject.toml",
+      "size_bytes": 1011,
+      "sha256": "ad33dc7090ea2689204984915e3df328dcf237f0c063fb7992f7277111db3aeb"
+    },
+    {
+      "path": "04_graphify/repo/ARCHITECTURE.md",
+      "size_bytes": 17120,
+      "sha256": "f557f8a32516a30b3bd3073c2321fe466c6ac9add2756bce2ea4bacddb9146a3"
+    },
+    {
+      "path": "04_graphify/repo/BENCHMARKS.md",
+      "size_bytes": 8887,
+      "sha256": "51cc92d5b6cb38f25869cc4d5447f42554c85601dadead48b30ce5b10fdd04ad"
+    },
+    {
+      "path": "04_graphify/repo/LICENSE",
+      "size_bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "04_graphify/repo/LICENSE-MIT",
+      "size_bytes": 1068,
+      "sha256": "36ecff6bbb97aca1be64e95f42538cf796adde5864edac583e620643c096931a"
+    },
+    {
+      "path": "04_graphify/repo/NOTICE",
+      "size_bytes": 335,
+      "sha256": "3448ea175bba09f6fed8a743000139fb4c7112de83f164355b5540b158576621"
+    },
+    {
+      "path": "04_graphify/repo/README.md",
+      "size_bytes": 40152,
+      "sha256": "f6d12f50ecd8f0c873af88ea8ef84a989101919ae531dd3cf404273d288d0562"
+    },
+    {
+      "path": "04_graphify/repo/pyproject.toml",
+      "size_bytes": 10337,
+      "sha256": "118f25e6efdab8f586d26dbe51af22482a62768b7a636b4c40d5eb65251e5626"
+    },
+    {
+      "path": "05_npg_evidence/CI_Evidence_Scope.md",
+      "size_bytes": 1377,
+      "sha256": "6996b87781431b2b9b998346d4b24c6fb328364e0ef63649303013914e90d5d6"
+    },
+    {
+      "path": "05_npg_evidence/CI_Jobs.json",
+      "size_bytes": 5189,
+      "sha256": "ab867777c3c89739e26cfb7b12dee6b02841645478b0aa9dd4e626c9b6847fa7"
+    },
+    {
+      "path": "05_npg_evidence/CI_Run.json",
+      "size_bytes": 16374,
+      "sha256": "79ebb86e3ae6a8d1c51003bb6d342f5381938efe1a4a2215b93f05d4a87edba5"
+    },
+    {
+      "path": "05_npg_evidence/NPG_Design_Operations_Guide.docx",
+      "size_bytes": 2438851,
+      "sha256": "e7a1dba44aa2b90826d14be02046d31a5af66a08c9a9f709ada951cce73e8a4c"
+    },
+    {
+      "path": "05_npg_evidence/Node22_Job.log",
+      "size_bytes": 704924,
+      "sha256": "ead9c8e0800d28a626fadae268bd3e59ebdbcbcf868f246a48c9d193ef2ca4b8"
+    },
+    {
+      "path": "05_npg_evidence/Node24_Job.log",
+      "size_bytes": 235078,
+      "sha256": "5c8c4482bc1e710606d467a0c2f0d70e31f197ce21ee566297938fb49c012cab"
+    },
+    {
+      "path": "05_npg_evidence/ci.yml",
+      "size_bytes": 2528,
+      "sha256": "4895d8afb58db8249104e92e66bee526239510549cd13c3ed1b5b78efd2a2932"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/AGENTS.md",
+      "size_bytes": 1554,
+      "sha256": "520a26595d8d200864a7b2925086dce0546a363cbf8e53826dd6a598f1b9f647"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/AUTOMATIC_FOLLOWTHROUGH.md",
+      "size_bytes": 21537,
+      "sha256": "299841daf91e6783606369a2b55b6e7d6a76e31d1c3a0faa1dac8af54766ab63"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/CENTRAL_SCHEDULER_MIGRATION.md",
+      "size_bytes": 4293,
+      "sha256": "8e30ff126a01e2c899917695eee581518815ccc72cd50ee042776cd748183ea5"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/OPERATIONS.md",
+      "size_bytes": 16399,
+      "sha256": "309f1bc299c0c4748ec29e4b661528b1fa6a33e91029b724fe99fbd16982043f"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/README.md",
+      "size_bytes": 43432,
+      "sha256": "60d88dfbc5cd8633dea15890604168735751a050a94e75a2001d163d951777fb"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/REVIEW_TIMEOUT_VERIFICATION.md",
+      "size_bytes": 4283,
+      "sha256": "4f74d7523b88cb156ef16f66bcb2bd5f6c8e80ac8615a7df7375ac40ca05d755"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/SOURCE_REVIEW_BOOTSTRAP.md",
+      "size_bytes": 3252,
+      "sha256": "6cd56399f2910720063e6c4556b1c875412014b8128d0bab455ae09320859dc4"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/VERIFICATION_20261012.md",
+      "size_bytes": 4372,
+      "sha256": "12b12abc32ba342a6f82924c2b61adbc7dc9c027d59a19d2ac132242b939bb75"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/VERIFICATION_20261020_OPERATIONS.md",
+      "size_bytes": 2101,
+      "sha256": "f882ea84eabdbcaa426d57dc49abe11e31308b562a2cae9ef12a4f1626b3954f"
+    },
+    {
+      "path": "06_remaining_checks/Runtime_and_Operational_Probe_Checklist.md",
+      "size_bytes": 3159,
+      "sha256": "f0288722cd13484bc5bf33c56c2dc12ba94c57e6f0daa9b55ad5a5483abfd8b6"
+    },
+    {
+      "path": "07_supporting_research/FoundationDB_SIGMOD21.pdf",
+      "size_bytes": 1053117,
+      "sha256": "ce786e9965dbc04f3e5ae1d57d6a895ee2dafb1b89f8f9c82355502895562b26"
+    },
+    {
+      "path": "07_supporting_research/References.md",
+      "size_bytes": 1270,
+      "sha256": "eb2ae7b34b225a540dca1eb6d59c18a6b340172aa7ac927d221149bb8a242588"
+    },
+    {
+      "path": "Console_Coordinator_Architecture_v1.3.2.dot",
+      "size_bytes": 2953,
+      "sha256": "5deb663aecb6eb124077c3e66fd7f49572aed434516610f23c040d5662012fe5"
+    },
+    {
+      "path": "Console_Coordinator_Architecture_v1.3.2.png",
+      "size_bytes": 220712,
+      "sha256": "01058ab8dca866fbcf6084069ef0e14e864ba85ac4b967eee1edbe7a5152959f"
+    },
+    {
+      "path": "Console_Coordinator_Architecture_v1.3.2.svg",
+      "size_bytes": 16377,
+      "sha256": "3e635f9b8b22427fd497181ca6b752f4baad9a5d00c98e61ee47bc2db42ea8fd"
+    },
+    {
+      "path": "Console_Coordinator_Followup_Experiments_v1.3.2.md",
+      "size_bytes": 26392,
+      "sha256": "76298af64bfb8b79ca8080ff35c22ab7e0a6f22865be9137e23fdb7bc9844d8b"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.2.md",
+      "size_bytes": 40702,
+      "sha256": "be4136e6f92e28bb6cefe95bd889ffc5a94edc536ad6306c27570a1af058f77f"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Validation_Plan.md",
+      "size_bytes": 183454,
+      "sha256": "d5f9a15d1e919ae86b3953d6ef9d4c219f2e47161f44750c1eb5382479879952"
+    },
+    {
+      "path": "Console_Coordinator_Sprints_v0.json",
+      "size_bytes": 178740,
+      "sha256": "9ecf4e2a64406bf9a38e351799b62524cefbf7fe01fb6a9becb658f281c50544"
+    },
+    {
+      "path": "DEV_AGENT_HANDOFF.md",
+      "size_bytes": 15336,
+      "sha256": "445a785d37e622ea520a11a93db83d8430c119901a541a2bff1ec8f86ef81abf"
+    },
+    {
+      "path": "Followup_Execution_v1.3.2.json",
+      "size_bytes": 4658,
+      "sha256": "e49d2b0a97dfbd19ae5814c0bcdbf7b583cd0b6877aa6c368ebd2de3472c8d19"
+    },
+    {
+      "path": "PAPER_REPO_MAPPING.md",
+      "size_bytes": 1900,
+      "sha256": "4e553e90e5587a63d881fb3d48b1fca3edb5b989df72a8a1c0b6259b9fae5cae"
+    },
+    {
+      "path": "ProgressReport_v0.schema.json",
+      "size_bytes": 4971,
+      "sha256": "115519465b79d07aeb86be3b343b595c361b6208787e3c8034f7a3f9ddea05da"
+    },
+    {
+      "path": "REPORTING_REVIEW_NOTES.md",
+      "size_bytes": 1170,
+      "sha256": "218130b2827df9d5fb56c1929c894e7633e4f651ac0f15c13c48fd31f3cabd9a"
+    },
+    {
+      "path": "SprintSpec_v0.schema.json",
+      "size_bytes": 10591,
+      "sha256": "b50f75bce79d7435f8963cc4d9758a64ee4c409a7972d015283432644a0ee78e"
+    },
+    {
+      "path": "Technical_Dependencies_v1.3.2.json",
+      "size_bytes": 7621,
+      "sha256": "f70958c96f53bd292fdd3bca7c755a44f655d1c48ad419ab355a9d75e7299495"
+    },
+    {
+      "path": "User_Decisions_2026-11-11.md",
+      "size_bytes": 1587,
+      "sha256": "eb9eb043df17824638a1ce68036f81a4b6c58fdecae51c15eeb0dd9bc98dd26a"
+    },
+    {
+      "path": "V1_2_PACKAGE_VALIDATION.json",
+      "size_bytes": 610,
+      "sha256": "6046a1c8172cacf12787317be7c58f946c5a6cc6f4e262372b7ceb7de5197a8c"
+    },
+    {
+      "path": "V1_2_PAPER_REPO_MAPPING.md",
+      "size_bytes": 1716,
+      "sha256": "56f2c52b483062e7e979da31521745b6304eca4d1dc37305a0f8f4514b6d0ee6"
+    },
+    {
+      "path": "V1_2_SOURCES.json",
+      "size_bytes": 22157,
+      "sha256": "304587ad746409b48f3cff172e8e5458858bb7de524f72e36f0c529a588257a2"
+    },
+    {
+      "path": "V1_3_1_SOURCES.json",
+      "size_bytes": 15615,
+      "sha256": "552bf6a274848a6a390b7e7bb237d6b49a12b790d6949b666da1db7f93cabdd3"
+    },
+    {
+      "path": "V1_3_2_Changes_and_Validation.md",
+      "size_bytes": 13919,
+      "sha256": "02aa33272820118ebffe2df2ddd290422caa601b99a6dc2a23f3814976748e91"
+    },
+    {
+      "path": "V1_3_Changes_and_Validation.md",
+      "size_bytes": 15051,
+      "sha256": "11ee07a61b86effd63ac25f053602c5f4e46191c07ba8669801b1c26c04240c2"
+    },
+    {
+      "path": "progress/README.md",
+      "size_bytes": 1009,
+      "sha256": "43829dad5e47c4f15daf3792a642c110ae944c1df029a944ca0df5f9752c92d7"
+    },
+    {
+      "path": "progress/RESULTS.md",
+      "size_bytes": 8555,
+      "sha256": "6c1fee1cc21c937ae721dd5810b2b3c7881a6fd220926fdb453d5fecfd95a098"
+    },
+    {
+      "path": "progress/RESUME.md",
+      "size_bytes": 630,
+      "sha256": "6127c5948f3cb7bbe878feea034f3366eebc37d10cccef537621080a290b8aac"
+    },
+    {
+      "path": "progress/STATUS.md",
+      "size_bytes": 2624,
+      "sha256": "c855e688804db10e6d373f8b149e23c8a1529cad746180e667b74eaa8a3b8ddf"
+    },
+    {
+      "path": "progress/TASKS.md",
+      "size_bytes": 13923,
+      "sha256": "df6f52cc7aa642150b286781f340c6d76347aa481ea7de5107bf7248c893de4a"
+    },
+    {
+      "path": "progress/events.jsonl",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "progress/state.json",
+      "size_bytes": 47586,
+      "sha256": "93575dcac7760ff2bb66c07c3364400ef810cae29bd14243a6ee15fa3b4e1d88"
+    },
+    {
+      "path": "reports/README.md",
+      "size_bytes": 1139,
+      "sha256": "68facc9d1394627d3ba0606254b16391a450fedf31715839a68940b27fd77d64"
+    },
+    {
+      "path": "reports/templates/CONVERSATION_UPDATE.md",
+      "size_bytes": 733,
+      "sha256": "f815373ee43503527beaa8f1bb8e7267c2b7b903172529935ee34db604d7eeb4"
+    },
+    {
+      "path": "reports/templates/EXPERIMENT_REPORT.md",
+      "size_bytes": 1685,
+      "sha256": "2f72424efb830133b5c942c597baf4e8996aac0746a9c990b0eb4e1414bfa0ab"
+    },
+    {
+      "path": "reports/templates/STOP_AND_RESUME.md",
+      "size_bytes": 698,
+      "sha256": "cbe28ba9977007f62e242c7cd5f04ea5411b6c6da2382ea043b7a393598b3f91"
+    },
+    {
+      "path": "reports/templates/TASK_REPORT.md",
+      "size_bytes": 1485,
+      "sha256": "3b50ed5a9b3903f0adee30624cfed1c105ddafab1cfee4e756bab3bfcfef0d82"
+    },
+    {
+      "path": "reports/templates/result.template.json",
+      "size_bytes": 1064,
+      "sha256": "8ac93eed56c32f99bc79291e2e7d4cdb1a61fa888dc2523b436bcb6f4cc08fd1"
+    },
+    {
+      "path": "scripts/render_progress.py",
+      "size_bytes": 11959,
+      "sha256": "7e1a152c3bd05c9d03d18c3e41b47cb5cf4c4db17731ee44e5d8dacec88ccda0"
+    },
+    {
+      "path": "scripts/validate_package.py",
+      "size_bytes": 7408,
+      "sha256": "a804b9bfddaf0780c69a858c07b50faa4b152a23062572c590fbdcf416a611fc"
+    },
+    {
+      "path": "v1_3_1_reporting_check.json",
+      "size_bytes": 886,
+      "sha256": "5b359900ee9e4062d4d8b991c3c51c5f2ec535baa5b93c948fe021f0a4271595"
+    },
+    {
+      "path": "v1_3_2_validation.json",
+      "size_bytes": 2622,
+      "sha256": "5709cf343d541da3325c80a9908eed12c295d8288bdb305fa95b315176354dc2"
+    },
+    {
+      "path": "v1_3_structure_check.json",
+      "size_bytes": 2137,
+      "sha256": "e54e05c962d07a7d96b40ced198d012611ee5a59b4b661129c67118b72edff86"
+    },
+    {
+      "path": "validation/report_generation_check.json",
+      "size_bytes": 1021,
+      "sha256": "80dafab11682d76ed1058380f79cb3f089e2a2eeaa86bd7d5dbdbcecec707b09"
+    },
+    {
+      "path": "validation/v1.3.1_task_contracts.json",
+      "size_bytes": 36180,
+      "sha256": "9331573f0f740b7631de743d84a457fd976a1e464eff800b49437757cdf71e28"
+    }
+  ]
+}

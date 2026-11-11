@@ -1,0 +1,51 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": true,
+  "plan_version": "v1.3.3",
+  "task_id": null,
+  "experiment_id": null,
+  "run_id": null,
+  "revision": 1,
+  "previous_run_ref": null,
+  "actor": {
+    "role": null,
+    "name": null
+  },
+  "started_at": null,
+  "finished_at": null,
+  "execution_kind": null,
+  "execution_state": "미실행",
+  "inputs": {
+    "spec_revision": null,
+    "repo_sha": null,
+    "image_digest": null,
+    "profile_revision": null,
+    "model_runtime_versions": []
+  },
+  "expected": null,
+  "observed": null,
+  "verdict": "미판정",
+  "verification": {
+    "level": "unverified",
+    "reviewer": null,
+    "evidence": []
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "양식·미실행",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
+  "adoption": "미판정",
+  "reuse_assets": [],
+  "unresolved": [],
+  "next_action": null,
+  "next_owner": null,
+  "resume_condition": null,
+  "evidence_refs": [],
+  "operational_report_ref": null,
+  "schedule_report_ref": null
+}

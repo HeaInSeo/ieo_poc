@@ -1,0 +1,437 @@
+{
+  "version": "v1.3.1",
+  "prior_source_manifest": "V1_2_SOURCES.json",
+  "revision_reason": "진척·결과 보고 운영 보완",
+  "files": [
+    {
+      "path": "00_READ_FIRST.md",
+      "size_bytes": 4090,
+      "sha256": "5258a0dbf3ce510deb619ca28e1c9b9c5fbdf891801fcdbba0467b28d812551f"
+    },
+    {
+      "path": "01_plan_and_review/Console_Coordinator_PoC_Validation_Plan_v1.2.md",
+      "size_bytes": 226358,
+      "sha256": "d0defe7ad23de4de0a595399db2b4e731344b95e5259c8ee38c57bda5dbaa464"
+    },
+    {
+      "path": "01_plan_and_review/Independent_Review_Recheck_18_28.md",
+      "size_bytes": 34054,
+      "sha256": "ceec446d51bf06378d39c4030a2c49f890accdb2dba6fb5fec9708d2e09efc1f"
+    },
+    {
+      "path": "01_plan_and_review/Independent_Review_v1.2_and_v1.3_Instructions.md",
+      "size_bytes": 21641,
+      "sha256": "0a00beea2a8bf9e27e26e5222ef05cdd8161dbd2ce424a0d8dab381a74dea633"
+    },
+    {
+      "path": "01_plan_and_review/Plan_Sections_5.2_5.3_8_Excerpts.md",
+      "size_bytes": 16883,
+      "sha256": "dc9ce447e629e3427e6b40ea5503a1a7e164818b0134f2aaacd6faa9a9d9c8d6"
+    },
+    {
+      "path": "01_plan_and_review/V1_2_Revision_History_Sections_8.md",
+      "size_bytes": 7674,
+      "sha256": "c994e9fd744701e24edfca673b9d4b632958464421fb2941621145871b2fe981"
+    },
+    {
+      "path": "02_design_sources/Console_Automation_Design_Log.md",
+      "size_bytes": 56975,
+      "sha256": "0719b992ccc10d752df6744d4c7df25becb7b4c5a5f153d4fa082122a91d10ae"
+    },
+    {
+      "path": "02_design_sources/Console_Coordinator_Architecture.png",
+      "size_bytes": 475282,
+      "sha256": "c8c2caa949fd0397a65dd055309f8d937342a71cdba2ebb6b55cdd78be6cd66b"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/Harness2_2610.14224v1.pdf",
+      "size_bytes": 8101889,
+      "sha256": "440be1f694f3b0fdfb8e612e9b2288ff0d8ab38641cfd1064fd77052ba360282"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/PAIRING.md",
+      "size_bytes": 778,
+      "sha256": "8cf4b11436568eacb2b438ce6fe83535caaa078a46646690d8e72c31c67d701e"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/repo/LICENSE",
+      "size_bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/repo/README.md",
+      "size_bytes": 9374,
+      "sha256": "17639ac4194bb5c042cbf645430a772ae9be81baee95ab41eaea73cafa138f23"
+    },
+    {
+      "path": "03_paper_repo_pairs/R01_Harness2/repo/pyproject.toml",
+      "size_bytes": 1195,
+      "sha256": "c78fd0d09d2f92bf796871c168b548dd4d33e21566dbb582e343266e24a0bada"
+    },
+    {
+      "path": "03_paper_repo_pairs/R02_Trace2Skill/PAIRING.md",
+      "size_bytes": 1016,
+      "sha256": "02e616c896603a6911088d56b597bfac6f24ffbbc3c6d90420422b636cbcf938"
+    },
+    {
+      "path": "03_paper_repo_pairs/R02_Trace2Skill/Trace2Skill_2603.25158v5.pdf",
+      "size_bytes": 1991654,
+      "sha256": "9f3f43101583a993b9a82905d790fb2dd57c60b37897187a0706c047bd0b58b0"
+    },
+    {
+      "path": "03_paper_repo_pairs/R02_Trace2Skill/repo/README.md",
+      "size_bytes": 15500,
+      "sha256": "3ece774d67f85ca88576475fb4efedca044e19bbeaf396089273052fd5365005"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/PAIRING.md",
+      "size_bytes": 765,
+      "sha256": "3d32008ea458953723d8aa99ff93edf4c814193e4b5e877b884f65f092a161ce"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/SkillOpt_2605.23904v2.pdf",
+      "size_bytes": 879864,
+      "sha256": "87f7f0f323b1671e9202b3ebb1596e909e507c71ecd1b360b0075a5ee1727fe3"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/repo/LICENSE",
+      "size_bytes": 1078,
+      "sha256": "9515a04280cf50ce154eb3ab8fa375c7cc5e6b45ea5cb23b7ff3830737020c15"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/repo/README.md",
+      "size_bytes": 9394,
+      "sha256": "24fc195fcbd4e7de67726abfc9691460d06f1ad00609e31a17842f952b87641e"
+    },
+    {
+      "path": "03_paper_repo_pairs/R03_SkillOpt/repo/pyproject.toml",
+      "size_bytes": 3259,
+      "sha256": "b6fe3c8ceea566ae8c28e94a3e33807e7681baf981db5fa4c580b2a4630a2056"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/PAIRING.md",
+      "size_bytes": 759,
+      "sha256": "49d1539dce69c537bd2b1d5349b320561f53b04ae215b77a2b3105bd381ef060"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/SkillOps_2605.13716v1.pdf",
+      "size_bytes": 1594213,
+      "sha256": "b56e5f031d1ee2a480e2b21d840755ad894cf7d10936d8bf0ac7f384cbdefbfc"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/repo/LICENSE",
+      "size_bytes": 1073,
+      "sha256": "2d7d534755621c604be93c2d189ccc85fbcdebb0bfcd5f4c7a0c3b07c2c6d075"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/repo/README.md",
+      "size_bytes": 8777,
+      "sha256": "e122c32db1647fe108f2323c30f0631cc84028f5b082bea05552f44340fb38dd"
+    },
+    {
+      "path": "03_paper_repo_pairs/R04_SkillOps/repo/pyproject.toml",
+      "size_bytes": 1011,
+      "sha256": "ad33dc7090ea2689204984915e3df328dcf237f0c063fb7992f7277111db3aeb"
+    },
+    {
+      "path": "04_graphify/repo/ARCHITECTURE.md",
+      "size_bytes": 17120,
+      "sha256": "f557f8a32516a30b3bd3073c2321fe466c6ac9add2756bce2ea4bacddb9146a3"
+    },
+    {
+      "path": "04_graphify/repo/BENCHMARKS.md",
+      "size_bytes": 8887,
+      "sha256": "51cc92d5b6cb38f25869cc4d5447f42554c85601dadead48b30ce5b10fdd04ad"
+    },
+    {
+      "path": "04_graphify/repo/LICENSE",
+      "size_bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "04_graphify/repo/LICENSE-MIT",
+      "size_bytes": 1068,
+      "sha256": "36ecff6bbb97aca1be64e95f42538cf796adde5864edac583e620643c096931a"
+    },
+    {
+      "path": "04_graphify/repo/NOTICE",
+      "size_bytes": 335,
+      "sha256": "3448ea175bba09f6fed8a743000139fb4c7112de83f164355b5540b158576621"
+    },
+    {
+      "path": "04_graphify/repo/README.md",
+      "size_bytes": 40152,
+      "sha256": "f6d12f50ecd8f0c873af88ea8ef84a989101919ae531dd3cf404273d288d0562"
+    },
+    {
+      "path": "04_graphify/repo/pyproject.toml",
+      "size_bytes": 10337,
+      "sha256": "118f25e6efdab8f586d26dbe51af22482a62768b7a636b4c40d5eb65251e5626"
+    },
+    {
+      "path": "05_npg_evidence/CI_Evidence_Scope.md",
+      "size_bytes": 1377,
+      "sha256": "6996b87781431b2b9b998346d4b24c6fb328364e0ef63649303013914e90d5d6"
+    },
+    {
+      "path": "05_npg_evidence/CI_Jobs.json",
+      "size_bytes": 5189,
+      "sha256": "ab867777c3c89739e26cfb7b12dee6b02841645478b0aa9dd4e626c9b6847fa7"
+    },
+    {
+      "path": "05_npg_evidence/CI_Run.json",
+      "size_bytes": 16374,
+      "sha256": "79ebb86e3ae6a8d1c51003bb6d342f5381938efe1a4a2215b93f05d4a87edba5"
+    },
+    {
+      "path": "05_npg_evidence/NPG_Design_Operations_Guide.docx",
+      "size_bytes": 2438851,
+      "sha256": "e7a1dba44aa2b90826d14be02046d31a5af66a08c9a9f709ada951cce73e8a4c"
+    },
+    {
+      "path": "05_npg_evidence/Node22_Job.log",
+      "size_bytes": 704924,
+      "sha256": "ead9c8e0800d28a626fadae268bd3e59ebdbcbcf868f246a48c9d193ef2ca4b8"
+    },
+    {
+      "path": "05_npg_evidence/Node24_Job.log",
+      "size_bytes": 235078,
+      "sha256": "5c8c4482bc1e710606d467a0c2f0d70e31f197ce21ee566297938fb49c012cab"
+    },
+    {
+      "path": "05_npg_evidence/ci.yml",
+      "size_bytes": 2528,
+      "sha256": "4895d8afb58db8249104e92e66bee526239510549cd13c3ed1b5b78efd2a2932"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/AGENTS.md",
+      "size_bytes": 1554,
+      "sha256": "520a26595d8d200864a7b2925086dce0546a363cbf8e53826dd6a598f1b9f647"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/AUTOMATIC_FOLLOWTHROUGH.md",
+      "size_bytes": 21537,
+      "sha256": "299841daf91e6783606369a2b55b6e7d6a76e31d1c3a0faa1dac8af54766ab63"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/CENTRAL_SCHEDULER_MIGRATION.md",
+      "size_bytes": 4293,
+      "sha256": "8e30ff126a01e2c899917695eee581518815ccc72cd50ee042776cd748183ea5"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/OPERATIONS.md",
+      "size_bytes": 16399,
+      "sha256": "309f1bc299c0c4748ec29e4b661528b1fa6a33e91029b724fe99fbd16982043f"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/README.md",
+      "size_bytes": 43432,
+      "sha256": "60d88dfbc5cd8633dea15890604168735751a050a94e75a2001d163d951777fb"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/REVIEW_TIMEOUT_VERIFICATION.md",
+      "size_bytes": 4283,
+      "sha256": "4f74d7523b88cb156ef16f66bcb2bd5f6c8e80ac8615a7df7375ac40ca05d755"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/SOURCE_REVIEW_BOOTSTRAP.md",
+      "size_bytes": 3252,
+      "sha256": "6cd56399f2910720063e6c4556b1c875412014b8128d0bab455ae09320859dc4"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/VERIFICATION_20261012.md",
+      "size_bytes": 4372,
+      "sha256": "12b12abc32ba342a6f82924c2b61adbc7dc9c027d59a19d2ac132242b939bb75"
+    },
+    {
+      "path": "05_npg_evidence/repo_documents/repo/VERIFICATION_20261020_OPERATIONS.md",
+      "size_bytes": 2101,
+      "sha256": "f882ea84eabdbcaa426d57dc49abe11e31308b562a2cae9ef12a4f1626b3954f"
+    },
+    {
+      "path": "06_remaining_checks/Runtime_and_Operational_Probe_Checklist.md",
+      "size_bytes": 2672,
+      "sha256": "c664d882dd9477efeaf080012bd15c1ad09feb187b6574ef1e85c58df83759ac"
+    },
+    {
+      "path": "07_supporting_research/FoundationDB_SIGMOD21.pdf",
+      "size_bytes": 1053117,
+      "sha256": "ce786e9965dbc04f3e5ae1d57d6a895ee2dafb1b89f8f9c82355502895562b26"
+    },
+    {
+      "path": "07_supporting_research/References.md",
+      "size_bytes": 1270,
+      "sha256": "eb2ae7b34b225a540dca1eb6d59c18a6b340172aa7ac927d221149bb8a242588"
+    },
+    {
+      "path": "Console_Coordinator_Architecture_v1.3.dot",
+      "size_bytes": 3048,
+      "sha256": "0f63bea8d1144597cf36c8d3b0127ccc328571ec38962ea7cbb09cdd98cf4004"
+    },
+    {
+      "path": "Console_Coordinator_Architecture_v1.3.png",
+      "size_bytes": 240572,
+      "sha256": "d6edf8334685526799fd80beaaa3b821a7864d4e3b882e6aeab86e0b2488eda7"
+    },
+    {
+      "path": "Console_Coordinator_Architecture_v1.3.svg",
+      "size_bytes": 18319,
+      "sha256": "ba24cca52bbf40831a9eb3d739726dd966ce7f75d4fd62b9b98003d365c3890d"
+    },
+    {
+      "path": "Console_Coordinator_Followup_Experiments_v1.3.md",
+      "size_bytes": 26360,
+      "sha256": "a41594a957642fd6793ed92328efb5a4104d72df1372847833c47bd14e240758"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.md",
+      "size_bytes": 38063,
+      "sha256": "0663e816ae4a5c2a39d26517d7d8d32d1fc6f19cca617ea58a9125c9df96e825"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Validation_Plan.md",
+      "size_bytes": 176892,
+      "sha256": "1b697f70ce667fe3d58d6f91370228a5d744a30f8f397e8924e2917bfb9c32d8"
+    },
+    {
+      "path": "Console_Coordinator_Sprints_v0.json",
+      "size_bytes": 172047,
+      "sha256": "a7d26dd685fc44cb632d0781080a5db9707e8d15584c76dccdd593e222730493"
+    },
+    {
+      "path": "DEV_AGENT_HANDOFF.md",
+      "size_bytes": 13038,
+      "sha256": "0b3b72e19d7dd2430593f888c31ca30aca63d8fa210953dbbabbc8a07826e220"
+    },
+    {
+      "path": "Followup_Execution_v1.3.json",
+      "size_bytes": 4658,
+      "sha256": "2b92b0afc59146f0448f725f793a1778add5a320af51e0f3f50055580269d5f0"
+    },
+    {
+      "path": "PAPER_REPO_MAPPING.md",
+      "size_bytes": 1900,
+      "sha256": "970e2d237c53829cd9f868a3015de7d5e48bbd45dd77437f82c64624c230b035"
+    },
+    {
+      "path": "ProgressReport_v0.schema.json",
+      "size_bytes": 4971,
+      "sha256": "115519465b79d07aeb86be3b343b595c361b6208787e3c8034f7a3f9ddea05da"
+    },
+    {
+      "path": "REPORTING_REVIEW_NOTES.md",
+      "size_bytes": 3258,
+      "sha256": "25fb4b882812144102381797f1642a502e41511162a69d24a943f6188773f1df"
+    },
+    {
+      "path": "SprintSpec_v0.schema.json",
+      "size_bytes": 10591,
+      "sha256": "b50f75bce79d7435f8963cc4d9758a64ee4c409a7972d015283432644a0ee78e"
+    },
+    {
+      "path": "Technical_Dependencies_v1.3.json",
+      "size_bytes": 7556,
+      "sha256": "91023aef8cc9b4b925ea2e49f6e6e57a4076cb966cd2b14d6c6b7c3c3b9484df"
+    },
+    {
+      "path": "User_Decisions_2026-11-10.md",
+      "size_bytes": 903,
+      "sha256": "267bef353632495b9c54718dc8d44ab1e65f2e208de6ba16a59e5e73c476be3d"
+    },
+    {
+      "path": "V1_2_PACKAGE_VALIDATION.json",
+      "size_bytes": 610,
+      "sha256": "6046a1c8172cacf12787317be7c58f946c5a6cc6f4e262372b7ceb7de5197a8c"
+    },
+    {
+      "path": "V1_2_PAPER_REPO_MAPPING.md",
+      "size_bytes": 1716,
+      "sha256": "56f2c52b483062e7e979da31521745b6304eca4d1dc37305a0f8f4514b6d0ee6"
+    },
+    {
+      "path": "V1_2_SOURCES.json",
+      "size_bytes": 22157,
+      "sha256": "304587ad746409b48f3cff172e8e5458858bb7de524f72e36f0c529a588257a2"
+    },
+    {
+      "path": "V1_3_Changes_and_Validation.md",
+      "size_bytes": 15051,
+      "sha256": "11ee07a61b86effd63ac25f053602c5f4e46191c07ba8669801b1c26c04240c2"
+    },
+    {
+      "path": "progress/README.md",
+      "size_bytes": 632,
+      "sha256": "33def1ad8b7deb2abbb03a7056dc71050504a4637ed80702d1dbff08b539b228"
+    },
+    {
+      "path": "progress/RESULTS.md",
+      "size_bytes": 5604,
+      "sha256": "9e46e8eeea78a15907f33b06799dc03db69a2b142beb70c75dd29180c80021f0"
+    },
+    {
+      "path": "progress/RESUME.md",
+      "size_bytes": 908,
+      "sha256": "9ff0790e105cb6f1ddb15cf398216f465c73ea758ef139275cddb0733e290679"
+    },
+    {
+      "path": "progress/STATUS.md",
+      "size_bytes": 2788,
+      "sha256": "386f428cf6b4d1c2e2f43f5b399e798496cff269cb2c501270e4699fc2cb18b6"
+    },
+    {
+      "path": "progress/TASKS.md",
+      "size_bytes": 11098,
+      "sha256": "442a416d0e3f9d21a025bd04eb6dacddd1450372eb48256d3a203341e0dbee9c"
+    },
+    {
+      "path": "progress/events.jsonl",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "progress/state.json",
+      "size_bytes": 47189,
+      "sha256": "b0ed22c81a305899981e3a632eb9a7bbac7e6c35c5fa5df0adf36ffe126aa7e5"
+    },
+    {
+      "path": "reports/README.md",
+      "size_bytes": 1139,
+      "sha256": "68facc9d1394627d3ba0606254b16391a450fedf31715839a68940b27fd77d64"
+    },
+    {
+      "path": "reports/templates/CONVERSATION_UPDATE.md",
+      "size_bytes": 712,
+      "sha256": "3d7806a1ab646face67822be2364f3a57313e963bc875f5a6c20a5066dc858d2"
+    },
+    {
+      "path": "reports/templates/EXPERIMENT_REPORT.md",
+      "size_bytes": 1410,
+      "sha256": "1c646f7c4482e19f98b2ffc3ca2805bdebb7c34c7a2d30c073c474915ef50cb5"
+    },
+    {
+      "path": "reports/templates/STOP_AND_RESUME.md",
+      "size_bytes": 698,
+      "sha256": "cbe28ba9977007f62e242c7cd5f04ea5411b6c6da2382ea043b7a393598b3f91"
+    },
+    {
+      "path": "reports/templates/TASK_REPORT.md",
+      "size_bytes": 1210,
+      "sha256": "9b8fbfebfc2ece3f5c7a933bf6e3feb09e1ca2b91c36455cd0e264b3dcb3a207"
+    },
+    {
+      "path": "reports/templates/result.template.json",
+      "size_bytes": 930,
+      "sha256": "497443e15dfbc4510b9b6f5f3774c2ff741f84e1da795a82c91750c6f90588a5"
+    },
+    {
+      "path": "v1_3_1_reporting_check.json",
+      "size_bytes": 886,
+      "sha256": "5b359900ee9e4062d4d8b991c3c51c5f2ec535baa5b93c948fe021f0a4271595"
+    },
+    {
+      "path": "v1_3_structure_check.json",
+      "size_bytes": 2137,
+      "sha256": "e54e05c962d07a7d96b40ced198d012611ee5a59b4b661129c67118b72edff86"
+    }
+  ]
+}

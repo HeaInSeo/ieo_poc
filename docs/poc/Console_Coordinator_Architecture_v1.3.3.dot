@@ -1,0 +1,41 @@
+digraph Console {
+ graph [rankdir=TB, newrank=true, bgcolor="#f5f8fc", pad="0.4", nodesep="0.4", ranksep="0.65", fontname="Noto Sans CJK KR", label="Console 코디네이터 · v1.3.3\nrepo당 개발 Pod + Guardrail Pod · 각 컨테이너 하나", labelloc=t, fontsize=23];
+ node [shape=box, style="rounded,filled", color="#9db3ca", fillcolor=white, fontname="Noto Sans CJK KR", fontsize=15, margin="0.2,0.15"];
+ edge [fontname="Noto Sans CJK KR", fontsize=11, color="#506a87", arrowsize=0.8];
+ ui [label="외부 UI / PoC CLI\n명세 등록 · 판정된 보고 조회", fillcolor="#e9f3ff"];
+ coord [label="중앙 코디네이터 · 별도 컨테이너\nRust / PID 1 / 단일 활성\n배정 · 증거 대조 · 조건부 병합", fillcolor="#dbeaf9", penwidth=2];
+ db [label="외부 실행 DB\n배정 · 세대 · 사건 · 판정 · outbox", fillcolor="#e5f5ee"];
+ watch [label="외부 감시기\n별도 수명·자격 / 읽기 전용", fillcolor="#fff5dd"];
+ github [label="GitHub / 보호된 CI\n고정 SHA 독립 검토\n승인 head 조건부 병합 → main CI", fillcolor="#e5f5ee"];
+ subgraph cluster_repo {
+  label="repo A 예시 · 공통 repo 라벨로 조회/관리 · 다른 repo도 같은 경계"; color="#8ba5c8"; style="rounded,filled"; fillcolor="#edf2fb"; fontsize=17;
+  subgraph cluster_dev {
+   label="A-dev Pod · 컨테이너 하나"; color="#658db9"; style="rounded";
+   ds [label="repo supervisor / PID 1\n개발 역할만 기동·복원·종료",fillcolor="#dce6f6"];
+   dev [label="개발 에이전트\n전용 UID · 파일시스템 · 자격\nREVIEW_PENDING 중 push 금지"];
+   ds -> dev;
+  }
+  subgraph cluster_guard {
+   label="A-guardrail Pod · 컨테이너 하나"; color="#658db9"; style="rounded";
+   gs [label="repo supervisor / PID 1\n검토 역할만 기동·복원·종료",fillcolor="#dce6f6"];
+   guard [label="Guardrail 에이전트\n전용 UID · 파일시스템 · 자격\n승인 명세·프로파일 + 고정 SHA"];
+   gs -> guard;
+  }
+  boundary [shape=note,label="직접 통신 · 공유 RW 볼륨 없음\nS3: 두 Pod 모두 PSA Restricted\n역할별 NetworkPolicy 실제 검증",fillcolor="#fff5dd"];
+ }
+ dv [label="개발 전용 영속 볼륨\n세션 · worktree · 체크포인트",fillcolor="#e5f5ee"];
+ gv [label="Guardrail 전용 영속 볼륨\n세션 · 검토 기록 · 체크포인트",fillcolor="#e5f5ee"];
+ ui -> coord [label="인증된 API",dir=both];
+ coord -> db [label="원자 기록·대조",dir=both];
+ watch -> coord [label="관측",style=dashed];
+ coord -> ds [label="개발 배정 / claim",dir=both];
+ coord -> gs [label="검토 배정 / claim",dir=both];
+ dev -> github [label="구현 · PR"];
+ guard -> github [label="현재 SHA 검토"];
+ github -> coord [label="실제 판정 증거",style=dashed,constraint=false];
+ dev -> dv [label="기록·복원",dir=both];
+ guard -> gv [label="기록·복원",dir=both];
+ {rank=same; ds; gs;}
+ {rank=same; dev; guard;}
+ {rank=same; dv; gv;}
+}

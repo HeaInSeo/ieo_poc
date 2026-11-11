@@ -1,0 +1,60 @@
+{
+  "schema_version": "console.report.v0",
+  "contract_revision": 4,
+  "event_id": "FIXTURE-coordinator_verdict",
+  "event_revision": 1,
+  "sprint_id": "FIXTURE-SPRINT",
+  "sprint_revision": 4,
+  "task_id": "FIXTURE-TASK",
+  "repo_id": "fixture-repo",
+  "assignment_id": "fixture-assignment",
+  "generation": 1,
+  "actor": {
+    "role": "coordinator",
+    "name": "fixture-coordinator_verdict"
+  },
+  "observed_at": "2026-11-12T00:00:00+09:00",
+  "channel": "coordinator_to_client",
+  "evidence_level": "verified",
+  "phase": "개발",
+  "operational_state": "작업 중",
+  "reason_code": null,
+  "evidence": [],
+  "unknown_facts": [
+    "설명용 fixture이며 실제 실행 증거가 아니다."
+  ],
+  "affected_tasks": [],
+  "next_action": "설명용 다음 행동",
+  "next_owner": "fixture-owner",
+  "resume_condition": null,
+  "next_check_at": null,
+  "decision": {
+    "required": false,
+    "question": null,
+    "options": [],
+    "recommendation": null,
+    "deadline_at": null,
+    "default_action": "현재 승인 범위 유지"
+  },
+  "schedule": {
+    "deadline_state": "undecided",
+    "deadline_at": null,
+    "status": "unassessed",
+    "remaining_tasks": null,
+    "remaining_reason": "설명용 표본",
+    "delay_reasons": [],
+    "affected_tasks": [],
+    "forecast": {
+      "state": "unestimated",
+      "completion_range": null,
+      "evidence": [],
+      "reason": "과거 실측 없음"
+    }
+  },
+  "report_type": "coordinator_verdict",
+  "body": {
+    "evidence_comparison": "설명용 대조 결과",
+    "affected_tasks": [],
+    "next_owner": "fixture-owner"
+  }
+}

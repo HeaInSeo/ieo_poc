@@ -1,0 +1,37 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": false,
+  "plan_version": "v1.3.3",
+  "task_id": "01-01",
+  "run_id": "scope-20261112",
+  "revision": 1,
+  "actor": {
+    "role": "design",
+    "name": "현재 설계 에이전트"
+  },
+  "observed_at": "2026-11-12T07:18:49+09:00",
+  "execution_kind": "local_design_scope",
+  "execution_state": "작성·검수 완료",
+  "verdict": "PASS",
+  "verification": {
+    "level": "verified",
+    "reviewer": "별도 범위 검토 세션",
+    "evidence": [
+      "reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md",
+      "validation/review_v1.3.3.md"
+    ]
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "대화 내 문서 조사/작성 비용의 역할별 원시 계측을 확보하지 않음"
+  },
+  "unresolved": [
+    "실제 repo URL·런타임·인증·표본·기한의 후속 작업 바인딩"
+  ],
+  "next_action": "01-02 런타임 후보 사용자 선택 후 계약 확정",
+  "evidence_refs": [
+    "reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md",
+    "validation/review_v1.3.3.md"
+  ]
+}

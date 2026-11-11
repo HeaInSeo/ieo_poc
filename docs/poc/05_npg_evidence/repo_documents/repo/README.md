@@ -1,0 +1,669 @@
+# Notion projection guard
+
+The [R1 sprint](SPRINT_R1.md) separates current Sori recovery from subsequent
+Operator restart and wiki adoption. The [saved-ACK case bridge](ACK_CASE_RECOVERY.md)
+is a reviewed-source candidate for verifying a stopped successful successor
+dispatch without replacing the pinned installed runtime or resending its request.
+Source tests are not production admission or a worker CLAIM.
+
+## One-case successor after an unwritten admission stop
+
+`authorize_case_successor` accepts explicit check-only/apply for one separately
+approved supplement. The original exception manifest, C classification, unknown
+application, retired authority, packet and closed transaction remain unchanged.
+Its sole predecessor must have an exact unsent terminal audit, `next=0`, no
+ticket, dispatch attempt, provider result or verification. The new ID must be
+unused and its edits must have the identical approved plan hash. It is an
+authorization for one new attempt, not a replay or successful application.
+
+The supplement pins the original journal and predecessor, complete reference
+pages, exact source head and replacement controls. All fresh full bodies,
+properties and revisions must match. Only the broker, runner, case controls and
+their three-line checksum may change; original control bytes are preserved in
+pinned backups. Hooks, policy and permissions stay pinned. Explicit operational
+approval retains the original uncertainty and the 30-second freshness and
+15-second send bounds. The supplement audit is saved before its one canonical
+pointer; an exact restart can complete that commit, while a second successor,
+positive send evidence or changed data is refused.
+
+The central callback finishes its canonical RPC before observing prerequisites.
+The runner collects bounded metadata replies directly, keeps full page requests
+off prompt matching, and never resends a request after a lost reply. Validate the
+entire full-sized MCP round trip in an isolated provider test before operation;
+small proof tests do not establish this. Admission still requires complete
+verification, then a fresh real own CLAIM with its existing timestamped
+`HELD until …` or `ACTIVE until …` lease. No test result creates that CLAIM.
+
+## Unwritten PREPARED MCP initialization recovery
+
+The explicit same-batch recovery accepts the exact recorded
+`McpServerError: MCP server is not initialized; send initialize and notifications/initialized before operational requests`
+remote failure only when the durable halted phase is `PREPARED`. It reuses the
+prepared native-read recovery's immutable plan, original ticket/snapshot, prior
+full receipt fingerprints, journal equality and orphan-evidence checks. The
+pending fresh full body, properties and revision must equal the saved preimage.
+Recovery restores only `PREPARED`; it does not acknowledge a write, advance an
+index or send a Notion request. `WRITE_PENDING`, uncertain/async outcomes,
+missing phase and similar error strings remain blocked. The audit retains the
+original error as an MCP initialization failure, without inventing an action or
+HTTP status. Ordinary authorize, one generated mutation and full verify still
+follow recovery.
+
+`reconcile_bori_prepared_mcp.cjs` is a separately reviewed helper for the exact
+`BORI-AUTH15-DRIFT-REPAIR-20261022` incident while that batch prevents a normal
+runtime upgrade. It checks the installed broker/runner/policy and approved
+manifest hashes and the exact original private installation receipt **before
+loading the installed legacy Broker**. The adjacent new broker is never imported
+or installed. The receipt's source and reviewed release, unchanged policy/service
+flags and after-hashes must match the fixed reviewed values. The helper pins the
+entire original journal, five-edit
+plan, next=4, PREPARED halt, error, ticket and snapshot. It requires five fresh
+complete native reads in original edit order: the first four must equal their
+full verified bodies, properties and revisions; the last must equal its full
+saved preimage and revision. Any runtime, policy, journal, evidence or page drift
+rejects recovery. Fixtures contain only synthetic page data.
+
+Run the helper from its reviewed immutable source tree with `--check-only`
+(also the default), passing the ordered array of full native fetch responses as
+one private JSON line on stdin. After independent review and normal landing,
+explicit `--apply` saves the complete original journal and fresh reads privately
+before restoring `PREPARED`. It preserves active, next=4, all edits, the original
+receipt and four verified receipts. It makes zero Notion writes, ACKs and page
+advances and does not replace any runtime, policy or manifest file. An existing
+audit, including one left by a failed restoration, blocks replay and requires
+separate reconciliation. Normal and rejected-input CLI exits close the broker lock.
+EOF before evidence produces an explicit failure and nonzero exit. Additional
+lines already buffered with the evidence are rejected before application. One
+complete evidence line receives a result without waiting for stdin to close.
+
+The explicit apply result includes `restoration.journalHash` and
+`restoration.auditHash`. Preserve that exact receipt and pass it as
+`config.restoration` to `continue_bori_prepared_mcp.js`. Configure its unchanged
+pinned runner to start this same reviewed incident helper with
+`--serve-continuation`. The bridge loads the pinned installed legacy Broker; it
+does not replace runtime files or permit a new batch.
+
+The continuation fresh-reads all five pages for an explicit restored-proof
+handshake and then fresh-reads every page again for authorization. It does not
+reuse prior-page responses from the handshake. The legacy broker alone rejects that handshake.
+The bridge rechecks the returned journal/audit hashes, original immutable journal,
+full restored plan, ticket, all four prior receipt fingerprints and the five full
+page proofs under its broker lock. It repeats those checks synchronously
+immediately before calling the legacy broker's ordinary authorize. Changes in the
+gap between helper restoration, handshake and authorization therefore fail before
+any Notion mutation. The final pending read must also match the verified preimage.
+
+Only the last target then follows ordinary authorize → one generated mutation →
+ACK/async handling → full verify → finally close. Native fetch, ACK/async and
+full-verification functions remain verbatim from the pinned runner and are checked
+by regressions. No mutation, ACK or page advance is replayed. Any failure retains
+the ordinary pending/HALTED barrier and closes the broker. After completion,
+validate the complete projection. A newer runtime may be installed only after
+canonical active is null, following [OPERATIONS.md](OPERATIONS.md).
+
+## Bounded recovery status
+
+`broker({action:'status', batchId})` returns the actual active ID and only the
+selected batch's plan, edits, index, status, receipt, error and halted phase.
+Unrelated batches and historical audits/receipt arrays are excluded. Invalid or
+nonexistent selected IDs fail closed; choosing a different existing batch preserves
+the real
+active ID so ordinary recovery identity checks still reject it. All three runner
+recovery entry points use this form and retain their existing `finally` close.
+Unscoped `status` keeps its historical full-journal behavior and may exceed a
+connector's response limit. Direct `runner.broker` callers must explicitly close
+the broker in `finally`, including when inspecting bounded status.
+
+## Exact NodeKit pointer rendering incident closure
+
+`reconcile_nodekit_pointer_partial.cjs` is restricted to the five-page
+`NODEKIT-CLI-UF-CLAIM-POINTER-20261021T0817Z` incident. It pins the original
+HALTED plan, ticket, both private snapshot files, installed broker/runner/policy,
+and the exact original, planned and serialized central literal hashes. The
+first page's entire protected prefix, suffix and properties must remain equal;
+its fresh full body/properties/revision must equal the saved unexpected readback.
+All five ordered fresh pages are required, and the four unattempted edits must
+still pass the current owned-section planner. Any future prepared/verified
+evidence, runtime drift, concurrent page change or production hold rejects it.
+
+The helper defaults to check-only. After independent review, an explicit `--apply`
+would save the complete original journal and fresh reads privately and close
+only this incident as `RECONCILED_PARTIAL`. It retains next=0, ticket, error and
+the immutable plan; it makes zero Notion writes, acknowledges zero writes and
+advances zero pages. The original misrendered write is not product acceptance
+or a complete projection. The remaining four edits are never replayed. A new
+complete observation must use current authority and the ordinary guarded path,
+using the required plain observation marker and the prewrite serialization checks below. No normal verifier,
+runtime installation, policy or worker evidence changes are part of this helper.
+A crash after the private audit is saved remains blocked for reconciliation;
+the audit must not be removed to retry. Run its synthetic tests with
+`node --test test_nodekit_pointer_partial.cjs`; no private page content is checked in.
+
+See [the reviewed two-stage recovery procedure](VERIFICATION_20261021_NODEKIT_POINTER.md)
+for immutable source pins, closure-before-upgrade ordering and deployment limits.
+
+## Source and installed version
+
+The source repository is `HeaInSeo/notion-projection-guard`. Runtime, tests and
+incident helpers preserve the immutable import; later operational updates have
+explicit code pins in the provenance verifier. See [MIGRATION.md](MIGRATION.md)
+for the 35-commit history map, legacy installation provenance and source cutover.
+Run `node --test test_guard.cjs test_runtime.cjs test_revision.cjs supervision_gate_cases.cjs serialized_format_cases.cjs test_nodekit_pointer_partial.cjs`
+on Node 22 or 24.
+
+[OPERATIONS.md](OPERATIONS.md) records the public/private storage boundary,
+deployment procedure, reusable supervisor/watch modules and offline version check.
+The recorded installed broker/runner come from full commit
+`01b8a7897bc8709450f536744577313c805c66ca`; see
+[the runtime manifest](deployment/runtime-01b8a789.json). A later documentation or
+verification-tool commit does not change that approved installed source version.
+
+## Complete repository observations
+
+`complete_projection.js` is the Code Mode entry point for these observations.
+It requires a fixed manifest: both native central metadata records, the repo
+index, both role queues, Router, hub and dashboard. Sori also requires its two
+already approved native central body sections. A combined observation therefore
+has nine body targets and four metadata targets. Missing or duplicate targets,
+wrong headings or different observation IDs reject before the body runner starts.
+
+Evaluate the file as a function expression and call
+`createCompleteProjection(tools, {createRunner, runnerConfig}).run(bundle)`.
+`createRunner` and `runnerConfig` remain the separately approved pinned runner
+and canonical broker command. The bundle contains `observationId` (ASCII letters,
+digits and hyphen), explicit `observationMarkerStyle: 'plain-v1'`,
+`repositories` (`nodekit`, `sori` and/or `bori`), ordinary `edits`, and
+`native: [{pageId, properties}]`. Each new body literal and native `큐 정리 근거`
+uses the identical plain prefix `observation-id: ID;`. Markdown markers are no
+longer admitted for new projections;
+native expectations include 작업 상태, 다음 담당자, 큐 구획,
+차단 대상, 재개 지시 and 큐 정리 근거; only central metadata keys are accepted.
+
+First check the canonical journal and authority, then reconcile native properties
+using the existing minimal property-only preservation procedure. The entry point
+does not write properties, worker proof or policy. It requires their fresh values
+before any body write and verifies all complete bodies/properties after the
+ordinary durable body batch. Only this final readback returns `COMPLETE`.
+`COMPLETED` from a caller-selected broker batch is insufficient. A concurrent own
+event, stale property, unknown read or uncertain write produces no completion
+certificate; preserve existing writes and re-observe rather than rolling back.
+
+This is workflow enforcement when the supervisor uses this entry point, not an
+access-control claim that it cannot invoke a different connector. Adoption must
+be recorded in the actual supervisor prompt and verified on real observations.
+
+## Successor and concurrency accounting
+
+Use one repository per ordinary observation: NodeKit needs body6/native2 and
+Sori body8/native2; BORI uses only the five existing shared bodies plus its
+exact O6 writer/pair native records (body5/native2). No BORI source body is
+authorized for mutation, and broker policy scope is unchanged. Every profile
+includes all shared projections. A busy unrelated worker
+does not defer these decisions. The canonical broker's global pending barrier
+continues to apply. Combined observations remain supported for an actually
+inseparable event, not as the default waiting policy.
+
+Evaluate `supervision_gate.js` as a function expression and call the returned
+`assess(snapshot)` before ending supervision. Its version-1 input contains a fresh
+UTC `observedAt`, `canonical: {active, nonterminal}`, `previousPending`, and
+`events`. Event and carried pending repositories must be `nodekit`, `sori` or `bori`,
+matching the complete projection manifest. Each event binds `repository` to a source (actual `MERGED` PR with full
+head/merge SHAs and timestamp, or an own `RELEASE` identity), canonical
+`expectedSuccessors`, complete projection certificate/source key and one
+disposition per successor. `eventKey(event)` supplies the stable key. PROMOTE or
+RECIRCULATE needs a real request receipt and a task/session/time/input-bound own
+receipt; KEEP_GATED needs an explicitly unmet condition with owner/trigger/source;
+DONE needs a structured completion proof with taskId, inputKey, eventId,
+sessionId, kind RELEASE, verdict PASS, acceptanceReceipt and UTC at. Requests
+and receipts cannot predate the triggering source. RELEASE keys encode an array
+of components as JSON, so slashes in task/event identities cannot alias another
+event. An omitted prior pending event remains pending.
+Carried keys must use the exact canonical encoding and name their declared
+repository. An active/nonterminal canonical barrier keeps the overall status
+PENDING even with no remaining source events; it never yields COMPLETE.
+Pending entries retain immutable `sourceAt` alongside `firstSeenAt`. Reobserving
+the same key must preserve that source instant, so moving a timestamp backwards
+cannot admit earlier request/completion proof. Legacy entries without sourceAt
+use firstSeenAt conservatively; an explicit malformed sourceAt is rejected.
+Pending entries also retain every known expectedSuccessors identity. Later
+observations may add obligations but cannot silently remove one; all retained
+successors still need valid dispositions. Legacy records without that list need
+explicit enrichment from their preserved canonical source snapshot before use.
+Persist the returned pending list in the existing private audit area and read it
+first next time. This check cannot discover omitted DAG successors or authenticate
+caller evidence; obtain them from current canonical documents and connector reads.
+
+`prewriteDecision(input)` allows fresh re-observation only for a known native
+preflight conflict before the body runner, bodyWrites0, all responses known,
+no registered batch and an idle canonical journal. It bounds attempts to three.
+Any unknown result, entered runner, registered batch or unresolved canonical state
+requires preservation/reconciliation. A decision is not permission to replay a
+write or bypass the approved runner. The module never mutates remote state,
+creates worker proof or declares product acceptance.
+
+## Exact transport pre-prepare closure
+
+`reconcile_transport_preprepare.cjs` handles only the recorded seven-page
+`QSYNC-20261019T132702Z-NK138-LANDED-SORI43-RECIRCULATE` incident. It pins the
+plan/error/ordered scope/runtime and verifies its first full receipt plus seven
+fresh pages. Any later snapshot, pending ticket, changed completed page, already
+written remaining literal, altered evidence or policy rejects closure.
+It defaults to check-only. Explicit `--apply` privately preserves the full journal,
+fresh sources and receipt hashes, marks only this incident `ABORTED_UNWRITTEN`
+and clears its active barrier. Its first write remains verified; the remaining
+six edits are not replayed. No Notion write, ACK, index advance, runtime replacement
+or policy expansion occurs. A new complete observation uses the normal runner.
+
+The hosted central supervisor previously called the Notion connector directly with
+a model-computed selection. On 2026-10-11T23:34Z it reported overwriting about
+4,000 characters across eleven pages. The exact faulty selection code is not
+retained in this repository, so an off-by-one or particular parser bug is not
+claimed. The observed failure mechanism is an unchecked selection followed by
+continued writes, without a durable per-page preservation barrier.
+
+`broker.cjs` now constructs the connector request. `runner.js` calls that request
+through the existing authenticated Notion connector. Neither file contains or
+extracts a Notion token. The broker uses the existing server-direct Desktop
+Commander device and its fixed approved command. No laptop hop is required.
+No Claude wrapper, timer, session, usage policy, or
+worker-owned proof is changed.
+
+## Enforced update sequence
+
+1. Bind an observation ID to exact ordered page IDs and literal edits. A prior
+   pending/HALTED batch blocks any new batch. A completed ID cannot issue a write.
+2. Fetch the entire enhanced-Markdown body and properties. Reject wrong IDs,
+   unknown/truncated blocks, unbounded/ambiguous sections and unsafe syntax.
+3. Accept a unique, single-line literal of at most 1024 characters, exclusively
+   in an explicit central observation/action/incident section. Reject headings,
+   nested headings, worker own records, synced blocks and native child blocks.
+   No offsets, ellipsis selection, full replacement, append or replace-all exist.
+4. Save the full raw preimage, body, properties, planned output and hashes with
+   private permissions, fsync, atomic rename, directory fsync and readback.
+5. Fetch again and compare body, properties and revision. Save WRITE_PENDING
+   before returning the one generated `update_content` request.
+6. Await the connector operation and any recognized async task. Fetch again.
+   Require the entire expected body and all protected prefix/suffix/properties
+   to match. Only a durable verified receipt unlocks the next page.
+7. Any discrepancy or unknown result halts the batch. Keep the preimage and
+   unexpected readback; do not rollback, blindly retry, or proceed to a new batch.
+
+This is a check-and-detect barrier, not remote atomic CAS. Notion can change
+between the final preflight and the write; exact-literal scope limits that write
+and full readback detects the change before the next page. Body hashes prove
+equality of the fetched enhanced-Markdown representation, not preservation of
+invisible native block identities. Omitted native completeness metadata is not
+invented as a positive guarantee; explicit unknown/truncation and unknown tags
+are rejected.
+
+## Hosted automation integration
+
+Fetch `runner.js` from the approved full GitHub commit, unwrap its `content`, and
+evaluate it as a function expression in Code Mode. Supply the verified fixed
+remote command and the observed Desktop Commander device ID. The generated
+request is the only Notion body mutation used by this execution path:
+
+```js
+const createRunner = Function('return ' + runnerSource)();
+const runner = createRunner(tools, { deviceId, command: approvedBrokerCommand });
+const result = await runner.run(observationId, [
+  { pageId, heading: exactFetchedCentralHeading, oldStr, newStr }
+]);
+```
+
+Create a fresh runner for each batch. One minimal literal per page per batch is
+intentional: additional edits require a new bounded batch after verified ACK.
+Never use a new batch ID to bypass unresolved state. Do not manually manufacture
+ACKs, clear the journal, or use a new state directory for a production retry.
+
+The hosted automation API currently exposes prompt/enabled/schedule updates,
+without per-task tool allowlists or routing controls. This integration changes
+the real calling path and enforces checks within it; it cannot revoke the
+automation's raw connector capability. Keep a damaged deployment paused until
+restoration and adoption are verified; the current recovery's enabled state is
+recorded separately in private execution evidence. Do not describe a prompt rule
+as capability isolation.
+
+## Deployment and recovery
+
+Source changes use the single ACTIVE PR in this repository. Hosted source reads
+use a verified full commit, never a mutable branch or tag. The original installed
+source and approval remain recorded as infra-lab `01b8a789` provenance.
+The runtime is `/home/heain/.local/share/notion-projection-guard` and durable state
+is `/home/heain/.local/state/notion-projection-guard`. Approved code/policy hashes
+are checked before starting the broker. Runtime code is 0555; policy/manifest
+0444; snapshots/journal 0600 within a 0700 directory. These modes protect against
+accidental writes, not owner/root tampering. Snapshots stay outside the public
+repository.
+
+`productionEnabled:false` is the checked-in default. Only the two explicit private
+NON-EXECUTABLE canary pages are writable under that default. The production pages
+are listed separately and stay blocked under that default even if a hosted task
+is enabled early. The existing approved runtime policy has its own pinned hash
+and private activation record; installing source does not authorize replacing it.
+Keep latest NodeKit worker receipts; a whole-page rollback to before 08:34 KST
+would erase later real worker evidence. Restoration and reconciliation are a
+separate gate, not performed by this guard.
+
+An ordinary close releases the process lock while preserving unresolved state.
+A crash can leave `broker.lock`: inspect its recorded PID on heain and prove that
+process is absent before removing only the stale process lock. Keep journal and
+snapshot files. A pending write can be reconciled read-only against its saved
+expected body; a mismatched/HALTED batch needs a reviewed bounded recovery.
+No automatic HALTED reset or rollback is implemented.
+
+### Native read failure before authorization
+
+The runner retries only a thrown/explicit failed native fetch, at most three
+read-only attempts with bounded backoff. It records page, phase, attempt count
+and the original connector errors in `readDiagnostics` after recovery, or in the
+durable `readDetail` if all attempts fail after begin. A successful but incomplete,
+wrong, concurrent or mismatched page still goes through the unchanged broker
+checks and is never converted into success by the retry loop. Mutation calls,
+unknown acknowledgements and async failures are never retried.
+
+`runner.resumeUnprepared(batchId, expectedPlanHash)` explicitly checks and applies
+the READY recovery below, then continues the original plan through ordinary
+preflight, prepare, authorization, mutation and full verification. It never
+starts a replacement batch. The method rejects a WRITE_PENDING/unknown outcome.
+
+`reconcile_unprepared_read` explicitly checks/applies only a failed native read
+halted from durable `READY`, with no receipt or pending/future snapshot. The
+original plan/error must match, all prior complete receipts must validate, and
+a fresh complete pending page must still admit the original scoped literal.
+It records a zero-write/zero-ack/zero-advance audit and restores only `READY`.
+Ordinary same-batch preflight, prepare, authorization, mutation and verification
+remain mandatory. Incomplete reads, already-applied text, policy changes,
+orphan snapshots, missing phase proof and other errors keep the barrier.
+
+The existing `runner.resume` also admits native `FETCH_ERROR`/`INCOMPLETE_READ`
+failures halted from durable `PREPARED`, retaining the exact original ticket.
+Its pending page must equal the entire saved preimage and revision. An applied
+output is refused and never replayed. The historical single-incident CLAIM40
+helper retains its original module pin; its synthetic tests use fixture pins.
+New verification receipts have full immutable fingerprints. Earlier reviewed
+arrow/applied-readback receipts can use their original bound reconciliation
+audit instead; their complete raw preimages, output, properties, revisions,
+timestamps and rendering evidence are revalidated. Only validated historical
+rendering evidence may remain beside a completed page. Untracked ordinary
+legacy receipts and unexplained orphan files remain blocked.
+
+### Unwritten authorize transport recovery
+
+JSON-line broker calls disable Desktop Commander prompt matching and match only
+the exact protocol request ID. Page JSON is never used as a prompt expression.
+
+An explicitly invoked runner.resume(batchId, expectedPlanHash) can reconcile
+only the observed DC invalid-prompt-regex failure while awaiting authorize.
+It requires the original HALTED batch, unchanged plan/error/ticket and intact
+private snapshots. All earlier full protected-content verification receipts are
+revalidated against their preimages, planned output, native raw reads and hashes.
+Those completed pages receive zero recovery writes, preserving later worker
+records without restoring old snapshots. The unwritten pending page must still
+match its entire fresh body/properties/revision preimage. An already-applied
+output, changed pending page, other transport error, lost Notion ACK, async
+failure or readback mismatch remains blocked.
+
+The broker records a durable reconciliation audit and restores only PREPARED.
+It keeps the page index, ticket, snapshots and edits; it does not acknowledge a
+write or advance the batch. The ordinary fresh authorization, one connector
+mutation, full verification and durable receipt still run for each remaining
+page. A restarted recovery must recheck all earlier durable receipts from zero.
+Use the same state directory and exact canonical batch; no journal editing or
+new batch ID is a recovery path.
+
+### Applied output after a failed revision read
+
+`reconcile_applied_readback` is a separate, explicitly invoked broker action for
+`REVISION_READ_ERROR`. Supply the original `batchId`, `planHash`, `expectedError`,
+pending receipt's `snapshotHash`, a fresh complete native `page`, and `apply:false`
+for a check before `apply:true`. It requires the entire pending page to equal
+the immutable planned output, unchanged full properties, a newer valid native
+revision, and intact raw preimages and full verification receipts for every
+earlier target. A readback mismatch, an unwritten page, incomplete reads, changed
+worker content, policy revocation or any evidence drift keeps the barrier.
+The halt must durably record `haltedFrom:WRITE_PENDING`; legacy halts without
+that authorization evidence and failures before authorize remain blocked.
+The runner classifies failed native fetches and incomplete revision/page reads
+only after its authorized update as this reason, while retaining the original
+bounded read error in the audit. Mismatches, lost mutation ACKs and broker faults
+retain their distinct causes.
+
+The action makes zero Notion writes. It durably records the exact applied-state
+proof and advances only that pending target; prior pages are never rewritten.
+The unchanged remaining plan then runs through ordinary fresh preflight,
+authorization, one mutation and protected readback. Restart after receipt
+persistence reuses only the identical recovery evidence. Ordinary `resume`
+continues to accept only its original unwritten authorize failure.
+
+The legacy CLAIM40 batch predates durable pre-halt authorization evidence. It
+cannot use the generic post-write recovery. The separately invoked
+`reconcile_claim40_superseded.cjs` is pinned to that exact batch, plan, pending
+snapshot, two original verification receipts, and complete r4 RELEASE41/PASS26
+source revisions. It checks all eight fresh targets: two durably verified
+outputs, one exact observed output with UNKNOWN original authorization, and
+five still-unprepared original literals. It closes only the obsolete CLAIM
+observation as `ABORTED_SUPERSEDED`, preserving next, pending ticket, plan and
+error. It makes zero Notion writes, acknowledges zero writes and advances zero
+pages. A durable full preimage/audit precedes closure; source, policy or evidence
+drift rejects it. A fresh observation of the newer RELEASE/PASS may follow only
+after that reviewed terminal reconciliation. This is not completion of CLAIM40.
+
+### Explicit recovery of the 2026-10-18 autolink mismatch
+
+Notion rendered one bare `package-cli.sh` in a central observation as
+`[package-cli.sh](http://package-cli.sh)`. The ordinary exact verifier correctly
+halted. It continues to reject normalization; no general readback cleanup is
+introduced. New batches reject unmarked hostname-shaped filenames and URLs
+before claiming the journal or fetching Notion. Use an explicit Markdown link;
+new inline-code literals are now rejected by the serialization-risk gate.
+Replayed legacy READY batches validate every remaining edit as well. The same
+check runs in prepare and authorize, so a saved PREPARED ticket cannot bypass it.
+
+The separately invoked `runner.reconcileAutolink(batchId, planHash,
+snapshotHash, actualHash, actualSnapshotHash)` reads Notion once and performs
+zero Notion mutations. It admits only a single-page, index-zero original
+`READBACK_MISMATCH` batch. The plan, original ticket, complete private preimage,
+complete unexpected readback and their hashes must match. The only permitted
+difference is the observed `package-cli.sh` autolink within the intended new
+literal; protected prefix, suffix and properties remain byte-for-byte equal.
+The fresh full page and revision must still match the saved unexpected readback.
+Only then does the broker save a verified receipt and reconciliation audit and
+complete that original batch. Other failures, multi-page recovery, changed links,
+concurrent worker records, tampered evidence and production holds stay blocked.
+Both recovery paths use the same canonical UUID scope check as initial admission,
+while retaining the exact original edit spelling and immutable plan hash.
+
+This entry point is never called automatically by `run` or `resume`. Its hashes
+come from a reviewed original incident, not from a replacement batch or a manual
+journal reset. A subsequent normal update still uses fresh preflight, the single
+canonical state, protected-content verification and durable ACK.
+
+### Explicit recovery of central arrow escaping
+
+A later six-page central batch halted on its first page: the connector returned
+the two plain ` -> ` sequences as ` -\> `. New writes reject plain ASCII arrows
+outside explicit links (`MARKDOWN_ESCAPE_RISK`); use `→`. New inline code is
+rejected separately rather than used as a formatting workaround.
+The ordinary verifier still requires exact equality.
+
+The separately invoked broker action `reconcile_escaped_arrows` requires that
+same six-page, index-zero HALTED plan and its original ticket, full snapshots,
+hashes and fresh revision. Only those two arrow escapes inside the intended
+central literal are admitted; properties and every protected byte must match.
+All remaining edits must pass the current policy and rendering preflight.
+The action writes no Notion content. It saves the reviewed first-page receipt
+and advances the original batch only to READY at index one. Run the unchanged
+original plan to apply its remaining five pages through normal verification.
+The audited receipt is also revalidated if a later unwritten transport recovery
+occurs, without rewriting the first page. No new batch/state, journal reset,
+general Markdown normalization, skipped page or policy expansion is involved.
+Calling `resume` with an unsupported identity leaves the current batch unchanged;
+in particular it cannot re-halt the READY batch after arrow reconciliation.
+Likewise, a rejected `run` admission cannot halt somebody else's existing plan.
+Inline code treats backslashes as literal content, including Windows paths.
+
+Run `node --test test_guard.cjs`. The suite exercises the 4,000-character range,
+tail loss, native child references, worker evidence, ambiguous scope, concurrent
+revision/properties, snapshot tampering/storage failure, lost ACK/restart,
+async failure and the actual connector orchestration's stop-before-next-write.
+
+### Exact Sori W02 central anchors
+
+The optional `centralSections` policy enables only the two legacy W02 writer and
+paired-review central headings listed in `policy.json`. The broker pins both
+page/heading pairs in code and rejects unknown, duplicate, broadened or malformed
+entries before opening state. These task pages cannot be canaries. Production
+must be enabled; the checked-in default remains disabled.
+
+These two pages receive no general heading-prefix permission, even if their IDs
+are added to `productionPages`. Their existing headings stay unchanged as stable
+anchors. No worker preflight, event, history, property, append or whole-page
+operation is supported. The same unique single-line limit, real following
+boundary, durable snapshot, fresh authorization and complete readback apply.
+Scope is checked again at prepare and authorize, including a prepared ticket
+reopened after the opt-in is removed or production is disabled. A rejected ticket
+stays blocked; no journal reset or replacement batch bypass is introduced.
+
+For activation, keep the existing canonical state and all runtime policy values;
+add only the two exact `centralSections` entries. Verify the candidate with a
+separate non-production test state, inspect that the canonical journal is idle,
+and acquire its existing broker lock before replacing approved runtime files.
+Keep an exact private backup and hash manifest. Stop on a busy lock or source
+change. Re-run file hashes and test rejection paths before any live write, then
+verify the two actual complete page readbacks. Test fixtures are not worker
+receipts or product acceptance, and full fetched equality is not atomic Notion CAS.
+
+`reconcile_w02_prewrite.cjs` is a separately invoked, single-incident recovery for
+the W02 projection batch halted before its first prepare when Notion stored a
+queue-cleanup timestamp at minute precision. It pins that batch, plan, error,
+zero-progress/no-ticket state, absence of prepared snapshots, the completed
+two-source batch and its full durable receipts, and exact fresh native values.
+It acknowledges no write, advances no page and emits no Notion request. A private
+audit restores only READY on the same plan, after which ordinary fresh prepare,
+authorization and full readback still apply. `--check-only` changes no journal.
+Any other incident, body/worker-property drift or prepared write remains blocked;
+the normal broker verifier admits no timestamp or content normalization.
+
+### Explicit recovery of the 2026-10-19 preflight connection failure
+
+`reconcile_preflight_connection.cjs` is a separately invoked, single-incident
+recovery for `QSYNC-20261019T0245Z-SORI40-LANDED-RWC1-ACCEPTED-NK138-CODEX-RUNNING`.
+That immutable nine-page batch halted with exactly
+`REMOTE_ERROR: McpServerError: Connection failed.` after one verified page and
+before preparing page two. The recovery requires next=1, no pending ticket,
+no pending snapshot/readback, the pinned plan and unchanged approved runtime.
+It validates the first page's complete durable snapshot/receipt and its fresh
+body, properties and revision. All nine fresh ordered reads must be complete;
+each remaining page must still have the unique original literal and no planned
+output inside the exact policy-authorized central section.
+
+The helper emits no Notion request, acknowledges no write and advances no page.
+`--check-only` leaves the journal unchanged. Explicit application saves a private
+full audit, keeps the original plan/error/next/ticket and restores only READY.
+The unchanged approved runner then executes the original batch, starting at
+page two, through ordinary prepare, fresh authorization and exact full readback.
+The already verified first page is never written again. Other errors, identities,
+prepared writes, changed receipts/pages, scope removal and unknown results stay
+blocked. No runtime broker, runner, policy or verifier normalization is added.
+Live pages and receipt copies remain outside the repository.
+
+### Explicit closure of the 2026-10-19 stale Router preflight
+
+`reconcile_router_stale_prewrite.cjs` is a separately invoked, one-incident closure,
+not an ordinary broker action or a general HALTED reset. The final Router edit
+in `QSYNC-20261019T082053Z-SORI42-RELEASE-ADMISSION` matched zero old literals:
+the actual central field contained additional retained text. No final-page
+snapshot, ticket or authorization existed. Its proposed REVIEW_REQUESTED state
+was subsequently superseded by the existing paired worker's real RELEASE v12.
+
+The helper requires the exact original five-page plan/error/next=4, all four
+complete durable snapshots and verification receipts, the original approved
+runtime/policy, five fresh ordered complete page reads, the exact reviewed
+Router body/properties/revision and the successor's own release/head. The complete
+paired worker body and revision are also pinned: retaining an old RELEASE while
+appending a later CLAIM/HOLD or moving its JSON to quoted history rejects closure.
+Later worker records on other completed pages are saved and never rewritten. Any prepared
+final-page evidence, unknown ACK, changed scope or receipt, concurrent Router
+change, absent successor release or production hold rejects the closure.
+
+Default invocation is check-only. Explicit `--apply` first saves the full original
+journal and fresh reads privately, then records `ABORTED_UNWRITTEN` on that
+original batch and releases its active barrier. The immutable plan/hash,
+next=4, original error, null receipt, other batches and earlier evidence remain
+unchanged. It performs zero Notion writes, acknowledges zero writes and advances
+zero pages; this status is not COMPLETED. Replaying the old plan cannot write.
+A fresh, bounded central observation must use the latest worker/GitHub source
+and the ordinary broker's preflight/write/full-readback/ACK path after closure.
+No runtime broker/runner replacement, policy expansion or new state directory
+is involved. A crash after the private audit but before closure remains blocked
+and requires separate reconciliation; do not delete that audit to retry.
+
+
+## Inline field boundaries and whole-batch preflight
+
+The broker now rejects incomplete backtick spans in old and new literals. The
+planner also checks each selection against the complete owned central section, rejecting
+an edge inside an existing span. Escaped ticks outside code and literal backslashes
+inside code remain distinct. Delimiter state carries across preceding lines so
+two multiline spans cannot be mispaired on the selected line. Heading discovery carries the same state from before the section: an apparent
+central heading inside a multiline code span grants no ownership.
+Native structural tags and closing fences must occupy their own line; trailing
+text cannot hide a new span. Ordinary text inside containers shares the lexer.
+This is a conservative editing grammar, not a general Markdown normalizer. The exact verifier remains unchanged.
+
+The runner validates admission without claiming a journal batch, then preflights
+all remaining complete target pages through that planner before `begin` or any
+Notion mutation. Each ordinary prepare/authorize repeats the check on fresh reads.
+A bad later selection therefore produces zero writes and no new HALTED batch.
+This is required for both direct guarded updates and the complete-manifest entry.
+Deploy the reviewed broker and runner together under verified runtime pins.
+
+`reconcile_v02_partial.cjs` is explicitly restricted to the original nine-page
+CENTRAL-20261019T153711Z-NK139-SORI43-GATES incident. It pins all eight complete
+snapshot/receipt files, the immutable plan/ticket and the single recorded central
+suffix escape, and requires nine fresh full readbacks. It never accepts that
+escape as unchanged protected content. Explicit apply saves a private audit and
+marks the same batch RECONCILED_PARTIAL, retaining next=3, ticket, error, edits
+and original planHash. No Notion write, successful ACK or page advance occurs.
+The five untouched old instructions are not replayed. A separately guarded bounded
+repair restores the original central V01/V02 fields and valid code boundaries;
+a fresh complete observation then consumes the later genuine NodeKit paired PASS
+alongside Sori's PASS. Only that full readback can establish current synchronization.
+
+## Serialized central fields
+
+Some complete Notion reads serialize an inline code annotation as
+`<code>value</code>` and an underscore in a heading as `\_`. The planner accepts
+only these narrowly observed representations: balanced, exact lowercase code
+wrappers containing plain text on the existing-literal side, and underscore
+escapes when locating an already policy-authorized heading. A selection must
+include the complete code field. Attributes, nested tags, new HTML and worker
+event syntax remain forbidden. Canonical and escaped aliases together are
+ambiguous. No body bytes, offsets, revision tokens, properties, protected hashes
+or post-write comparisons are normalized.
+
+For a new complete observation, explicit `observationMarkerStyle: 'plain-v1'`
+is required. It selects the plain prefix `observation-id: ID;` in body literals
+and native observation metadata; IDs use letters, digits and hyphens only.
+The complete new body literal and native observation reason reject backticks
+and underscores, including escaped forms. The broker repeats this check at
+batch admission, preflight, prepare and authorize, so direct calls and persisted
+pre-upgrade READY/PREPARED plans cannot bypass it. Old exported literals keep
+their exact representation. Missing style, Markdown markers, mixed styles and
+duplicate identities reject before reads or writes.
+
+This specifically prevents the two observed transformations (backticks to code
+tags, and underscore escaping). It is not a general guarantee that arbitrary
+Markdown round-trips unchanged. Explicit links retain the existing admission
+rules; every unexpected rendering/content/property difference still halts exact
+verification. No normalization or looser protected comparison is introduced.
+The helper defaults to check-only and cannot be called automatically by run/resume.
+
+## Ordinary landing follow-through
+
+See [AUTOMATIC_FOLLOWTHROUGH.md](AUTOMATIC_FOLLOWTHROUGH.md) for the additive
+scheduled projection entry, current original/pair binding, preserved case
+controls and actual successor-intake acceptance. Its installation and real
+scheduled adoption require separate evidence; source availability is not a
+runtime completion claim.

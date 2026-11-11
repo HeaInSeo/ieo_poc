@@ -1,0 +1,3 @@
+Scope: ChatGPT Work local environment only; not remote Dev Server or runtime probe.
+exit_code=0
+codex-cli 0.167.0-alpha.4

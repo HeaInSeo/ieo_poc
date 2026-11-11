@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "사람용 스프린트 입력 v0 r4",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "repo",
+    "goal",
+    "deadline",
+    "tasks"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "out_of_scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "deadline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "at",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "set",
+            "none",
+            "undecided"
+          ]
+        },
+        "at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "set"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "at": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "output",
+          "done_when",
+          "how_to_check"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "output": {
+            "type": "string",
+            "minLength": 1
+          },
+          "done_when": {
+            "type": "string",
+            "minLength": 1
+          },
+          "how_to_check": {
+            "type": "string",
+            "minLength": 1
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "expected_duration": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "min_minutes",
+              "max_minutes",
+              "evidence"
+            ],
+            "properties": {
+              "min_minutes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_minutes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "evidence": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

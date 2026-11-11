@@ -1,0 +1,43 @@
+{
+  "scope": "local progress renderer fixtures only; not runtime probe or PoC acceptance",
+  "cases": [
+    {
+      "case": "separate_initial_progress_no_combined_denominator",
+      "result": "PASS"
+    },
+    {
+      "case": "one_verified_task_preserves_followup_denominator",
+      "result": "PASS"
+    },
+    {
+      "case": "claim_cannot_become_verified_completion",
+      "result": "PASS"
+    },
+    {
+      "case": "missing_latest_report_rejected_before_view_write",
+      "result": "PASS"
+    },
+    {
+      "case": "all_runs_and_original_failed_result_retained",
+      "result": "PASS"
+    },
+    {
+      "case": "duplicate_run_revision_rejected",
+      "result": "PASS"
+    },
+    {
+      "case": "out_of_root_evidence_rejected",
+      "result": "PASS"
+    },
+    {
+      "case": "interrupted_view_reconstructed_deterministically_from_same_state",
+      "result": "PASS"
+    },
+    {
+      "case": "events_and_resume_are_derived_no_manual_copy",
+      "result": "PASS"
+    }
+  ],
+  "passed": 9,
+  "failed": 0
+}

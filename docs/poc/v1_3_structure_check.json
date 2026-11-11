@@ -1,0 +1,107 @@
+{
+  "version": "v1.3",
+  "main_sprints": 9,
+  "main_tasks": 72,
+  "main_experiments": 30,
+  "tracks": {
+    "핵심": 57,
+    "확장": 8,
+    "종합": 7
+  },
+  "execution_graph": {
+    "nodes": 72,
+    "edges": 184,
+    "cycles": 0,
+    "undefined": 0
+  },
+  "technical_graph": {
+    "nodes": 49,
+    "edges": 214,
+    "cycles": 0,
+    "undefined": 0
+  },
+  "followup_tasks": 12,
+  "followup_candidates": 5,
+  "followup_graph": {
+    "nodes": 12,
+    "edges": 18,
+    "cycles": 0,
+    "undefined": 0
+  },
+  "ancestor_comparison": [
+    {
+      "milestone": "첫 실제 PR",
+      "old_id": "04-03",
+      "new_id": "04-03",
+      "before": 19,
+      "after": 14
+    },
+    {
+      "milestone": "최소 씨앗 S0",
+      "old_id": "05-05",
+      "new_id": "05-05",
+      "before": 38,
+      "after": 24
+    },
+    {
+      "milestone": "NodeKit 실제 백로그",
+      "old_id": "07-02",
+      "new_id": "07-02",
+      "before": 41,
+      "after": 35
+    }
+  ],
+  "document_checks_only": true,
+  "schema_drafts_valid": 9,
+  "schema_ready_registration_passed": false,
+  "negative_shape_and_reference_cases": [
+    "필수 필드 누락",
+    "미바인딩 draft의 ready 전환",
+    "undefined",
+    "cycle",
+    "profile",
+    "duplicate",
+    "agent claim의 verified 형태 거부",
+    "사유/다음 확인 없는 보유 대기 형태 거부"
+  ],
+  "unchanged_main_p_blocks": [
+    "P01",
+    "P03",
+    "P04",
+    "P06",
+    "P07",
+    "P09",
+    "P10",
+    "P11",
+    "P14",
+    "P15",
+    "P16",
+    "P17",
+    "P18",
+    "P19",
+    "P25",
+    "P27"
+  ],
+  "four_research_p_blocks_byte_preserved": true,
+  "all_76_legacy_tasks_mapped": true,
+  "conditional_task_graph": {
+    "nodes": 72,
+    "edges": 189,
+    "cycles": 0,
+    "undefined": 0
+  },
+  "conditional_technical_graph": {
+    "nodes": 49,
+    "edges": 217,
+    "cycles": 0,
+    "undefined": 0
+  },
+  "markdown_tables_checked": 79,
+  "markdown_table_errors": 0,
+  "new_doc_broken_local_links": 0,
+  "original_evidence_files_preserved": 45,
+  "runtime_probes_performed": 0,
+  "poc_experiments_executed": 0,
+  "main_accepted_tasks": 0,
+  "followup_accepted_tasks": 0
+}

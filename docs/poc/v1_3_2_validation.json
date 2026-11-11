@@ -1,0 +1,112 @@
+{
+  "plan_version": "v1.3.2",
+  "main_graph": {
+    "nodes": 72,
+    "edges": 185,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "ancestor_counts": {
+    "04-03": 14,
+    "05-05": 24,
+    "07-02": 36
+  },
+  "dependency_delta": {
+    "added": [
+      [
+        "07-01",
+        "04-14"
+      ]
+    ],
+    "removed": []
+  },
+  "acceptance_changed_within_review_scope": [
+    "01-02",
+    "01-04",
+    "01-06",
+    "02-01",
+    "02-04",
+    "02-06",
+    "02-07",
+    "04-07",
+    "04-13",
+    "07-01",
+    "07-02",
+    "07-03",
+    "08-03",
+    "08-05",
+    "09-02"
+  ],
+  "schema_errors": 0,
+  "sprint_digests": [
+    {
+      "sprint_id": "POC-01",
+      "revision": 3,
+      "digest": "0bcef8ef86435c293c3b053954d849f7f526b7c313b1125ce920c1ac76a894f0"
+    },
+    {
+      "sprint_id": "POC-02",
+      "revision": 3,
+      "digest": "e1d1a5d3663725847b0aef0c53bd9c53edacc8c1f23458dbb2544affbb12de99"
+    },
+    {
+      "sprint_id": "POC-03",
+      "revision": 3,
+      "digest": "ee8ae6f6d1ec9995e8e4ecd2f613848897db0e14cd4839344d992b94783de668"
+    },
+    {
+      "sprint_id": "POC-04",
+      "revision": 3,
+      "digest": "5bcfe851d2d92d152a0f4b581948b338ad392d3fc7933651c89bccd684f02c62"
+    },
+    {
+      "sprint_id": "POC-05",
+      "revision": 3,
+      "digest": "74ddd127b335e844a7fde32de5a17c04c0958e4b6f669034cd8d588c0a5c7ddb"
+    },
+    {
+      "sprint_id": "POC-06",
+      "revision": 3,
+      "digest": "35123a11d1c7337472b1be82230b027717ef9bdbbf3ed87366d4e1dd796348e3"
+    },
+    {
+      "sprint_id": "POC-07",
+      "revision": 3,
+      "digest": "cb10aaf18e1eb5c3986dd097429c848092645460234cc42769e44f000e9fcd8d"
+    },
+    {
+      "sprint_id": "POC-08",
+      "revision": 3,
+      "digest": "b23a4423363cc2db5b79b0f29afa5b4d1957f540792c2edf785bafe2d95c12ad"
+    },
+    {
+      "sprint_id": "POC-09",
+      "revision": 3,
+      "digest": "cb5908a7000ae8341767ff209fe2965aaaa0d6ed679844b46682544e1ebe5069"
+    }
+  ],
+  "ledger_spec_match": true,
+  "technical_graph": {
+    "nodes": 49,
+    "edges": 215,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "followup_graph": {
+    "nodes": 12,
+    "edges": 18,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "initial_progress": {
+    "main": "0/72",
+    "followup": "0/12",
+    "main_experiments": "0/30",
+    "followup_candidates": "0/5",
+    "runtime_probe": "NOT_RUN",
+    "poc_execution": "NOT_RUN"
+  },
+  "generated_views_match": true,
+  "current_internal_file_links_checked": 58,
+  "source_scope": "provided v1.3.1 package + provided review + official Restricted/NetworkPolicy/conditional merge contracts; no live operations"
+}
