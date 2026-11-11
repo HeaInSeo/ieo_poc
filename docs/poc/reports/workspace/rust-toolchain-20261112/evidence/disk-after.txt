@@ -1,0 +1,6 @@
+## after
+Filesystem           Size  Used Avail Use% Mounted on
+/dev/mapper/rl-home   33G   31G  1.6G  96% /home
+/dev/mapper/rl-root   67G   53G   15G  79% /
+617M	/opt/rust/rustup
+21M	/opt/rust/cargo

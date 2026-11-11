@@ -1,0 +1,4 @@
+## before
+Filesystem           Size  Used Avail Use% Mounted on
+/dev/mapper/rl-home   33G   31G  1.6G  96% /home
+/dev/mapper/rl-root   67G   52G   15G  78% /

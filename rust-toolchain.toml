@@ -1,0 +1,5 @@
+# 2026-11-12 개발 서버 설치 실측값으로 고정 (docs/poc/reports/workspace/rust-toolchain-20261112)
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
