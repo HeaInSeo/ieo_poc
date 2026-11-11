@@ -1,0 +1,5 @@
+수동 변이 확인(2026-11-12, 로컬). 각 변이 후 `cargo test -q`, 확인 뒤 원본 복원.
+M1 순환 검사 비활성(find_cycle 결과 무시)     → FAILED 15 passed; 1 failed (dependency_cycle)
+M2 로컬 선행 plan_version 대조 제거            → FAILED 15 passed; 1 failed (prerequisite_with_wrong_plan_version_is_undefined)
+M3 digest 대조 비활성                          → FAILED 15 passed; 1 failed (digest_mismatch)
+복원 후 전체: ok 4 / 11 / 16 passed

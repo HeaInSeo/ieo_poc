@@ -1,0 +1,14 @@
+[workspace]
+resolver = "3"
+members = ["crates/ieo-spec"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+repository = "https://github.com/HeaInSeo/ieo_poc"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
