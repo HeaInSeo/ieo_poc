@@ -1,0 +1,1 @@
+d890e2fef6fa991b19cde2e608199bc1dca4e37f41f884edf8849ff693048de6  rustup-init.sh (https://sh.rustup.rs, 2026-11-12 다운로드)

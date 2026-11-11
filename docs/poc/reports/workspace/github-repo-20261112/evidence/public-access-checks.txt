@@ -1,0 +1,3 @@
+observed_at: 2026-11-11T23:50:48Z
+anonymous GET https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md -> HTTP 200
+HeaInSeo/notion-projection-guard visibility: public

@@ -1,0 +1,16 @@
+Reference ID    : C17BF302 (193.123.243.2)
+Stratum         : 4
+Ref time (UTC)  : Wed Nov 11 23:49:49 2026
+System time     : 0.000111124 seconds slow of NTP time
+Last offset     : -0.000013321 seconds
+RMS offset      : 0.000229840 seconds
+Frequency       : 3.292 ppm slow
+Residual freq   : -0.001 ppm
+Skew            : 0.058 ppm
+Root delay      : 0.011241603 seconds
+Root dispersion : 0.001388473 seconds
+Update interval : 1043.5 seconds
+Leap status     : Normal
+
+2026-11-11T23:50:47Z
+Date: Wed, 11 Nov 2026 23:50:48 GMT
