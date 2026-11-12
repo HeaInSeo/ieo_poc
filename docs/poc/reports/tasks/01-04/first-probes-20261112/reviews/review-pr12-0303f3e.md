@@ -1,4 +1,4 @@
-<!-- 보관본: PR #12 독립 검토(Guardrail) 0303f3e 원문 -->
+<!-- 보관본: PR #12 독립 검토(Guardrail) 0303f3e 원문. 게시 댓글 https://github.com/HeaInSeo/ieo_poc/pull/12#issuecomment-6817381159 -->
 # PR #12 독립 검토 (Guardrail) · 01-04 첫 세 probe
 
 - 검토 SHA: `0303f3e32dfcd6112eb8438a07c08b004da2a2b8` (branch `task/01-04-probes`)
