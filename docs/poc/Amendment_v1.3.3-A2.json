@@ -1,0 +1,63 @@
+{
+  "id": "v1.3.3-A2",
+  "date": "2026-11-12",
+  "plan_version": "v1.3.3",
+  "decision_ref": "User_Decisions_2026-11-12_0202.md",
+  "baselines_unchanged": {
+    "main_tasks": 73,
+    "main_experiments": 31,
+    "followup_tasks": 12,
+    "followup_candidates": 5
+  },
+  "profile_revisions": [
+    {
+      "profile_id": "poc-acceptance-v1.3.3",
+      "revision": 6,
+      "changed_items": [
+        "02-02.accept"
+      ]
+    }
+  ],
+  "sprint_revisions": [
+    {
+      "sprint_id": "POC-02",
+      "revision": 6
+    }
+  ],
+  "changed_acceptance": [
+    "02-02"
+  ],
+  "deferred": [
+    {
+      "item": "비공개 평가 세트의 강한 봉인·OS 권한으로 개발 계정의 정답 접근 차단 실증",
+      "from_task": "02-02",
+      "owner_task": "04-07",
+      "timing": "P07 숨긴 결함 회차 착수 전. 평가 목적·위협 범위에 맞는 최소 구성 검토, 개발 서버 권한 개편을 전제로 하지 않음"
+    }
+  ],
+  "scope_limit": "02-02의 평가 환경 준비 범위만. 제품 런타임의 개발·Guardrail 역할·자격 격리 조건은 불변",
+  "note": "progress/ 아래 파일은 생성 화면이므로 이 대조에서 제외한다(원본은 state.json). A1의 files 항목 중 이 개정이 다시 바꾼 파일은 이 목록의 sha256이 현재 값이다.",
+  "files": [
+    {
+      "path": "Console_Coordinator_Sprints_v0.json",
+      "original_sha256": "e12e07ee5d027371b4af6a58b197cff382737751caafc55699a0d15fd2b0a763",
+      "sha256": "45d78f28486013d0d7ac9348427267124f9e56c14d4cd84358251240a247c287",
+      "change": "amended",
+      "reason": "A2 프로파일 rev 6(02-02.accept), POC-02 rev 6·출처·digest, amendments 목록"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md",
+      "original_sha256": "23f6b3245f9894670ddbd0dab5318a3af80ab4808d0c45c7acfa16a9ff079962",
+      "sha256": "f2c283d7be0864db71cd091bd1bac52f7212be7a936eb1ada94d5b538718d400",
+      "change": "amended",
+      "reason": "A2 02-02 행 수용 기준 rev 6"
+    },
+    {
+      "path": "scripts/validate_package.py",
+      "original_sha256": "bd43577b73f090c9f89c6685660e0f2063d546521661f8dc79f816b8ecc2448c",
+      "sha256": "5ec6f24c74864954c706f56602012d26929fd6058a5c53ce95659f4a6b7c7be5",
+      "change": "amended",
+      "reason": "A2 개정 순차 적용 검사(A1·A2)"
+    }
+  ]
+}

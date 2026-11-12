@@ -16,6 +16,7 @@
 //! - the wrapper never retries; a retry is a new run linked with `retry_of`.
 
 pub mod aggregate;
+pub mod clock;
 pub mod judge;
 pub mod record;
 pub mod redact;
