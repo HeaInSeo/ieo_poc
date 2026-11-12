@@ -37,7 +37,8 @@ def validate(root):
     removed=sorted((k,p['task_id']) for k in old for p in old[k]['prerequisites'] if p['task_id'] not in g[k])
     assert added==[('07-01','04-16')] and not removed and g['04-16']==['04-09','01-03']
     out['dependency_delta']={'existing_added':added,'removed':removed,'new_task':{'04-16':g['04-16']}}
-    changed=sorted(k for k in old if old[k]['acceptance']['criteria']!=byid[k]['acceptance']['criteria'])
+    p4items=next(q for q in spec['inspection_profiles'] if q['revision']==4)['items']
+    changed=sorted(k for k in old if old[k]['acceptance']['criteria']!=p4items[k+'.accept'])
     assert changed==sorted(['01-02','01-03','01-04','01-07','01-08','02-01','07-01','07-04','09-02','09-03'])
     for k in old:
         if k not in ['01-07','01-08']:assert byid[k]['outputs']==old[k]['outputs']
@@ -47,7 +48,7 @@ def validate(root):
     out['ancestor_counts']={k:len(ancestors(g,k)) for k in ['04-03','05-05','07-01','07-02']};out['changed_acceptance_ids']=changed
     amend=json.loads((root/'Amendment_v1.3.3-A1.json').read_text());profiles={(q['profile_id'],q['revision']):q for q in spec['inspection_profiles']}
     assert sorted(profiles)==[('poc-acceptance-v1.3.3',4),('poc-acceptance-v1.3.3',5)];p4=profiles[('poc-acceptance-v1.3.3',4)];p5=profiles[('poc-acceptance-v1.3.3',5)]
-    assert sorted(k for k in p4['items'] if p4['items'][k]!=p5['items'][k])==['01-03.accept','01-04.accept'] and set(p4['items'])==set(p5['items'])
+    assert sorted(k for k in p4['items'] if p4['items'][k]!=p5['items'][k])==sorted(c+'.accept' for c in amend['changed_acceptance']) and set(p4['items'])==set(p5['items'])
     revs={x['sprint_id']:x['revision'] for x in amend['sprint_revisions']};digests=[]
     for s in spec['sprints']:
         jsonschema.Draft202012Validator(schema,format_checker=jsonschema.FormatChecker()).validate(s)

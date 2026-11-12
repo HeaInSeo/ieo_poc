@@ -7,10 +7,10 @@
 
 | # | 변경 | 위치 |
 | --- | --- | --- |
-| 1 | **01-03 단계별 동결.** 01-03은 01-04 첫 세 probe 조건, 작업별 초기 상한, 재개 probe, 최소 P12를 동결한다. 나머지 실험의 표본·예산·기대값은 담당·시점·차단 조건만 인수한다. 각 항목은 해당 첫 실행 전에 동결 증거가 있어야 시작한다 | 장부·명세 `01-03.accept`, 계획 끝의 A1 문단, [동결 대장](reports/tasks/01-03/staged-freeze-20261112/freeze_register.json) |
+| 1 | **01-03 단계별 동결.** 01-03은 01-04 첫 세 probe 조건, 작업별 초기 상한, 재개 probe, 최소 P12 수치를 동결한다. 나머지 실험의 표본·예산·기대값은 담당·시점·차단 조건만 인수한다. 각 항목은 해당 첫 실행 전에 동결 증거가 있어야 시작한다. 이를 해당 작업의 수용 기준에 넣었다: 04-09(L09), 04-16(L05), 07-02·07-03(L04), 07-04(L06) | 장부·명세 `01-03.accept`·위 작업들, 장부·명세·계획의 A1 읽기 규칙, EARLY-01 문단(L02), P36 절차, [동결 대장](reports/tasks/01-03/staged-freeze-20261112/freeze_register.json) |
 | 2 | **01-04 판정표 A1-GATE-01-04.** 자격 방식 A에서 공급자 한도 공유가 확인되면 지원 구성으로 기록하고 진행한다. 동시 실행 불가·역할 자격 격리 실패/미확인·한도 구조 관측 불가는 중단이다 | 장부·명세 `01-04.accept`, [런타임 계약 rev 5 §8](reports/tasks/01-02/runtime-contract-20261112/Runtime_Contract_v0.md), [probe_gate_table.json](reports/tasks/01-03/staged-freeze-20261112/probe_gate_table.json), READ_FIRST·HANDOFF·probe 확인표의 안내 문장 |
-| 3 | 명세 개정: 수용 프로파일 `poc-acceptance-v1.3.3` **revision 5**를 추가했다(rev 4는 보존, `01-03.accept`·`01-04.accept` 두 항목만 다름). `POC-01`을 **revision 5**로 올리고 01-03·01-04가 rev 5 항목을 참조한다. 출처에 결정 원문을 추가했고 `limits.unresolved_reason`을 갱신했다. 한도 값은 여전히 `null`(draft)이다. 다른 스프린트는 revision 4 그대로다 | `Console_Coordinator_Sprints_v0.json` |
-| 4 | 검증기: 프로파일·스프린트 revision을 이 개정 색인에서 읽는다. 전달 패키지 `SHA256SUMS.txt`의 각 파일이 원본과 같거나 이 색인에 개정 후 SHA-256과 함께 올라 있는지 확인한다 | `scripts/validate_package.py` |
+| 3 | 명세 개정: 수용 프로파일 `poc-acceptance-v1.3.3` **revision 5**를 추가했다. rev 4는 보존했고, rev 5는 위 7개 작업의 항목만 다르다. 이 7개 작업이 rev 5 항목을 참조한다. 9개 스프린트를 모두 **revision 5**로 올렸다: 출처에 결정 원문을 추가하고, `limits.unresolved_reason`을 L01 문구(자기 repo를 포함한 모든 실제 실행 등록·배정 전 바인딩)로 바꿨다. 한도 값은 여전히 `null`(draft)이다. 최상위 `amendments`에 읽기 규칙을 넣었다 | `Console_Coordinator_Sprints_v0.json` |
+| 4 | 검증기: 프로파일·스프린트 revision과 바뀐 수용 항목을 이 개정 색인에서 읽는다. v1.3.2 대비 변경 대조는 rev 4 항목으로 계속한다. 전달 패키지 `SHA256SUMS.txt`의 각 파일이 원본과 같거나 이 색인에 개정 후 SHA-256과 함께 올라 있는지 확인한다. **이는 정합 검사일 뿐 진위 검사가 아니다.** 색인에 항목을 추가하면 어떤 변경도 통과하므로, 변경의 정당성은 git 이력·PR·독립 검토로 확인한다 | `scripts/validate_package.py` |
 | 5 | **D11.** 제3자 논문 PDF를 공개 저장소의 현재 파일 목록에서 삭제하고 원문 링크로 바꿨다. 공개 URL의 파일은 삭제한 사본과 SHA-256이 같다([대조 기록](reports/tasks/01-03/staged-freeze-20261112/evidence/d11-link-check.txt)). 커밋 `d92b414`부터 이 개정 직전까지의 이력에는 남아 있으며, 이력 재작성은 하지 않았다 | `07_supporting_research/References.md`, `SOURCES.json`, `.gitignore` |
 
 ## 2. 바뀌지 않은 것

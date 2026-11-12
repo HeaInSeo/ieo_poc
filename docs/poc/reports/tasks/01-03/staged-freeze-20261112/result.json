@@ -5,16 +5,16 @@
   "task_id": "01-03",
   "experiment_id": null,
   "run_id": "staged-freeze-20261112",
-  "revision": 1,
+  "revision": 2,
   "previous_run_ref": "reports/tasks/01-03/decision-proposal-20261112/REPORT.md",
   "actor": {
     "role": "development",
     "name": "개발 에이전트(Claude Code 대화 세션)"
   },
   "execution_kind": "design_decision_freeze",
-  "execution_state": "독립 검토 대기",
+  "execution_state": "교정 rev 2·재검토 대기",
   "inputs": {
-    "spec_revision": "POC-01 rev 5 (v1.3.3-A1)",
+    "spec_revision": "POC-01..09 rev 5 (v1.3.3-A1)",
     "repo_sha": null,
     "image_digest": null,
     "profile_revision": "poc-acceptance-v1.3.3 rev 5",
@@ -24,7 +24,7 @@
     ]
   },
   "expected": "사용자 결정 원문 기록, stage_0 동결값과 later 항목의 담당·시점·차단 조건, 01-04 판정표의 장부·명세·런타임 계약 동일 반영, 작업 수 불변, D11 반영",
-  "observed": "freeze_register stage_0 8·later 9; 판정표 장부=명세(rev 5 프로파일)=런타임 계약 rev 5 §8=probe_gate_table.json; validate_package PASS(문서 정합만); draft 9×201, executable 9×422 UNBOUND_DRAFT; Rust 72 tests pass; PDF 공개 URL sha256 일치",
+  "observed": "freeze_register stage_0 8·later 9(차단 강제 위치 포함); 판정표 장부=명세=런타임 계약 rev 5 §8=probe_gate_table.json; 7개 수용 기준 rev 5; validate_package PASS(문서 정합만); draft 9×201, executable 9×422 UNBOUND_DRAFT; P26 후보 스냅샷(sori 6, NodeKit 3·부족); 호스트 rootless podman·sub-UID 확인; 런타임 probe 0회",
   "verdict": "미판정",
   "verification": {
     "level": "claim",
@@ -47,8 +47,9 @@
   "unresolved": [
     "later L01~L09: 각 첫 실행 전 동결 증거 필요",
     "L08 두 결함 교정(02-03 전)",
-    "D8 P26 후보 준비(07-01 진입 시)",
-    "D9 봉인 방식 미정"
+    "P26 NodeKit 후보 부족·정책 대기 이슈: 07-01 동결 전 사용자 결정",
+    "D9 봉인 방식 미정",
+    "F07 치명적 오해 정의 분리(사용자 확인)"
   ],
   "next_action": "독립 검토 → 조건부 병합·main CI → 원장 갱신 → L08 교정 PR → 01-04(사용자 자격 발급 후 P1→P2→P3)",
   "evidence_refs": [
@@ -57,7 +58,9 @@
     "reports/tasks/01-03/staged-freeze-20261112/Probe_Budget_Rules.md",
     "reports/tasks/01-03/staged-freeze-20261112/evidence/validate.txt",
     "reports/tasks/01-03/staged-freeze-20261112/evidence/executable-check.txt",
-    "reports/tasks/01-03/staged-freeze-20261112/evidence/d11-link-check.txt"
+    "reports/tasks/01-03/staged-freeze-20261112/evidence/d11-link-check.txt",
+    "reports/tasks/01-03/staged-freeze-20261112/P26_Candidates.md",
+    "reports/tasks/01-03/staged-freeze-20261112/evidence/host-isolation-check.txt"
   ],
   "started_at": null,
   "finished_at": null,
