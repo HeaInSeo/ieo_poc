@@ -33,3 +33,18 @@ jobs:
           rustc -V | tee /dev/stderr | grep -q '^rustc 1\.99\.1 '
           cargo fmt --version | tee /dev/stderr | grep -q '^rustfmt 1\.10\.0-stable '
           cargo clippy --version | tee /dev/stderr | grep -q '^clippy 0\.1\.99 '
+  rust-check:
+    name: rust fmt clippy test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: install toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: cargo clippy -D warnings
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: cargo test
+        run: cargo test --locked --all-targets
+      - name: plan manifest digests and draft registration (all 9 accepted as draft)
+        run: cargo run --locked -q --bin ieo-spec -- check-manifest docs/poc/Console_Coordinator_Sprints_v0.json > /dev/null

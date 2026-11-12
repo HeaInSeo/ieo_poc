@@ -1,0 +1,62 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": false,
+  "plan_version": "v1.3.3",
+  "task_id": "01-07",
+  "experiment_id": null,
+  "run_id": "spec-contract-20261112",
+  "revision": 2,
+  "previous_run_ref": null,
+  "actor": {
+    "role": "development",
+    "name": "개발 에이전트(Claude Code 대화 세션)"
+  },
+  "execution_kind": "design_contract_with_reference_implementation",
+  "execution_state": "교정 rev2·재검토 대기",
+  "inputs": {
+    "spec_revision": "POC-01..09 rev 4",
+    "repo_sha": null,
+    "image_digest": null,
+    "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+    "model_runtime_versions": [
+      "rustc 1.99.1"
+    ]
+  },
+  "expected": "거부 종류별 고유 코드·필드 위치·교정 내용, 9개 명세 digest 재현, draft 실행 등록 거부",
+  "observed": "41 tests passed; digest 9/9; draft 9×201; executable 9×422 UNBOUND_DRAFT only; rev2 regressions for review F2-F7 and P3",
+  "verdict": "미판정",
+  "verification": {
+    "level": "claim",
+    "reviewer": null,
+    "evidence": []
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "대화 세션의 역할별 원시 사용량 수단 없음",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
+  "adoption": "미판정",
+  "reuse_assets": [
+    "crates/ieo-spec"
+  ],
+  "unresolved": [
+    "§1.4 공백 G1~G8: 새 contract revision 여부 사용자 결정",
+    "403 범위 판정은 01-08"
+  ],
+  "next_action": "독립 검토 → PR 병합·main CI → 원장 갱신 → 01-08",
+  "evidence_refs": [
+    "reports/tasks/01-07/spec-contract-20261112/Registration_Contract_v0.md",
+    "reports/tasks/01-07/spec-contract-20261112/evidence/cargo-test.log",
+    "reports/tasks/01-07/spec-contract-20261112/evidence/check-manifest-draft.txt"
+  ],
+  "started_at": null,
+  "finished_at": null,
+  "next_owner": "독립 검토 세션",
+  "resume_condition": "현재 head SHA 독립 승인 + CI 성공 → 조건부 병합",
+  "operational_report_ref": null,
+  "schedule_report_ref": null
+}

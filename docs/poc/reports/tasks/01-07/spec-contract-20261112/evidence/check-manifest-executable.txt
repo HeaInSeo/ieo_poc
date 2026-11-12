@@ -1,0 +1,480 @@
+[
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "ebf2594e562865cdcf129153349374428e80f4a73f114f96f0325e23f2b963b3",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-01"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "4b8077e60aec7b4dd71de6a5cd475a544b9613ecd6145466410b8091243ad3bb",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-02"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "90990ca2514401682c9b8e96adc327afeb03875b74591a7800b5858d0a3901ad",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-03"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "26f0e6684246c6b535e65c8d0fa0ca141609d9826803568fccfcb57fa1b68527",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-04"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "b093a8525b390abaf40aaf280952acb73c9a3e1c0edb57baeb095289950c7864",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-05"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "282efb8b897c48f84fc802932f64d46b57382dfbc2a1227fd04a9b60ff71a974",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-06"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "267788c0452ba1ec923202096e09b32a0651ad063d285c55741ee5a01f633854",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-07"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "f032728a745adb4af93b32e9bbb45656ce25e8a1233f0a41e1d6533cf0b85038",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-08"
+  },
+  {
+    "http_status": 422,
+    "outcome": {
+      "computed_digest": "08572de4a66890a2b8ef7d61bf5ebd70ee86c2928a916a7208c6dfdb4b356faa",
+      "rejections": [
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "실제 repo·한도·출처 바인딩을 채운 새 revision을 ready로 제출하세요.",
+          "field": "registration_state",
+          "message": "draft 명세는 실행 가능 등록을 할 수 없습니다.",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[0]",
+          "message": "미바인딩: 실제 repository_url",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[1]",
+          "message": "미바인딩: 실행 주체·역할별 자격",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[2]",
+          "message": "미바인딩: 시간/토큰/교정 한도",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[3]",
+          "message": "미바인딩: 실행 일정·선행 출처의 관측 시각",
+          "retryable_after_edit": true
+        },
+        {
+          "code": "UNBOUND_DRAFT",
+          "correction": "이 항목을 바인딩하고 목록에서 제거한 새 revision을 제출하세요.",
+          "field": "unresolved_bindings[4]",
+          "message": "미바인딩: 적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+          "retryable_after_edit": true
+        }
+      ],
+      "state": "REJECTED"
+    },
+    "revision": 4,
+    "sprint_id": "POC-09"
+  }
+]
+exit=1
