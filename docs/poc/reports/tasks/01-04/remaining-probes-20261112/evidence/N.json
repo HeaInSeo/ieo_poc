@@ -1,0 +1,46 @@
+{
+  "N1": {
+    "attempt": 11,
+    "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "issued": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54"
+  },
+  "N2": {
+    "attempt": 12,
+    "exit_code": 0,
+    "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "result": "KESTREL-62F61D",
+    "codeword_recalled": true,
+    "stderr_tail": "#ENV_NAMES CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CONFIG_DIR GOLANG_VERSION GOPATH GOTOOLCHAIN HOME HOSTNAME LANG PATH PWD SHLVL _ container \n#UID 20001 GID 20001 CWD /state/work\n#T_START 1794468923.615132327\n#T_END 1794468927.373864155\n"
+  },
+  "N3": {
+    "attempt": 13,
+    "exit_code": 0,
+    "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "result": "KESTREL-62F61D",
+    "codeword_recalled": true,
+    "stderr_tail": "#ENV_NAMES CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CONFIG_DIR GOLANG_VERSION GOPATH GOTOOLCHAIN HOME HOSTNAME LANG PATH PWD SHLVL _ container \n#UID 20001 GID 20001 CWD /state/work\n#T_START 1794468927.985646630\n#T_END 1794468931.548353248\n"
+  },
+  "N4": {
+    "long": {
+      "attempt": 14,
+      "exit_code": 0,
+      "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+      "result": "slept",
+      "interval": [
+        1794468932.1576679,
+        1794468983.2261477
+      ]
+    },
+    "concurrent": {
+      "attempt": 15,
+      "exit_code": 0,
+      "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+      "result": "",
+      "interval": [
+        1794468944.1456838,
+        1794468949.5542
+      ]
+    },
+    "session_files": "83 /opt/rust/ieo_poc_probe/roles/development/state/claude/projects/-state-work/fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54.jsonl\nfb34c53a-b7e0-4b89-9ae4-bde0c4e67f54.jsonl\n"
+  }
+}

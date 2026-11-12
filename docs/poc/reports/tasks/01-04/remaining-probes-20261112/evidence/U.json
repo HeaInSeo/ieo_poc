@@ -1,0 +1,68 @@
+[
+  {
+    "attempt": 1,
+    "tool_uses": [
+      {
+        "name": "Bash",
+        "input": {
+          "command": "echo U-ALLOWED",
+          "description": "Echo a test string"
+        },
+        "parent": null
+      },
+      {
+        "name": "Write",
+        "input": {
+          "file_path": "/state/work/u/ok.txt",
+          "content": "u-ok"
+        },
+        "parent": null
+      },
+      {
+        "name": "Bash",
+        "input": {
+          "command": "ls /",
+          "description": "List root directory"
+        },
+        "parent": null
+      },
+      {
+        "name": "Write",
+        "input": {
+          "file_path": "/state/home/u-denied.txt",
+          "content": "u-denied"
+        },
+        "parent": null
+      }
+    ],
+    "permission_denials": [
+      {
+        "tool_name": "Write",
+        "tool_use_id": "toolu_01BDr2nFQXdSveF5eF4HSjcf",
+        "tool_input": {
+          "file_path": "/state/work/u/ok.txt",
+          "content": "u-ok"
+        }
+      },
+      {
+        "tool_name": "Bash",
+        "tool_use_id": "toolu_014QiWEpQo6Wgoht1XC2NZpp",
+        "tool_input": {
+          "command": "ls /",
+          "description": "List root directory"
+        }
+      },
+      {
+        "tool_name": "Write",
+        "tool_use_id": "toolu_014tmpefnQzPB7DYR5tR4krD",
+        "tool_input": {
+          "file_path": "/state/home/u-denied.txt",
+          "content": "u-denied"
+        }
+      }
+    ],
+    "files": "total 0\ndrwxr-xr-x. 2 20001 20001  6 11월 12 16:31 .\ndrwx------. 4 20001 20001 25 11월 12 16:31 ..\nDENIED_FILE_ABSENT\n",
+    "timeout": false,
+    "result_subtype": "success"
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "attempt": 4,
+  "tool_uses": [
+    {
+      "name": "Bash",
+      "input": {
+        "command": "echo U-ALLOWED",
+        "description": "Print a test string"
+      },
+      "parent": null
+    },
+    {
+      "name": "Write",
+      "input": {
+        "file_path": "/state/work/u/ok.txt",
+        "content": "u-ok"
+      },
+      "parent": null
+    },
+    {
+      "name": "Bash",
+      "input": {
+        "command": "ls /",
+        "description": "List root directory"
+      },
+      "parent": null
+    },
+    {
+      "name": "Write",
+      "input": {
+        "file_path": "/state/home/u-denied.txt",
+        "content": "u-denied"
+      },
+      "parent": null
+    }
+  ],
+  "permission_denials": [
+    {
+      "tool_name": "Bash",
+      "tool_use_id": "toolu_01UBbXSFHwRJRne9Ht8mk5jx",
+      "tool_input": {
+        "command": "ls /",
+        "description": "List root directory"
+      }
+    },
+    {
+      "tool_name": "Write",
+      "tool_use_id": "toolu_01GcqQ19b6SzY9yf7ioF4Uue",
+      "tool_input": {
+        "file_path": "/state/home/u-denied.txt",
+        "content": "u-denied"
+      }
+    }
+  ],
+  "files": "total 4\ndrwxr-xr-x. 2 20001 20001 20 11월 12 16:32 .\ndrwx------. 4 20001 20001 25 11월 12 16:32 ..\n-rw-r--r--. 1 20001 20001  4 11월 12 16:32 ok.txt\nu-okDENIED_FILE_ABSENT\n",
+  "timeout": false,
+  "result_subtype": "success"
+}

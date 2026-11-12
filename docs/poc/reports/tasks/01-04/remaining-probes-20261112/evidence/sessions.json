@@ -1,0 +1,23 @@
+{
+  "codeword": "KESTREL-62F61D",
+  "S_N": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+  "S_G3": "d625a14a-cf21-4fb3-b977-07bfd30fc29b",
+  "S_R": "228beaa8-5a42-46ef-b9a7-93c418719718",
+  "S_L1": "27b12b88-b012-444c-9741-d76b03e899b2",
+  "S_T": "29603ca9-dd9d-4e9a-ad37-ae0e253ec172",
+  "S_U": [
+    "af589b76-7e6a-4627-a7e4-5c9694bb14c8",
+    "0cd25bbb-22e5-42b2-8829-6fc2a8ed29e5"
+  ],
+  "S_G1": [
+    "eb27a4ed-0996-41b5-919e-dc7d93858be8",
+    "74c84ae1-bf72-4e24-bba2-d970e4c3e789"
+  ],
+  "S_G2": "b55939d1-d0a6-4a78-b20b-c94cef2a5334",
+  "S_C": [
+    "d60c61fe-b24c-4022-be6d-e35e4dca3e7e",
+    "eb5c833d-8aa2-4dad-8e37-b9b9121134ed",
+    "d6fedeea-30a7-4e69-b8e1-39177e361cf9",
+    "421bd14d-678a-4f4d-9e08-a059a032d6df"
+  ]
+}
