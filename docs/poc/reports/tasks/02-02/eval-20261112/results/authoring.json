@@ -1,0 +1,192 @@
+{
+ "scored_at": "2026-11-12T13:55:05Z",
+ "set": "authoring",
+ "set_file": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/sets/authoring.json",
+ "bin": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/build/src/target/release/ieo-evidence",
+ "totals": {
+  "determined_cases": 14,
+  "passed": 14,
+  "failed": 0,
+  "undetermined_cases_excluded": 0,
+  "undetermined_fields_excluded": 19,
+  "checked_fields": 234,
+  "failed_fields": 0
+ },
+ "cases": [
+  {
+   "id": "A-01",
+   "verdict": "PASS",
+   "checked_fields": 10,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-02",
+   "verdict": "PASS",
+   "checked_fields": 8,
+   "failed_fields": [],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 1.03,
+   "workdir": null
+  },
+  {
+   "id": "A-03",
+   "verdict": "PASS",
+   "checked_fields": 5,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-04",
+   "verdict": "PASS",
+   "checked_fields": 32,
+   "failed_fields": [],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-05",
+   "verdict": "PASS",
+   "checked_fields": 59,
+   "failed_fields": [],
+   "undetermined_fields": 4,
+   "exits": [
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.05,
+   "workdir": null
+  },
+  {
+   "id": "A-06",
+   "verdict": "PASS",
+   "checked_fields": 21,
+   "failed_fields": [],
+   "undetermined_fields": 3,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-07",
+   "verdict": "PASS",
+   "checked_fields": 25,
+   "failed_fields": [],
+   "undetermined_fields": 3,
+   "exits": [
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "A-08",
+   "verdict": "PASS",
+   "checked_fields": 20,
+   "failed_fields": [],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-09",
+   "verdict": "PASS",
+   "checked_fields": 9,
+   "failed_fields": [],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-10",
+   "verdict": "PASS",
+   "checked_fields": 5,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    2,
+    2
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-11",
+   "verdict": "PASS",
+   "checked_fields": 8,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-12",
+   "verdict": "PASS",
+   "checked_fields": 4,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    2,
+    2
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "A-13",
+   "verdict": "PASS",
+   "checked_fields": 6,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 3.01,
+   "workdir": null
+  },
+  {
+   "id": "A-14",
+   "verdict": "PASS",
+   "checked_fields": 22,
+   "failed_fields": [],
+   "undetermined_fields": 3,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  }
+ ],
+ "undetermined_cases": []
+}

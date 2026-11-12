@@ -1,0 +1,6 @@
+P-01   PASS  fields 19 checked, 0 failed, 0 undetermined  exits=[0]  0.0s
+P-02   PASS  fields 8 checked, 0 failed, 0 undetermined  exits=[1]  0.0s
+P-03   PASS  fields 5 checked, 0 failed, 1 undetermined  exits=[1]  0.0s
+P-04   PASS  fields 29 checked, 0 failed, 2 undetermined  exits=[0]  0.0s
+P-05   PASS  fields 7 checked, 0 failed, 0 undetermined  exits=[1]  0.0s
+TOTAL set=public determined=5 passed=5 failed=0 | undetermined cases excluded=0, undetermined fields excluded=3 | fields checked=68 failed=0

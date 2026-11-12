@@ -1,0 +1,89 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "d",
+  "attempt_id": "a",
+  "command_id": "c",
+  "role": "other",
+  "retry_of": null,
+  "model_request": false,
+  "argv": [
+    "/bin/sh",
+    "-c",
+    "printf \"a=%s\\nb=%s\\nh=%s\\n\" \"$1\" \"$1\" \"$2\"; k=\"sk-\"\"ant-oat01-Zz9yXx0123456789_cd-EF\"; printf \"e=%s k=%s\\n\" \"$1\" \"$k\" >&2; echo tail-ok",
+    "sh",
+    "[SECRET-VALUE-REDACTED]",
+    "[SECRET-SHA256-REDACTED]"
+  ],
+  "cwd": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/results/diag-secret",
+  "env_names": [],
+  "started_at": "2026-11-12T13:55:32.608Z",
+  "ended_at": "2026-11-12T13:55:32.630Z",
+  "duration_ms": 22,
+  "process": {
+    "kind": "exited",
+    "exit_code": 0,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "output_incomplete": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 87,
+    "sha256": "9be3f8e31586cbac684fb81616de479357b946021c49e75b5f5a1ade00338fee"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 44,
+    "sha256": "0da2d61f0be544278b02e5ee2fea3f0661b36f0e54f260801cc622336a009703"
+  },
+  "redaction": {
+    "secret_sources": 1,
+    "stdout_replacements": 3,
+    "stderr_replacements": 2,
+    "argv_replacements": 2,
+    "secret_value_seen": true
+  },
+  "artifacts": [],
+  "markers": [
+    {
+      "pattern": "tail-ok",
+      "found": true
+    }
+  ],
+  "result_event": null,
+  "usage": {
+    "applicability": "not_applicable",
+    "session_mode": "unknown",
+    "resume_base": null,
+    "run": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "session": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "parent": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "children": [],
+    "attribution_check": "not_checked",
+    "attribution_detail": null,
+    "by_model": {},
+    "cost_usd_reported": null,
+    "run_cost_usd": null,
+    "partial_observations": [],
+    "internal_retries": "not_applicable"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "succeeded",
+    "reasons": [],
+    "counts_as_success": true
+  }
+}

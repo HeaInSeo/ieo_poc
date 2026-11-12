@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","cwd":"/state/work","session_id":"5a1c0000-0000-4000-8000-000000000022","tools":["Agent"],"model":"claude-syn-1","permissionMode":"dontAsk","claude_code_version":"2.1.322"}
+{"type":"assistant","message":{"model":"claude-syn-1","id":"msg_u22a","type":"message","role":"assistant","content":[{"type":"text","text":"OK22"}],"stop_reason":null,"usage":{"input_tokens":2,"output_tokens":4,"cache_read_input_tokens":100,"cache_creation_input_tokens":10}},"parent_tool_use_id":null,"session_id":"5a1c0000-0000-4000-8000-000000000022"}
+{"type":"result","subtype":"success","is_error":false,"num_turns":1,"stop_reason":"end_turn","session_id":"5a1c0000-0000-4000-8000-000000000022","total_cost_usd":0.0011,"result":"done"}

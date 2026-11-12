@@ -1,0 +1,2666 @@
+{
+ "set": "validation",
+ "format": "ieo-0202-caseset/v1",
+ "cases": [
+  {
+   "id": "V-01",
+   "set": "validation",
+   "family": "success_markers_artifacts",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a01 --command c --artifact '{TMP}/r1.txt' --artifact '{TMP}/r2.bin' --marker 'RESULT=ok-\\d+' --marker 'phase two done' --role development -- /bin/sh -c 'printf '\"'\"'hello-1301\\n'\"'\"' > {TMP}/r1.txt; printf '\"'\"'xyz'\"'\"' > {TMP}/r2.bin; echo RESULT=ok-1301; echo '\"'\"'phase two done'\"'\"''"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a01/c#": {
+     "$has_keys": [
+      "format",
+      "task_id",
+      "attempt_id",
+      "command_id",
+      "role",
+      "retry_of",
+      "model_request",
+      "argv",
+      "cwd",
+      "env_names",
+      "started_at",
+      "ended_at",
+      "duration_ms",
+      "process",
+      "stdout",
+      "stderr",
+      "redaction",
+      "artifacts",
+      "markers",
+      "result_event",
+      "usage",
+      "judgment"
+     ]
+    },
+    "record:vt/a01/c#/role": "development",
+    "record:vt/a01/c#/retry_of": null,
+    "record:vt/a01/c#/artifacts/0/bytes": 11,
+    "record:vt/a01/c#/artifacts/0/sha256": "af84e04f20feff19995592c37962a13d81311c4414c40e04321b58bc187accca",
+    "record:vt/a01/c#/artifacts/1/bytes": 3,
+    "record:vt/a01/c#/artifacts/1/sha256": "3608bca1e44ea6c4d268eb6db02260269892c0b42b86bbf1e77a6fa16c3c9282",
+    "record:vt/a01/c#/markers/0/found": true,
+    "record:vt/a01/c#/markers/1/found": true,
+    "record:vt/a01/c#/process/term_sent": false,
+    "record:vt/a01/c#/process/kill_sent": false,
+    "record:vt/a01/c#/process/output_incomplete": false,
+    "record:vt/a01/c#/stdout/bytes": 30,
+    "record:vt/a01/c#/stdout/sha256": "f499b4572b536557cb5d2dfe42f28c99678d992192d1b94a16771c08c76f9d96",
+    "file:vt/a01/c/stdout": {
+     "$text": "RESULT=ok-1301\nphase two done\n"
+    },
+    "record:vt/a01/c#/stderr/bytes": 0,
+    "record:vt/a01/c#/judgment/status": "succeeded",
+    "record:vt/a01/c#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:vt/a01/c#": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a01/c#/role": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a01/c#/retry_of": "contracts/evidence-record-v0.schema.json (no --retry-of)",
+    "record:vt/a01/c#/artifacts/0/bytes": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a01/c#/artifacts/0/sha256": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a01/c#/artifacts/1/bytes": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a01/c#/artifacts/1/sha256": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a01/c#/markers/0/found": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a01/c#/markers/1/found": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a01/c#/process/term_sent": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a01/c#/process/kill_sent": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a01/c#/process/output_incomplete": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a01/c#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('RESULT=ok-1301\\nphase two done\\n')",
+    "record:vt/a01/c#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('RESULT=ok-1301\\nphase two done\\n')",
+    "file:vt/a01/c/stdout": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:vt/a01/c#/stderr/bytes": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a01/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a01/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-02",
+   "set": "validation",
+   "family": "nonzero_exit",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a02 --command c -- /bin/sh -c 'echo partial-out; echo '\"'\"'err-line-42'\"'\"' >&2; exit 42'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a02/c#/process/exit_code": 42,
+    "record:vt/a02/c#/process/kind": "exited",
+    "record:vt/a02/c#/stdout/bytes": 12,
+    "record:vt/a02/c#/stdout/sha256": "28b22518202420b5916bd882930cdae90e4e9d69330f3c173e02f69ab7b40b0d",
+    "file:vt/a02/c/stdout": {
+     "$text": "partial-out\n"
+    },
+    "record:vt/a02/c#/stderr/bytes": 12,
+    "record:vt/a02/c#/stderr/sha256": "daac16e7256615c7f3c0b86f22d2a5d75739c0875f2cb77081f10233805892dc",
+    "file:vt/a02/c/stderr": {
+     "$text": "err-line-42\n"
+    },
+    "record:vt/a02/c#/judgment/status": "failed",
+    "record:vt/a02/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a02/c#/process/exit_code": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a02/c#/process/kind": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a02/c#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('partial-out\\n')",
+    "record:vt/a02/c#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('partial-out\\n')",
+    "file:vt/a02/c/stdout": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:vt/a02/c#/stderr/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('err-line-42\\n')",
+    "record:vt/a02/c#/stderr/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('err-line-42\\n')",
+    "file:vt/a02/c/stderr": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:vt/a02/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a02/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-03",
+   "set": "validation",
+   "family": "signaled",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a03 --command c -- /bin/sh -c 'echo before-kill; kill -KILL $$'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a03/c#/process/kind": "signaled",
+    "record:vt/a03/c#/process/signal": 9,
+    "record:vt/a03/c#/stdout/bytes": 12,
+    "record:vt/a03/c#/stdout/sha256": "8d2aa9a771bc25a625c5692fec190b1ee51f4fbc8dce71038f2572178753c83b",
+    "file:vt/a03/c/stdout": {
+     "$text": "before-kill\n"
+    },
+    "record:vt/a03/c#/judgment/status": "failed",
+    "record:vt/a03/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a03/c#/process/kind": "02-01 REPORT §1 row 실행(run.rs) / contracts/evidence-record-v0.schema.json",
+    "record:vt/a03/c#/process/signal": "contracts/evidence-record-v0.schema.json; SIGKILL=9",
+    "record:vt/a03/c#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('before-kill\\n')",
+    "record:vt/a03/c#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('before-kill\\n')",
+    "file:vt/a03/c/stdout": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:vt/a03/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a03/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:vt/a03/c#/process/exit_code": "exit_code value for a signaled process (null vs other) not fixed"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-04",
+   "set": "validation",
+   "family": "launch_failure",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a04 --command c --marker x -- /opt/ieo-absent-dir-9/tool --flag"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a04/c#/process/kind": "launch_failed",
+    "record:vt/a04/c#/process/launch_error": {
+     "$not_null": true
+    },
+    "record:vt/a04/c#/process/exit_code": null,
+    "exists:vt/a04/c/record.json": true,
+    "record:vt/a04/c#/judgment/status": "failed",
+    "record:vt/a04/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a04/c#/process/kind": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a04/c#/process/launch_error": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a04/c#/process/exit_code": "contracts/evidence-record-v0.schema.json (no process ran)",
+    "exists:vt/a04/c/record.json": "02-01 REPORT §1 row 실행(run.rs) (record left on launch failure)",
+    "record:vt/a04/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a04/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-05",
+   "set": "validation",
+   "family": "timeout_term_honoured",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a05 --command c --timeout-s 1 --grace-s 5 -- /bin/sleep 30"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a05/c#/process/kind": "timed_out",
+    "record:vt/a05/c#/process/timeout_ms": 1000,
+    "record:vt/a05/c#/process/term_sent": true,
+    "record:vt/a05/c#/process/kill_sent": false,
+    "record:vt/a05/c#/process/stray_group_killed": false,
+    "record:vt/a05/c#/duration_ms": {
+     "$gte": 980,
+     "$lte": 5500
+    },
+    "record:vt/a05/c#/judgment/status": "failed",
+    "record:vt/a05/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a05/c#/process/kind": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a05/c#/process/timeout_ms": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a05/c#/process/term_sent": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a05/c#/process/kill_sent": "02-01 REPORT §1 row 실행(run.rs) (sleep dies on TERM, group empty)",
+    "record:vt/a05/c#/process/stray_group_killed": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a05/c#/duration_ms": "02-01 REPORT §1 row 실행(run.rs); >= timeout, < timeout+grace (+0.5 s slack)",
+    "record:vt/a05/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a05/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-06",
+   "set": "validation",
+   "family": "timeout_term_ignored_member",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a06 --command c --env PATH --timeout-s 1 --grace-s 1 --expect timeout -- /bin/sh -c '(trap '\"'\"''\"'\"' TERM; exec sleep 4723) >/dev/null 2>&1 & sleep 60'"
+   ],
+   "post": [
+    "pgrep -f 'sleep 472[3]' >/dev/null"
+   ],
+   "expected": {
+    "record:vt/a06/c#/process/kind": "timed_out",
+    "record:vt/a06/c#/process/term_sent": true,
+    "record:vt/a06/c#/process/kill_sent": true,
+    "record:vt/a06/c#/process/stray_group_killed": true,
+    "post[0]": 1,
+    "record:vt/a06/c#/judgment/status": "expected_matched",
+    "record:vt/a06/c#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:vt/a06/c#/process/kind": "review-pr21-273907b §2 P2-3 (TERM-ignoring member KILLed after grace, stray_group_killed)",
+    "record:vt/a06/c#/process/term_sent": "review-pr21-273907b §2 P2-3 (TERM-ignoring member KILLed after grace, stray_group_killed)",
+    "record:vt/a06/c#/process/kill_sent": "review-pr21-273907b §2 P2-3 (TERM-ignoring member KILLed after grace, stray_group_killed)",
+    "record:vt/a06/c#/process/stray_group_killed": "review-pr21-273907b §2 P2-3 (TERM-ignoring member KILLed after grace, stray_group_killed)",
+    "post[0]": "review-pr21-273907b §2 P2-3 (TERM-ignoring member KILLed after grace, stray_group_killed) (no surviving member; pgrep exit 1 = none)",
+    "record:vt/a06/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a06/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-07",
+   "set": "validation",
+   "family": "timeout_term_ignored_leader",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a07 --command c --env PATH --timeout-s 1 --grace-s 1 --expect timeout -- /bin/sh -c 'trap '\"'\"''\"'\"' TERM; sleep 3741; echo after'"
+   ],
+   "post": [
+    "pgrep -f 'sleep 374[1]' >/dev/null"
+   ],
+   "expected": {
+    "record:vt/a07/c#/process/kind": "timed_out",
+    "record:vt/a07/c#/process/term_sent": true,
+    "record:vt/a07/c#/process/kill_sent": true,
+    "record:vt/a07/c#/duration_ms": {
+     "$gte": 1980
+    },
+    "post[0]": 1,
+    "record:vt/a07/c#/judgment/status": "expected_matched",
+    "record:vt/a07/c#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:vt/a07/c#/process/kind": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a07/c#/process/term_sent": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a07/c#/process/kill_sent": "02-01 REPORT §1 row 실행(run.rs) (members remain after grace -> KILL)",
+    "record:vt/a07/c#/duration_ms": "02-01 REPORT §1 row 실행(run.rs); leader dies only at KILL after timeout+grace = 2000 ms (-20 ms)",
+    "post[0]": "02-01 REPORT §1 row 실행(run.rs) / review-pr21-273907b §2 P2-3 (TERM-ignoring member KILLed after grace, stray_group_killed)",
+    "record:vt/a07/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a07/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:vt/a07/c#/process/stray_group_killed": "flag semantics when the leader itself is still alive at KILL not fixed"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-08",
+   "set": "validation",
+   "family": "intentional_deny",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a08 --command c --expect nonzero_exit --marker WRITE_DENIED -- /bin/sh -c 'if ( : > /proc/version ) 2>/dev/null; then echo WROTE; exit 0; else echo WRITE_DENIED; exit 1; fi'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a08/c#/process/exit_code": 1,
+    "record:vt/a08/c#/judgment/expected": "nonzero_exit",
+    "record:vt/a08/c#/judgment/status": "expected_matched",
+    "record:vt/a08/c#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:vt/a08/c#/process/exit_code": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a08/c#/judgment/expected": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a08/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a08/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-09",
+   "set": "validation",
+   "family": "intentional_deny_not_matched",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a09 --command c1 --expect nonzero_exit -- /bin/sh -c 'echo fine; exit 0'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a09 --command c2 --expect nonzero_exit --marker ABORTED_BY_POLICY -- /bin/sh -c 'echo other-failure; exit 2'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a09/c1#/judgment/status": "expected_not_matched",
+    "record:vt/a09/c1#/judgment/counts_as_success": false,
+    "exit[0]": 1,
+    "record:vt/a09/c2#/judgment/status": "expected_not_matched",
+    "record:vt/a09/c2#/judgment/counts_as_success": false,
+    "exit[1]": 1,
+    "record:vt/a09/c2#/markers/0/found": false
+   },
+   "basis": {
+    "record:vt/a09/c1#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a09/c1#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a09/c2#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a09/c2#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[1]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a09/c2#/markers/0/found": "02-01 REPORT §1 row 판정(judge.rs)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-10",
+   "set": "validation",
+   "family": "missing_evidence",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a10 --command c --artifact '{TMP}/never.out' --marker 'NEVER_PRINTED_\\w+' -- /bin/sh -c 'echo something-else'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a10/c#/artifacts/0/present": false,
+    "record:vt/a10/c#/artifacts/0/sha256": null,
+    "record:vt/a10/c#/markers/0/found": false,
+    "record:vt/a10/c#/judgment/reasons": {
+     "$len_gte": 2
+    },
+    "record:vt/a10/c#/judgment/status": "incomplete",
+    "record:vt/a10/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a10/c#/artifacts/0/present": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a10/c#/artifacts/0/sha256": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a10/c#/markers/0/found": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a10/c#/judgment/reasons": "02-01 REPORT §1 row 판정(judge.rs) (all reasons listed; REPORT §2 '사유 2개 모두')",
+    "record:vt/a10/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a10/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:vt/a10/c#/judgment/reasons (value text)": "wording of reasons not fixed (only count lower bound checked)"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-11",
+   "set": "validation",
+   "family": "marker_stdout_only",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a11 --command c --marker ONLY-ON-ERR-5 -- /bin/sh -c 'echo ONLY-ON-ERR-5 >&2; echo plain'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a11/c#/markers/0/found": false,
+    "record:vt/a11/c#/judgment/status": "incomplete",
+    "record:vt/a11/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a11/c#/markers/0/found": "02-01 REPORT §5 item 4 (markers searched in stdout after masking)",
+    "record:vt/a11/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a11/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-12",
+   "set": "validation",
+   "family": "model_child_usage",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/t.jsonl",
+      "fixture": "fx-02.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a12 --command c --model-request --session new --marker ECHO-OK -- /bin/cat '{FIX}/t.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a12/c#/model_request": true,
+    "record:vt/a12/c#/result_event/count": 1,
+    "record:vt/a12/c#/result_event/present": true,
+    "record:vt/a12/c#/result_event/subtype": "success",
+    "record:vt/a12/c#/result_event/is_error": false,
+    "record:vt/a12/c#/result_event/session_id": "29603ca9-dd9d-4e9a-ad37-ae0e253ec172",
+    "record:vt/a12/c#/result_event/num_turns": 2,
+    "record:vt/a12/c#/result_event/stop_reason": "end_turn",
+    "record:vt/a12/c#/result_event/non_json_lines": 0,
+    "record:vt/a12/c#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a12/c#/result_event/compact_boundaries": 0,
+    "record:vt/a12/c#/usage/applicability": "model",
+    "record:vt/a12/c#/usage/session_mode": "new",
+    "record:vt/a12/c#/usage/internal_retries": "unmeasured",
+    "record:vt/a12/c#/usage/parent/state": "measured",
+    "record:vt/a12/c#/usage/parent/tokens": {
+     "input": 4,
+     "output": 157,
+     "cache_read": 7907,
+     "cache_creation": 2886
+    },
+    "record:vt/a12/c#/usage/session/state": "measured",
+    "record:vt/a12/c#/usage/session/tokens": {
+     "input": 6,
+     "output": 166,
+     "cache_read": 7907,
+     "cache_creation": 3730
+    },
+    "record:vt/a12/c#/usage/cost_usd_reported": {
+     "$approx": 0.016116699999999998
+    },
+    "record:vt/a12/c#/usage/resume_base": null,
+    "record:vt/a12/c#/usage/run/state": "measured",
+    "record:vt/a12/c#/usage/run/tokens": {
+     "input": 6,
+     "output": 166,
+     "cache_read": 7907,
+     "cache_creation": 3730
+    },
+    "record:vt/a12/c#/usage/run_cost_usd": {
+     "$approx": 0.016116699999999998
+    },
+    "record:vt/a12/c#/usage/attribution_check": "consistent",
+    "record:vt/a12/c#/judgment/status": "succeeded",
+    "record:vt/a12/c#/judgment/counts_as_success": true,
+    "exit[0]": 0,
+    "record:vt/a12/c#/usage/children/0/tool_use_id": "toolu_013tQgWfRyafKrqQipk3EsZk",
+    "record:vt/a12/c#/usage/children/0/agent_id": "af06f3de7793d2534",
+    "record:vt/a12/c#/usage/children/0/usage/tokens": {
+     "input": 2,
+     "output": 9,
+     "cache_read": 0,
+     "cache_creation": 844
+    },
+    "record:vt/a12/c#/stdout/sha256": "65ab636992642d7589dae4776eca2ccbe16db9ac37a896fa539130f62c3a777b",
+    "record:vt/a12/c#/stdout/bytes": 12011
+   },
+   "basis": {
+    "record:vt/a12/c#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a12/c#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a12/c#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a12/c#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a12/c#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a12/c#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a12/c#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a12/c#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a12/c#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a12/c#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a12/c#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a12/c#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a12/c#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a12/c#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a12/c#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a12/c#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 157, 'cache_read': 7907, 'cache_creation': 2886}",
+    "record:vt/a12/c#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a12/c#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 6, 'output': 166, 'cache_read': 7907, 'cache_creation': 3730}",
+    "record:vt/a12/c#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a12/c#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a12/c#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a12/c#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a12/c#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.016116699999999998",
+    "record:vt/a12/c#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a12/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a12/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a12/c#/usage/children/0/tool_use_id": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a12/c#/usage/children/0/agent_id": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a12/c#/usage/children/0/usage/tokens": "02-01 REPORT §1 row 사용량(stream.rs) + Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; parent(4,157,7907,2886)+child(2,9,0,844)=modelUsage(6,166,7907,3730)",
+    "record:vt/a12/c#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a12/c#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest"
+   },
+   "undetermined_fields": {
+    "record:vt/a12/c#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a12/c#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-13",
+   "set": "validation",
+   "family": "model_resume_chain_compaction",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/n1.jsonl",
+      "fixture": "fx-03.jsonl"
+     },
+     {
+      "path": "{FIX}/n2.jsonl",
+      "fixture": "fx-04.jsonl"
+     },
+     {
+      "path": "{FIX}/n3.jsonl",
+      "fixture": "fx-05.jsonl"
+     },
+     {
+      "path": "{FIX}/n4a.jsonl",
+      "fixture": "fx-06.jsonl"
+     },
+     {
+      "path": "{FIX}/l2.jsonl",
+      "fixture": "fx-08.jsonl"
+     },
+     {
+      "path": "{FIX}/l3.jsonl",
+      "fixture": "fx-09.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a13-0 --command n1 --model-request --session new -- /bin/cat '{FIX}/n1.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a13-1 --command n2 --model-request --session resume --resume-base '{OUT}/vt/a13-0/n1/record.json' -- /bin/cat '{FIX}/n2.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a13-2 --command n3 --model-request --session resume --resume-base '{OUT}/vt/a13-1/n2/record.json' -- /bin/cat '{FIX}/n3.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a13-3 --command n4a --model-request --session resume --resume-base '{OUT}/vt/a13-2/n3/record.json' -- /bin/cat '{FIX}/n4a.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a13-4 --command l2 --model-request --session resume --resume-base '{OUT}/vt/a13-3/n4a/record.json' -- /bin/cat '{FIX}/l2.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a13-5 --command l3 --model-request --session resume --resume-base '{OUT}/vt/a13-4/l2/record.json' -- /bin/cat '{FIX}/l3.jsonl'",
+    "'{BIN}' summarize '{OUT}'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a13-0/n1#/model_request": true,
+    "record:vt/a13-0/n1#/result_event/count": 1,
+    "record:vt/a13-0/n1#/result_event/present": true,
+    "record:vt/a13-0/n1#/result_event/subtype": "success",
+    "record:vt/a13-0/n1#/result_event/is_error": false,
+    "record:vt/a13-0/n1#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a13-0/n1#/result_event/num_turns": 1,
+    "record:vt/a13-0/n1#/result_event/stop_reason": "end_turn",
+    "record:vt/a13-0/n1#/result_event/non_json_lines": 0,
+    "record:vt/a13-0/n1#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a13-0/n1#/result_event/compact_boundaries": 0,
+    "record:vt/a13-0/n1#/usage/applicability": "model",
+    "record:vt/a13-0/n1#/usage/session_mode": "new",
+    "record:vt/a13-0/n1#/usage/internal_retries": "unmeasured",
+    "record:vt/a13-0/n1#/usage/parent/state": "measured",
+    "record:vt/a13-0/n1#/usage/parent/tokens": {
+     "input": 2,
+     "output": 135,
+     "cache_read": 2224,
+     "cache_creation": 342
+    },
+    "record:vt/a13-0/n1#/usage/session/state": "measured",
+    "record:vt/a13-0/n1#/usage/session/tokens": {
+     "input": 2,
+     "output": 135,
+     "cache_read": 2224,
+     "cache_creation": 342
+    },
+    "record:vt/a13-0/n1#/usage/cost_usd_reported": {
+     "$approx": 0.0029444000000000002
+    },
+    "record:vt/a13-0/n1#/usage/resume_base": null,
+    "record:vt/a13-0/n1#/usage/run/state": "measured",
+    "record:vt/a13-0/n1#/usage/run/tokens": {
+     "input": 2,
+     "output": 135,
+     "cache_read": 2224,
+     "cache_creation": 342
+    },
+    "record:vt/a13-0/n1#/usage/run_cost_usd": {
+     "$approx": 0.0029444000000000002
+    },
+    "record:vt/a13-0/n1#/usage/attribution_check": "consistent",
+    "record:vt/a13-0/n1#/judgment/status": "succeeded",
+    "record:vt/a13-0/n1#/judgment/counts_as_success": true,
+    "exit[0]": 0,
+    "record:vt/a13-1/n2#/model_request": true,
+    "record:vt/a13-1/n2#/result_event/count": 1,
+    "record:vt/a13-1/n2#/result_event/present": true,
+    "record:vt/a13-1/n2#/result_event/subtype": "success",
+    "record:vt/a13-1/n2#/result_event/is_error": false,
+    "record:vt/a13-1/n2#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a13-1/n2#/result_event/num_turns": 1,
+    "record:vt/a13-1/n2#/result_event/stop_reason": "end_turn",
+    "record:vt/a13-1/n2#/result_event/non_json_lines": 0,
+    "record:vt/a13-1/n2#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a13-1/n2#/result_event/compact_boundaries": 0,
+    "record:vt/a13-1/n2#/usage/applicability": "model",
+    "record:vt/a13-1/n2#/usage/session_mode": "resume",
+    "record:vt/a13-1/n2#/usage/internal_retries": "unmeasured",
+    "record:vt/a13-1/n2#/usage/parent/state": "measured",
+    "record:vt/a13-1/n2#/usage/parent/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2566,
+     "cache_creation": 158
+    },
+    "record:vt/a13-1/n2#/usage/session/state": "measured",
+    "record:vt/a13-1/n2#/usage/session/tokens": {
+     "input": 6,
+     "output": 147,
+     "cache_read": 4790,
+     "cache_creation": 500
+    },
+    "record:vt/a13-1/n2#/usage/cost_usd_reported": {
+     "$approx": 0.003961
+    },
+    "record:vt/a13-1/n2#/usage/run/state": "measured",
+    "record:vt/a13-1/n2#/usage/run/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2566,
+     "cache_creation": 158
+    },
+    "record:vt/a13-1/n2#/usage/run_cost_usd": {
+     "$approx": 0.0010165999999999999
+    },
+    "record:vt/a13-1/n2#/usage/attribution_check": "consistent",
+    "record:vt/a13-1/n2#/judgment/status": "succeeded",
+    "record:vt/a13-1/n2#/judgment/counts_as_success": true,
+    "exit[1]": 0,
+    "record:vt/a13-2/n3#/model_request": true,
+    "record:vt/a13-2/n3#/result_event/count": 1,
+    "record:vt/a13-2/n3#/result_event/present": true,
+    "record:vt/a13-2/n3#/result_event/subtype": "success",
+    "record:vt/a13-2/n3#/result_event/is_error": false,
+    "record:vt/a13-2/n3#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a13-2/n3#/result_event/num_turns": 1,
+    "record:vt/a13-2/n3#/result_event/stop_reason": "end_turn",
+    "record:vt/a13-2/n3#/result_event/non_json_lines": 0,
+    "record:vt/a13-2/n3#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a13-2/n3#/result_event/compact_boundaries": 0,
+    "record:vt/a13-2/n3#/usage/applicability": "model",
+    "record:vt/a13-2/n3#/usage/session_mode": "resume",
+    "record:vt/a13-2/n3#/usage/internal_retries": "unmeasured",
+    "record:vt/a13-2/n3#/usage/parent/state": "measured",
+    "record:vt/a13-2/n3#/usage/parent/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2724,
+     "cache_creation": 37
+    },
+    "record:vt/a13-2/n3#/usage/session/state": "measured",
+    "record:vt/a13-2/n3#/usage/session/tokens": {
+     "input": 10,
+     "output": 159,
+     "cache_read": 7514,
+     "cache_creation": 537
+    },
+    "record:vt/a13-2/n3#/usage/cost_usd_reported": {
+     "$approx": 0.0045094
+    },
+    "record:vt/a13-2/n3#/usage/run/state": "measured",
+    "record:vt/a13-2/n3#/usage/run/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2724,
+     "cache_creation": 37
+    },
+    "record:vt/a13-2/n3#/usage/run_cost_usd": {
+     "$approx": 0.0005484000000000001
+    },
+    "record:vt/a13-2/n3#/usage/attribution_check": "consistent",
+    "record:vt/a13-2/n3#/judgment/status": "succeeded",
+    "record:vt/a13-2/n3#/judgment/counts_as_success": true,
+    "exit[2]": 0,
+    "record:vt/a13-3/n4a#/model_request": true,
+    "record:vt/a13-3/n4a#/result_event/count": 1,
+    "record:vt/a13-3/n4a#/result_event/present": true,
+    "record:vt/a13-3/n4a#/result_event/subtype": "success",
+    "record:vt/a13-3/n4a#/result_event/is_error": false,
+    "record:vt/a13-3/n4a#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a13-3/n4a#/result_event/num_turns": 3,
+    "record:vt/a13-3/n4a#/result_event/stop_reason": "end_turn",
+    "record:vt/a13-3/n4a#/result_event/non_json_lines": 0,
+    "record:vt/a13-3/n4a#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a13-3/n4a#/result_event/compact_boundaries": 0,
+    "record:vt/a13-3/n4a#/usage/applicability": "model",
+    "record:vt/a13-3/n4a#/usage/session_mode": "resume",
+    "record:vt/a13-3/n4a#/usage/internal_retries": "unmeasured",
+    "record:vt/a13-3/n4a#/usage/parent/state": "measured",
+    "record:vt/a13-3/n4a#/usage/parent/tokens": {
+     "input": 8,
+     "output": 342,
+     "cache_read": 13364,
+     "cache_creation": 1528
+    },
+    "record:vt/a13-3/n4a#/usage/session/state": "measured",
+    "record:vt/a13-3/n4a#/usage/session/tokens": {
+     "input": 18,
+     "output": 501,
+     "cache_read": 20878,
+     "cache_creation": 2065
+    },
+    "record:vt/a13-3/n4a#/usage/cost_usd_reported": {
+     "$approx": 0.015393800000000001
+    },
+    "record:vt/a13-3/n4a#/usage/run/state": "measured",
+    "record:vt/a13-3/n4a#/usage/run/tokens": {
+     "input": 8,
+     "output": 342,
+     "cache_read": 13364,
+     "cache_creation": 1528
+    },
+    "record:vt/a13-3/n4a#/usage/run_cost_usd": {
+     "$approx": 0.0108844
+    },
+    "record:vt/a13-3/n4a#/usage/attribution_check": "consistent",
+    "record:vt/a13-3/n4a#/judgment/status": "succeeded",
+    "record:vt/a13-3/n4a#/judgment/counts_as_success": true,
+    "exit[3]": 0,
+    "record:vt/a13-4/l2#/model_request": true,
+    "record:vt/a13-4/l2#/result_event/count": 1,
+    "record:vt/a13-4/l2#/result_event/present": true,
+    "record:vt/a13-4/l2#/result_event/subtype": "success",
+    "record:vt/a13-4/l2#/result_event/is_error": false,
+    "record:vt/a13-4/l2#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a13-4/l2#/result_event/num_turns": 1,
+    "record:vt/a13-4/l2#/result_event/stop_reason": "end_turn",
+    "record:vt/a13-4/l2#/result_event/non_json_lines": 0,
+    "record:vt/a13-4/l2#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a13-4/l2#/result_event/compact_boundaries": 0,
+    "record:vt/a13-4/l2#/usage/applicability": "model",
+    "record:vt/a13-4/l2#/usage/session_mode": "resume",
+    "record:vt/a13-4/l2#/usage/internal_retries": "unmeasured",
+    "record:vt/a13-4/l2#/usage/parent/state": "measured",
+    "record:vt/a13-4/l2#/usage/parent/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2761,
+     "cache_creation": 1042
+    },
+    "record:vt/a13-4/l2#/usage/session/state": "measured",
+    "record:vt/a13-4/l2#/usage/session/tokens": {
+     "input": 22,
+     "output": 513,
+     "cache_read": 23639,
+     "cache_creation": 3107
+    },
+    "record:vt/a13-4/l2#/usage/cost_usd_reported": {
+     "$approx": 0.0199659
+    },
+    "record:vt/a13-4/l2#/usage/run/state": "measured",
+    "record:vt/a13-4/l2#/usage/run/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2761,
+     "cache_creation": 1042
+    },
+    "record:vt/a13-4/l2#/usage/run_cost_usd": {
+     "$approx": 0.004572100000000001
+    },
+    "record:vt/a13-4/l2#/usage/attribution_check": "consistent",
+    "record:vt/a13-4/l2#/judgment/status": "succeeded",
+    "record:vt/a13-4/l2#/judgment/counts_as_success": true,
+    "exit[4]": 0,
+    "record:vt/a13-5/l3#/model_request": true,
+    "record:vt/a13-5/l3#/result_event/count": 1,
+    "record:vt/a13-5/l3#/result_event/present": true,
+    "record:vt/a13-5/l3#/result_event/subtype": "success",
+    "record:vt/a13-5/l3#/result_event/is_error": false,
+    "record:vt/a13-5/l3#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a13-5/l3#/result_event/num_turns": 0,
+    "record:vt/a13-5/l3#/result_event/stop_reason": null,
+    "record:vt/a13-5/l3#/result_event/non_json_lines": 0,
+    "record:vt/a13-5/l3#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a13-5/l3#/result_event/compact_boundaries": 1,
+    "record:vt/a13-5/l3#/usage/applicability": "model",
+    "record:vt/a13-5/l3#/usage/session_mode": "resume",
+    "record:vt/a13-5/l3#/usage/internal_retries": "unmeasured",
+    "record:vt/a13-5/l3#/usage/parent/state": "measured",
+    "record:vt/a13-5/l3#/usage/parent/tokens": {
+     "input": 0,
+     "output": 0,
+     "cache_read": 0,
+     "cache_creation": 0
+    },
+    "record:vt/a13-5/l3#/usage/session/state": "measured",
+    "record:vt/a13-5/l3#/usage/session/tokens": {
+     "input": 2042,
+     "output": 1867,
+     "cache_read": 26400,
+     "cache_creation": 4126
+    },
+    "record:vt/a13-5/l3#/usage/cost_usd_reported": {
+     "$approx": 0.0403695
+    },
+    "record:vt/a13-5/l3#/usage/run/state": "measured",
+    "record:vt/a13-5/l3#/usage/run/tokens": {
+     "input": 2020,
+     "output": 1354,
+     "cache_read": 2761,
+     "cache_creation": 1019
+    },
+    "record:vt/a13-5/l3#/usage/run_cost_usd": {
+     "$approx": 0.0204036
+    },
+    "record:vt/a13-5/l3#/usage/attribution_check": "mismatch",
+    "record:vt/a13-5/l3#/usage/attribution_detail": {
+     "$not_null": true
+    },
+    "record:vt/a13-5/l3#/judgment/status": "succeeded",
+    "record:vt/a13-5/l3#/judgment/counts_as_success": true,
+    "exit[5]": 0,
+    "summary[6]~completeness": "complete",
+    "summary[6]~tokens_measured_sum": {
+     "input": 2042,
+     "output": 1867,
+     "cache_read": 26400,
+     "cache_creation": 4126
+    }
+   },
+   "basis": {
+    "record:vt/a13-0/n1#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a13-0/n1#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a13-0/n1#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-0/n1#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-0/n1#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-0/n1#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-0/n1#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-0/n1#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-0/n1#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a13-0/n1#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a13-0/n1#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a13-0/n1#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a13-0/n1#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a13-0/n1#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a13-0/n1#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a13-0/n1#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 2, 'output': 135, 'cache_read': 2224, 'cache_creation': 342}",
+    "record:vt/a13-0/n1#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a13-0/n1#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 2, 'output': 135, 'cache_read': 2224, 'cache_creation': 342}",
+    "record:vt/a13-0/n1#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a13-0/n1#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a13-0/n1#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-0/n1#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a13-0/n1#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0029444000000000002",
+    "record:vt/a13-0/n1#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a13-0/n1#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a13-0/n1#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a13-1/n2#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a13-1/n2#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a13-1/n2#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-1/n2#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-1/n2#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-1/n2#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-1/n2#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-1/n2#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-1/n2#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a13-1/n2#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a13-1/n2#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a13-1/n2#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a13-1/n2#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a13-1/n2#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a13-1/n2#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a13-1/n2#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 12, 'cache_read': 2566, 'cache_creation': 158}",
+    "record:vt/a13-1/n2#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a13-1/n2#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 6, 'output': 147, 'cache_read': 4790, 'cache_creation': 500}",
+    "record:vt/a13-1/n2#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a13-1/n2#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-1/n2#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a13-1/n2#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0010165999999999999",
+    "record:vt/a13-1/n2#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a13-1/n2#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a13-1/n2#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[1]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a13-2/n3#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a13-2/n3#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a13-2/n3#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-2/n3#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-2/n3#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-2/n3#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-2/n3#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-2/n3#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-2/n3#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a13-2/n3#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a13-2/n3#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a13-2/n3#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a13-2/n3#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a13-2/n3#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a13-2/n3#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a13-2/n3#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 12, 'cache_read': 2724, 'cache_creation': 37}",
+    "record:vt/a13-2/n3#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a13-2/n3#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 10, 'output': 159, 'cache_read': 7514, 'cache_creation': 537}",
+    "record:vt/a13-2/n3#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a13-2/n3#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-2/n3#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a13-2/n3#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0005484000000000001",
+    "record:vt/a13-2/n3#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a13-2/n3#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a13-2/n3#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[2]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a13-3/n4a#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a13-3/n4a#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a13-3/n4a#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-3/n4a#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-3/n4a#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-3/n4a#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-3/n4a#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-3/n4a#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-3/n4a#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a13-3/n4a#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a13-3/n4a#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a13-3/n4a#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a13-3/n4a#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a13-3/n4a#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a13-3/n4a#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a13-3/n4a#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 8, 'output': 342, 'cache_read': 13364, 'cache_creation': 1528}",
+    "record:vt/a13-3/n4a#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a13-3/n4a#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 18, 'output': 501, 'cache_read': 20878, 'cache_creation': 2065}",
+    "record:vt/a13-3/n4a#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a13-3/n4a#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-3/n4a#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a13-3/n4a#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0108844",
+    "record:vt/a13-3/n4a#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a13-3/n4a#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a13-3/n4a#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[3]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a13-4/l2#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a13-4/l2#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a13-4/l2#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-4/l2#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-4/l2#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-4/l2#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-4/l2#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-4/l2#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-4/l2#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a13-4/l2#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a13-4/l2#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a13-4/l2#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a13-4/l2#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a13-4/l2#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a13-4/l2#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a13-4/l2#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 12, 'cache_read': 2761, 'cache_creation': 1042}",
+    "record:vt/a13-4/l2#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a13-4/l2#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 22, 'output': 513, 'cache_read': 23639, 'cache_creation': 3107}",
+    "record:vt/a13-4/l2#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a13-4/l2#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-4/l2#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a13-4/l2#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.004572100000000001",
+    "record:vt/a13-4/l2#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a13-4/l2#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a13-4/l2#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[4]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a13-5/l3#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a13-5/l3#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a13-5/l3#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-5/l3#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-5/l3#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-5/l3#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-5/l3#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-5/l3#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a13-5/l3#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a13-5/l3#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a13-5/l3#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a13-5/l3#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a13-5/l3#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a13-5/l3#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a13-5/l3#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a13-5/l3#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 0, 'output': 0, 'cache_read': 0, 'cache_creation': 0}",
+    "record:vt/a13-5/l3#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a13-5/l3#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 2042, 'output': 1867, 'cache_read': 26400, 'cache_creation': 4126}",
+    "record:vt/a13-5/l3#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a13-5/l3#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a13-5/l3#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle; L3 session(2042,1867,26400,4126)-L2 session(22,513,23639,3107)=(2020,1354,2761,1019) (REPORT §3 compaction usage)",
+    "record:vt/a13-5/l3#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0204036",
+    "record:vt/a13-5/l3#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조 (compaction: run != parent 0 + no child -> mismatch, kept measured)",
+    "record:vt/a13-5/l3#/usage/attribution_detail": "02-01 REPORT §1 row 귀속 대조 (difference recorded)",
+    "record:vt/a13-5/l3#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a13-5/l3#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[5]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "summary[6]~completeness": "02-01 REPORT §1 row 합산(aggregate.rs)",
+    "summary[6]~tokens_measured_sum": "02-01 REPORT §1 row 합산(aggregate.rs) + review-pr21-2df3c35 §3.4 (tokens_measured_sum null when nothing measured; key name from accepted review); sum of run shares = final cumulative (2042,1867,26400,4126)"
+   },
+   "undetermined_fields": {
+    "record:vt/a13-0/n1#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a13-0/n1#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a13-1/n2#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a13-1/n2#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a13-2/n3#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a13-2/n3#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a13-3/n4a#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a13-3/n4a#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a13-4/l2#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a13-4/l2#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a13-5/l3#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a13-5/l3#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-14",
+   "set": "validation",
+   "family": "model_wrong_base",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/n1.jsonl",
+      "fixture": "fx-03.jsonl"
+     },
+     {
+      "path": "{FIX}/n2.jsonl",
+      "fixture": "fx-04.jsonl"
+     },
+     {
+      "path": "{FIX}/n3.jsonl",
+      "fixture": "fx-05.jsonl"
+     },
+     {
+      "path": "{FIX}/n4a.jsonl",
+      "fixture": "fx-06.jsonl"
+     },
+     {
+      "path": "{FIX}/n4b.jsonl",
+      "fixture": "fx-07.jsonl"
+     },
+     {
+      "path": "{FIX}/l2.jsonl",
+      "fixture": "fx-08.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a14-0 --command n1 --model-request --session new -- /bin/cat '{FIX}/n1.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a14-1 --command n2 --model-request --session resume --resume-base '{OUT}/vt/a14-0/n1/record.json' -- /bin/cat '{FIX}/n2.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a14-2 --command n3 --model-request --session resume --resume-base '{OUT}/vt/a14-1/n2/record.json' -- /bin/cat '{FIX}/n3.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a14-3 --command n4a --model-request --session resume --resume-base '{OUT}/vt/a14-2/n3/record.json' -- /bin/cat '{FIX}/n4a.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a14-4 --command n4b --model-request --session resume --resume-base '{OUT}/vt/a14-3/n4a/record.json' -- /bin/cat '{FIX}/n4b.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a14-5 --command l2 --model-request --session resume --resume-base '{OUT}/vt/a14-4/n4b/record.json' -- /bin/cat '{FIX}/l2.jsonl'",
+    "'{BIN}' summarize '{OUT}'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a14-4/n4b#/model_request": true,
+    "record:vt/a14-4/n4b#/result_event/count": 2,
+    "record:vt/a14-4/n4b#/result_event/present": true,
+    "record:vt/a14-4/n4b#/result_event/subtype": "success",
+    "record:vt/a14-4/n4b#/result_event/is_error": false,
+    "record:vt/a14-4/n4b#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a14-4/n4b#/result_event/num_turns": 1,
+    "record:vt/a14-4/n4b#/result_event/stop_reason": "end_turn",
+    "record:vt/a14-4/n4b#/result_event/non_json_lines": 0,
+    "record:vt/a14-4/n4b#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a14-4/n4b#/result_event/compact_boundaries": 0,
+    "record:vt/a14-4/n4b#/usage/applicability": "model",
+    "record:vt/a14-4/n4b#/usage/session_mode": "resume",
+    "record:vt/a14-4/n4b#/usage/internal_retries": "unmeasured",
+    "record:vt/a14-4/n4b#/usage/parent/state": "measured",
+    "record:vt/a14-4/n4b#/usage/parent/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2761,
+     "cache_creation": 1078
+    },
+    "record:vt/a14-4/n4b#/usage/session/state": "measured",
+    "record:vt/a14-4/n4b#/usage/session/tokens": {
+     "input": 14,
+     "output": 171,
+     "cache_read": 10275,
+     "cache_creation": 1615
+    },
+    "record:vt/a14-4/n4b#/usage/cost_usd_reported": {
+     "$approx": 0.009225500000000001
+    },
+    "record:vt/a14-4/n4b#/usage/run/state": "unmeasured",
+    "record:vt/a14-5/l2#/model_request": true,
+    "record:vt/a14-5/l2#/result_event/count": 1,
+    "record:vt/a14-5/l2#/result_event/present": true,
+    "record:vt/a14-5/l2#/result_event/subtype": "success",
+    "record:vt/a14-5/l2#/result_event/is_error": false,
+    "record:vt/a14-5/l2#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a14-5/l2#/result_event/num_turns": 1,
+    "record:vt/a14-5/l2#/result_event/stop_reason": "end_turn",
+    "record:vt/a14-5/l2#/result_event/non_json_lines": 0,
+    "record:vt/a14-5/l2#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a14-5/l2#/result_event/compact_boundaries": 0,
+    "record:vt/a14-5/l2#/usage/applicability": "model",
+    "record:vt/a14-5/l2#/usage/session_mode": "resume",
+    "record:vt/a14-5/l2#/usage/internal_retries": "unmeasured",
+    "record:vt/a14-5/l2#/usage/parent/state": "measured",
+    "record:vt/a14-5/l2#/usage/parent/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2761,
+     "cache_creation": 1042
+    },
+    "record:vt/a14-5/l2#/usage/session/state": "measured",
+    "record:vt/a14-5/l2#/usage/session/tokens": {
+     "input": 22,
+     "output": 513,
+     "cache_read": 23639,
+     "cache_creation": 3107
+    },
+    "record:vt/a14-5/l2#/usage/cost_usd_reported": {
+     "$approx": 0.0199659
+    },
+    "record:vt/a14-5/l2#/usage/run/state": "unmeasured",
+    "record:vt/a14-3/n4a#/usage/run/tokens": {
+     "input": 8,
+     "output": 342,
+     "cache_read": 13364,
+     "cache_creation": 1528
+    },
+    "summary[6]~completeness": "incomplete",
+    "summary[6]~tokens_measured_sum": {
+     "input": 18,
+     "output": 501,
+     "cache_read": 20878,
+     "cache_creation": 2065
+    },
+    "summary[6]": {
+     "$contains_all": [
+      "n4b",
+      "a14-5"
+     ]
+    }
+   },
+   "basis": {
+    "record:vt/a14-4/n4b#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a14-4/n4b#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=2",
+    "record:vt/a14-4/n4b#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a14-4/n4b#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-4/n4b#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-4/n4b#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-4/n4b#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-4/n4b#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-4/n4b#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a14-4/n4b#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a14-4/n4b#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a14-4/n4b#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a14-4/n4b#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a14-4/n4b#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a14-4/n4b#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a14-4/n4b#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 12, 'cache_read': 2761, 'cache_creation': 1078}",
+    "record:vt/a14-4/n4b#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a14-4/n4b#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 14, 'output': 171, 'cache_read': 10275, 'cache_creation': 1615}",
+    "record:vt/a14-4/n4b#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a14-4/n4b#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs); N4b session (14,171,10275,1615) < base N4a (18,501,20878,2065) -> decreasing -> unmeasured",
+    "record:vt/a14-5/l2#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a14-5/l2#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a14-5/l2#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a14-5/l2#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-5/l2#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-5/l2#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-5/l2#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-5/l2#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a14-5/l2#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a14-5/l2#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a14-5/l2#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a14-5/l2#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a14-5/l2#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a14-5/l2#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a14-5/l2#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a14-5/l2#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 12, 'cache_read': 2761, 'cache_creation': 1042}",
+    "record:vt/a14-5/l2#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a14-5/l2#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 22, 'output': 513, 'cache_read': 23639, 'cache_creation': 3107}",
+    "record:vt/a14-5/l2#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a14-5/l2#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs); L2-N4b=(8,342,13364,1492) != parent (4,12,2761,1042), no compaction -> withdrawn (REPORT §3)",
+    "record:vt/a14-3/n4a#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; (8,342,13364,1528)",
+    "summary[6]~completeness": "02-01 REPORT §1 row 합산(aggregate.rs)",
+    "summary[6]~tokens_measured_sum": "02-01 REPORT §1 row 합산(aggregate.rs) + review-pr21-2df3c35 §3.4 (tokens_measured_sum null when nothing measured; key name from accepted review); measured runs n1..n4a sum = N4a cumulative (18,501,20878,2065)",
+    "summary[6]": "02-01 REPORT §1 row 합산(aggregate.rs) (unmeasured runs listed: n4b, and l2 of attempt a14-5)"
+   },
+   "undetermined_fields": {
+    "record:vt/a14-4/n4b#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a14-4/n4b#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a14-5/l2#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a14-5/l2#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a14-4/n4b#/usage/resume_base": "whether a rejected base is still echoed in resume_base not fixed",
+    "record:vt/a14-4/n4b#/judgment/status": "whether unmeasured run usage affects judgment is not fixed",
+    "record:vt/a14-5/l2#/usage/resume_base": "whether a rejected base is still echoed in resume_base not fixed",
+    "record:vt/a14-5/l2#/judgment/status": "whether unmeasured run usage affects judgment is not fixed"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-15",
+   "set": "validation",
+   "family": "model_resume_branch_base",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/n1.jsonl",
+      "fixture": "fx-03.jsonl"
+     },
+     {
+      "path": "{FIX}/n2.jsonl",
+      "fixture": "fx-04.jsonl"
+     },
+     {
+      "path": "{FIX}/n3.jsonl",
+      "fixture": "fx-05.jsonl"
+     },
+     {
+      "path": "{FIX}/n4b.jsonl",
+      "fixture": "fx-07.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a15-0 --command n1 --model-request --session new -- /bin/cat '{FIX}/n1.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a15-1 --command n2 --model-request --session resume --resume-base '{OUT}/vt/a15-0/n1/record.json' -- /bin/cat '{FIX}/n2.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a15-2 --command n3 --model-request --session resume --resume-base '{OUT}/vt/a15-1/n2/record.json' -- /bin/cat '{FIX}/n3.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a15-3 --command n4b --model-request --session resume --resume-base '{OUT}/vt/a15-2/n3/record.json' -- /bin/cat '{FIX}/n4b.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a15-3/n4b#/model_request": true,
+    "record:vt/a15-3/n4b#/result_event/count": 2,
+    "record:vt/a15-3/n4b#/result_event/present": true,
+    "record:vt/a15-3/n4b#/result_event/subtype": "success",
+    "record:vt/a15-3/n4b#/result_event/is_error": false,
+    "record:vt/a15-3/n4b#/result_event/session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "record:vt/a15-3/n4b#/result_event/num_turns": 1,
+    "record:vt/a15-3/n4b#/result_event/stop_reason": "end_turn",
+    "record:vt/a15-3/n4b#/result_event/non_json_lines": 0,
+    "record:vt/a15-3/n4b#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a15-3/n4b#/result_event/compact_boundaries": 0,
+    "record:vt/a15-3/n4b#/usage/applicability": "model",
+    "record:vt/a15-3/n4b#/usage/session_mode": "resume",
+    "record:vt/a15-3/n4b#/usage/internal_retries": "unmeasured",
+    "record:vt/a15-3/n4b#/usage/parent/state": "measured",
+    "record:vt/a15-3/n4b#/usage/parent/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2761,
+     "cache_creation": 1078
+    },
+    "record:vt/a15-3/n4b#/usage/session/state": "measured",
+    "record:vt/a15-3/n4b#/usage/session/tokens": {
+     "input": 14,
+     "output": 171,
+     "cache_read": 10275,
+     "cache_creation": 1615
+    },
+    "record:vt/a15-3/n4b#/usage/cost_usd_reported": {
+     "$approx": 0.009225500000000001
+    },
+    "record:vt/a15-3/n4b#/usage/run/state": "measured",
+    "record:vt/a15-3/n4b#/usage/run/tokens": {
+     "input": 4,
+     "output": 12,
+     "cache_read": 2761,
+     "cache_creation": 1078
+    },
+    "record:vt/a15-3/n4b#/usage/run_cost_usd": {
+     "$approx": 0.004716100000000001
+    },
+    "record:vt/a15-3/n4b#/usage/attribution_check": "consistent",
+    "record:vt/a15-3/n4b#/judgment/status": "succeeded",
+    "record:vt/a15-3/n4b#/judgment/counts_as_success": true,
+    "exit[3]": 0
+   },
+   "basis": {
+    "record:vt/a15-3/n4b#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a15-3/n4b#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=2 (two result events; selected = the one with num_turns 1)",
+    "record:vt/a15-3/n4b#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a15-3/n4b#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a15-3/n4b#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a15-3/n4b#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a15-3/n4b#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a15-3/n4b#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a15-3/n4b#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a15-3/n4b#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a15-3/n4b#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a15-3/n4b#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a15-3/n4b#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a15-3/n4b#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a15-3/n4b#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a15-3/n4b#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 12, 'cache_read': 2761, 'cache_creation': 1078}",
+    "record:vt/a15-3/n4b#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a15-3/n4b#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 14, 'output': 171, 'cache_read': 10275, 'cache_creation': 1615}",
+    "record:vt/a15-3/n4b#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a15-3/n4b#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a15-3/n4b#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a15-3/n4b#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.004716100000000001",
+    "record:vt/a15-3/n4b#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a15-3/n4b#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a15-3/n4b#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[3]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:vt/a15-3/n4b#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a15-3/n4b#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-16",
+   "set": "validation",
+   "family": "model_different_session_base",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/a.jsonl",
+      "fixture": "fx-03.jsonl"
+     },
+     {
+      "path": "{FIX}/b.jsonl",
+      "fixture": "fx-11.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a16-0 --command base --model-request --session new -- /bin/cat '{FIX}/a.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a16-1 --command next --model-request --session resume --resume-base '{OUT}/vt/a16-0/base/record.json' -- /bin/cat '{FIX}/b.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a16-1/next#/model_request": true,
+    "record:vt/a16-1/next#/result_event/count": 1,
+    "record:vt/a16-1/next#/result_event/present": true,
+    "record:vt/a16-1/next#/result_event/subtype": "success",
+    "record:vt/a16-1/next#/result_event/is_error": false,
+    "record:vt/a16-1/next#/result_event/session_id": "228beaa8-5a42-46ef-b9a7-93c418719718",
+    "record:vt/a16-1/next#/result_event/num_turns": 1,
+    "record:vt/a16-1/next#/result_event/stop_reason": "end_turn",
+    "record:vt/a16-1/next#/result_event/non_json_lines": 0,
+    "record:vt/a16-1/next#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a16-1/next#/result_event/compact_boundaries": 0,
+    "record:vt/a16-1/next#/usage/applicability": "model",
+    "record:vt/a16-1/next#/usage/session_mode": "resume",
+    "record:vt/a16-1/next#/usage/internal_retries": "unmeasured",
+    "record:vt/a16-1/next#/usage/parent/state": "measured",
+    "record:vt/a16-1/next#/usage/parent/tokens": {
+     "input": 4,
+     "output": 14,
+     "cache_read": 2449,
+     "cache_creation": 586
+    },
+    "record:vt/a16-1/next#/usage/session/state": "measured",
+    "record:vt/a16-1/next#/usage/session/tokens": {
+     "input": 6,
+     "output": 626,
+     "cache_read": 3098,
+     "cache_creation": 2386
+    },
+    "record:vt/a16-1/next#/usage/cost_usd_reported": {
+     "$approx": 0.0161258
+    },
+    "record:vt/a16-1/next#/usage/run/state": "unmeasured"
+   },
+   "basis": {
+    "record:vt/a16-1/next#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a16-1/next#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a16-1/next#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a16-1/next#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a16-1/next#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a16-1/next#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a16-1/next#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a16-1/next#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a16-1/next#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a16-1/next#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a16-1/next#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a16-1/next#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a16-1/next#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a16-1/next#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a16-1/next#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a16-1/next#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 4, 'output': 14, 'cache_read': 2449, 'cache_creation': 586}",
+    "record:vt/a16-1/next#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a16-1/next#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 6, 'output': 626, 'cache_read': 3098, 'cache_creation': 2386}",
+    "record:vt/a16-1/next#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a16-1/next#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs); base session_id differs (REPORT §2 '다른 세션 기준 -> 미계측')"
+   },
+   "undetermined_fields": {
+    "record:vt/a16-1/next#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a16-1/next#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a16-1/next#/usage/resume_base": "whether a rejected base is still echoed not fixed"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-17",
+   "set": "validation",
+   "family": "model_result_error",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/e.jsonl",
+      "fixture": "fx-12.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a17 --command c --model-request --session new -- /bin/cat '{FIX}/e.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a17/c#/model_request": true,
+    "record:vt/a17/c#/result_event/count": 1,
+    "record:vt/a17/c#/result_event/present": true,
+    "record:vt/a17/c#/result_event/subtype": "error_during_execution",
+    "record:vt/a17/c#/result_event/is_error": true,
+    "record:vt/a17/c#/result_event/session_id": "73305c11-cd0f-4d86-83e4-585fb858ab1a",
+    "record:vt/a17/c#/result_event/num_turns": 0,
+    "record:vt/a17/c#/result_event/stop_reason": null,
+    "record:vt/a17/c#/result_event/non_json_lines": 0,
+    "record:vt/a17/c#/result_event/rate_limit_statuses": [],
+    "record:vt/a17/c#/result_event/compact_boundaries": 0,
+    "record:vt/a17/c#/usage/applicability": "model",
+    "record:vt/a17/c#/usage/session_mode": "new",
+    "record:vt/a17/c#/usage/internal_retries": "unmeasured",
+    "record:vt/a17/c#/usage/parent/state": "measured",
+    "record:vt/a17/c#/usage/parent/tokens": {
+     "input": 0,
+     "output": 0,
+     "cache_read": 0,
+     "cache_creation": 0
+    },
+    "record:vt/a17/c#/usage/cost_usd_reported": {
+     "$approx": 0
+    },
+    "record:vt/a17/c#/usage/resume_base": null,
+    "record:vt/a17/c#/usage/run/state": "measured",
+    "record:vt/a17/c#/usage/run/tokens": {
+     "input": 0,
+     "output": 0,
+     "cache_read": 0,
+     "cache_creation": 0
+    },
+    "record:vt/a17/c#/usage/run_cost_usd": {
+     "$approx": 0.0
+    },
+    "record:vt/a17/c#/judgment/status": "failed",
+    "record:vt/a17/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a17/c#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a17/c#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a17/c#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a17/c#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a17/c#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a17/c#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a17/c#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a17/c#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a17/c#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a17/c#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a17/c#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a17/c#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a17/c#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a17/c#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a17/c#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a17/c#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 0, 'output': 0, 'cache_read': 0, 'cache_creation': 0}",
+    "record:vt/a17/c#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a17/c#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a17/c#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a17/c#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle; new session, modelUsage empty, result.usage explicit zeros -> measured 0 (REPORT §3 P2c para)",
+    "record:vt/a17/c#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0",
+    "record:vt/a17/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a17/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:vt/a17/c#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a17/c#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a17/c#/usage/session": "session measure for empty modelUsage in new session not fixed"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-18",
+   "set": "validation",
+   "family": "model_result_error_resume",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/b.jsonl",
+      "fixture": "fx-13.jsonl"
+     },
+     {
+      "path": "{FIX}/e.jsonl",
+      "fixture": "fx-12.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a18-0 --command base --model-request --session new -- /bin/cat '{FIX}/b.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a18-1 --command err --model-request --session resume --resume-base '{OUT}/vt/a18-0/base/record.json' --expect result_error -- /bin/cat '{FIX}/e.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a18-1/err#/model_request": true,
+    "record:vt/a18-1/err#/result_event/count": 1,
+    "record:vt/a18-1/err#/result_event/present": true,
+    "record:vt/a18-1/err#/result_event/subtype": "error_during_execution",
+    "record:vt/a18-1/err#/result_event/is_error": true,
+    "record:vt/a18-1/err#/result_event/session_id": "73305c11-cd0f-4d86-83e4-585fb858ab1a",
+    "record:vt/a18-1/err#/result_event/num_turns": 0,
+    "record:vt/a18-1/err#/result_event/stop_reason": null,
+    "record:vt/a18-1/err#/result_event/non_json_lines": 0,
+    "record:vt/a18-1/err#/result_event/rate_limit_statuses": [],
+    "record:vt/a18-1/err#/result_event/compact_boundaries": 0,
+    "record:vt/a18-1/err#/usage/applicability": "model",
+    "record:vt/a18-1/err#/usage/session_mode": "resume",
+    "record:vt/a18-1/err#/usage/internal_retries": "unmeasured",
+    "record:vt/a18-1/err#/usage/parent/state": "measured",
+    "record:vt/a18-1/err#/usage/parent/tokens": {
+     "input": 0,
+     "output": 0,
+     "cache_read": 0,
+     "cache_creation": 0
+    },
+    "record:vt/a18-1/err#/usage/cost_usd_reported": {
+     "$approx": 0
+    },
+    "record:vt/a18-1/err#/usage/run/state": "unmeasured",
+    "record:vt/a18-1/err#/judgment/status": "expected_matched",
+    "record:vt/a18-1/err#/judgment/counts_as_success": true,
+    "exit[1]": 0,
+    "record:vt/a18-1/err#/usage/session/state": "unmeasured"
+   },
+   "basis": {
+    "record:vt/a18-1/err#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a18-1/err#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a18-1/err#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a18-1/err#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a18-1/err#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a18-1/err#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a18-1/err#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a18-1/err#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a18-1/err#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a18-1/err#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a18-1/err#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a18-1/err#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a18-1/err#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a18-1/err#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a18-1/err#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a18-1/err#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 0, 'output': 0, 'cache_read': 0, 'cache_creation': 0}",
+    "record:vt/a18-1/err#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a18-1/err#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a18-1/err#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a18-1/err#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[1]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a18-1/err#/usage/session/state": "02-01 REPORT §3 (resume share / base cases) P2c para + review-pr21-2df3c35 P2-1 (run and session unmeasured)"
+   },
+   "undetermined_fields": {
+    "record:vt/a18-1/err#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a18-1/err#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-19",
+   "set": "validation",
+   "family": "model_truncated",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/t.jsonl",
+      "fixture": "fx-23.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a19 --command c1 --model-request --session new -- /bin/cat '{FIX}/t.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a19 --command c2 --model-request --session new --expect no_result -- /bin/cat '{FIX}/t.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a19/c1#/model_request": true,
+    "record:vt/a19/c1#/result_event/count": 0,
+    "record:vt/a19/c1#/result_event/present": false,
+    "record:vt/a19/c1#/result_event/non_json_lines": 1,
+    "record:vt/a19/c1#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a19/c1#/result_event/compact_boundaries": 0,
+    "record:vt/a19/c1#/usage/applicability": "model",
+    "record:vt/a19/c1#/usage/session_mode": "new",
+    "record:vt/a19/c1#/usage/internal_retries": "unmeasured",
+    "record:vt/a19/c1#/usage/parent/state": "unmeasured",
+    "record:vt/a19/c1#/usage/session/state": "unmeasured",
+    "record:vt/a19/c1#/usage/resume_base": null,
+    "record:vt/a19/c1#/usage/run/state": "unmeasured",
+    "record:vt/a19/c1#/judgment/status": "incomplete",
+    "record:vt/a19/c1#/judgment/counts_as_success": false,
+    "exit[0]": 1,
+    "record:vt/a19/c2#/model_request": true,
+    "record:vt/a19/c2#/result_event/count": 0,
+    "record:vt/a19/c2#/result_event/present": false,
+    "record:vt/a19/c2#/result_event/non_json_lines": 1,
+    "record:vt/a19/c2#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:vt/a19/c2#/result_event/compact_boundaries": 0,
+    "record:vt/a19/c2#/usage/applicability": "model",
+    "record:vt/a19/c2#/usage/session_mode": "new",
+    "record:vt/a19/c2#/usage/internal_retries": "unmeasured",
+    "record:vt/a19/c2#/usage/parent/state": "unmeasured",
+    "record:vt/a19/c2#/usage/session/state": "unmeasured",
+    "record:vt/a19/c2#/usage/resume_base": null,
+    "record:vt/a19/c2#/usage/run/state": "unmeasured",
+    "record:vt/a19/c2#/judgment/status": "expected_matched",
+    "record:vt/a19/c2#/judgment/counts_as_success": true,
+    "exit[1]": 0,
+    "record:vt/a19/c1#/usage/partial_observations": {
+     "$len": 3
+    },
+    "record:vt/a19/c1#/usage/partial_observations/1/message_id": "msg_t23b",
+    "record:vt/a19/c1#/usage/partial_observations/2/tokens": {
+     "input": 1,
+     "output": 2,
+     "cache_read": 870,
+     "cache_creation": 9
+    },
+    "record:vt/a19/c1#/usage/partial_observations/0/parent_tool_use_id": null
+   },
+   "basis": {
+    "record:vt/a19/c1#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a19/c1#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=0",
+    "record:vt/a19/c1#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a19/c1#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a19/c1#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a19/c1#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a19/c1#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a19/c1#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a19/c1#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a19/c1#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) (no result event -> run/parent/session unmeasured)",
+    "record:vt/a19/c1#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) (no result event -> run/parent/session unmeasured)",
+    "record:vt/a19/c1#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a19/c1#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a19/c1#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a19/c1#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a19/c2#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a19/c2#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=0",
+    "record:vt/a19/c2#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a19/c2#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a19/c2#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a19/c2#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a19/c2#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a19/c2#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a19/c2#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a19/c2#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) (no result event -> run/parent/session unmeasured)",
+    "record:vt/a19/c2#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) (no result event -> run/parent/session unmeasured)",
+    "record:vt/a19/c2#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a19/c2#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a19/c2#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a19/c2#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[1]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a19/c1#/usage/partial_observations": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a19/c1#/usage/partial_observations/1/message_id": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a19/c1#/usage/partial_observations/2/tokens": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a19/c1#/usage/partial_observations/0/parent_tool_use_id": "02-01 REPORT §1 row 사용량(stream.rs)"
+   },
+   "undetermined_fields": {
+    "record:vt/a19/c1#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a19/c1#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a19/c2#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a19/c2#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-20",
+   "set": "validation",
+   "family": "model_missing_usage_fields",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/m.jsonl",
+      "fixture": "fx-24.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a20 --command c --model-request --session new -- /bin/cat '{FIX}/m.jsonl'",
+    "'{BIN}' summarize '{OUT}/vt/a20/c/record.json'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a20/c#/model_request": true,
+    "record:vt/a20/c#/result_event/count": 1,
+    "record:vt/a20/c#/result_event/present": true,
+    "record:vt/a20/c#/result_event/subtype": "success",
+    "record:vt/a20/c#/result_event/is_error": false,
+    "record:vt/a20/c#/result_event/session_id": "5a1c0000-0000-4000-8000-000000000024",
+    "record:vt/a20/c#/result_event/num_turns": 1,
+    "record:vt/a20/c#/result_event/stop_reason": "end_turn",
+    "record:vt/a20/c#/result_event/non_json_lines": 0,
+    "record:vt/a20/c#/result_event/rate_limit_statuses": [],
+    "record:vt/a20/c#/result_event/compact_boundaries": 0,
+    "record:vt/a20/c#/usage/applicability": "model",
+    "record:vt/a20/c#/usage/session_mode": "new",
+    "record:vt/a20/c#/usage/internal_retries": "unmeasured",
+    "record:vt/a20/c#/usage/parent/state": "unmeasured",
+    "record:vt/a20/c#/usage/session/state": "unmeasured",
+    "record:vt/a20/c#/usage/cost_usd_reported": {
+     "$approx": 0.0021
+    },
+    "record:vt/a20/c#/usage/resume_base": null,
+    "record:vt/a20/c#/usage/run/state": "unmeasured",
+    "summary[1]~completeness": "incomplete",
+    "summary[1]~tokens_measured_sum": null
+   },
+   "basis": {
+    "record:vt/a20/c#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a20/c#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a20/c#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a20/c#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a20/c#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a20/c#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a20/c#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a20/c#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a20/c#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a20/c#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a20/c#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a20/c#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a20/c#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a20/c#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a20/c#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) (missing one of four fields -> unmeasured)",
+    "record:vt/a20/c#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) (modelUsage missing a field / absent)",
+    "record:vt/a20/c#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a20/c#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a20/c#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "summary[1]~completeness": "02-01 REPORT §1 row 합산(aggregate.rs)",
+    "summary[1]~tokens_measured_sum": "02-01 REPORT §1 row 합산(aggregate.rs) + review-pr21-2df3c35 §3.4 (tokens_measured_sum null when nothing measured; key name from accepted review)"
+   },
+   "undetermined_fields": {
+    "record:vt/a20/c#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a20/c#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a20/c#/judgment/status": "whether unmeasured usage affects judgment is not fixed"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-21",
+   "set": "validation",
+   "family": "model_rate_limit_and_extra_model",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/r.jsonl",
+      "fixture": "fx-25.jsonl"
+     },
+     {
+      "path": "{FIX}/x.jsonl",
+      "fixture": "fx-27.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a21 --command rl --model-request --session new -- /bin/cat '{FIX}/r.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a21 --command two --model-request --session new -- /bin/cat '{FIX}/x.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a21/rl#/model_request": true,
+    "record:vt/a21/rl#/result_event/count": 1,
+    "record:vt/a21/rl#/result_event/present": true,
+    "record:vt/a21/rl#/result_event/subtype": "success",
+    "record:vt/a21/rl#/result_event/is_error": false,
+    "record:vt/a21/rl#/result_event/session_id": "5a1c0000-0000-4000-8000-000000000025",
+    "record:vt/a21/rl#/result_event/num_turns": 1,
+    "record:vt/a21/rl#/result_event/stop_reason": "end_turn",
+    "record:vt/a21/rl#/result_event/non_json_lines": 0,
+    "record:vt/a21/rl#/result_event/rate_limit_statuses": [
+     "allowed_warning"
+    ],
+    "record:vt/a21/rl#/result_event/compact_boundaries": 0,
+    "record:vt/a21/rl#/usage/applicability": "model",
+    "record:vt/a21/rl#/usage/session_mode": "new",
+    "record:vt/a21/rl#/usage/internal_retries": "unmeasured",
+    "record:vt/a21/rl#/usage/parent/state": "measured",
+    "record:vt/a21/rl#/usage/parent/tokens": {
+     "input": 2,
+     "output": 8,
+     "cache_read": 640,
+     "cache_creation": 33
+    },
+    "record:vt/a21/rl#/usage/session/state": "measured",
+    "record:vt/a21/rl#/usage/session/tokens": {
+     "input": 2,
+     "output": 8,
+     "cache_read": 640,
+     "cache_creation": 33
+    },
+    "record:vt/a21/rl#/usage/cost_usd_reported": {
+     "$approx": 0.0009
+    },
+    "record:vt/a21/rl#/usage/resume_base": null,
+    "record:vt/a21/rl#/usage/run/state": "measured",
+    "record:vt/a21/rl#/usage/run/tokens": {
+     "input": 2,
+     "output": 8,
+     "cache_read": 640,
+     "cache_creation": 33
+    },
+    "record:vt/a21/rl#/usage/run_cost_usd": {
+     "$approx": 0.0009
+    },
+    "record:vt/a21/rl#/usage/attribution_check": "consistent",
+    "record:vt/a21/rl#/judgment/status": "succeeded",
+    "record:vt/a21/rl#/judgment/counts_as_success": true,
+    "exit[0]": 0,
+    "record:vt/a21/rl#/judgment/reasons": {
+     "$len_gte": 1
+    },
+    "record:vt/a21/two#/model_request": true,
+    "record:vt/a21/two#/result_event/count": 1,
+    "record:vt/a21/two#/result_event/present": true,
+    "record:vt/a21/two#/result_event/subtype": "success",
+    "record:vt/a21/two#/result_event/is_error": false,
+    "record:vt/a21/two#/result_event/session_id": "5a1c0000-0000-4000-8000-000000000027",
+    "record:vt/a21/two#/result_event/num_turns": 1,
+    "record:vt/a21/two#/result_event/stop_reason": "end_turn",
+    "record:vt/a21/two#/result_event/non_json_lines": 0,
+    "record:vt/a21/two#/result_event/rate_limit_statuses": [],
+    "record:vt/a21/two#/result_event/compact_boundaries": 0,
+    "record:vt/a21/two#/usage/applicability": "model",
+    "record:vt/a21/two#/usage/session_mode": "new",
+    "record:vt/a21/two#/usage/internal_retries": "unmeasured",
+    "record:vt/a21/two#/usage/parent/state": "measured",
+    "record:vt/a21/two#/usage/parent/tokens": {
+     "input": 5,
+     "output": 30,
+     "cache_read": 1200,
+     "cache_creation": 90
+    },
+    "record:vt/a21/two#/usage/session/state": "measured",
+    "record:vt/a21/two#/usage/session/tokens": {
+     "input": 12,
+     "output": 41,
+     "cache_read": 1200,
+     "cache_creation": 490
+    },
+    "record:vt/a21/two#/usage/cost_usd_reported": {
+     "$approx": 0.0034
+    },
+    "record:vt/a21/two#/usage/resume_base": null,
+    "record:vt/a21/two#/usage/run/state": "measured",
+    "record:vt/a21/two#/usage/run/tokens": {
+     "input": 12,
+     "output": 41,
+     "cache_read": 1200,
+     "cache_creation": 490
+    },
+    "record:vt/a21/two#/usage/run_cost_usd": {
+     "$approx": 0.0034
+    },
+    "record:vt/a21/two#/usage/attribution_check": "mismatch",
+    "record:vt/a21/two#/usage/attribution_detail": {
+     "$not_null": true
+    },
+    "record:vt/a21/two#/judgment/status": "succeeded",
+    "record:vt/a21/two#/judgment/counts_as_success": true,
+    "exit[1]": 0
+   },
+   "basis": {
+    "record:vt/a21/rl#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a21/rl#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a21/rl#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a21/rl#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/rl#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/rl#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/rl#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/rl#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/rl#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a21/rl#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a21/rl#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a21/rl#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a21/rl#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a21/rl#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a21/rl#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a21/rl#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 2, 'output': 8, 'cache_read': 640, 'cache_creation': 33}",
+    "record:vt/a21/rl#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a21/rl#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 2, 'output': 8, 'cache_read': 640, 'cache_creation': 33}",
+    "record:vt/a21/rl#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a21/rl#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a21/rl#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a21/rl#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:vt/a21/rl#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0009",
+    "record:vt/a21/rl#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:vt/a21/rl#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a21/rl#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a21/rl#/judgment/reasons": "02-01 REPORT §1 row 판정(judge.rs) (non-allowed rate limit signal kept in reasons, non-blocking)",
+    "record:vt/a21/two#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:vt/a21/two#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:vt/a21/two#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a21/two#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/two#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/two#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/two#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/two#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:vt/a21/two#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:vt/a21/two#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:vt/a21/two#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:vt/a21/two#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:vt/a21/two#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:vt/a21/two#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:vt/a21/two#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:vt/a21/two#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 5, 'output': 30, 'cache_read': 1200, 'cache_creation': 90}",
+    "record:vt/a21/two#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:vt/a21/two#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 12, 'output': 41, 'cache_read': 1200, 'cache_creation': 490}",
+    "record:vt/a21/two#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:vt/a21/two#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:vt/a21/two#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a21/two#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle; two models summed: (5,30,1200,90)+(7,11,0,400)",
+    "record:vt/a21/two#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0034",
+    "record:vt/a21/two#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조; run (12,41,1200,490) != parent (5,30,1200,90) + no children; withdrawal rule applies to resumed runs only",
+    "record:vt/a21/two#/usage/attribution_detail": "02-01 REPORT §1 row 귀속 대조 (difference recorded)",
+    "record:vt/a21/two#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a21/two#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[1]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:vt/a21/rl#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a21/rl#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules",
+    "record:vt/a21/two#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:vt/a21/two#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-22",
+   "set": "validation",
+   "family": "secret_masking",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{TMP}/s.txt",
+      "text": "Zq7-secret-VALUE-9931"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a22 --command c --secret-file '{TMP}/s.txt' --marker tail-ok -- /bin/sh -c 'printf \"a=%s\\nb=%s\\nh=%s\\n\" \"$1\" \"$1\" \"$2\"; k=\"sk-\"\"ant-oat01-Qw3rTy0123456789_ab-CD\"; printf \"e=%s k=%s\\n\" \"$1\" \"$k\" >&2; echo tail-ok' sh Zq7-secret-VALUE-9931 3940b2be2f1bca583f377eb3dfba2f7b08c5cb8e9aff8c37953234690e298956"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a22/c#/redaction/stdout_replacements": 3,
+    "record:vt/a22/c#/redaction/stderr_replacements": 2,
+    "record:vt/a22/c#/redaction/argv_replacements": 2,
+    "record:vt/a22/c#/redaction/secret_value_seen": true,
+    "tree": {
+     "$tree_not_contains": [
+      "Zq7-secret-VALUE-9931",
+      "3940b2be2f1bca583f377eb3dfba2f7b08c5cb8e9aff8c37953234690e298956",
+      "Qw3rTy0123456789_ab"
+     ]
+    },
+    "record:vt/a22/c#/markers/0/found": true,
+    "record:vt/a22/c#/judgment/status": "succeeded",
+    "record:vt/a22/c#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:vt/a22/c#/redaction/stdout_replacements": "02-01 REPORT §1 row 비밀; value x2 + its SHA-256 hex x1 in stdout",
+    "record:vt/a22/c#/redaction/stderr_replacements": "02-01 REPORT §1 row 비밀; value x1 + sk-ant-… form x1 in stderr",
+    "record:vt/a22/c#/redaction/argv_replacements": "02-01 REPORT §1 row 비밀; argv holds value x1 and SHA hex x1 (sk-ant literal split in script)",
+    "record:vt/a22/c#/redaction/secret_value_seen": "02-01 REPORT §1 row 비밀",
+    "tree": "02-01 REPORT §1 row 비밀 (masked before storing; nothing under OUT holds the value)",
+    "record:vt/a22/c#/markers/0/found": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a22/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a22/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:vt/a22/c#/redaction/secret_sources": "what counts as a secret source not fixed",
+    "record:vt/a22/c#/argv": "replacement placeholder text not fixed"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-23",
+   "set": "validation",
+   "family": "secret_trailing_newline_and_marker",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{TMP}/s.txt",
+      "text": "Nl-trail-secret-4417\n"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a23 --command c --secret-file '{TMP}/s.txt' --marker 'Nl-trail-secret-44\\d7' -- /bin/sh -c 'echo \"token: $1\"; echo visible-ok' sh Nl-trail-secret-4417"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a23/c#/redaction/stdout_replacements": 1,
+    "record:vt/a23/c#/redaction/argv_replacements": 1,
+    "record:vt/a23/c#/markers/0/found": false,
+    "tree": {
+     "$tree_not_contains": [
+      "Nl-trail-secret-4417"
+     ]
+    },
+    "file:vt/a23/c/stdout": {
+     "$contains": "visible-ok"
+    },
+    "record:vt/a23/c#/judgment/status": "incomplete",
+    "record:vt/a23/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a23/c#/redaction/stdout_replacements": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed) (trailing newline trimmed, value masked)",
+    "record:vt/a23/c#/redaction/argv_replacements": "02-01 REPORT §1 row 비밀",
+    "record:vt/a23/c#/markers/0/found": "02-01 REPORT §5 item 4 (markers searched in stdout after masking) (marker equal to secret is not found, intended)",
+    "tree": "02-01 REPORT §1 row 비밀",
+    "file:vt/a23/c/stdout": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:vt/a23/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a23/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-24",
+   "set": "validation",
+   "family": "secret_refusal",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{TMP}/b.txt",
+      "text": "abcd\\efghij-22"
+     },
+     {
+      "path": "{TMP}/s.txt",
+      "text": "x7Kq2pZ"
+     },
+     {
+      "path": "{TMP}/t.txt",
+      "text": "abc\tdefghij-33"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a24 --command bs --secret-file '{TMP}/b.txt' -- /bin/sh -c 'echo hi'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a24 --command short --secret-file '{TMP}/s.txt' -- /bin/sh -c 'echo hi'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a24 --command tab --secret-file '{TMP}/t.txt' -- /bin/sh -c 'echo hi'"
+   ],
+   "post": [],
+   "expected": {
+    "exit[0]": 2,
+    "exists:vt/a24/bs": false,
+    "cli_stderr[0]": {
+     "$not_contains": "abcd\\efghij-22"
+    },
+    "exit[1]": 2,
+    "exists:vt/a24/short": false,
+    "cli_stderr[1]": {
+     "$not_contains": "x7Kq2pZ"
+    },
+    "exit[2]": 2,
+    "exists:vt/a24/tab": false,
+    "cli_stderr[2]": {
+     "$not_contains": "abc\tdefghij-33"
+    }
+   },
+   "basis": {
+    "exit[0]": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed) / 02-01 REPORT §1 row 비밀 (<8 bytes, '\\\\', control char refused)",
+    "exists:vt/a24/bs": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed)",
+    "cli_stderr[0]": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed)",
+    "exit[1]": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed) / 02-01 REPORT §1 row 비밀 (<8 bytes, '\\\\', control char refused)",
+    "exists:vt/a24/short": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed)",
+    "cli_stderr[1]": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed)",
+    "exit[2]": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed) / 02-01 REPORT §1 row 비밀 (<8 bytes, '\\\\', control char refused)",
+    "exists:vt/a24/tab": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed)",
+    "cli_stderr[2]": "review-pr21-273907b §2 P2-4 + REPORT §1 비밀 row (refusal exit 2, before dir creation, value not printed)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-25",
+   "set": "validation",
+   "family": "env_allowlist",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {
+     "IEO_T_ALLOWED": "allowed-value-5521",
+     "IEO_T_SECRETISH": "hidden-value-8830"
+    }
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a25 --command c --env PATH --env IEO_T_ALLOWED -- /bin/sh -c 'printf \"%s|%s|%s\\n\" \"${IEO_T_ALLOWED:-unset}\" \"${IEO_T_SECRETISH:-unset}\" \"${HOME:-unset}\"'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a25/c#/env_names": {
+     "$set_eq": [
+      "PATH",
+      "IEO_T_ALLOWED"
+     ]
+    },
+    "record:vt/a25/c#/stdout/bytes": 31,
+    "record:vt/a25/c#/stdout/sha256": "9455551fb82faeddc6debbd9a506da556c4f75324c481fa65b702017f11655e3",
+    "file:vt/a25/c/stdout": {
+     "$text": "allowed-value-5521|unset|unset\n"
+    },
+    "recordtext:vt/a25/c": {
+     "$not_contains": "allowed-value-5521"
+    },
+    "tree": {
+     "$tree_not_contains": [
+      "hidden-value-8830"
+     ]
+    },
+    "record:vt/a25/c#/judgment/status": "succeeded",
+    "record:vt/a25/c#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:vt/a25/c#/env_names": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a25/c#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('allowed-value-5521|unset|unset\\n')",
+    "record:vt/a25/c#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('allowed-value-5521|unset|unset\\n')",
+    "file:vt/a25/c/stdout": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "recordtext:vt/a25/c": "02-01 REPORT §1 row 실행(run.rs) (values not recorded)",
+    "tree": "02-01 REPORT §1 row 실행(run.rs) (non-allowed variable not passed)",
+    "record:vt/a25/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a25/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-26",
+   "set": "validation",
+   "family": "non_overwrite",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a26 --command c -- /bin/sh -c 'echo original-26; exit 3'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a26 --command c -- /bin/sh -c 'echo replaced-26'"
+   ],
+   "post": [],
+   "expected": {
+    "exit[0]": 1,
+    "exit[1]": 2,
+    "record:vt/a26/c#/process/exit_code": 3,
+    "file:vt/a26/c/stdout": {
+     "$text": "original-26\n"
+    }
+   },
+   "basis": {
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "exit[1]": "02-01 REPORT §1 intro (one dir per command, no overwrite) + task brief item 6 (exit 2 = request/evidence-write error)",
+    "record:vt/a26/c#/process/exit_code": "02-01 REPORT §1 intro (one dir per command, no overwrite) + task brief item 6 (exit 2 = request/evidence-write error) (first record kept)",
+    "file:vt/a26/c/stdout": "02-01 REPORT §1 intro (one dir per command, no overwrite) + task brief item 6 (exit 2 = request/evidence-write error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-27",
+   "set": "validation",
+   "family": "summarize_mixed_and_duplicates",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/e.jsonl",
+      "fixture": "fx-12.jsonl"
+     },
+     {
+      "path": "{FIX}/p.jsonl",
+      "fixture": "fx-01.jsonl"
+     },
+     {
+      "path": "{FIX}/g.jsonl",
+      "fixture": "fx-14.jsonl"
+     },
+     {
+      "path": "{FIX}/t.jsonl",
+      "fixture": "fx-02.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vs --attempt a1 --command main --model-request --session new -- /bin/cat '{FIX}/e.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vs --attempt a2 --command main --model-request --session new --retry-of a1 -- /bin/cat '{FIX}/p.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vs --attempt a2 --command rev --model-request --session new --role review -- /bin/cat '{FIX}/g.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vs --attempt a2 --command agent --model-request --session new -- /bin/cat '{FIX}/t.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vs --attempt a2 --command build -- /bin/sh -c 'echo built'",
+    "'{BIN}' summarize '{OUT}'",
+    "'{BIN}' summarize '{OUT}' '{OUT}/vs/a2/agent/record.json'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vs/a2/main#/retry_of": "a1",
+    "record:vs/a2/rev#/role": "review",
+    "record:vs/a1/main#/usage/run/tokens": {
+     "input": 0,
+     "output": 0,
+     "cache_read": 0,
+     "cache_creation": 0
+    },
+    "summary[5]~completeness": "complete",
+    "summary[5]~tokens_measured_sum": {
+     "input": 10,
+     "output": 181,
+     "cache_read": 9205,
+     "cache_creation": 7533
+    },
+    "exit[6]": 2
+   },
+   "basis": {
+    "record:vs/a2/main#/retry_of": "contracts/evidence-record-v0.schema.json --retry-of",
+    "record:vs/a2/rev#/role": "contracts/evidence-record-v0.schema.json",
+    "record:vs/a1/main#/usage/run/tokens": "02-01 REPORT §3 (resume share / base cases) P2c para (new session explicit zeros)",
+    "summary[5]~completeness": "02-01 REPORT §1 row 합산(aggregate.rs) (failed, retry, review, child-bearing runs all measured)",
+    "summary[5]~tokens_measured_sum": "02-01 REPORT §1 row 합산(aggregate.rs) + review-pr21-2df3c35 §3.4 (tokens_measured_sum null when nothing measured; key name from accepted review); 0 + (2,6,649,1900) + (2,9,649,1903) + (6,166,7907,3730) = {'input': 10, 'output': 181, 'cache_read': 9205, 'cache_creation': 7533}",
+    "exit[6]": "task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-28",
+   "set": "validation",
+   "family": "summarize_unmeasured_and_no_model",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/n2.jsonl",
+      "fixture": "fx-04.jsonl"
+     },
+     {
+      "path": "{FIX}/r1.jsonl",
+      "fixture": "fx-10.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vu --attempt a1 --command loose-resume --model-request --session resume -- /bin/cat '{FIX}/n2.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vu --attempt a1 --command fresh --model-request --session new -- /bin/cat '{FIX}/r1.jsonl'",
+    "'{BIN}' run --out '{OUT}' --task vn --attempt a1 --command plain1 -- /bin/sh -c 'echo p1'",
+    "'{BIN}' run --out '{OUT}' --task vn --attempt a1 --command plain2 -- /bin/sh -c 'exit 4'",
+    "'{BIN}' summarize '{OUT}/vu'",
+    "'{BIN}' summarize '{OUT}/vn'"
+   ],
+   "post": [],
+   "expected": {
+    "summary[4]~completeness": "incomplete",
+    "summary[4]~tokens_measured_sum": {
+     "input": 2,
+     "output": 612,
+     "cache_read": 649,
+     "cache_creation": 1800
+    },
+    "summary[4]": {
+     "$contains": "loose-resume"
+    },
+    "summary[5]~completeness": "no_model_runs",
+    "summary[5]~tokens_measured_sum": null
+   },
+   "basis": {
+    "summary[4]~completeness": "02-01 REPORT §1 row 합산(aggregate.rs)",
+    "summary[4]~tokens_measured_sum": "02-01 REPORT §1 row 합산(aggregate.rs) (sum of measured runs only: R1 (2,612,649,1800))",
+    "summary[4]": "02-01 REPORT §1 row 합산(aggregate.rs) (unmeasured run listed)",
+    "summary[5]~completeness": "02-01 REPORT §1 row 합산(aggregate.rs)",
+    "summary[5]~tokens_measured_sum": "02-01 REPORT §1 row 합산(aggregate.rs) + review-pr21-2df3c35 §3.4 (tokens_measured_sum null when nothing measured; key name from accepted review)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-29",
+   "set": "validation",
+   "family": "detached_holds_pipe",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a29 --command c --env PATH --marker 'held-out-\\d+' -- /bin/sh -c 'echo held-out-29; setsid sleep 8 & sleep 1; exit 0'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a29/c#/process/output_incomplete": true,
+    "record:vt/a29/c#/process/exit_code": 0,
+    "record:vt/a29/c#/stdout/bytes": 12,
+    "record:vt/a29/c#/markers/0/found": true,
+    "record:vt/a29/c#/judgment/status": "incomplete",
+    "record:vt/a29/c#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:vt/a29/c#/process/output_incomplete": "review-pr21-273907b §2 P2-2 + REPORT §1 run row (output_incomplete -> incomplete)",
+    "record:vt/a29/c#/process/exit_code": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a29/c#/stdout/bytes": "review-pr21-273907b §2 P2-2 + REPORT §1 run row (output_incomplete -> incomplete); len('held-out-29\\n')",
+    "record:vt/a29/c#/markers/0/found": "review-pr21-273907b §2 P2-2 + REPORT §1 run row (output_incomplete -> incomplete)",
+    "record:vt/a29/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a29/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-30",
+   "set": "validation",
+   "family": "leftover_member_drain",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a30 --command drain --env PATH -- /bin/sh -c '(sleep 0.4; echo late-line-81) & echo early-81'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a30 --command linger --env PATH -- /bin/sh -c '(sleep 6; echo never-62) & echo early-62'",
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a30 --command quiet --env PATH -- /bin/sh -c 'sleep 6 >/dev/null 2>&1 & echo ok-63'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a30/drain#/stdout/bytes": 22,
+    "record:vt/a30/drain#/stdout/sha256": "5d0fbd9642096c516a4965929f5f293465a9235ba5be2a5dfd96e699978cb100",
+    "file:vt/a30/drain/stdout": {
+     "$text": "early-81\nlate-line-81\n"
+    },
+    "record:vt/a30/drain#/process/output_incomplete": false,
+    "record:vt/a30/drain#/process/stray_group_killed": false,
+    "record:vt/a30/drain#/judgment/status": "succeeded",
+    "record:vt/a30/drain#/judgment/counts_as_success": true,
+    "exit[0]": 0,
+    "record:vt/a30/linger#/process/output_incomplete": true,
+    "record:vt/a30/linger#/process/stray_group_killed": true,
+    "file:vt/a30/linger/stdout": {
+     "$text": "early-62\n"
+    },
+    "record:vt/a30/linger#/judgment/status": "incomplete",
+    "record:vt/a30/linger#/judgment/counts_as_success": false,
+    "exit[1]": 1,
+    "record:vt/a30/quiet#/process/output_incomplete": false,
+    "record:vt/a30/quiet#/process/stray_group_killed": true,
+    "record:vt/a30/quiet#/judgment/reasons": {
+     "$len_gte": 1
+    },
+    "record:vt/a30/quiet#/judgment/status": "succeeded",
+    "record:vt/a30/quiet#/judgment/counts_as_success": true,
+    "exit[2]": 0
+   },
+   "basis": {
+    "record:vt/a30/drain#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('early-81\\nlate-line-81\\n')",
+    "record:vt/a30/drain#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('early-81\\nlate-line-81\\n')",
+    "file:vt/a30/drain/stdout": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:vt/a30/drain#/process/output_incomplete": "task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2)",
+    "record:vt/a30/drain#/process/stray_group_killed": "task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2) (member ends inside 2 s window, not killed)",
+    "record:vt/a30/drain#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a30/drain#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a30/linger#/process/output_incomplete": "task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2) (killed while holding pipes)",
+    "record:vt/a30/linger#/process/stray_group_killed": "02-01 REPORT §1 row 실행(run.rs) + task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2)",
+    "file:vt/a30/linger/stdout": "task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2)",
+    "record:vt/a30/linger#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a30/linger#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[1]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:vt/a30/quiet#/process/output_incomplete": "task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2) (pipes not held)",
+    "record:vt/a30/quiet#/process/stray_group_killed": "02-01 REPORT §1 row 실행(run.rs) (leftover member killed after window, recorded)",
+    "record:vt/a30/quiet#/judgment/reasons": "02-01 REPORT §1 row 실행(run.rs) (listed in reasons, non-blocking)",
+    "record:vt/a30/quiet#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a30/quiet#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[2]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-31",
+   "set": "validation",
+   "family": "shared_output_deadline",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a31 --command c --env PATH -- /bin/sh -c 'setsid /bin/sh -c '\"'\"'sleep 0.5; echo late-err-74 >&2'\"'\"' & echo out-74'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a31/c#/stdout/bytes": 7,
+    "record:vt/a31/c#/stdout/sha256": "80e2a4bb279e893df290e48353a7e24969f5d2f64efb8ae0719eb01b1408e0ca",
+    "file:vt/a31/c/stdout": {
+     "$text": "out-74\n"
+    },
+    "record:vt/a31/c#/stderr/bytes": 12,
+    "record:vt/a31/c#/stderr/sha256": "ba2e5a8a3b1ecf43a7d8d1fa8f4373c2f0dd84e0d1a84d6d009f9c5bc3700696",
+    "file:vt/a31/c/stderr": {
+     "$text": "late-err-74\n"
+    },
+    "record:vt/a31/c#/process/output_incomplete": false,
+    "record:vt/a31/c#/judgment/status": "succeeded",
+    "record:vt/a31/c#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:vt/a31/c#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('out-74\\n')",
+    "record:vt/a31/c#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('out-74\\n')",
+    "file:vt/a31/c/stdout": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:vt/a31/c#/stderr/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('late-err-74\\n')",
+    "record:vt/a31/c#/stderr/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('late-err-74\\n')",
+    "file:vt/a31/c/stderr": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:vt/a31/c#/process/output_incomplete": "task brief item 5 (carried fixes: 2 s drain, output_incomplete on kill with open pipes, shared 2 s deadline, summarize duplicate refusal exit 2) (stdout and stderr share one 2 s deadline) + review-pr21-273907b P3-2",
+    "record:vt/a31/c#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:vt/a31/c#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-32",
+   "set": "validation",
+   "family": "request_errors",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/p.jsonl",
+      "fixture": "fx-01.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a32 --command nosess --model-request -- /bin/cat '{FIX}/p.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "exit[0]": 2
+   },
+   "basis": {
+    "exit[0]": "REPORT §4 row 실제 프로세스 ('세션 방식 없는 모델 요청 거부') + review-pr21-2df3c35 §3.5 (exit 2)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "V-33",
+   "set": "validation",
+   "family": "undetermined_rules",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/m.jsonl",
+      "fixture": "fx-26.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a33 --command c --model-request --session new -- /bin/cat '{FIX}/m.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a33/c#/result_event/subtype": "error_max_turns",
+    "record:vt/a33/c#/result_event/is_error": false,
+    "record:vt/a33/c#/result_event/num_turns": 3
+   },
+   "basis": {
+    "record:vt/a33/c#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a33/c#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:vt/a33/c#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs)"
+   },
+   "undetermined_fields": {
+    "record:vt/a33/c#/judgment/status": "subtype != success with is_error=false: open item P3-2 (02-01 ledger, owner 02-02); not fixed by approved rules",
+    "exit[0]": "follows judgment, which is undetermined (P3-2)"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-34",
+   "set": "validation",
+   "family": "undetermined_rules",
+   "title_for_author": "",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/t.jsonl",
+      "fixture": "fx-23.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task vt --attempt a34 --command c --env PATH --model-request --session new --timeout-s 1 --grace-s 1 --expect timeout -- /bin/sh -c 'cat {FIX}/t.jsonl; sleep 30'"
+   ],
+   "post": [],
+   "expected": {
+    "record:vt/a34/c#/process/kind": "timed_out",
+    "record:vt/a34/c#/process/term_sent": true,
+    "record:vt/a34/c#/result_event/present": false
+   },
+   "basis": {
+    "record:vt/a34/c#/process/kind": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a34/c#/process/term_sent": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:vt/a34/c#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)"
+   },
+   "undetermined_fields": {
+    "record:vt/a34/c#/judgment/status": "model request with --expect timeout: open item P3-4 (missing result blocking vs timeout expectation) not fixed",
+    "exit[0]": "follows undetermined judgment (P3-4)"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "V-35",
+   "set": "validation",
+   "family": "undetermined_rules",
+   "title_for_author": "",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [],
+   "post": [],
+   "expected": {},
+   "basis": {},
+   "undetermined_fields": {},
+   "status": "undetermined",
+   "undetermined_reason": "natural exit racing the timeout deadline (open item P3-6): which of exited/timed_out is recorded is not fixed and not reproducible deterministically; case not executed"
+  }
+ ]
+}

@@ -1,0 +1,195 @@
+{
+ "scored_at": "2026-11-12T13:53:52Z",
+ "set": "public",
+ "set_file": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/sets/public.json",
+ "bin": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/dryrun/fake.sh",
+ "totals": {
+  "determined_cases": 5,
+  "passed": 4,
+  "failed": 1,
+  "undetermined_cases_excluded": 0,
+  "undetermined_fields_excluded": 3,
+  "checked_fields": 68,
+  "failed_fields": 29
+ },
+ "cases": [
+  {
+   "id": "P-01",
+   "verdict": "PASS",
+   "checked_fields": 19,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.04,
+   "workdir": null
+  },
+  {
+   "id": "P-02",
+   "verdict": "PASS",
+   "checked_fields": 8,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 0.04,
+   "workdir": null
+  },
+  {
+   "id": "P-03",
+   "verdict": "PASS",
+   "checked_fields": 5,
+   "failed_fields": [],
+   "undetermined_fields": 1,
+   "exits": [
+    1
+   ],
+   "seconds": 0.04,
+   "workdir": null
+  },
+  {
+   "id": "P-04",
+   "verdict": "FAIL",
+   "checked_fields": 29,
+   "failed_fields": [
+    {
+     "field": "record:pt/a1/c4#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 1"
+    },
+    {
+     "field": "record:pt/a1/c4#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "record:pt/a1/c4#/usage/children",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    1
+   ],
+   "seconds": 0.04,
+   "workdir": null
+  },
+  {
+   "id": "P-05",
+   "verdict": "PASS",
+   "checked_fields": 7,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 0.04,
+   "workdir": null
+  }
+ ],
+ "undetermined_cases": []
+}

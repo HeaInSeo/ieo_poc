@@ -1,0 +1,272 @@
+{
+ "created_at": "2026-11-12T13:53:52Z",
+ "candidate_commit_targeted": "1785cb76e1b5456150865453a990b9b910d56a9e",
+ "rules_used": [
+  "docs/poc/reports/tasks/02-01/collector-20261112/REPORT.md (§1, §3, §4, §5)",
+  "contracts/evidence-record-v0.schema.json",
+  "docs/poc/reports/tasks/01-02/runtime-contract-20261112/Runtime_Contract_v0.md (§4.2 child-usage row, §11 item 7)",
+  "docs/poc/reports/tasks/02-01/collector-20261112/reviews/review-pr21-2df3c35.md",
+  "docs/poc/reports/tasks/02-01/collector-20261112/reviews/review-pr21-273907b.md",
+  "task brief items 5 (carried fixes) and 6 (CLI interface)",
+  "docs/poc/reports/tasks/01-04/*/evidence/attempts/*/stdout.jsonl (fixtures, see fixtures/SOURCES.json)"
+ ],
+ "not_read": [
+  "crates/ieo-evidence/src",
+  "crates/ieo-evidence/tests",
+  "02-01 crosscheck_0104.py",
+  "02-01 evidence/"
+ ],
+ "candidate_executed": false,
+ "sealing": "not enforced: same OS account; strong sealing deferred by user decision A2; independence unverified",
+ "files": [
+  {
+   "path": "AUTHOR_NOTES.md",
+   "sha256": "2c3484cf52cbdac9225f67358ecd5d796af16fdb0f3f6efd1fa745edddf3508f"
+  },
+  {
+   "path": "dryrun/fake-public.json",
+   "sha256": "1ef4adb1fe17b35c477ee7fade12cefcd11f06e5ccff2aa0f98652baf3cab143"
+  },
+  {
+   "path": "dryrun/fake-public.txt",
+   "sha256": "d9053a3dd5d36a1b9f45a98bcb885193e653fca82cdbc5ffbe25ced2d659169d"
+  },
+  {
+   "path": "dryrun/fake.py",
+   "sha256": "e0a56a6af6e13bbed9e7db90f9d189f2e1292a15056956cbacff57d6154404d3"
+  },
+  {
+   "path": "dryrun/fake.sh",
+   "sha256": "91fa0ce0b7e7e2b8bbba4739e9ecbe54040654be66a798a63eb53694bbe82afe"
+  },
+  {
+   "path": "dryrun/stub-authoring.json",
+   "sha256": "08d6c02eedaef88ac40f086c4d90643d83e83daaca2536d4b051e6acc9af7eb0"
+  },
+  {
+   "path": "dryrun/stub-authoring.txt",
+   "sha256": "41ef021e1a1196be9cc9e7db033da158e18b8b18115d3a93ee2da523952c78e4"
+  },
+  {
+   "path": "dryrun/stub-public.json",
+   "sha256": "4e3399e85cd8a1f75e70bacd29a6420f39c6feb00a64e46e4049bd5ff073e3b3"
+  },
+  {
+   "path": "dryrun/stub-public.txt",
+   "sha256": "6c48a99b500cb2ec6991c68f87d338c88ac0cb56b84969b3ea6ac046b917a6d1"
+  },
+  {
+   "path": "dryrun/stub-silent.sh",
+   "sha256": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb"
+  },
+  {
+   "path": "dryrun/stub-validation.json",
+   "sha256": "f8a0118f62cb0ffd91594e812d3c323999899793e82c041937469fe41de0540d"
+  },
+  {
+   "path": "dryrun/stub-validation.txt",
+   "sha256": "e760220427e6e07fab8852ce4f07d6053ac1b5e6d9cc30715fdbbd2c1edf430e"
+  },
+  {
+   "path": "fixtures/SOURCES.json",
+   "sha256": "e3f973dd1dfa1e8236ceec630a16b7d5f22bb171ffdc0fc70a26d81a04cd87c7"
+  },
+  {
+   "path": "fixtures/fx-01.jsonl",
+   "sha256": "014c4d836f0db42e9e15347d8227cdb33f73c89cb4dbb124229b29c2b3dd8946"
+  },
+  {
+   "path": "fixtures/fx-02.jsonl",
+   "sha256": "65ab636992642d7589dae4776eca2ccbe16db9ac37a896fa539130f62c3a777b"
+  },
+  {
+   "path": "fixtures/fx-03.jsonl",
+   "sha256": "2e31f215c141202cf28240da747bebeb85aa1b54e681476df08cf88060efef8f"
+  },
+  {
+   "path": "fixtures/fx-04.jsonl",
+   "sha256": "286ce47edc0bc425f1787290dab765dd954bc657a9d1edd76f0904d9334bc275"
+  },
+  {
+   "path": "fixtures/fx-05.jsonl",
+   "sha256": "f7ee0fdbdba56d26a194db6359a2dad3c1264c3635a696777cb996237f3221d0"
+  },
+  {
+   "path": "fixtures/fx-06.jsonl",
+   "sha256": "f1af9fd73bf976b9c1a024bbb307e080fd0eada8dc2eb6edf0bc61f517c91bad"
+  },
+  {
+   "path": "fixtures/fx-07.jsonl",
+   "sha256": "9904e59568766df979776c3b11cc01c76f1807ad3c008b9b4cb68b296ee17b15"
+  },
+  {
+   "path": "fixtures/fx-08.jsonl",
+   "sha256": "6db64df86b24233260f7555fc3cfbc4e99cb4783de593b3d6eb8ea800f57f12b"
+  },
+  {
+   "path": "fixtures/fx-09.jsonl",
+   "sha256": "44e485e6d5b159abd1d879ea86272a4779b0cf8912060a2fd31de3e1d54d64c0"
+  },
+  {
+   "path": "fixtures/fx-10.jsonl",
+   "sha256": "991dfd1235193add7ba5267263d2b6b218c06c196fa18562a42bf8fe171dd210"
+  },
+  {
+   "path": "fixtures/fx-11.jsonl",
+   "sha256": "16d64831b1a70f44ab6149450f096d17739ffc48a29f6c06912ff3a57ba648d9"
+  },
+  {
+   "path": "fixtures/fx-12.jsonl",
+   "sha256": "7c1f1d251e983dba87900d5e5c613342d1b0d4aada8303d335af3bc0fb3eecf7"
+  },
+  {
+   "path": "fixtures/fx-13.jsonl",
+   "sha256": "bd012310f18884b8d2fa92e3e6f8b7f9832f646eabaeb764c19874a04841f429"
+  },
+  {
+   "path": "fixtures/fx-14.jsonl",
+   "sha256": "3040bb90b1901f1e61523708f9534107df43b5ace9c78591771a89514dfa66ee"
+  },
+  {
+   "path": "fixtures/fx-20.jsonl",
+   "sha256": "241d107ff09bed0d68716db225c7fbd01e5b87b8c1f652c598ec3db0535b513b"
+  },
+  {
+   "path": "fixtures/fx-21.jsonl",
+   "sha256": "b8ba35e4bcbd9e650a0a62838458eb5cc5654011713e0606365166c5491627dc"
+  },
+  {
+   "path": "fixtures/fx-22.jsonl",
+   "sha256": "eadf1ce0b661cb8b84cd577ac2b60b7ed3076af9a305c44c23959dd4e13d64d1"
+  },
+  {
+   "path": "fixtures/fx-23.jsonl",
+   "sha256": "976442ca98f0e04353928f47f0ae84d8f4ece05238be29dc9a941b1798c9ede1"
+  },
+  {
+   "path": "fixtures/fx-24.jsonl",
+   "sha256": "07a11a7f966be7691e56f2a95a8deeb1574e9cd822c93a771b545231c1833611"
+  },
+  {
+   "path": "fixtures/fx-25.jsonl",
+   "sha256": "0979bdf7a62990b6b9995a598e9bb9bd2f6c3db78f0f02b22ade974c7b1f732b"
+  },
+  {
+   "path": "fixtures/fx-26.jsonl",
+   "sha256": "882e6193cdcdc6dca83aa944a0b360447e0c11b0671dda250292ef27f76b1aa6"
+  },
+  {
+   "path": "fixtures/fx-27.jsonl",
+   "sha256": "33f803df904bb08f8edfbb0e0e0ee1195c65f01e85b355886e46feecea03e863"
+  },
+  {
+   "path": "score.py",
+   "sha256": "03038f05abbab6255f16e4bf783a41afa61070a3b7850decf98423d516f51bae"
+  },
+  {
+   "path": "sets/authoring.json",
+   "sha256": "e8e6c7613be6284f8c80de9ec8af4dfbc160a82f635f4ac16cbc0317f4368ae0"
+  },
+  {
+   "path": "sets/public.json",
+   "sha256": "5a3f2fa33b3a2e96994a4675681fdeba7a5cacbb419eb35c33950330827cfeb9"
+  },
+  {
+   "path": "sets/validation.json",
+   "sha256": "236465119efe764f2b573c99a2e3ff199553a5809d2ba32055b53983c2be9910"
+  },
+  {
+   "path": "tools/gen_sets.py",
+   "sha256": "e1201023851938d7c8ee0f18f35cb42da58581bc4cd7df45295a6f52db37b107"
+  },
+  {
+   "path": "tools/make_fixtures.py",
+   "sha256": "f295fbe8cf14c326b8b5f75294c2cdef2e311d6067bf3abc0c71dd3b18751c30"
+  },
+  {
+   "path": "tools/oracle_stream.py",
+   "sha256": "832b7918b99a197fa31f8c4890520f5e89e605f8b7f4095b684d084db24b1d06"
+  }
+ ],
+ "counts": {
+  "public": {
+   "cases": 5,
+   "determined": 5,
+   "undetermined": 0,
+   "determined_fields": 68,
+   "undetermined_fields": 3,
+   "by_family": {
+    "success_markers_artifacts": 1,
+    "nonzero_exit": 1,
+    "launch_failure": 1,
+    "model_new_session": 1,
+    "missing_evidence": 1
+   }
+  },
+  "authoring": {
+   "cases": 14,
+   "determined": 14,
+   "undetermined": 0,
+   "determined_fields": 234,
+   "undetermined_fields": 19,
+   "by_family": {
+    "success_markers_artifacts": 1,
+    "timeout_term_honoured": 1,
+    "missing_evidence": 1,
+    "model_child_usage": 1,
+    "model_resume_share": 1,
+    "model_resume_no_base": 1,
+    "model_result_error": 1,
+    "model_truncated": 1,
+    "secret_masking": 1,
+    "secret_refusal": 1,
+    "env_allowlist": 1,
+    "non_overwrite_and_dup_summary": 1,
+    "detached_holds_pipe": 1,
+    "model_missing_usage": 1
+   }
+  },
+  "validation": {
+   "cases": 35,
+   "determined": 34,
+   "undetermined": 1,
+   "determined_fields": 628,
+   "undetermined_fields": 52,
+   "by_family": {
+    "success_markers_artifacts": 1,
+    "nonzero_exit": 1,
+    "signaled": 1,
+    "launch_failure": 1,
+    "timeout_term_honoured": 1,
+    "timeout_term_ignored_member": 1,
+    "timeout_term_ignored_leader": 1,
+    "intentional_deny": 1,
+    "intentional_deny_not_matched": 1,
+    "missing_evidence": 1,
+    "marker_stdout_only": 1,
+    "model_child_usage": 1,
+    "model_resume_chain_compaction": 1,
+    "model_wrong_base": 1,
+    "model_resume_branch_base": 1,
+    "model_different_session_base": 1,
+    "model_result_error": 1,
+    "model_result_error_resume": 1,
+    "model_truncated": 1,
+    "model_missing_usage_fields": 1,
+    "model_rate_limit_and_extra_model": 1,
+    "secret_masking": 1,
+    "secret_trailing_newline_and_marker": 1,
+    "secret_refusal": 1,
+    "env_allowlist": 1,
+    "non_overwrite": 1,
+    "summarize_mixed_and_duplicates": 1,
+    "summarize_unmeasured_and_no_model": 1,
+    "detached_holds_pipe": 1,
+    "leftover_member_drain": 1,
+    "shared_output_deadline": 1,
+    "request_errors": 1,
+    "undetermined_rules": 3
+   }
+  }
+ }
+}

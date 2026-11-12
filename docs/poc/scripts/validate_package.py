@@ -46,10 +46,19 @@ def validate(root):
     assert '04-16' in ancestors(g,'07-02') and '04-16' in ancestors(g,'07-03')
     assert '04-15' not in ancestors(g,'07-02')
     out['ancestor_counts']={k:len(ancestors(g,k)) for k in ['04-03','05-05','07-01','07-02']};out['changed_acceptance_ids']=changed
-    amend=json.loads((root/'Amendment_v1.3.3-A1.json').read_text());profiles={(q['profile_id'],q['revision']):q for q in spec['inspection_profiles']}
-    assert sorted(profiles)==[('poc-acceptance-v1.3.3',4),('poc-acceptance-v1.3.3',5)];p4=profiles[('poc-acceptance-v1.3.3',4)];p5=profiles[('poc-acceptance-v1.3.3',5)]
-    assert sorted(k for k in p4['items'] if p4['items'][k]!=p5['items'][k])==sorted(c+'.accept' for c in amend['changed_acceptance']) and set(p4['items'])==set(p5['items'])
-    revs={x['sprint_id']:x['revision'] for x in amend['sprint_revisions']};digests=[]
+    # Amendments apply in order (A1: profile 4->5, A2: 5->6). Each profile revision differs from the
+    # previous one exactly in its amendment's changed_acceptance; a task uses the latest revision that
+    # changed it, a sprint the latest revision any amendment gave it (v1.3.3-A2).
+    amends=[json.loads((root/f'Amendment_v1.3.3-{a}.json').read_text()) for a in ('A1','A2')]
+    profiles={(q['profile_id'],q['revision']):q for q in spec['inspection_profiles']}
+    assert sorted(profiles)==[('poc-acceptance-v1.3.3',r) for r in (4,5,6)]
+    task_rev={};revs={}
+    for am in amends:
+        (pr,)=am['profile_revisions'];r=pr['revision'];prev=profiles[('poc-acceptance-v1.3.3',r-1)];cur=profiles[('poc-acceptance-v1.3.3',r)]
+        assert set(prev['items'])==set(cur['items']) and sorted(k for k in prev['items'] if prev['items'][k]!=cur['items'][k])==sorted(c+'.accept' for c in am['changed_acceptance'])==sorted(pr['changed_items'])
+        for c in am['changed_acceptance']:task_rev[c]=r
+        for x in am['sprint_revisions']:revs[x['sprint_id']]=x['revision']
+    amend=amends[-1];digests=[]
     for s in spec['sprints']:
         jsonschema.Draft202012Validator(schema,format_checker=jsonschema.FormatChecker()).validate(s)
         assert s['revision']==revs.get(s['sprint_id'],4) and s['contract_revision']==4 and s['registration_state']=='draft'
@@ -57,7 +66,7 @@ def validate(root):
         for ref in s['sources']:assert hashlib.sha256((root/ref['ref']).read_bytes()).hexdigest()==ref['digest']
         for t in s['tasks']:
             a=t['acceptance'];profile=profiles[(a['profile_id'],a['profile_revision'])]
-            assert a['profile_revision']==(5 if t['task_id'] in amend['changed_acceptance'] else 4)
+            assert a['profile_revision']==task_rev.get(t['task_id'],4)
             assert a['criteria']==t['exit_condition']==profile['items'][a['item_ids'][0]]
             assert all(d['plan_version']=='v1.3.3' for d in t['prerequisites'])
         digests.append({'sprint_id':s['sprint_id'],'revision':s['revision'],'digest':s['digest']})
@@ -87,7 +96,7 @@ def validate(root):
             assert (p.parent/unquote(ref)).exists(),(str(p),ref);links+=1
     out['current_internal_links_checked']=links
     out['report_contract_checks']=module(root/'scripts/validate_contracts.py','contracts').check(root)
-    sums={l[66:]:l[:64] for l in (root/'SHA256SUMS.txt').read_text().splitlines() if l.strip()};changed={c['path']:c for c in amend['files']};absent=0
+    sums={l[66:]:l[:64] for l in (root/'SHA256SUMS.txt').read_text().splitlines() if l.strip()};changed={c['path']:c for am in amends for c in am['files']};absent=0
     assert set(changed)<=set(sums),'amendment lists a file outside the delivered package'
     for path,orig in sums.items():
         f=root/path
@@ -98,7 +107,7 @@ def validate(root):
             if c['change']=='removed_from_repository':continue
             assert hashlib.sha256(f.read_bytes()).hexdigest()==c['sha256'],path
         else:assert hashlib.sha256(f.read_bytes()).hexdigest()==orig,path
-    out['package_integrity']={'delivered':len(sums),'amended':len(changed),'gitignored_paper_pdfs_absent':absent,'amendment':amend['id']}
+    out['package_integrity']={'delivered':len(sums),'amended':len(changed),'gitignored_paper_pdfs_absent':absent,'amendment':amend['id'],'amendments':[am['id'] for am in amends]}
     return out
 if __name__=='__main__':
     ap=argparse.ArgumentParser();ap.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[1]);ap.add_argument('--write',action='store_true');a=ap.parse_args()

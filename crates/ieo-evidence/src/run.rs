@@ -47,6 +47,9 @@ pub struct RunSpec {
     pub secrets: Vec<Vec<u8>>,
 }
 
+/// Time given to output pipes after the command exits.
+pub const DRAIN: Duration = Duration::from_secs(2);
+
 pub const ROLES: &[&str] = &["development", "guardrail", "review", "coordinator", "other"];
 
 #[derive(Debug)]
@@ -275,30 +278,42 @@ pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
                     process.launch_error = Some("종료 상태를 얻지 못함".into());
                 }
             }
-            // Group members that outlive the leader (review P2-3): after a timeout they
-            // get the rest of the grace period, then KILL; after a normal exit they
-            // are killed at once. Either way it is recorded.
-            if group_alive(pgid) {
-                if let Some(t0) = term_at {
-                    while !process.kill_sent && t0.elapsed() < spec.grace && group_alive(pgid) {
-                        thread::sleep(Duration::from_millis(20));
-                    }
-                    if group_alive(pgid) {
-                        signal_group(pgid, "KILL");
-                        process.kill_sent = true;
-                        process.stray_group_killed = true;
-                    }
-                } else {
-                    signal_group(pgid, "KILL");
-                    process.kill_sent = true;
-                    process.stray_group_killed = true;
+            // Group members that outlive the leader (review P2-3). After a timeout they
+            // get the rest of the grace period. After a normal exit they get a drain
+            // window to finish writing (review 273907b P3-1). Then the group is killed
+            // and that is recorded; if the pipes were still open at that moment the
+            // stored output may be cut, so the run cannot count as success.
+            let drain_until = Instant::now() + DRAIN;
+            let pipes_done =
+                |o: &Reader, e: &Reader| o.wait(Duration::ZERO) && e.wait(Duration::ZERO);
+            if let Some(t0) = term_at {
+                while !process.kill_sent && t0.elapsed() < spec.grace && group_alive(pgid) {
+                    thread::sleep(Duration::from_millis(20));
+                }
+            } else {
+                while Instant::now() < drain_until
+                    && group_alive(pgid)
+                    && !pipes_done(&out_r, &err_r)
+                {
+                    thread::sleep(Duration::from_millis(20));
                 }
             }
-            // A descendant outside the group (setsid) can still hold the pipes.
-            // Keep what was read and record that the output may be incomplete
-            // (review P2-2) instead of discarding it.
-            let o_done = out_r.wait(Duration::from_secs(2));
-            let e_done = err_r.wait(Duration::from_millis(200));
+            if group_alive(pgid) {
+                let open_at_kill = !pipes_done(&out_r, &err_r);
+                signal_group(pgid, "KILL");
+                process.kill_sent = true;
+                process.stray_group_killed = true;
+                if open_at_kill {
+                    process.output_incomplete = true;
+                }
+            }
+            // A descendant outside the group (setsid) can still hold the pipes. One
+            // shared deadline for both streams (review 273907b P3-2); keep what was
+            // read and record that the output may be incomplete (review P2-2).
+            let collect_until = Instant::now() + DRAIN;
+            let left = || collect_until.saturating_duration_since(Instant::now());
+            let o_done = out_r.wait(left());
+            let e_done = err_r.wait(left());
             if !(o_done && e_done) {
                 process.output_incomplete = true;
             }

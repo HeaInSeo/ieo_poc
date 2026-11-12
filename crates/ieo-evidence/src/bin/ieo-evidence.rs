@@ -164,6 +164,26 @@ fn summarize_cmd(args: &[String]) -> Result<ExitCode, String> {
             serde_json::from_str(&text).map_err(|e| format!("{}: {e}", f.display()))?;
         records.push(r);
     }
+    // The same run given twice (overlapping paths) would be counted twice
+    // (review 2df3c35 P3-7): refuse instead of silently de-duplicating.
+    let mut seen = std::collections::BTreeMap::new();
+    for (r, f) in records.iter().zip(&files) {
+        let key = (
+            r.task_id.clone(),
+            r.attempt_id.clone(),
+            r.command_id.clone(),
+        );
+        if let Some(prev) = seen.insert(key, f.clone()) {
+            return Err(format!(
+                "같은 회차가 두 번 입력됨: {}/{}/{} ({} · {})",
+                r.task_id,
+                r.attempt_id,
+                r.command_id,
+                prev.display(),
+                f.display()
+            ));
+        }
+    }
     let s = summarize(&records);
     println!(
         "{}",

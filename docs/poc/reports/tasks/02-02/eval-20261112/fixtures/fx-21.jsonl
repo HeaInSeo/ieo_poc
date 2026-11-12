@@ -1,0 +1,5 @@
+{"type":"system","subtype":"init","cwd":"/state/work","session_id":"5a1c0000-0000-4000-8000-000000000021","tools":["Agent"],"model":"claude-syn-1","permissionMode":"dontAsk","claude_code_version":"2.1.322"}
+{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","rateLimitType":"five_hour"},"session_id":"5a1c0000-0000-4000-8000-000000000021"}
+{"type":"assistant","message":{"model":"claude-syn-1","id":"msg_t21a","type":"message","role":"assistant","content":[{"type":"text","text":"working"}],"stop_reason":null,"usage":{"input_tokens":5,"output_tokens":17,"cache_read_input_tokens":900,"cache_creation_input_tokens":120}},"parent_tool_use_id":null,"session_id":"5a1c0000-0000-4000-8000-000000000021"}
+{"type":"assistant","message":{"model":"claude-syn-1","id":"msg_t21b","type":"message","role":"assistant","content":[{"type":"text","text":"still working"}],"stop_reason":null,"usage":{"input_tokens":1,"output_tokens":3,"cache_read_input_tokens":1020,"cache_creation_input_tokens":0}},"parent_tool_use_id":null,"session_id":"5a1c0000-0000-4000-8000-000000000021"}
+{"type":"assistant","message":{"id":"msg_t21c","usage":{"input_tok

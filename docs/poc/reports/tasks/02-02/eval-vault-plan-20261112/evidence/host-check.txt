@@ -1,0 +1,27 @@
+# read-only host check 2026-11-12T13:18:45Z as heain
+uid=1001(heain) gid=1001(heain) groups=1001(heain),10(wheel),974(ollama) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+
+User heain may run the following commands on localhost-3:
+    (ALL) ALL
+    (ALL) SETENV: NOPASSWD: /usr/local/bin/kind
+sudo -n true: sudo: a password is required
+rc=1
+wheel:x:10:heain
+account ghrunner 1000 /bin/bash
+account heain 1001 /bin/bash
+UMASK		022
+HOME_MODE	0700
+drwxr-xr-x.  4 root root  35  2월  4  2026 /home
+drwxr-xr-x. 10 root root 129 10월 31 20:04 /opt
+drwxr-xr-x.  2 root root   6 10월 11  2021 /srv
+/dev/mapper/rl-home xfs    33G   32G  749M  98% /home
+/dev/mapper/rl-root xfs    67G   60G  7.2G  90% /
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+ptrace_scope 0
+selinux Enforcing
+ghrunner:100000:65536
+heain:165536:65536
+podman version 4.9.4-rhel
+sshd active
+-rwsr-xr-x. 1 root root  50160  2월  9  2024 /usr/bin/su
+---s--x--x. 1 root root 191000  8월 27  2025 /usr/bin/sudo

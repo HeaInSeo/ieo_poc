@@ -1,0 +1,7 @@
+source: git -C /opt/rust/src/github.com/HeaInSeo/ieo_poc-0202 archive 1785cb7 | tar -x -C build/src
+commit: 1785cb76e1b5456150865453a990b9b910d56a9e
+command: PATH=/opt/rust/cargo/bin:$PATH cargo build --offline --locked --release -p ieo-evidence
+toolchain: cargo 1.99.1 (5f94df478 2026-08-27) / rustc 1.99.1 (58cf8f9c3 2026-10-13)
+binary: build/src/target/release/ieo-evidence
+sha256: 8125cc4a370ec0c52ba1c45b1446b091f32179e8d884d3f76b5f25564211ce16
+built_at: 2026-11-12T13:55:01Z

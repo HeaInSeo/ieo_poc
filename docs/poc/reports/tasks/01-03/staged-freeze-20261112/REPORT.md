@@ -63,7 +63,7 @@
 - 문서 정합 검증([validate.txt](evidence/validate.txt)): `validate_package.py` PASS, `render_progress.py --check` PASS. 장부와 명세 rev 5의 수용 기준이 같고, 전달 파일 120개 중 개정 10개가 색인과 일치한다. **문서 정합 확인이며 런타임 PASS가 아니다.**
 - 명세 검사: draft에서 9개 명세가 모두 201이다. executable에서는 9개 모두 422 `UNBOUND_DRAFT`다([executable-check.txt](evidence/executable-check.txt)). 한도가 null인 명세는 실행 등록되지 않는다(D4).
 - D11: 공개 URL의 PDF는 삭제한 사본과 SHA-256이 같다. 이력에는 커밋 `d92b414`부터 남아 있다([d11-link-check.txt](evidence/d11-link-check.txt)).
-- 런타임은 실행하지 않았다(probe 0회). 01-04 준비로 이 호스트의 격리 수단만 확인했다([host-isolation-check.txt](evidence/host-isolation-check.txt)): sudo는 없고 rootless podman과 sub-UID 범위가 있다. 그래서 P2의 UID 경계를 시험할 수 있을 것으로 본다(실제 동작은 01-04에서 확인).
+- 런타임은 실행하지 않았다(probe 0회). 01-04 준비로 이 호스트의 격리 수단만 확인했다([host-isolation-check.txt](evidence/host-isolation-check.txt)): sudo는 없고 rootless podman과 sub-UID 범위가 있다. **[정정 2026-11-12, 개정 A2]** “sudo는 없고”는 근거(`sudo -n true` → “a password is required”, 즉 비밀번호 없는 sudo 불가)를 넘어선 서술이다. heain은 wheel 그룹이며 `(ALL) ALL`(비밀번호 필요)과 `(ALL) SETENV: NOPASSWD: /usr/local/bin/kind` 권한이 있다([02-02 읽기 전용 확인](../../02-02/eval-vault-plan-20261112/evidence/host-check.txt)). 01-04 P2 격리 판정은 컨테이너 안 역할 UID 사이의 판정이라 영향이 없다. 그래서 P2의 UID 경계를 시험할 수 있을 것으로 본다(실제 동작은 01-04에서 확인).
 
 ## 5. 다음
 
