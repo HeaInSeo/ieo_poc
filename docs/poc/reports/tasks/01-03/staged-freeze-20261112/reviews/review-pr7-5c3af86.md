@@ -1,3 +1,4 @@
+<!-- 보관본: PR #7 댓글 https://github.com/HeaInSeo/ieo_poc/pull/7#issuecomment-6815281502 의 본문. 댓글에는 머리말(검토 주체·SHA·판정) 2줄이 더 있고, reject 댓글에는 끝에 교정 커밋 안내가 더 있다 -->
 # PR #7 독립 검토 (Guardrail) · 01-03 단계별 동결 v1.3.3-A1
 
 - 검토 SHA: `5c3af86` (branch `task/01-03-staged-freeze`)

@@ -1,6 +1,6 @@
 # PoC 진행과 최근 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0006` · 원장 SHA-256 `d231918122c74b4cbf3015c9688fd5ed9a035d9bf8a488f36fa03cc282ad9844`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0006` · 원장 SHA-256 `988069b9889ab535ec9b412e2534a229160ff7d407fa810765ff75d59c94b956`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -29,8 +29,8 @@
 | --- | --- |
 | 현재 작업 | 01-04 |
 | 다음 작업 | 01-04 |
-| 마지막 실제 작업 관측 | 2026-11-12T14:18:58+09:00 |
-| 화면 snapshot 작성 | 2026-11-12T14:18:58+09:00 |
+| 마지막 실제 작업 관측 | 2026-11-12T14:22:39+09:00 |
+| 화면 snapshot 작성 | 2026-11-12T14:22:39+09:00 |
 | 보고 owner | 개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님) |
 | 열람 상태 | GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면) |
 | 고정 사용자 링크 | https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md |
@@ -72,6 +72,7 @@
 - 01-07 후속(비차단): N1 옛 revision 실행 등록·승격(L08 교정 PR로 진행), N2 생성 ID 충돌 시 부수 순환 보고, N3 비현실적 예상값·2^53 초과, N4 ready+미바인딩 400 vs §1.6 422 명시(01-08), N5 소수 증거값 문자열화. §1.4 공백 G1~G8의 contract revision 5 여부는 사용자 결정.
 - 01-08 후속(02-03 구현 전 반영): N1(L08 교정 PR로 진행) STALE_ASSIGNMENT 늦은 결과를 원 SHA·배정에 귀속 보존(§1.9)·멱등 재생을 배정 대조보다 먼저·에이전트 재조회 경로, N2 completion_summary가 첫 공백 뒤 확인 범위를 숨김; P3 N3 분수 9자리·음수 오프셋 시험, N4 순서·동일 시각 과다 알림, N5 Guardrail의 불변 명세 revision 조회, N6 ConversionResult additionalProperties·409 명시, N7 evidence 머리글 SHA.
 - 01-03 검토 P3(비차단): N1 검증기의 rev4→5 차이 집합이 개정 색인 의존(rev 4 프로파일 digest 고정 권고), N2 명세 최상위 amendments가 스프린트 digest에 묶이지 않음, N3 배정 경로 차단 주체 미기재, N4 낡은 문구 3곳, N5 동결 대장에 체크포인트 임계값·idle 정책 항목 없음, N6 probe 구간 F06 재개는 7,200초 안에서 실질 3회·'CLI 기동' 표현, N7 p26-raw 커밋 JSON의 이메일·서명 축약 권고, N8 호스트 점검 기록 최소화, N9 P26 근거의 shallow clone 줄 번호.
+- PR #7 자동 검토 P2(814a5fb): validate_package.py --write가 전달본 v1_3_3_validation.json을 덮어써 다음 검산 실패(재현). 별도 경로 저장으로 교정 PR 예정.
 
 다음 의존 작업 착수 전·제어를 돌려받는 지점마다 원장을 갱신하고 재생성한다. 응답 없는 동안 새 관측을 추정하지 않는다. 강제 종료 뒤 실제 외부 효과를 대조한다.
 

@@ -2,8 +2,8 @@
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
   "snapshot_id": "v1.3.3-EXEC-0006",
-  "snapshot_created_at": "2026-11-12T14:18:58+09:00",
-  "last_actual_work_observed_at": "2026-11-12T14:18:58+09:00",
+  "snapshot_created_at": "2026-11-12T14:22:39+09:00",
+  "last_actual_work_observed_at": "2026-11-12T14:22:39+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
   "phase": "01-04 · 역할별 자격(A) 사용자 발급 대기 · 02-03 선행 교정(L08) PR 준비",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
@@ -60,7 +60,7 @@
       "group": "핵심",
       "kind": "설계",
       "status": "검수 완료",
-      "last_observed_at": "2026-11-12T14:18:58+09:00",
+      "last_observed_at": "2026-11-12T14:22:39+09:00",
       "latest_report": "reports/tasks/01-03/staged-freeze-20261112/REPORT.md",
       "result_state": "PASS · 단계별 동결(v1.3.3-A1): stage_0 F01~F08 동결, later L01~L09 담당·시점·차단 조건 인수. 후속 실험값 전체 동결 아님",
       "verification_level": "verified",
@@ -82,7 +82,7 @@
       "group": "핵심",
       "kind": "준비",
       "status": "조건 대기",
-      "last_observed_at": "2026-11-12T14:18:58+09:00",
+      "last_observed_at": "2026-11-12T14:22:39+09:00",
       "latest_report": null,
       "result_state": "미실행 · 선행 01-03 검수 완료. 역할별 자격 2개(A: 같은 구독의 역할별 장기 토큰) 사용자 발급 대기",
       "verification_level": "unverified",
@@ -1819,7 +1819,8 @@
     "GitHub 계정 1개: 독립 검토는 PR 댓글+원장 기록이며 GitHub Approve로 강제되지 않음. chatgpt-codex-connector[bot] 자동 검토는 보조 정보로만 취급.",
     "01-07 후속(비차단): N1 옛 revision 실행 등록·승격(L08 교정 PR로 진행), N2 생성 ID 충돌 시 부수 순환 보고, N3 비현실적 예상값·2^53 초과, N4 ready+미바인딩 400 vs §1.6 422 명시(01-08), N5 소수 증거값 문자열화. §1.4 공백 G1~G8의 contract revision 5 여부는 사용자 결정.",
     "01-08 후속(02-03 구현 전 반영): N1(L08 교정 PR로 진행) STALE_ASSIGNMENT 늦은 결과를 원 SHA·배정에 귀속 보존(§1.9)·멱등 재생을 배정 대조보다 먼저·에이전트 재조회 경로, N2 completion_summary가 첫 공백 뒤 확인 범위를 숨김; P3 N3 분수 9자리·음수 오프셋 시험, N4 순서·동일 시각 과다 알림, N5 Guardrail의 불변 명세 revision 조회, N6 ConversionResult additionalProperties·409 명시, N7 evidence 머리글 SHA.",
-    "01-03 검토 P3(비차단): N1 검증기의 rev4→5 차이 집합이 개정 색인 의존(rev 4 프로파일 digest 고정 권고), N2 명세 최상위 amendments가 스프린트 digest에 묶이지 않음, N3 배정 경로 차단 주체 미기재, N4 낡은 문구 3곳, N5 동결 대장에 체크포인트 임계값·idle 정책 항목 없음, N6 probe 구간 F06 재개는 7,200초 안에서 실질 3회·'CLI 기동' 표현, N7 p26-raw 커밋 JSON의 이메일·서명 축약 권고, N8 호스트 점검 기록 최소화, N9 P26 근거의 shallow clone 줄 번호."
+    "01-03 검토 P3(비차단): N1 검증기의 rev4→5 차이 집합이 개정 색인 의존(rev 4 프로파일 digest 고정 권고), N2 명세 최상위 amendments가 스프린트 digest에 묶이지 않음, N3 배정 경로 차단 주체 미기재, N4 낡은 문구 3곳, N5 동결 대장에 체크포인트 임계값·idle 정책 항목 없음, N6 probe 구간 F06 재개는 7,200초 안에서 실질 3회·'CLI 기동' 표현, N7 p26-raw 커밋 JSON의 이메일·서명 축약 권고, N8 호스트 점검 기록 최소화, N9 P26 근거의 shallow clone 줄 번호.",
+    "PR #7 자동 검토 P2(814a5fb): validate_package.py --write가 전달본 v1_3_3_validation.json을 덮어써 다음 검산 실패(재현). 별도 경로 저장으로 교정 PR 예정."
   ],
   "notes": [
     "등록 전 분모는 73/12이며 현재 실행 진척은 이 원장에 기록한다.",
@@ -1947,7 +1948,7 @@
       "event_id": "STAGED-FREEZE-01-03-20261112",
       "event_revision": 1,
       "task_id": "01-03",
-      "observed_at": "2026-11-12T14:18:58+09:00",
+      "observed_at": "2026-11-12T14:22:39+09:00",
       "state": "사용자 결정 D1~D12 수신 → 독립 검토 5c3af86 reject → 814a5fb approve → 조건부 병합 4bd4eaf · main CI success(3 job)",
       "evidence": [
         "User_Decisions_2026-11-12_0103.md",
@@ -1960,7 +1961,7 @@
   "resume": {
     "last_verified_stage": "01-03 검수 완료(PR #7 병합 4bd4eaf, 단계별 동결 v1.3.3-A1, main CI 3 job success). 01 스프린트 01-01·01-02·01-03·01-07·01-08 완료",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main 4bd4eaf00ccab1307e651a6eebb9475f7f30cff6 (이 보고 PR 병합 전) · 로컬 fix/02-03-prereq-stale-revision(worktree ../ieo_poc-fix, 미커밋 교정, #7 위로 rebase 필요)",
+    "branch_sha": "main 4bd4eaf00ccab1307e651a6eebb9475f7f30cff6 (이 보고 PR 병합 전) · fix/02-03-prereq-stale-revision 3fbe970(4bd4eaf 위, L08 교정, PR 전) · fix/validate-write-path(4bd4eaf 위, 자동 검토 P2 --write 교정, 커밋 전)",
     "plan_and_spec": "v1.3.3-A1 · 명세 9개 rev 5 · 프로파일 poc-acceptance-v1.3.3 rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
     "running": "보고 PR(report/01-03-accepted) 검토·병합. 런타임 세션 없음(01-04 모델 호출 0회)",
     "unresolved_external_effects": [],
@@ -1972,7 +1973,7 @@
       "reports/tasks/01-03/staged-freeze-20261112/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "보고 PR 병합 → L08 교정 PR(독립 검토·병합) → 사용자 역할별 토큰 2개 수령 → 01-04 P1→P2→P3(판정표 A1-GATE-01-04, 예산 30회·7,200초·300초)",
+    "next_action": "보고 PR 병합 → --write 교정 PR(사용자 후속 지시 1) → L08 교정 PR → 사용자 역할별 토큰 2개 수령 → 01-04 P1→P2→P3(판정표 A1-GATE-01-04, 예산 30회·7,200초·300초)",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
