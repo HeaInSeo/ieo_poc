@@ -782,7 +782,9 @@ fn wrong_resume_base_is_withdrawn_and_compaction_is_counted() {
 #[test]
 fn output_held_by_detached_descendant_is_kept_and_flagged() {
     let out = tmp();
-    let mut s = spec(&out, "echo hello-marker; setsid sleep 20 & exit 0");
+    // `sleep 1` lets setsid run before the leader exits; otherwise the collector may kill the
+    // child while it is still in the group (correct, but then nothing holds the pipe).
+    let mut s = spec(&out, "echo hello-marker; setsid sleep 20 & sleep 1; exit 0");
     s.required_markers = vec!["hello-marker".into()];
     let r = execute(&s).unwrap();
     assert!(r.process.output_incomplete);
@@ -799,10 +801,12 @@ fn output_held_by_detached_descendant_is_kept_and_flagged() {
 #[test]
 fn group_member_ignoring_term_is_killed_after_grace() {
     let out = tmp();
-    let marker = format!("ieo-p23-{}", std::process::id());
+    // POSIX sh (dash on CI): no `exec -a`; a per-process sleep length identifies the member.
+    let secs = 4000 + std::process::id() % 1000;
+    let marker = format!("sleep {secs}");
     let mut s = spec(
         &out,
-        &format!("(trap '' TERM; exec -a {marker} sleep 47) >/dev/null 2>&1 & sleep 60"),
+        &format!("(trap '' TERM; exec {marker}) >/dev/null 2>&1 & sleep 60"),
     );
     s.timeout = Some(Duration::from_secs(1));
     s.grace = Duration::from_secs(1);
