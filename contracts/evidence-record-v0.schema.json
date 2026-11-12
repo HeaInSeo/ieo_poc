@@ -1,0 +1,757 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/HeaInSeo/ieo_poc/contracts/evidence-record-v0.schema.json",
+  "title": "ieo-evidence-record/v0",
+  "description": "02-01 (T03): one record per command run. Usage that was not observed is 'unmeasured' with a reason, never 0. Exit code 0 alone is never success. No secret values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "task_id",
+    "attempt_id",
+    "command_id",
+    "role",
+    "retry_of",
+    "model_request",
+    "argv",
+    "cwd",
+    "env_names",
+    "started_at",
+    "ended_at",
+    "duration_ms",
+    "process",
+    "stdout",
+    "stderr",
+    "redaction",
+    "artifacts",
+    "markers",
+    "result_event",
+    "usage",
+    "judgment"
+  ],
+  "properties": {
+    "format": {
+      "const": "ieo-evidence-record/v0"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "command_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "role": {
+      "enum": [
+        "development",
+        "guardrail",
+        "review",
+        "coordinator",
+        "other"
+      ]
+    },
+    "retry_of": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model_request": {
+      "type": "boolean"
+    },
+    "argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "cwd": {
+      "type": "string"
+    },
+    "env_names": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[^=]+$"
+      }
+    },
+    "started_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+    },
+    "ended_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "exit_code",
+        "signal",
+        "timeout_ms",
+        "term_sent",
+        "kill_sent",
+        "stray_group_killed",
+        "launch_error"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "exited",
+            "signaled",
+            "timed_out",
+            "launch_failed"
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "signal": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "timeout_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "term_sent": {
+          "type": "boolean"
+        },
+        "kill_sent": {
+          "type": "boolean"
+        },
+        "stray_group_killed": {
+          "type": "boolean"
+        },
+        "launch_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "stdout": {
+      "$ref": "#/$defs/stream_file"
+    },
+    "stderr": {
+      "$ref": "#/$defs/stream_file"
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "secret_sources",
+        "stdout_replacements",
+        "stderr_replacements",
+        "argv_replacements",
+        "secret_value_seen"
+      ],
+      "properties": {
+        "secret_sources": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stdout_replacements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stderr_replacements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argv_replacements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "secret_value_seen": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "present",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "markers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pattern",
+          "found"
+        ],
+        "properties": {
+          "pattern": {
+            "type": "string"
+          },
+          "found": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "result_event": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "present",
+            "subtype",
+            "is_error",
+            "session_id",
+            "num_turns",
+            "stop_reason",
+            "runtime_version",
+            "non_json_lines",
+            "rate_limit_statuses",
+            "compact_boundaries"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "present": {
+              "type": "boolean"
+            },
+            "subtype": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "is_error": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "session_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "num_turns": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "stop_reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runtime_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "non_json_lines": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rate_limit_statuses": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "compact_boundaries": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicability",
+        "session_mode",
+        "resume_base",
+        "run",
+        "session",
+        "parent",
+        "children",
+        "attribution_check",
+        "attribution_detail",
+        "by_model",
+        "cost_usd_reported",
+        "run_cost_usd",
+        "partial_observations",
+        "internal_retries"
+      ],
+      "properties": {
+        "applicability": {
+          "enum": [
+            "model",
+            "not_applicable"
+          ]
+        },
+        "session": {
+          "$ref": "#/$defs/measure",
+          "description": "Session totals as reported (modelUsage); cumulative over earlier runs when resumed."
+        },
+        "parent": {
+          "$ref": "#/$defs/measure"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tool_use_id",
+              "agent_id",
+              "usage"
+            ],
+            "properties": {
+              "tool_use_id": {
+                "type": "string"
+              },
+              "agent_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "usage": {
+                "$ref": "#/$defs/measure"
+              }
+            }
+          }
+        },
+        "attribution_check": {
+          "enum": [
+            "consistent",
+            "mismatch",
+            "not_checked"
+          ]
+        },
+        "attribution_detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "by_model": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/tokens"
+          }
+        },
+        "cost_usd_reported": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "partial_observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "message_id",
+              "parent_tool_use_id",
+              "tokens"
+            ],
+            "properties": {
+              "message_id": {
+                "type": "string"
+              },
+              "parent_tool_use_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tokens": {
+                "$ref": "#/$defs/tokens"
+              }
+            }
+          }
+        },
+        "internal_retries": {
+          "enum": [
+            "unmeasured",
+            "not_applicable"
+          ]
+        },
+        "session_mode": {
+          "enum": [
+            "new",
+            "resume",
+            "unknown"
+          ]
+        },
+        "resume_base": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "task_id",
+                "attempt_id",
+                "command_id",
+                "session_id",
+                "session",
+                "cost_usd_reported"
+              ],
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "attempt_id": {
+                  "type": "string"
+                },
+                "command_id": {
+                  "type": "string"
+                },
+                "session_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "session": {
+                  "$ref": "#/$defs/measure"
+                },
+                "cost_usd_reported": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "run": {
+          "$ref": "#/$defs/measure",
+          "description": "This run's usage (children and compaction included); the value summed across runs."
+        },
+        "run_cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "judgment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected",
+        "status",
+        "reasons",
+        "counts_as_success"
+      ],
+      "properties": {
+        "expected": {
+          "enum": [
+            "success",
+            "nonzero_exit",
+            "timeout",
+            "no_result",
+            "result_error"
+          ]
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "incomplete",
+            "expected_matched",
+            "expected_not_matched"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "counts_as_success": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "model_request": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result_event": {
+            "type": "null"
+          },
+          "usage": {
+            "properties": {
+              "applicability": {
+                "const": "not_applicable"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_request": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result_event": {
+            "type": "object"
+          },
+          "usage": {
+            "properties": {
+              "applicability": {
+                "const": "model"
+              },
+              "session_mode": {
+                "enum": [
+                  "new",
+                  "resume"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "judgment": {
+            "properties": {
+              "status": {
+                "const": "succeeded"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "process": {
+            "properties": {
+              "kind": {
+                "const": "exited"
+              },
+              "exit_code": {
+                "const": 0
+              }
+            }
+          },
+          "judgment": {
+            "properties": {
+              "counts_as_success": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "usage": {
+            "properties": {
+              "session_mode": {
+                "const": "new"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "usage": {
+            "properties": {
+              "resume_base": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input",
+        "output",
+        "cache_read",
+        "cache_creation"
+      ],
+      "properties": {
+        "input": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_read": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_creation": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "measure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "tokens",
+            "source"
+          ],
+          "properties": {
+            "state": {
+              "const": "measured"
+            },
+            "tokens": {
+              "$ref": "#/$defs/tokens"
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "reason"
+          ],
+          "properties": {
+            "state": {
+              "const": "unmeasured"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "stream_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "bytes",
+        "sha256"
+      ],
+      "properties": {
+        "file": {
+          "enum": [
+            "stdout",
+            "stderr"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

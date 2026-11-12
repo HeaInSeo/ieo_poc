@@ -52,5 +52,9 @@ jobs:
         run: cargo clippy --all-targets --locked -- -D warnings
       - name: cargo test
         run: cargo test --locked --all-targets
+      - name: 02-01 collector replay of the 35 real 01-04 streams (no model calls)
+        run: |
+          cargo build --locked -q -p ieo-evidence
+          python3 -I docs/poc/reports/tasks/02-01/collector-20261112/crosscheck_0104.py "$PWD/target/debug/ieo-evidence" "$PWD" "$RUNNER_TEMP/replay-0104"
       - name: plan manifest digests and draft registration (all 9 accepted as draft)
         run: cargo run --locked -q --bin ieo-spec -- check-manifest docs/poc/Console_Coordinator_Sprints_v0.json > /dev/null
