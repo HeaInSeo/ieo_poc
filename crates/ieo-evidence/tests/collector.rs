@@ -525,10 +525,13 @@ fn evidence_is_never_overwritten_and_ids_are_checked() {
 #[test]
 fn stray_background_process_does_not_hang_the_collector() {
     let out = tmp();
+    // `sleep` inherits stdout: it still holds the pipe when killed after the drain
+    // window, so the stored output may be cut -> incomplete, never success.
     let r = execute(&spec(&out, "sleep 30 & echo x")).unwrap();
     assert!(r.process.stray_group_killed);
+    assert!(r.process.output_incomplete);
     assert!(r.duration_ms < 8_000, "{}", r.duration_ms);
-    assert_eq!(r.judgment.status, JudgmentStatus::Succeeded);
+    assert_eq!(r.judgment.status, JudgmentStatus::Incomplete);
 }
 
 #[test]
@@ -836,4 +839,38 @@ fn leftover_member_after_normal_exit_is_killed_and_recorded() {
             .iter()
             .any(|x| x.contains("남은 프로세스"))
     );
+}
+
+/// Review 273907b P3-1: a group member that writes shortly after the leader exits
+/// is given the drain window; its output is kept.
+#[test]
+fn late_output_within_drain_window_is_kept() {
+    let out = tmp();
+    let r = execute(&spec(&out, "(sleep 0.3; echo late-line) & echo early")).unwrap();
+    let d = out.join("ev/02-01/a1/c1");
+    assert_eq!(
+        std::fs::read_to_string(d.join("stdout")).unwrap(),
+        "early\nlate-line\n"
+    );
+    assert!(!r.process.output_incomplete);
+    assert!(!r.process.stray_group_killed);
+    assert_eq!(r.judgment.status, JudgmentStatus::Succeeded);
+}
+
+/// Review 273907b P3-2: stdout and stderr get the same treatment.
+#[test]
+fn late_stderr_from_detached_descendant_is_kept_like_stdout() {
+    let out = tmp();
+    let r = execute(&spec(
+        &out,
+        "setsid sh -c 'sleep 0.5; echo late-err >&2' & sleep 0.2; exit 0",
+    ))
+    .unwrap();
+    let d = out.join("ev/02-01/a1/c1");
+    assert_eq!(
+        std::fs::read_to_string(d.join("stderr")).unwrap(),
+        "late-err\n"
+    );
+    assert!(!r.process.output_incomplete);
+    assert_eq!(r.judgment.status, JudgmentStatus::Succeeded);
 }
