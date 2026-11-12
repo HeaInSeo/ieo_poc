@@ -224,7 +224,7 @@
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/43222844640"
       ],
       "next_action": "02-02 착수",
-      "unresolved": "토큰 총량 정의(네 항목 중 무엇을 셀지)는 L01/L02 동결 항목. 새 claude -p 실시간 실행 미확인(모델 호출 0) — 02-04 또는 승인 예산 회차. 검토 273907b P3-1(정상 종료 뒤 즉시 KILL로 늦은 출력이 잘려도 succeeded, KILL은 사유에 기록)·P3-2(stderr 대기 200 ms) → 02-02 사용 전 계측기 수정. 검토 2df3c35 P3-7(summarize 중복 입력) → 같은 수정. setsid로 그룹을 벗어나 관을 닫은 자손은 기록되지 않음"
+      "unresolved": "토큰 총량 정의(네 항목 중 무엇을 셀지)는 L01/L02 동결 항목. 새 claude -p 실시간 실행 미확인(모델 호출 0) — 02-04 또는 승인 예산 회차. 검토 273907b P3-1(정상 종료 뒤 즉시 KILL로 늦은 출력이 잘려도 succeeded, KILL은 사유에 기록)·P3-2(stderr 대기 200 ms) → 02-02 사용 전 계측기 수정. 검토 2df3c35 P3-7(summarize 중복 입력) → 같은 수정. setsid로 그룹을 벗어나 관을 닫은 자손은 기록되지 않음 · [02-02에서 교정 091e099: 273907b P3-1·P3-2, 2df3c35 P3-7 — PR #23 병합 dca7911]"
     },
     {
       "task_id": "02-02",
@@ -250,7 +250,7 @@
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/43234135722"
       ],
       "next_action": "02-03 착수 전 L07·L08·01-08 N2·PR #10 P3 확인",
-      "unresolved": "검토 f46818a P3: freeze push 증거가 로컬 reflog뿐(다음 동결은 ls-remote·CI 기록 보존), summarize 중복 거부의 crate 시험 없음(계측기 다음 수정), 기대 필드 59/930이 개발 쪽 요약(이월 교정·종료 코드)에 근거해 독립성이 낮음, validate_package가 개정 revision 순서·스프린트 revision 증가를 단언하지 않음, 01-03 정정 뒤 문장 흐름. 독립 담당 사용량 미계측"
+      "unresolved": "검토 f46818a P3: freeze push 증거가 로컬 reflog뿐(다음 동결은 ls-remote·CI 기록 보존), summarize 중복 거부의 crate 시험 없음(계측기 다음 수정), 기대 필드 59/930이 개발 쪽 요약(이월 교정·종료 코드)에 근거해 독립성이 낮음, validate_package가 개정 revision 순서·스프린트 revision 증가를 단언하지 않음, 01-03 정정 뒤 문장 흐름. 독립 담당 사용량 미계측 · 검토 f46818a P3-2: result.json cost.elapsed_seconds는 null로 남김(실측 약 2,350초는 REPORT 머리·이 원장 result_state에 기록)"
     },
     {
       "task_id": "02-03",
@@ -279,7 +279,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달"
+      "unresolved": "착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달 · 02-01→02-02 이월 판정 규칙(담당 02-04, 시점: 02-04가 계측기 판정을 supervisor 판정 입력으로 연결하기 전): 2df3c35 P3-2 결과 subtype≠success이고 is_error가 false/없음(현재 succeeded — 02-02 validation V-33 관측), P3-3 nonzero_exit/no_result 기대가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 일치 불가, P3-6 마감 직전 자연 종료 경쟁. 규칙을 정한 뒤 새 평가 세트 버전으로 시험(02-02 validation은 사용 완료)"
     },
     {
       "task_id": "02-05",
@@ -1056,7 +1056,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "02-01→02-02 이월 판정 규칙 미결(미확정으로 분리됨): P3-2 결과 subtype≠success이고 is_error 아님(현재 succeeded), P3-3 nonzero_exit/no_result가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 불가, P3-6 마감 직전 자연 종료 경쟁. 담당: 이 규칙을 판정 입력으로 처음 쓰는 작업(02-04 supervisor 판정 연결 또는 09-01 결과 처분) 착수 전에 규칙을 정하고 새 세트 버전으로 시험"
+      "unresolved": null
     },
     {
       "task_id": "09-02",
