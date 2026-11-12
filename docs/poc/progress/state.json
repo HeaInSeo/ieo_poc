@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0010",
-  "snapshot_created_at": "2026-11-12T18:08:43+09:00",
-  "last_actual_work_observed_at": "2026-11-12T18:08:43+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0011",
+  "snapshot_created_at": "2026-11-12T19:33:17+09:00",
+  "last_actual_work_observed_at": "2026-11-12T19:33:17+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "01-05 검수 완료(PR #17) · 01-04 후속 보완(PR #16) 병합 · 다음 01-06",
+  "phase": "01-06 검수 완료(PR #19) · 다음 02-01",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -13,8 +13,8 @@
     "main_experiments": 31,
     "followup_candidates": 5
   },
-  "current_task": "01-06",
-  "next_task": "01-06",
+  "current_task": "02-01",
+  "next_task": "02-01",
   "tasks": [
     {
       "task_id": "01-01",
@@ -137,14 +137,25 @@
       "track": "main",
       "group": "핵심",
       "kind": "준비",
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
-      "verification_level": "unverified",
-      "evidence": [],
-      "next_action": null,
-      "unresolved": "착수 전제(01-05 Current_Operations §2): PoC 자원은 ieo-probe-* 이름만, 기존 컨테이너(local-registry) 비접촉, 재부팅·사용자 systemd 관리자 비접촉. claude-report-bridge.timer(enabled·elapsed, OnBootSec 1min·5min 주기)를 01-06과 각 실험 첫 실행 전에 재조회"
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-12T19:33:17+09:00",
+      "latest_report": "reports/tasks/01-06/lab-20261112/REPORT.md",
+      "result_state": "시험실 보관(sha256 a26b7290…, 자격 제외)→정리→초기화→대조, 재정리→재초기화→대조 모두 기대 일치(E 16·E1b 7, check-init 통과). 생성기 render_progress.py 일괄 교체·남은 임시 파일 탐지 보강, 시험 26건 PASS(CI 실행). STATUS 고정 경로·GitHub 익명 200, 사용자 실제 열람 미확인. PR #19 검토 b301843 approve·자동 검토 P1/P2 교정 → f873fa4 approve(01-06 검토 2/4) → 조건부 병합 c0f93d7 · main CI success",
+      "verification_level": "verified",
+      "evidence": [
+        "reports/tasks/01-06/lab-20261112/REPORT.md",
+        "reports/tasks/01-06/lab-20261112/Lab_Procedure.md",
+        "reports/tasks/01-06/lab-20261112/evidence/verify-1.json",
+        "reports/tasks/01-06/lab-20261112/evidence/verify-2.json",
+        "reports/tasks/01-06/lab-20261112/evidence/archive-manifest.json",
+        "reports/tasks/01-06/lab-20261112/evidence/test_render_progress.txt",
+        "reports/tasks/01-06/lab-20261112/evidence/lab-guard-checks.txt",
+        "reports/tasks/01-06/lab-20261112/evidence/viewing-paths.txt",
+        "reports/tasks/01-06/lab-20261112/reviews/review-pr19-f873fa4.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/19"
+      ],
+      "next_action": "02-01 착수",
+      "unresolved": "검토 f873fa4 P3: 저장소 안 보관 거부가 실행 중인 checkout만 봄(다른 worktree·공유 작업공간 미포함), reset --archived가 오래된 MANIFEST도 허용, E 거부 표식이 거부 원인을 보지 않음(E1 main 불변 검사 없음), verify-1·2는 이전 lab.py(25검사) 산출. 보관본은 호스트 로컬. 사용자 실제 열람 미확인"
     },
     {
       "task_id": "01-07",
@@ -257,7 +268,8 @@
       "result_state": "미실행",
       "verification_level": "unverified",
       "evidence": [],
-      "next_action": null
+      "next_action": null,
+      "unresolved": "런타임 계약 rev 6 §10 항목 5: 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) — PR #18 검토 P3-1"
     },
     {
       "task_id": "02-06",
@@ -2094,14 +2106,27 @@
         "reports/tasks/01-05/baseline-20261112/reviews/review-pr17-00a7566.md",
         "https://github.com/HeaInSeo/ieo_poc/pull/17"
       ]
+    },
+    {
+      "event_id": "01-06-ACCEPTED-20261112",
+      "event_revision": 1,
+      "task_id": "01-06",
+      "observed_at": "2026-11-12T19:33:17+09:00",
+      "state": "01-06 검수 완료. PR #19: b301843 독립 approve·codex P1·P2×2(시험실 밖 경로 상속, 상대 보관 경로, init 결과 미판정) → f873fa4 교정·approve(01-06 검토 2/4) → 조건부 병합 c0f93d7 · main CI success",
+      "evidence": [
+        "reports/tasks/01-06/lab-20261112/REPORT.md",
+        "reports/tasks/01-06/lab-20261112/reviews/review-pr19-b301843.md",
+        "reports/tasks/01-06/lab-20261112/reviews/review-pr19-f873fa4.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/19"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "01-05 검수 완료(PR #17 병합 4bcba6a, main CI success). 7/73 · 0/12",
+    "last_verified_stage": "01-06 검수 완료(PR #19 병합 c0f93d7, main CI success). 8/73 · 0/12",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main 4bcba6ac2151d94e846143e87f51797c056262fc (이 보고 PR 병합 전)",
+    "branch_sha": "main c0f93d7d523ae3bc14f33c1f6f7e8c39a8c03aef (이 보고 PR 병합 전)",
     "plan_and_spec": "v1.3.3-A1 · 명세 9개 rev 5 · 프로파일 poc-acceptance-v1.3.3 rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR(report/01-05-accepted). 런타임 세션 없음",
+    "running": "보고 PR(report/01-06-accepted). 런타임 세션 없음. 시험실은 01-06 초기 상태(컨테이너 정지)",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2115,10 +2140,11 @@
       "reports/tasks/01-04/remaining-probes-20261112/REPORT.md",
       "reports/workspace/test-env-assets-20261112/ASSETS.md",
       "reports/workspace/harness-result-check-20261112/REPORT.md",
-      "reports/tasks/01-05/baseline-20261112/REPORT.md"
+      "reports/tasks/01-05/baseline-20261112/REPORT.md",
+      "reports/tasks/01-06/lab-20261112/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "01-06 시험실 초기화·증거 보존 경로 착수(선행 01-04·01-05 충족)",
+    "next_action": "02-01 명령 실행·증거 수집·비용 계측기 착수(선행 01-03·01-06 충족)",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
