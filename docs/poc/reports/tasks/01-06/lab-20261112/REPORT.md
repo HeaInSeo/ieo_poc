@@ -12,7 +12,7 @@
 
 | 수용 기준 문구 | 결과 | 근거 |
 | --- | --- | --- |
-| 사례별 초기 상태, 원본 로그·버전·시각·사용량 기록 위치와 정리 절차를 **재현**한다 | 보관 → 정리 → 초기화 → 대조를 2회 실행했고 두 번 모두 기대 초기 상태와 일치했다. 두 초기화 결과는 구조가 같다. 디렉터리·모드·항목 수·역할 볼륨·컨테이너·네트워크가 같고, 이름 digest만 새 seed 커밋 SHA 때문에 다르다. 초기화마다 E 16건·E1b 7건 허용/거부가 기대대로였다 | [Lab_Procedure.md](Lab_Procedure.md) §2~§4. evidence/`inv-0..3`, `archive-manifest.json`, `reset-1/2.json`, `init-1/2/`, `verify-1/2.json` |
+| 사례별 초기 상태, 원본 로그·버전·시각·사용량 기록 위치와 정리 절차를 **재현**한다 | 보관(1회, 01-04 상태 보존) → 정리 → 초기화 → 대조를 실행했고, 이어 정리 → 초기화 → 대조를 한 번 더 했다(두 번째 정리는 init-1이 다시 만들 수 있는 상태만 지웠다). 두 번 모두 기대 초기 상태와 일치했다. 두 초기화 결과는 구조가 같다. 디렉터리·모드·항목 수·역할 볼륨·컨테이너·네트워크가 같고, 이름 digest만 새 seed 커밋 SHA 때문에 다르다. 초기화마다 E 16건·E1b 7건 허용/거부가 기대대로였다 | [Lab_Procedure.md](Lab_Procedure.md) §2~§4. evidence/`inv-0..3`, `archive-manifest.json`, `reset-1/2.json`, `init-1/2/`, `verify-1/2.json` |
 | 후속 실험에 필요한 환경만 준비 | 01-04에서 쓴 환경(역할 볼륨, repo·forge, DB, 수신기)의 초기화만 만들었다. 클러스터·관측기(08-02), GHCR, 역할별 GitHub 자격(GH1~GH5, 사용자 발급)은 쓰는 실험이 준비한다 | Lab_Procedure §2. 시험 환경 자산 목록(test-env-assets) |
 | STATUS 고정 경로와 결과 인덱스/보고 링크를 첫 응답으로 제공 | 이 문서 첫 절, Lab_Procedure §5 | evidence/[viewing-paths.txt](evidence/viewing-paths.txt): 호스트 경로 존재, GitHub 4개 URL 익명 200 |
 | state.json만 진행 원본으로 갱신하고 render_progress.py로 STATUS/TASKS/RESULTS 및 파생 이력/재개 화면 생성 | 생성기 `scripts/render_progress.py`를 이 작업의 산출물로 포함한다. 01-01부터 써 왔고, 이번에 쓰기 방식을 보강했다(§2) | 원장 갱신 PR들(#8~#18)이 모두 이 생성기로 화면을 만들었다 |
@@ -32,8 +32,23 @@
 - 정리 대상은 `ieo-probe-*` 컨테이너 3·네트워크 2와 시험실 데이터 디렉터리 9개다. `bin`·`e-secrets`는 남겼다.
 - 01-05가 넘긴 report bridge timer는 inventory마다 다시 조회한다. 이번 상태는 enabled·active·elapsed다(`inv-*.json` `timers`).
 
-## 4. 한계
+## 4. 검토 반영(b301843: 독립 검토 approve, 자동 검토 P1·P2 2건)
+
+- **자동 검토 P1**(상속된 `IEO_PROBE_BASE`/`IEO_PROBE_SECRETS`가 init의 하위 probe를 시험실 밖으로 보낼 수 있음): `child_env()`가 두 변수를 시험실 값으로 고정한다. 다른 값을 상속하면 거부한다.
+- **자동 검토 P2**(상대 경로 `--dest`): 처음에 한 번 절대 경로로 풀고, 셸 인자는 따옴표로 감싼다. 저장소 안 목적지도 거부한다(독립 검토 P3-4).
+- **자동 검토 P2**(init이 E/E1b 결과를 보지 않고 성공 보고): `check_init()`이 시험마다 필요한 표식과 금지 표식, DB 스키마 rc를 판정한다. 맞지 않으면 init이 실패한다. 기존 init-1·2 증거에 사후로 실행해 둘 다 통과했다(각 `init-check.json`).
+- 독립 검토 P3 처리:
+  - reset은 직전 보관 MANIFEST(`--archived`, sha256 확인)를 요구한다(P3-5).
+  - 보관 제외에 `*credentials*`를 더했다(P3-3).
+  - 항상 참이던 검사를 지웠다(P3-6).
+  - CI가 `test_render_progress.py`를 실행한다(P3-7).
+  - 기록 위치 표에 형식이 생긴 시점을 적었다(P3-2).
+  - 시험 환경 자산 목록과 01-04 재현 명령이 가리키던 상태가 정리됐음을 적었다(P3-7).
+- 검사 원본은 [lab-guard-checks.txt](evidence/lab-guard-checks.txt)다. init-1·2 통과, 음성 대조 2건 실패 검출, 거부 3건, 상대 경로 보관 정상이 들어 있다. 모델 요청은 없다.
+
+## 5. 한계
 
 - 보관본은 이 호스트에만 있다. 호스트 장애에는 보존되지 않는다. 보관본의 sha256은 저장소에 남는다.
 - 모델 요청이 필요한 사례(역할 세션 재개 등)의 초기화는 세션 기록 0건 상태로 끝난다. 세션을 만드는 시험은 각 실험 예산으로 한다.
 - 초기화 결과의 git 객체 SHA는 실행마다 다르다. 같은 SHA가 필요한 실험은 seed를 고정한 별도 절차가 필요하다.
+- 01-04 증거가 가리키던 역할 볼륨(예: 첫 세 probe REPORT §8의 `identity_claims.py` 재현 명령, 시험 환경 자산 목록의 `roles-recreated`·`snapshots/73ea669…`)은 정리됐다. 그 상태는 보관본 `/opt/rust/ieo_poc_archive/lab-20261112T091332Z`에만 있다. 재현하려면 보관본을 시험실 밖에 풀어 쓴다.

@@ -32,11 +32,11 @@
 | 기록 | 위치 | 담는 것 |
 | --- | --- | --- |
 | 모델 요청 시도 원본 | `reports/tasks/<task>/<run>/evidence/attempts/NN-<probe>-<role>/` | `stdout.jsonl`(stream-json 원문, 토큰·해시 가림), `stderr.txt`(환경 변수 이름, UID, 컨테이너 안 시각 `#T_START/#T_END`), `meta.json` |
-| 시도별 요약 | 같은 폴더의 `meta.json` | argv, UTC 시작·종료, 종료 코드, 시간 초과, 결과 사건(`usage`·`modelUsage`·`total_cost_usd`·`num_turns`), `rate_limit_event`, 토큰 지문, `result_missing`·`judgeable`, 누적 시도·남은 벽시계 |
+| 시도별 요약 | 같은 폴더의 `meta.json` | argv, UTC 시작·종료, 종료 코드, 시간 초과, 결과 사건(`usage`·`modelUsage`·`total_cost_usd`·`num_turns`), `rate_limit_event`, 토큰 지문, 누적 시도·남은 벽시계(01-04 나머지 run부터). `result_missing`·`judgeable`은 PR #16 이후 하네스부터 있다(01-04 원본에는 없음) |
 | 누적 예산 | `evidence/budget.json` | 시도 예약·기동 여부, 첫 시도 시각, CLI 기동(모델 없음) 목록 |
 | 버전 | `evidence/setup.json`, `E.json` `info.images` | podman rootless·subuid, 볼륨 소유, 이미지 ID·digest, CLI 사본 sha256, 수신기 소스 sha256 |
-| 모델 없는 시험 | `P2.json`, `E.json`, `E1b.json` | argv, rc, 출력, 판정 표식(`markers`), `judgement_basis` |
-| 작업 결과 | `reports/tasks/<task>/<run>/result.json` | 입력 버전, 기대·관측, 비용 필드(미계측이면 이유를 적고 0으로 쓰지 않음) |
+| 모델 없는 시험 | `P2.json`, `E.json`, `E1b.json` | argv, rc, 출력. 판정 표식(`markers`)·`judgement_basis`는 PR #16 이후 하네스부터 있다(01-04 원본에는 없고, 01-06 init-1·2에는 있음) |
+| 작업 결과 | `reports/tasks/<task>/<run>/result.json` | 입력 버전, 기대·관측, 비용 필드(미계측이면 이유를 적고 0으로 쓰지 않음). 01-04 run에는 없고 01-01·01-03·01-05·01-06에는 있다 |
 | 진행 원장 | `progress/state.json`(유일 원본) → `render_progress.py`가 STATUS·TASKS·RESULTS·RESUME·events.jsonl 생성 | 작업 상태, 사건 `observed_at`, 재개 정보 |
 | 시험실 상태 | `lab.py inventory` JSON(이 run의 `evidence/inv-*.json`) | 디렉터리 모드·소유·항목 수·이름 digest, 역할 볼륨 상태, `ieo-probe-*` 자원, 기존 timer 상태 |
 | 시험실 보관본 | 저장소 밖 `/opt/rust/ieo_poc_archive/<시각>/lab-state.tar.gz`(0600, 디렉터리 0700)와 `MANIFEST.json` | 정리 전 전체 상태(자격 제외). sha256은 이 run의 [archive-manifest.json](evidence/archive-manifest.json) |
@@ -46,8 +46,8 @@
 
 1. `lab.py inventory --out <before>`
 2. `lab.py archive --dest /opt/rust/ieo_poc_archive/lab-<UTC>`. 정리 전 증거를 보존한다. 01-04의 세션 기록 원문도 여기 남는다.
-3. `lab.py reset --yes`. `ieo-probe-*` 컨테이너·네트워크와 시험실 데이터 디렉터리를 지운다. 남는 것은 `bin`·`e-secrets`뿐이다.
-4. `lab.py init --evidence <dir>`. 모델 요청 없이 초기 상태를 만들고 E·E1b 허용/거부를 다시 시험한다.
+3. `lab.py reset --yes --archived <2의 MANIFEST.json>`(다시 만들 수 있는 상태만이면 `--no-archive-needed`). `ieo-probe-*` 컨테이너·네트워크와 시험실 데이터 디렉터리를 지운다. 남는 것은 `bin`·`e-secrets`뿐이다.
+4. `lab.py init --evidence <dir>`. 모델 요청 없이 초기 상태를 만들고 E·E1b 허용/거부를 다시 시험한다. 하위 probe의 시험실 경로를 고정하고, 결과를 `check_init`으로 판정한다. 하나라도 어긋나면 실패다.
 5. `lab.py inventory --out <after>` → `lab.py verify --inventory <after>`. 기대 초기 상태와 대조한다.
 6. 공유 작업공간(`/opt/rust/src/github.com/HeaInSeo/ieo_poc`)은 병합마다 `main`으로 되돌린다(아래 §5).
 

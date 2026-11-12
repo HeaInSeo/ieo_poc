@@ -21,6 +21,9 @@ jobs:
       - name: render_progress.py --check
         working-directory: docs/poc
         run: python scripts/render_progress.py --check
+      - name: render_progress.py behaviour tests (01-06, temporary copies)
+        working-directory: docs/poc
+        run: python scripts/test_render_progress.py
       - name: OpenAPI contract (external $ref resolved)
         working-directory: contracts
         run: openapi-spec-validator ieo-api-v0.openapi.yaml

@@ -7,11 +7,13 @@ Credentials (/opt/rust/ieo_poc_secrets, role cred/ copies, e-secrets) are never 
 Usage (.venv-poc/bin/python -I probes/lab/lab.py ...):
   inventory [--out FILE]            current lab state (names, modes, owners, counts, digests of names; no contents)
   archive --dest DIR                tar of lab state except credentials, with sha256 and a name manifest
-  reset --yes                       remove ieo-probe-* containers/networks and lab data dirs (keeps bin/, e-secrets/)
+  reset --yes --archived MANIFEST   remove ieo-probe-* containers/networks and lab data dirs (keeps bin/, e-secrets/);
+                                    needs the MANIFEST of the archive just taken (or --no-archive-needed)
+  check-init --evidence DIR         judge E/E1b evidence of an init against the expected markers
   init --evidence DIR               probe.py setup + probe2.py e + e1b (no model calls) -> initial state
   verify --inventory FILE           check an inventory against the documented initial state
 """
-import argparse, hashlib, json, os, subprocess, sys
+import argparse, hashlib, json, os, re, shlex, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +24,7 @@ REPO = Path(__file__).resolve().parents[2]
 PY = sys.executable
 DATA_DIRS = ["roles", "roles-recreated", "testrepos", "snapshots", "snapshots-g", "snapshots-galt", "forge", "rx-data", "g2-src", "g3-cfg", "seed-a", "seed-b"]
 KEEP = ["bin", "e-secrets"]
-NEVER_ARCHIVE = ["*/cred", "*/cred/*", "e-secrets", "e-secrets/*"]
+NEVER_ARCHIVE = ["*/cred", "*/cred/*", "e-secrets", "e-secrets/*", "*.credentials.json", "*credentials*"]
 
 
 def now():
@@ -89,17 +91,21 @@ def cmd_inventory(a):
 
 
 def cmd_archive(a):
-    dest = Path(a.dest)
-    if LAB in Path(os.path.abspath(dest)).parents or dest.resolve() == LAB:
+    # resolve once (PR #19 automated review P2): a relative --dest must mean the same place for mkdir, tar and hashing
+    dest = Path(a.dest).expanduser().resolve()
+    if dest == LAB or LAB in dest.parents:
         sys.exit("archive destination must be outside the lab")
+    if dest == REPO or REPO in dest.parents:
+        sys.exit("archive destination must be outside the repository (it holds role session records)")
     dest.mkdir(parents=True, exist_ok=True)
     os.chmod(dest, 0o700)
     tar = dest / "lab-state.tar.gz"
     present = [d for d in DATA_DIRS if (LAB / d).exists()]
-    excl = " ".join(f"--exclude='{x}'" for x in NEVER_ARCHIVE)
-    unshare(f"cd {LAB} && tar --numeric-owner {excl} -czf {tar} {' '.join(present)} && chmod 0600 {tar}")
-    listing = unshare(f"tar -tzvf {tar} --numeric-owner").stdout
-    if any(seg in line for line in listing.splitlines() for seg in ("/cred/", "e-secrets")):
+    excl = " ".join("--exclude=" + shlex.quote(x) for x in NEVER_ARCHIVE)
+    q = shlex.quote(str(tar))
+    unshare(f"cd {shlex.quote(str(LAB))} && tar --numeric-owner {excl} -czf {q} {' '.join(present)} && chmod 0600 {q}")
+    listing = unshare(f"tar -tzvf {q} --numeric-owner").stdout
+    if any(seg in line for line in listing.splitlines() for seg in ("/cred/", "e-secrets", "credentials")):
         sys.exit("ARCHIVE GUARD: credential path found in archive listing")
     names = sorted(l.split()[-1] for l in listing.splitlines())
     sha = hashlib.sha256(tar.read_bytes()).hexdigest()
@@ -113,6 +119,14 @@ def cmd_archive(a):
 def cmd_reset(a):
     if not a.yes:
         sys.exit("reset needs --yes")
+    # evidence first: reset needs the MANIFEST of an archive taken just before, unless explicitly waived
+    if not a.no_archive_needed:
+        if not a.archived:
+            sys.exit("reset needs --archived <MANIFEST.json> (or --no-archive-needed when the state is regenerable)")
+        m = json.loads(Path(a.archived).read_text())
+        tar = Path(m["archive"])
+        if not tar.exists() or hashlib.sha256(tar.read_bytes()).hexdigest() != m["sha256"]:
+            sys.exit("archive in MANIFEST missing or sha256 mismatch")
     removed = {"containers": [], "networks": [], "dirs": []}
     for n in podman_names("ps"):
         if n.startswith(PREFIX):
@@ -130,16 +144,74 @@ def cmd_reset(a):
     print(json.dumps({"at": now(), "removed": removed, "kept": left}, ensure_ascii=False, indent=2))
 
 
+def child_env():
+    """Pin the probes to the guarded lab (PR #19 automated review P1): probe.py/probe2.py read IEO_PROBE_BASE /
+    IEO_PROBE_SECRETS; an inherited override must never move setup/E/E1b outside /opt/rust/ieo_poc_probe."""
+    env = dict(os.environ)
+    want = {"IEO_PROBE_BASE": str(LAB / "roles"), "IEO_PROBE_SECRETS": str(SECRETS)}
+    for k, v in want.items():
+        if env.get(k) not in (None, v):
+            sys.exit(f"SCOPE GUARD: inherited {k} differs from the lab ({env[k]!r}); unset it")
+        env[k] = v
+    return env
+
+
+# expected decisive markers per E/E1b test (the 01-04 expectations); "absent" markers must not appear
+EXPECT_TESTS = {
+    "E1-dev-push-work": (["PUSH_WORK_OK"], []), "E1-dev-push-main": (["PUSH_MAIN_REJECTED"], ["PUSH_MAIN_OK"]),
+    "E1-gd-read-snapshot": (["READ_OK"], []), "E1-gd-write-snapshot": (["WRITE_DENIED", "REPO_ABSENT"], ["WRITE_OK", "REPO_VISIBLE"]),
+    "E2-coord-insert": (["COORD_OK"], []), "E2-reader-select": (["READER_SELECT_OK"], []),
+    "E2-reader-insert": (["READER_INSERT_DENIED"], ["READER_INSERT_OK"]), "E2-no-password": (["NOPW_DENIED"], ["NOPW_OK"]),
+    "E2-development-reach": (["REACH_DENIED"], ["REACH_OK"]), "E2-guardrail-reach": (["REACH_DENIED"], ["REACH_OK"]),
+    "E3-post-new": (["^201$"], []), "E3-post-replay": (["^200$", '"replay":true'], []), "E3-post-conflict": (["^409$"], []),
+    "E3-get": (["HTTP/1.1 200", "X-Stored-Count: 1"], []), "E3-no-token": (["^401$"], []), "E3-other-token": (["^401$"], []),
+    "E1b-dev-push-work": (["PUSH_WORK_OK"], []), "E1b-dev-push-main": (["PUSH_MAIN_REJECTED"], ["PUSH_MAIN_OK"]),
+    "E1b-dev-force-main": (["FORCE_MAIN_REJECTED"], ["FORCE_MAIN_OK"]), "E1b-dev-delete-main": (["DELETE_MAIN_REJECTED"], ["DELETE_MAIN_OK"]),
+    "E1b-dev-repo-files": (["ABSENT /srv/a.git$", "ABSENT /srv/a.git/hooks/pre-receive"], ["VISIBLE /srv/a.git"]),
+    "E1b-gd-reach": (["REACH_DENIED"], ["REACH_OK"]), "E1b-main-unchanged": ([], []),
+}
+
+
+def check_init(ev: Path):
+    """Judge the generated E/E1b evidence against EXPECT_TESTS (PR #19 automated review P2): init succeeds only if
+    every test shows its expected markers, none of the forbidden ones, and the DB schema init returned 0."""
+    res = []
+    e = json.loads((ev / "E.json").read_text()); e1b = json.loads((ev / "E1b.json").read_text())
+    res.append({"id": "E2 schema init rc", "ok": e["info"].get("pg_init_rc") == 0, "got": e["info"].get("pg_init_rc")})
+    tests = {t["id"]: t for t in e["tests"] + e1b["tests"]}
+    for tid, (need, forbid) in EXPECT_TESTS.items():
+        t = tests.get(tid)
+        if t is None:
+            res.append({"id": tid, "ok": False, "got": "missing"}); continue
+        out = t.get("output", "")
+        if tid == "E1b-main-unchanged":
+            need = [r"refs/heads/main " + re.escape(e1b["seed_main"])]
+        miss = [m for m in need if not re.search(m, out, re.M)]
+        bad = [m for m in forbid if re.search(m, out, re.M)]
+        res.append({"id": tid, "ok": not miss and not bad, "missing": miss, "forbidden_seen": bad})
+    extra = sorted(set(tests) - set(EXPECT_TESTS))
+    res.append({"id": "no unexpected tests", "ok": not extra, "got": extra})
+    return {"all_ok": all(r["ok"] for r in res), "checks": res}
+
+
+def cmd_check_init(a):
+    out = check_init(Path(a.evidence).resolve())
+    (Path(a.evidence) / "init-check.json").write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
+    print(json.dumps({"all_ok": out["all_ok"], "failed": [r["id"] for r in out["checks"] if not r["ok"]]}))
+    sys.exit(0 if out["all_ok"] else 1)
+
+
 def cmd_init(a):
     ev = Path(a.evidence).resolve()
     ev.mkdir(parents=True, exist_ok=True)
     py = [PY, "-I"]
+    env = child_env()
     steps = [("setup", py + [str(REPO / "probes/01-04/probe.py"), "setup", "--evidence", str(ev)]),
              ("e", py + [str(REPO / "probes/01-04/probe2.py"), "e", "--evidence", str(ev)]),
              ("e1b", py + [str(REPO / "probes/01-04/probe2.py"), "e1b", "--evidence", str(ev)])]
     log = []
     for name, cmd in steps:
-        r = sh(cmd, check=False)
+        r = sh(cmd, check=False, env=env)
         log.append({"step": name, "rc": r.returncode, "tail": (r.stdout + r.stderr)[-1500:]})
         if r.returncode:
             (ev / "init-log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2) + "\n")
@@ -147,7 +219,11 @@ def cmd_init(a):
     for c in ("ieo-probe-pg", "ieo-probe-rx"):  # leave the lab at rest: services stopped, data kept
         sh(["podman", "stop", "-t", "5", c], check=False)
     (ev / "init-log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2) + "\n")
-    print(json.dumps([{k: x[k] for k in ("step", "rc")} for x in log]))
+    chk = check_init(ev)
+    (ev / "init-check.json").write_text(json.dumps(chk, ensure_ascii=False, indent=2) + "\n")
+    print(json.dumps({"steps": [{k: x[k] for k in ("step", "rc")} for x in log], "behaviour_ok": chk["all_ok"]}))
+    if not chk["all_ok"]:
+        sys.exit("init: E/E1b behaviour does not match the expected initial state -> not initialised")
 
 
 EXPECTED = {
@@ -180,7 +256,6 @@ def cmd_verify(a):
     for n, st in EXPECTED["containers"].items():
         c(f"container {n} {st}", inv["containers"].get(n) == st, inv["containers"].get(n))
     c("networks", inv["networks"] == EXPECTED["networks"], inv["networks"])
-    c("only ieo-probe-* touched (others listed, not removed)", True, inv.get("other_containers_not_touched"))
     out = {"at": now(), "inventory": a.inventory, "checks": res, "all_ok": all(x["ok"] for x in res)}
     print(json.dumps(out, ensure_ascii=False, indent=2))
     sys.exit(0 if out["all_ok"] else 1)
@@ -191,11 +266,12 @@ def main():
     sp = ap.add_subparsers(dest="cmd", required=True)
     p = sp.add_parser("inventory"); p.add_argument("--out")
     p = sp.add_parser("archive"); p.add_argument("--dest", required=True)
-    p = sp.add_parser("reset"); p.add_argument("--yes", action="store_true")
+    p = sp.add_parser("reset"); p.add_argument("--yes", action="store_true"); p.add_argument("--archived"); p.add_argument("--no-archive-needed", action="store_true")
+    p = sp.add_parser("check-init"); p.add_argument("--evidence", required=True)
     p = sp.add_parser("init"); p.add_argument("--evidence", required=True)
     p = sp.add_parser("verify"); p.add_argument("--inventory", required=True)
     a = ap.parse_args()
-    {"inventory": cmd_inventory, "archive": cmd_archive, "reset": cmd_reset, "init": cmd_init, "verify": cmd_verify}[a.cmd](a)
+    {"inventory": cmd_inventory, "archive": cmd_archive, "reset": cmd_reset, "init": cmd_init, "check-init": cmd_check_init, "verify": cmd_verify}[a.cmd](a)
 
 
 if __name__ == "__main__":
