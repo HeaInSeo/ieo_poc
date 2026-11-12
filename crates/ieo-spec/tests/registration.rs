@@ -122,7 +122,7 @@ fn duplicate_task_id_across_registered_sprint() {
     }
     let got = codes(&redigest(s), CheckMode::Draft);
     assert!(
-        got.contains(&(Code::DuplicateTaskId, "tasks[8].task_id".to_string())),
+        got.contains(&(Code::TaskIdConflict, "tasks[8].task_id".to_string())),
         "{got:?}"
     );
 }
@@ -273,4 +273,88 @@ fn every_rejection_has_field_and_correction() {
             "{r:?}"
         );
     }
+}
+
+// --- regressions from independent review of fbe1f24 ---
+
+#[test]
+fn draft_registered_spec_is_not_idempotent_for_executable_intake() {
+    // F2: same content registered as draft must not short-circuit an executable request.
+    let s = sprint(0);
+    let mut reg = registry("POC-01");
+    reg.add_spec(&s); // stored as draft
+    let out = check_registration(&s, &reg, CheckMode::Executable);
+    assert_eq!(out.http_status(), 422);
+    assert!(out.rejections.iter().all(|r| r.code == Code::UnboundDraft));
+    // Executable-registered + executable request stays idempotent.
+    let ready = redigest(bound_ready(sprint(0)));
+    let mut reg2 = registry("POC-01");
+    reg2.add_spec_with_mode(&ready, CheckMode::Executable);
+    assert_eq!(
+        check_registration(&ready, &reg2, CheckMode::Executable).http_status(),
+        200
+    );
+}
+
+#[test]
+fn spec_estimate_range_order_checked() {
+    // F3
+    let mut s = sprint(0);
+    s["tasks"][0]["estimate"] = json!({"state": "measured", "range_seconds": {"min": 1200, "max": 600},
+                                       "evidence": ["fixture://m"], "reason": null});
+    assert_eq!(
+        codes(&redigest(s), CheckMode::Draft),
+        vec![(
+            Code::EstimateRangeReversed,
+            "tasks[0].estimate.range_seconds".to_string()
+        )]
+    );
+}
+
+#[test]
+fn non_integer_numbers_rejected_before_digest() {
+    // F6: float formatting differs between implementations; v0 allows integers only.
+    let mut s = sprint(0);
+    s["tasks"][0]["evidence"] = json!([{"ratio": 1e-7}]);
+    let out = check_registration(&s, &registry("POC-01"), CheckMode::Draft);
+    assert_eq!(out.http_status(), 400);
+    assert_eq!(out.rejections[0].field, "tasks[0].evidence[0].ratio");
+    let big: Value = serde_json::from_str(r#"{"n": 18446744073709551616}"#).unwrap_or(Value::Null);
+    let mut s2 = sprint(0);
+    s2["tasks"][0]["evidence"] = json!([big]);
+    assert_eq!(
+        check_registration(&s2, &registry("POC-01"), CheckMode::Draft).http_status(),
+        400
+    );
+}
+
+#[test]
+fn lower_revision_after_higher_is_conflict() {
+    let s = sprint(0); // revision 4
+    let mut reg = registry("POC-01");
+    reg.add_spec(&s);
+    let mut lower = s.clone();
+    lower["revision"] = json!(3);
+    lower["title"] = json!("older revision, new content");
+    let out = check_registration(&redigest(lower), &reg, CheckMode::Draft);
+    assert_eq!(out.http_status(), 409);
+    assert!(
+        out.rejections
+            .iter()
+            .any(|r| r.code == Code::RevisionConflict)
+    );
+}
+
+#[test]
+fn ready_with_unresolved_bindings_is_format_error() {
+    // F7: for `ready`, unresolved bindings are excluded by the schema (400); UNBOUND_DRAFT is for drafts.
+    let mut s = bound_ready(sprint(0));
+    s["unresolved_bindings"] = json!(["실제 repository_url"]);
+    let out = check_registration(&redigest(s), &registry("POC-01"), CheckMode::Executable);
+    assert_eq!(out.http_status(), 400);
+    assert!(
+        out.rejections
+            .iter()
+            .any(|r| r.code == Code::SchemaViolation && r.field == "unresolved_bindings")
+    );
 }

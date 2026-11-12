@@ -1,5 +1,4 @@
-   Compiling ieo-spec v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc/crates/ieo-spec)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.63s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
      Running unittests src/lib.rs (target/debug/deps/ieo_spec-69758e7ab3e5903e)
 
 running 4 tests
@@ -18,42 +17,52 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
      Running tests/conversion.rs (target/debug/deps/conversion-cb3e4728bf5eacaa)
 
-running 11 tests
+running 16 tests
+test sprint_number_must_fit_two_digits ... ok
 test duplicate_task_names ... ok
 test cycle_among_human_tasks ... ok
+test generated_id_colliding_with_registered_task_is_rejected ... ok
 test undecided_deadline_needs_reason ... ok
 test missing_required_human_field ... ok
 test estimate_without_evidence_is_format_error ... ok
 test unresolved_prerequisite_matches_documented_example ... ok
 test reversed_estimate ... ok
+test overflowing_minutes_are_rejected_not_panicking ... ok
+test set_deadline_reason_and_generated_fields_are_recorded ... ok
 test deadline_set_requires_timestamp ... ok
+test integral_float_minutes_are_converted_not_zeroed ... ok
 test ids_are_stable_for_same_input ... ok
 test criteria_outside_profile_go_to_semantic_review_not_approved ... ok
 test converts_to_valid_draft_with_ids_estimates_and_digest ... ok
 
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
      Running tests/registration.rs (target/debug/deps/registration-45c6659ec39b5dde)
 
-running 16 tests
+running 21 tests
 test all_nine_package_digests_reproduce ... ok
-test ready_without_repository_url_fails_format_layer ... ok
 test missing_field_is_distinguished ... ok
+test ready_without_repository_url_fails_format_layer ... ok
 test schema_violation_other_than_missing ... ok
+test ready_with_unresolved_bindings_is_format_error ... ok
 test baseline_poc01_draft_accepted_and_digest_matches_package ... ok
+test lower_revision_after_higher_is_conflict ... ok
 test digest_mismatch ... ok
-test dependency_cycle ... ok
-test unknown_profile_item_and_unknown_profile ... ok
-test undefined_prerequisite ... ok
-test bound_ready_spec_accepted_for_executable_registration ... ok
-test every_rejection_has_field_and_correction ... ok
 test prerequisite_with_wrong_plan_version_is_undefined ... ok
+test undefined_prerequisite ... ok
+test unknown_profile_item_and_unknown_profile ... ok
+test dependency_cycle ... ok
+test bound_ready_spec_accepted_for_executable_registration ... ok
+test spec_estimate_range_order_checked ... ok
+test every_rejection_has_field_and_correction ... ok
 test duplicate_task_id_within_spec ... ok
 test duplicate_task_id_across_registered_sprint ... ok
 test revision_identity_conflict_and_idempotent_resubmit ... ok
 test unbound_draft_rejected_only_for_executable_registration ... ok
+test non_integer_numbers_rejected_before_digest ... ok
+test draft_registered_spec_is_not_idempotent_for_executable_intake ... ok
 
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
 
    Doc-tests ieo_spec
 

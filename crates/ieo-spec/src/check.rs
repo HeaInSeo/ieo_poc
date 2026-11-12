@@ -27,7 +27,8 @@ struct RegisteredTask {
 #[derive(Debug, Default, Clone)]
 pub struct Registry {
     tasks: BTreeMap<String, RegisteredTask>,
-    revisions: BTreeMap<(String, u64), String>,
+    /// (sprint_id, revision) → (digest, mode it was registered in).
+    revisions: BTreeMap<(String, u64), (String, CheckMode)>,
     profiles: BTreeMap<(String, u64), BTreeSet<String>>,
 }
 
@@ -64,8 +65,13 @@ impl Registry {
         }
     }
 
-    /// Record a spec as registered (its tasks become resolvable prerequisites).
+    /// Record a spec as registered in draft mode (its tasks become resolvable prerequisites).
     pub fn add_spec(&mut self, spec: &Value) {
+        self.add_spec_with_mode(spec, CheckMode::Draft);
+    }
+
+    /// Record a spec as registered in the given mode.
+    pub fn add_spec_with_mode(&mut self, spec: &Value, mode: CheckMode) {
         let sprint_id = spec["sprint_id"].as_str().unwrap_or_default().to_string();
         let plan_version = spec["plan_version"]
             .as_str()
@@ -73,7 +79,7 @@ impl Registry {
             .to_string();
         if let (Some(rev), Some(d)) = (spec["revision"].as_u64(), spec["digest"].as_str()) {
             self.revisions
-                .insert((sprint_id.clone(), rev), d.to_string());
+                .insert((sprint_id.clone(), rev), (d.to_string(), mode));
         }
         for t in spec["tasks"].as_array().into_iter().flatten() {
             let id = t["task_id"].as_str().unwrap_or_default().to_string();
@@ -145,6 +151,29 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
             rejections: format,
         };
     }
+    // 1b. digest canonical form is defined for integer numbers only (Python and
+    // Rust float formatting differ, e.g. 1e-07 vs 1e-7; integers beyond 64 bits
+    // become floats). Reject any other number before computing the digest.
+    let mut non_int = Vec::new();
+    find_non_integer_numbers(spec, "", &mut non_int);
+    if !non_int.is_empty() {
+        let rejections = non_int
+            .into_iter()
+            .map(|f| {
+                Rejection::new(
+                    Code::SchemaViolation,
+                    f,
+                    "v0 명세의 숫자는 64비트 정수만 허용합니다(digest 정본 직렬화 규칙).",
+                    "소수·지수 표기·64비트를 넘는 수를 정수 또는 문자열로 바꾸세요.",
+                )
+            })
+            .collect();
+        return CheckOutcome {
+            state: CheckState::Rejected,
+            computed_digest: None,
+            rejections,
+        };
+    }
     let mut rej = Vec::new();
     let digest = spec_digest(spec);
     let sprint_id = spec["sprint_id"].as_str().unwrap_or_default();
@@ -161,8 +190,14 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
     }
 
     // 3. revision identity
-    if let Some(existing) = registry.revisions.get(&(sprint_id.to_string(), revision)) {
-        if *existing == digest && rej.is_empty() {
+    if let Some((existing, stored_mode)) =
+        registry.revisions.get(&(sprint_id.to_string(), revision))
+    {
+        // Idempotent only when the stored registration already covers the
+        // requested mode; a draft-stored spec asked for executable intake must
+        // still pass the binding check below.
+        let covers = *stored_mode == CheckMode::Executable || mode == CheckMode::Draft;
+        if *existing == digest && rej.is_empty() && covers {
             return CheckOutcome {
                 state: CheckState::AlreadyRegistered,
                 computed_digest: Some(digest),
@@ -177,6 +212,20 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
                 "기존 revision을 바꾸지 말고 revision을 올려 새로 제출하세요.",
             ));
         }
+    } else if let Some(latest) = registry
+        .revisions
+        .keys()
+        .filter(|(id, _)| id == sprint_id)
+        .map(|(_, r)| *r)
+        .max()
+        .filter(|latest| *latest > revision)
+    {
+        rej.push(Rejection::new(
+            Code::RevisionConflict,
+            "revision",
+            format!("{sprint_id}에는 이미 더 높은 revision {latest}이(가) 등록돼 있습니다."),
+            format!("revision을 {latest}보다 크게 올려 제출하세요."),
+        ));
     }
 
     let tasks: Vec<&Value> = spec["tasks"]
@@ -197,7 +246,7 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
             ));
         } else if let Some(other) = registry.tasks.get(id).filter(|r| r.sprint_id != sprint_id) {
             rej.push(Rejection::new(
-                Code::DuplicateTaskId,
+                Code::TaskIdConflict,
                 format!("tasks[{i}].task_id"),
                 format!(
                     "작업 ID {id}은(는) 이미 {}에 등록돼 있습니다.",
@@ -265,6 +314,21 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
             format!("선행 관계가 순환합니다: {}", cycle.join(" → ")),
             "순환의 한 간선을 제거하거나 작업을 나누세요.",
         ));
+    }
+
+    // 6b. measured estimate range order (the schema cannot express min <= max)
+    for (i, t) in tasks.iter().enumerate() {
+        let r = &t["estimate"]["range_seconds"];
+        if let (Some(lo), Some(hi)) = (r["min"].as_u64(), r["max"].as_u64())
+            && lo > hi
+        {
+            rej.push(Rejection::new(
+                Code::EstimateRangeReversed,
+                format!("tasks[{i}].estimate.range_seconds"),
+                format!("예상 범위 최소 {lo}초가 최대 {hi}초보다 큽니다."),
+                "min ≤ max가 되게 고치거나, 근거가 없으면 unestimated로 두세요.",
+            ));
+        }
     }
 
     // 7. acceptance profile items
@@ -378,4 +442,27 @@ fn find_cycle(
         }
     }
     None
+}
+
+/// Collect locations of numbers that are not representable as i64/u64.
+fn find_non_integer_numbers(v: &Value, path: &str, out: &mut Vec<String>) {
+    match v {
+        Value::Number(n) if !(n.is_i64() || n.is_u64()) => out.push(path.to_string()),
+        Value::Array(a) => {
+            for (i, x) in a.iter().enumerate() {
+                find_non_integer_numbers(x, &format!("{path}[{i}]"), out);
+            }
+        }
+        Value::Object(m) => {
+            for (k, x) in m {
+                let p = if path.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{path}.{k}")
+                };
+                find_non_integer_numbers(x, &p, out);
+            }
+        }
+        _ => {}
+    }
 }

@@ -248,3 +248,83 @@ fn ids_are_stable_for_same_input() {
         .unwrap_or_default();
     assert_eq!(a, b);
 }
+
+// --- regressions from independent review of fbe1f24 ---
+
+#[test]
+fn integral_float_minutes_are_converted_not_zeroed() {
+    let mut v = input();
+    v["tasks"][1]["expected_duration"]["min_minutes"] = json!(10.0);
+    v["tasks"][1]["expected_duration"]["max_minutes"] = json!(20.0);
+    let rec = convert_human_input(&v, &ctx(&[]))
+        .map(|r| r.spec)
+        .unwrap_or(Value::Null);
+    assert_eq!(
+        rec["tasks"][1]["estimate"]["range_seconds"],
+        json!({"min": 600, "max": 1200})
+    );
+    v["tasks"][1]["expected_duration"]["min_minutes"] = json!(30.0);
+    assert_eq!(
+        rejected_codes(&v),
+        vec![(
+            Code::EstimateRangeReversed,
+            "tasks[1].expected_duration".to_string()
+        )]
+    );
+}
+
+#[test]
+fn overflowing_minutes_are_rejected_not_panicking() {
+    let mut v = input();
+    v["tasks"][1]["expected_duration"]["min_minutes"] = json!(1u64 << 62);
+    v["tasks"][1]["expected_duration"]["max_minutes"] = json!(1u64 << 62);
+    assert_eq!(
+        rejected_codes(&v),
+        vec![(
+            Code::SchemaViolation,
+            "tasks[1].expected_duration".to_string()
+        )]
+    );
+}
+
+#[test]
+fn generated_id_colliding_with_registered_task_is_rejected() {
+    let mut c = ctx(&[]);
+    c.registered_tasks.insert("11-01".into(), "v1.3.3".into());
+    let err = convert_human_input(&input(), &c).err().unwrap_or_default();
+    assert!(
+        err.iter()
+            .any(|r| r.code == Code::TaskIdConflict && r.field == "tasks[0]"),
+        "{err:?}"
+    );
+}
+
+#[test]
+fn sprint_number_must_fit_two_digits() {
+    let mut c = ctx(&[]);
+    c.sprint_number = 100;
+    let err = convert_human_input(&input(), &c).err().unwrap_or_default();
+    assert_eq!(err.len(), 1);
+    assert_eq!(err[0].field, "context.sprint_number");
+}
+
+#[test]
+fn set_deadline_reason_and_generated_fields_are_recorded() {
+    let mut v = input();
+    v["deadline"] =
+        json!({"state": "set", "at": "2026-12-01T18:00:00+09:00", "reason": "분기 계획 마감"});
+    let rec = convert_human_input(&v, &ctx(&[]));
+    let rec = match rec {
+        Ok(r) => r,
+        Err(e) => panic!("{e:?}"),
+    };
+    assert_eq!(
+        rec.preserved_unrepresented["deadline_reason"],
+        "분기 계획 마감"
+    );
+    assert!(
+        rec.generated_fields
+            .iter()
+            .any(|f| f.starts_with("tasks[].requirement_ids"))
+    );
+}

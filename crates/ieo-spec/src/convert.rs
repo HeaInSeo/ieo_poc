@@ -49,6 +49,8 @@ pub struct ConversionRecord {
     pub preserved_unrepresented: Value,
     /// Tasks whose `done_when` is not covered by an approved profile item → semantic review / approval.
     pub semantic_review_required: Vec<String>,
+    /// Spec fields the converter filled mechanically (not written by the user); listed for the conversion review.
+    pub generated_fields: Vec<String>,
     pub unresolved_bindings: Vec<String>,
 }
 
@@ -60,14 +62,75 @@ pub fn convert_human_input(
     if !format.is_empty() {
         return Err(format);
     }
+    if !(1..=99).contains(&ctx.sprint_number) {
+        return Err(vec![Rejection::new(
+            Code::SchemaViolation,
+            "context.sprint_number",
+            format!(
+                "스프린트 번호 {}로는 `NN-NN` 작업 ID를 만들 수 없습니다.",
+                ctx.sprint_number
+            ),
+            "코디네이터가 1~99의 스프린트 번호를 부여해야 합니다.",
+        )]);
+    }
     let tasks = input["tasks"].as_array().cloned().unwrap_or_default();
     let mut rej = Vec::new();
+
+    // Estimates as whole minutes → seconds. The schema's "integer" also admits
+    // 10.0, so read integral floats too; reject values whose seconds overflow.
+    let mut minutes: Vec<Option<(u64, u64)>> = Vec::new();
+    for (i, t) in tasks.iter().enumerate() {
+        let d = &t["expected_duration"];
+        if d.is_null() {
+            minutes.push(None);
+            continue;
+        }
+        let read = |v: &Value| -> Option<u64> {
+            v.as_u64().or_else(|| {
+                v.as_f64()
+                    .filter(|f| f.fract() == 0.0 && *f >= 1.0 && *f <= u64::MAX as f64)
+                    .map(|f| f as u64)
+            })
+        };
+        let lo = read(&d["min_minutes"]).and_then(|m| m.checked_mul(60).map(|s| (m, s)));
+        let hi = read(&d["max_minutes"]).and_then(|m| m.checked_mul(60).map(|s| (m, s)));
+        match (lo, hi) {
+            (Some((lo_m, lo_s)), Some((hi_m, hi_s))) => {
+                if lo_m > hi_m {
+                    rej.push(Rejection::new(
+                        Code::EstimateRangeReversed,
+                        format!("tasks[{i}].expected_duration"),
+                        format!("최소 {lo_m}분이 최대 {hi_m}분보다 큽니다."),
+                        "min_minutes ≤ max_minutes가 되게 고치세요. 근거가 없으면 이 필드를 빼서 미산정으로 두세요.",
+                    ));
+                }
+                minutes.push(Some((lo_s, hi_s)));
+            }
+            _ => {
+                rej.push(Rejection::new(
+                    Code::SchemaViolation,
+                    format!("tasks[{i}].expected_duration"),
+                    "예상 범위를 초 단위 정수로 바꿀 수 없습니다(범위 초과).",
+                    "현실적인 분 단위 정수로 고치세요.",
+                ));
+                minutes.push(None);
+            }
+        }
+    }
 
     // Step 1: stable IDs, in input order.
     let mut name_to_id: BTreeMap<String, String> = BTreeMap::new();
     for (i, t) in tasks.iter().enumerate() {
         let name = t["name"].as_str().unwrap_or_default().to_string();
         let id = format!("{:02}-{:02}", ctx.sprint_number, i + 1);
+        if ctx.registered_tasks.contains_key(&id) {
+            rej.push(Rejection::new(
+                Code::TaskIdConflict,
+                format!("tasks[{i}]"),
+                format!("생성할 작업 ID {id}이(가) 이미 다른 등록 스프린트에 있습니다."),
+                "코디네이터가 겹치지 않는 스프린트 번호를 부여해야 합니다.",
+            ));
+        }
         if name_to_id.insert(name.clone(), id).is_some() {
             rej.push(Rejection::new(
                 Code::DuplicateTaskName,
@@ -97,20 +160,6 @@ pub fn convert_human_input(
             }
         }
         prereqs.push(list);
-    }
-    // Step 4 precheck: estimate range order (schema cannot express min ≤ max).
-    for (i, t) in tasks.iter().enumerate() {
-        let d = &t["expected_duration"];
-        if let (Some(lo), Some(hi)) = (d["min_minutes"].as_u64(), d["max_minutes"].as_u64())
-            && lo > hi
-        {
-            rej.push(Rejection::new(
-                Code::EstimateRangeReversed,
-                format!("tasks[{i}].expected_duration"),
-                format!("최소 {lo}분이 최대 {hi}분보다 큽니다."),
-                "min_minutes ≤ max_minutes가 되게 고치세요. 근거가 없으면 이 필드를 빼서 미산정으로 두세요.",
-            ));
-        }
     }
     // Cycles among the human tasks.
     let ids: Vec<String> = tasks
@@ -144,14 +193,11 @@ pub fn convert_human_input(
         if !ctx.profile_items.contains(&item) {
             semantic.push(id.clone());
         }
-        let estimate = match t.get("expected_duration") {
-            Some(d) => json!({
+        let estimate = match minutes[i] {
+            Some((min, max)) => json!({
                 "state": "measured",
-                "range_seconds": {
-                    "min": d["min_minutes"].as_u64().unwrap_or_default() * 60,
-                    "max": d["max_minutes"].as_u64().unwrap_or_default() * 60,
-                },
-                "evidence": d["evidence"].clone(),
+                "range_seconds": {"min": min, "max": max},
+                "evidence": t["expected_duration"]["evidence"].clone(),
                 "reason": null,
             }),
             None => json!({
@@ -248,8 +294,17 @@ pub fn convert_human_input(
         preserved_unrepresented: json!({
             "out_of_scope": input.get("out_of_scope").cloned().unwrap_or(json!([])),
             "decisions": input.get("decisions").cloned().unwrap_or(json!([])),
+            "deadline_reason": input["deadline"]["reason"].clone(),
         }),
         semantic_review_required: semantic,
+        generated_fields: vec![
+            "tasks[].task_id".into(),
+            "tasks[].kind (구현 고정)".into(),
+            "tasks[].requirement_ids (<sprint_id>-REQ-<nn>)".into(),
+            "tasks[].outputs[].artifact_id".into(),
+            "tasks[].acceptance.item_ids (<task_id>.accept)".into(),
+            "digest".into(),
+        ],
         unresolved_bindings: unresolved,
     })
 }
