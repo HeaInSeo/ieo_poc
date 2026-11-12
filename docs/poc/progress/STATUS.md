@@ -1,10 +1,10 @@
 # PoC 진행과 최근 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0007` · 원장 SHA-256 `cc3d6cc261e93717d9590725ee8420f3aa03e90c50c4e43e6a606c2cbae232a4`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0008` · 원장 SHA-256 `fb89c7a7375a4aaa46e4af6423b73fcff2a60b02fbece33988816a22e90f168f`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
-**현재: 01-04 · 역할별 자격(A) 사용자 발급 대기 · 계획·하네스 실행 전 고정(a321cd2) · 다음 작업: 01-04**
+**현재: 01-04 · 첫 세 probe 판정표 통과(PR #12) · 나머지 범위 계획을 브랜치 task/01-04-remaining c4c4113에 실행 전 커밋(미실행·미병합) · 다음 작업: 01-04**
 
 주계획과 조건부 후속은 별도 진행률이다. 실험 평가 종료·공수·제품 완성률과 구분한다. ZIP은 전달 시점 스냅샷이다.
 
@@ -15,7 +15,7 @@
 
 | 구간 | 상태별 수 |
 | --- | --- |
-| 주계획 | 미착수 67 · 준비됨 0 · 진행 0 · 검수 중 0 · 검수 완료 5 · 조건 대기 1 · 종료 미충족 0 |
+| 주계획 | 미착수 67 · 준비됨 0 · 진행 1 · 검수 중 0 · 검수 완료 5 · 조건 대기 0 · 종료 미충족 0 |
 | 후속 | 미착수 12 · 준비됨 0 · 진행 0 · 검수 중 0 · 검수 완료 0 · 조건 대기 0 · 종료 미충족 0 |
 
 | 구간 | 평가 종료 |
@@ -29,8 +29,8 @@
 | --- | --- |
 | 현재 작업 | 01-04 |
 | 다음 작업 | 01-04 |
-| 마지막 실제 작업 관측 | 2026-11-12T14:43:24+09:00 |
-| 화면 snapshot 작성 | 2026-11-12T14:43:24+09:00 |
+| 마지막 실제 작업 관측 | 2026-11-12T16:30:08+09:00 |
+| 화면 snapshot 작성 | 2026-11-12T16:30:08+09:00 |
 | 보고 owner | 개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님) |
 | 열람 상태 | GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면) |
 | 고정 사용자 링크 | https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md |
@@ -40,15 +40,14 @@
 
 | 작업 | 상태·판정 | 최근 보고 |
 | --- | --- | --- |
+| 01-04 | 진행 / 첫 세 probe(A1-GATE-01-04): P1 지원 · P2 격리 성립 확인 · P3 공유 quota 확인(지원 구성 기록, 한도 분리 아님) → 진행. 모델 요청 9/30 · 벽시계 69초. 독립 검토 0303f3e reject(P2-1 토큰 SHA-256 전체값 공개 증거 기록) → 4ada612 approve → 조건부 병합 64750e5 · main CI success. 01-04 전체는 미완(나머지 범위 남음) | [보고](../reports/tasks/01-04/first-probes-20261112/REPORT.md) |
 | 01-03 | 검수 완료 / PASS · 단계별 동결(v1.3.3-A1): stage_0 F01~F08 동결, later L01~L09 담당·시점·차단 조건 인수. 후속 실험값 전체 동결 아님 | [보고](../reports/tasks/01-03/staged-freeze-20261112/REPORT.md) |
 | 01-08 | 검수 완료 / PASS · 보고 v0·API 계약·참조 구현(ieo-report) | [보고](../reports/tasks/01-08/report-api-contract-20261112/REPORT.md) |
 | 01-07 | 검수 완료 / PASS · 등록 검사 계약·참조 구현(ieo-spec) | [보고](../reports/tasks/01-07/spec-contract-20261112/REPORT.md) |
 | 01-02 | 검수 완료 / PASS · 설계 계약(실제 지원은 01-04 probe) | [보고](../reports/tasks/01-02/runtime-contract-20261112/REPORT.md) |
 | 01-01 | 검수 완료 / PASS · 설계 범위 | [보고](../reports/tasks/01-01/scope-20261112/REPORT.md) |
 
-| 작업 | 사유·다음 행동 |
-| --- | --- |
-| 01-04 | 사용자가 개발·Guardrail 토큰 2개를 비밀 기록 없이 전달 → P1 동시 두 세션 → P2 자격·세션·저장소 격리 → P3 한도 구조(판정표 A1-GATE-01-04, 30회·7,200초·시도당 300초) |
+현재 실행의 대기/실패 기록 없음. 계획상 선행 작업은 아직 미수행.
 
 | 필수 기능/전환 | 상태 | 증거 | 관측 시각 |
 | --- | --- | --- | --- |
@@ -74,6 +73,8 @@
 - 01-03 검토 P3(비차단): N1 검증기의 rev4→5 차이 집합이 개정 색인 의존(rev 4 프로파일 digest 고정 권고), N2 명세 최상위 amendments가 스프린트 digest에 묶이지 않음, N3 배정 경로 차단 주체 미기재, N4 낡은 문구 3곳, N5 동결 대장에 체크포인트 임계값·idle 정책 항목 없음, N6 probe 구간 F06 재개는 7,200초 안에서 실질 3회·'CLI 기동' 표현, N7 p26-raw 커밋 JSON의 이메일·서명 축약 권고, N8 호스트 점검 기록 최소화, N9 P26 근거의 shallow clone 줄 번호.
 - PR #9 검토 P3: 쓰기 거부가 assert라 python -O로 우회, validation/ mkdir 없음, write-fixed 증거의 결과 SHA가 최종 파일과 다름(재현은 됨), L04 기록에 sori S6 약함 미기재.
 - PR #10 검토 P3(02-03 착수 시 처리): N1 01-08 계약 검사 순서·409 목록에 ASSIGNMENT_SHA_MISMATCH 누락·OpenAPI 'An An' 오타·null 본문 SHA 규칙 미기재, N2 Registry가 digest 재계산 없이 호출자 문자열 신뢰, N3 Replay 영수증 counts_for_current_judgment 재계산 미구현(항상 false), N4 판정 입력은 판정 시점의 현재 배정으로 정의·시험 필요, N5 cargo-test 로그 머리줄 '1 changes' 설명 없음. review_currency는 처분을 모름(F6).
+- PR #12 검토 P3(01-04 나머지 계획에서 반영): P3-3 2d가 파일 전체 일치만 탐지, P3-4 2b가 errno를 버림, P3-6 budget.log 명칭·meta 누적값·시도 05 표식·auth status 원문 미보존, P3-9 해시는 argv 대신 RO 파일로 전달 권고. P3-8 토큰 SHA-256 전체값의 공개 이력 잔존과 교체 여부를 사용자에게 보고.
+- PR #12 자동 검토 P2(codex 4547423210, probe.py P3 2회차가 1회차의 한도·인증 신호를 보지 않고 기동 — Probe_Budget_Rules §4): 유효. 이번 실행은 모든 rate_limit_event가 allowed·오류 없음이라 판정 영향 없음. 하네스 교정(probe.py stop_on_signal, probe2.py stop_signals)은 task/01-04-remaining c4c4113, 01-04 나머지 결과 PR에서 검토. 처분 답글 https://github.com/HeaInSeo/ieo_poc/pull/12#discussion_r4547547000
 
 다음 의존 작업 착수 전·제어를 돌려받는 지점마다 원장을 갱신하고 재생성한다. 응답 없는 동안 새 관측을 추정하지 않는다. 강제 종료 뒤 실제 외부 효과를 대조한다.
 

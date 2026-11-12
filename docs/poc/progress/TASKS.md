@@ -1,6 +1,6 @@
 # 주계획·후속 작업 상태
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0007` · 원장 SHA-256 `cc3d6cc261e93717d9590725ee8420f3aa03e90c50c4e43e6a606c2cbae232a4`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0008` · 원장 SHA-256 `fb89c7a7375a4aaa46e4af6423b73fcff2a60b02fbece33988816a22e90f168f`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -11,7 +11,7 @@
 | 01-01 · 목표·필수 기능·선택적 방법의 범위표 | 설계 / 핵심 | 검수 완료 | PASS · 설계 범위 / verified | 2026-11-12T07:18:49+09:00 | [보고](../reports/tasks/01-01/scope-20261112/REPORT.md) | 런타임 선택안 확인 |
 | 01-02 · 에이전트 런타임·역할·인증·재개 계약 | 설계 / 핵심 | 검수 완료 | PASS · 설계 계약(실제 지원은 01-04 probe) / verified | 2026-11-12T09:13:53+09:00 | [보고](../reports/tasks/01-02/runtime-contract-20261112/REPORT.md) | 01-04 첫 probe 전 역할별 자격 방식(A/B/C) 사용자 결정 |
 | 01-03 · 표본·독립 기대값·예산·기한 | 설계 / 핵심 | 검수 완료 | PASS · 단계별 동결(v1.3.3-A1): stage_0 F01~F08 동결, later L01~L09 담당·시점·차단 조건 인수. 후속 실험값 전체 동결 아님 / verified | 2026-11-12T14:22:39+09:00 | [보고](../reports/tasks/01-03/staged-freeze-20261112/REPORT.md) | later 항목은 각 첫 실행 전 동결 증거. L08 교정 PR(02-03 전) |
-| 01-04 · 시험 repo·DB·수신기·역할 자격 | 준비 / 핵심 | 조건 대기 | 미실행(모델 요청 0회) · 계획·하네스 실행 전 고정(브랜치 task/01-04-probes a321cd2) · 역할별 자격 2개(A) 사용자 발급 대기 · 계획·준비 증거는 01-04 결과 PR에서 main에 들어옴(PROBE_PLAN.md, container-smoke.txt) / unverified | 2026-11-12T14:43:24+09:00 | 없음 · 미실행 | 사용자가 개발·Guardrail 토큰 2개를 비밀 기록 없이 전달 → P1 동시 두 세션 → P2 자격·세션·저장소 격리 → P3 한도 구조(판정표 A1-GATE-01-04, 30회·7,200초·시도당 300초) |
+| 01-04 · 시험 repo·DB·수신기·역할 자격 | 준비 / 핵심 | 진행 | 첫 세 probe(A1-GATE-01-04): P1 지원 · P2 격리 성립 확인 · P3 공유 quota 확인(지원 구성 기록, 한도 분리 아님) → 진행. 모델 요청 9/30 · 벽시계 69초. 독립 검토 0303f3e reject(P2-1 토큰 SHA-256 전체값 공개 증거 기록) → 4ada612 approve → 조건부 병합 64750e5 · main CI success. 01-04 전체는 미완(나머지 범위 남음) / partial | 2026-11-12T16:30:08+09:00 | [보고](../reports/tasks/01-04/first-probes-20261112/REPORT.md) | 나머지 범위(E·U·G·N·L·C·T·R) 실행 — 계획·기대값·예산 B2(모델 요청 30회·시도당 300초·probe 벽시계 7,200초, 첫 세 probe 예산과 별도)는 브랜치 task/01-04-remaining c4c4113의 reports/tasks/01-04/remaining-probes-20261112/PROBE_PLAN.md에 실행 전 커밋됨(결과 PR에서 main 반영) → 결과 PR·독립 검수 |
 | 01-05 · 원본·기준선·운영 충돌 범위 기록 | 준비 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |
 | 01-06 · 시험실 초기화·증거 보존 경로 | 준비 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |
 | 01-07 · 스프린트 명세 v0·등록 검사 계약 | 설계 / 핵심 | 검수 완료 | PASS · 등록 검사 계약·참조 구현(ieo-spec) / verified | 2026-11-12T09:28:54+09:00 | [보고](../reports/tasks/01-07/spec-contract-20261112/REPORT.md) | 01-08 PR |
