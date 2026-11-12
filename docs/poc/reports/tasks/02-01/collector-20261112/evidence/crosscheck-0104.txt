@@ -3,7 +3,7 @@ first/01-P1-development | new | - | measured |  | consistent | succeeded | -
 first/02-P1-guardrail | new | - | measured |  | consistent | succeeded | -
 first/03-P1-development | new | - | measured |  | consistent | succeeded | -
 first/04-P1-guardrail | new | - | measured |  | consistent | succeeded | -
-first/05-P2c-development | new | - | measured |  | not_checked | failed | -
+first/05-P2c-development | resume | 03-04-P1-guardrail | unmeasured | result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자 | not_checked | failed | -
 first/06-P3-development | new | - | measured |  | consistent | succeeded | -
 first/07-P3-guardrail | new | - | measured |  | consistent | succeeded | -
 first/08-P3-development | new | - | measured |  | consistent | succeeded | -
@@ -35,5 +35,5 @@ remai/25-R2-development | resume | 31-24-R1-development | measured |  | consiste
 remai/26-AM1-development | new | - | measured |  | consistent | succeeded | -
 remai/27-AM2-development | new | - | measured |  | consistent | succeeded | -
 
-{"new": 26, "resume": 9, "run_measured": 33, "run_unmeasured": 2, "semantic_checked": 30, "semantic_equal": 30}
+{"new": 25, "resume": 10, "run_measured": 32, "run_unmeasured": 3, "semantic_checked": 30, "semantic_equal": 30}
 streams 35 · mismatches 0

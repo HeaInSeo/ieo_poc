@@ -13,11 +13,11 @@
   },
   "retries": 0,
   "timed_out": 0,
-  "wall_ms_sum": 681,
+  "wall_ms_sum": 735,
   "usage": {
     "completeness": "incomplete",
     "model_runs": 35,
-    "measured_runs": 33,
+    "measured_runs": 32,
     "tokens_measured_sum": {
       "input": 2120,
       "output": 6291,
@@ -25,6 +25,13 @@
       "cache_creation": 28749
     },
     "unmeasured": [
+      {
+        "task_id": "01-04-replay",
+        "attempt_id": "04-05-P2c-development",
+        "command_id": "replay",
+        "role": "other",
+        "reason": "result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자식 합으로 대신할 수 없음"
+      },
       {
         "task_id": "01-04-replay",
         "attempt_id": "22-15-N4b-development",
@@ -52,7 +59,7 @@
     "other": {
       "completeness": "incomplete",
       "model_runs": 35,
-      "measured_runs": 33,
+      "measured_runs": 32,
       "tokens_measured_sum": {
         "input": 2120,
         "output": 6291,
@@ -60,6 +67,13 @@
         "cache_creation": 28749
       },
       "unmeasured": [
+        {
+          "task_id": "01-04-replay",
+          "attempt_id": "04-05-P2c-development",
+          "command_id": "replay",
+          "role": "other",
+          "reason": "result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자식 합으로 대신할 수 없음"
+        },
         {
           "task_id": "01-04-replay",
           "attempt_id": "22-15-N4b-development",

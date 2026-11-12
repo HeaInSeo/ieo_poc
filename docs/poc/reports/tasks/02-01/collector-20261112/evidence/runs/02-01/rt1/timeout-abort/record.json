@@ -15,9 +15,9 @@
     "HOME",
     "PATH"
   ],
-  "started_at": "2026-11-12T12:35:13.016Z",
-  "ended_at": "2026-11-12T12:35:15.050Z",
-  "duration_ms": 2033,
+  "started_at": "2026-11-12T12:46:06.057Z",
+  "ended_at": "2026-11-12T12:46:08.091Z",
+  "duration_ms": 2034,
   "process": {
     "kind": "timed_out",
     "exit_code": null,
@@ -26,6 +26,7 @@
     "term_sent": true,
     "kill_sent": false,
     "stray_group_killed": false,
+    "output_incomplete": false,
     "launch_error": null
   },
   "stdout": {

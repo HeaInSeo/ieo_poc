@@ -1,0 +1,88 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "02-01",
+  "attempt_id": "rt1",
+  "command_id": "timeout-term-ignored",
+  "role": "other",
+  "retry_of": null,
+  "model_request": false,
+  "argv": [
+    "sh",
+    "-c",
+    "(trap \"\" TERM; exec sleep 47) >/dev/null 2>&1 & sleep 60"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "HOME",
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:46:08.094Z",
+  "ended_at": "2026-11-12T12:46:10.121Z",
+  "duration_ms": 2027,
+  "process": {
+    "kind": "timed_out",
+    "exit_code": null,
+    "signal": 15,
+    "timeout_ms": 1000,
+    "term_sent": true,
+    "kill_sent": true,
+    "stray_group_killed": true,
+    "output_incomplete": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [],
+  "result_event": null,
+  "usage": {
+    "applicability": "not_applicable",
+    "session_mode": "unknown",
+    "resume_base": null,
+    "run": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "session": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "parent": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "children": [],
+    "attribution_check": "not_checked",
+    "attribution_detail": null,
+    "by_model": {},
+    "cost_usd_reported": null,
+    "run_cost_usd": null,
+    "partial_observations": [],
+    "internal_retries": "not_applicable"
+  },
+  "judgment": {
+    "expected": "timeout",
+    "status": "expected_matched",
+    "reasons": [
+      "기대 Timeout: 관측 일치",
+      "시간 초과(1000 ms, TERM true · KILL true)",
+      "명령 뒤에 남은 프로세스 그룹 구성원을 KILL함"
+    ],
+    "counts_as_success": true
+  }
+}

@@ -1,21 +1,21 @@
 {
   "format": "ieo-evidence-summary/v0",
-  "records": 8,
+  "records": 10,
   "task_ids": [
     "02-01"
   ],
   "by_judgment": {
-    "expected_matched": 2,
+    "expected_matched": 3,
     "failed": 1,
-    "incomplete": 1,
+    "incomplete": 2,
     "succeeded": 4
   },
   "by_role": {
-    "other": 8
+    "other": 10
   },
   "retries": 0,
-  "timed_out": 1,
-  "wall_ms_sum": 6334,
+  "timed_out": 2,
+  "wall_ms_sum": 10708,
   "usage": {
     "completeness": "no_model_runs",
     "model_runs": 0,

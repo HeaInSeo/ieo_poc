@@ -19,9 +19,9 @@
     "HOME",
     "PATH"
   ],
-  "started_at": "2026-11-12T12:35:08.745Z",
-  "ended_at": "2026-11-12T12:35:11.057Z",
-  "duration_ms": 2312,
+  "started_at": "2026-11-12T12:46:01.662Z",
+  "ended_at": "2026-11-12T12:46:04.275Z",
+  "duration_ms": 2612,
   "process": {
     "kind": "exited",
     "exit_code": 0,
@@ -30,12 +30,13 @@
     "term_sent": false,
     "kill_sent": false,
     "stray_group_killed": false,
+    "output_incomplete": false,
     "launch_error": null
   },
   "stdout": {
     "file": "stdout",
-    "bytes": 2007,
-    "sha256": "24b4bac2299392736c82d163c51282311612a68c207f38d91f343f20677f9476"
+    "bytes": 2270,
+    "sha256": "3453e25e7d9fc45e8807c9ff5493cf0cf31ae55d6e6bf3eed087802f46ac304c"
   },
   "stderr": {
     "file": "stderr",
@@ -52,7 +53,7 @@
   "artifacts": [],
   "markers": [
     {
-      "pattern": "test result: ok\\. 24 passed",
+      "pattern": "test result: ok\\. 27 passed",
       "found": true
     }
   ],

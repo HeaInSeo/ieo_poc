@@ -16,9 +16,9 @@
     "HOME",
     "PATH"
   ],
-  "started_at": "2026-11-12T12:35:08.722Z",
-  "ended_at": "2026-11-12T12:35:08.742Z",
-  "duration_ms": 20,
+  "started_at": "2026-11-12T12:46:01.639Z",
+  "ended_at": "2026-11-12T12:46:01.660Z",
+  "duration_ms": 21,
   "process": {
     "kind": "exited",
     "exit_code": 0,
@@ -27,12 +27,13 @@
     "term_sent": false,
     "kill_sent": false,
     "stray_group_killed": false,
+    "output_incomplete": false,
     "launch_error": null
   },
   "stdout": {
     "file": "stdout",
     "bytes": 41,
-    "sha256": "c4c67134ee0d72c17483f9c3bf0e45761c6d364bfa52784a5dec5cc55696075c"
+    "sha256": "1076f3d27493dd11608e0d746922f17394cdba6c5faae01d0ffc6ca3e5aa7f74"
   },
   "stderr": {
     "file": "stderr",

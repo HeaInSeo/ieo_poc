@@ -5,7 +5,7 @@
   "task_id": "02-01",
   "experiment_id": null,
   "run_id": "collector-20261112",
-  "revision": 1,
+  "revision": 2,
   "previous_run_ref": null,
   "actor": {
     "role": "development",
@@ -15,7 +15,7 @@
   "execution_state": "독립 검토 대기",
   "inputs": {
     "spec_revision": "POC-02 rev 5 (v1.3.3-A1)",
-    "repo_sha": "91d570ed5f027288b65d0785bfa8a49c19a38752",
+    "repo_sha": "97b7231716760d7fb1efd88ddc2cede1e3194037",
     "image_digest": null,
     "profile_revision": "poc-acceptance-v1.3.3 rev 4",
     "model_runtime_versions": [
@@ -23,7 +23,7 @@
     ]
   },
   "expected": "명령·종료 코드·원본 로그·SHA/digest·모델 사용량을 정해진 형식으로 수집, 오류 비은닉, 부모·자식·실패·중단·검토 사용량 합산, 미계측 0 대체 금지, state.json+01-06 생성기의 같은 snapshot/digest 화면, 73·12 분리·합산 진행률 없음",
-  "observed": "ieo-evidence 시험 28건·작업공간 106건·생성기 시험 28건 PASS; 01-04 실제 stream 35개 재생 독립 대조 35/35 일치(재개 세션 modelUsage 누적 발견 → 회차 몫 규칙, 계약 rev 7); 실제 실행 8건 기대대로(성공 4·기대 일치 2·실패 1·불완전 1)",
+  "observed": "ieo-evidence 시험 32건·작업공간 110건·생성기 시험 28건 PASS; 01-04 실제 stream 35개 재생 독립 대조 35/35 일치, 32 계측·3 미계측(P2c·N4b·L2, 사유 명시); 재개 세션 modelUsage 누적 발견 → 회차 몫 규칙, 계약 rev 7; 실제 실행 10건 기대대로(성공 4·기대 일치 3·불완전 2·실패 1); 검토 2df3c35 P2 4건 교정",
   "verdict": "미판정",
   "verification": {
     "level": "claim",
@@ -49,7 +49,8 @@
     "토큰 총량 정의(네 항목 중 무엇을 셀지)는 L01/L02 동결 항목",
     "새 claude -p 실시간 실행 미확인(모델 호출 0) — 02-04 또는 승인 예산 회차",
     "재개 기준 오류는 압축 있는 재개에서 mismatch로만 남음(계약 §5-5 전제)",
-    "setsid로 그룹을 벗어난 자손은 시간 초과 시 미회수"
+    "setsid로 그룹을 벗어나 관을 닫은 자손은 기록되지 않음(관을 잡으면 output_incomplete)",
+    "검토 2df3c35 P3-2·3·4·6(판정 규칙 보강) → 02-02, P3-9 → 02-04, P3-7(summarize 중복 입력) → 계측기 다음 수정"
   ],
   "next_action": "독립 검토 → 조건부 병합·main CI → 원장 갱신 → 02-02",
   "evidence_refs": [

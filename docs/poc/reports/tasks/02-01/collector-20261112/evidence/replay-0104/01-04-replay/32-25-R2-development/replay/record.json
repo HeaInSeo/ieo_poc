@@ -14,9 +14,9 @@
   "env_names": [
     "PATH"
   ],
-  "started_at": "2026-11-12T12:35:08.642Z",
-  "ended_at": "2026-11-12T12:35:08.663Z",
-  "duration_ms": 20,
+  "started_at": "2026-11-12T12:46:01.555Z",
+  "ended_at": "2026-11-12T12:46:01.576Z",
+  "duration_ms": 21,
   "process": {
     "kind": "exited",
     "exit_code": 0,
@@ -25,6 +25,7 @@
     "term_sent": false,
     "kill_sent": false,
     "stray_group_killed": false,
+    "output_incomplete": false,
     "launch_error": null
   },
   "stdout": {

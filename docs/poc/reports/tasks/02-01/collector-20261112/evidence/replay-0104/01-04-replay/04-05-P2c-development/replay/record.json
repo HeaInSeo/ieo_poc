@@ -14,9 +14,9 @@
   "env_names": [
     "PATH"
   ],
-  "started_at": "2026-11-12T12:35:08.011Z",
-  "ended_at": "2026-11-12T12:35:08.032Z",
-  "duration_ms": 20,
+  "started_at": "2026-11-12T12:46:00.877Z",
+  "ended_at": "2026-11-12T12:46:00.899Z",
+  "duration_ms": 21,
   "process": {
     "kind": "exited",
     "exit_code": 0,
@@ -25,6 +25,7 @@
     "term_sent": false,
     "kill_sent": false,
     "stray_group_killed": false,
+    "output_incomplete": false,
     "launch_error": null
   },
   "stdout": {
@@ -61,27 +62,31 @@
   },
   "usage": {
     "applicability": "model",
-    "session_mode": "new",
-    "resume_base": null,
-    "run": {
-      "state": "measured",
-      "tokens": {
-        "input": 0,
-        "output": 0,
-        "cache_read": 0,
-        "cache_creation": 0
+    "session_mode": "resume",
+    "resume_base": {
+      "task_id": "01-04-replay",
+      "attempt_id": "03-04-P1-guardrail",
+      "command_id": "replay",
+      "session_id": "73305c11-cd0f-4d86-83e4-585fb858ab1a",
+      "session": {
+        "state": "measured",
+        "tokens": {
+          "input": 2,
+          "output": 9,
+          "cache_read": 2552,
+          "cache_creation": 0
+        },
+        "source": "result.modelUsage"
       },
-      "source": "새 세션: result.usage + 자식 tool_use_result.usage (result.modelUsage 비어 있음)"
+      "cost_usd_reported": 0.00034920000000000003
+    },
+    "run": {
+      "state": "unmeasured",
+      "reason": "result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자식 합으로 대신할 수 없음"
     },
     "session": {
-      "state": "measured",
-      "tokens": {
-        "input": 0,
-        "output": 0,
-        "cache_read": 0,
-        "cache_creation": 0
-      },
-      "source": "result.usage + 자식 tool_use_result.usage (result.modelUsage 비어 있음)"
+      "state": "unmeasured",
+      "reason": "result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자식 합으로 대신할 수 없음"
     },
     "parent": {
       "state": "measured",
@@ -98,7 +103,7 @@
     "attribution_detail": null,
     "by_model": {},
     "cost_usd_reported": 0.0,
-    "run_cost_usd": 0.0,
+    "run_cost_usd": null,
     "partial_observations": [],
     "internal_retries": "unmeasured"
   },
