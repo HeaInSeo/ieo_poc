@@ -1,0 +1,21 @@
+# 01-04 준비: 호스트 격리 수단 확인 (2026-11-12T05:05:30Z), 모델 호출 0회
+$ id
+uid=1001(heain) gid=1001(heain) groups=1001(heain),10(wheel),974(ollama) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+$ sudo -n true
+sudo: a password is required
+$ command -v podman buildah unshare bwrap newuidmap kubectl docker
+/usr/bin/podman
+/usr/bin/buildah
+/usr/bin/unshare
+/usr/bin/bwrap
+/usr/bin/newuidmap
+/usr/local/bin/kubectl
+$ grep heain /etc/subuid /etc/subgid
+/etc/subuid:heain:165536:65536
+/etc/subgid:heain:165536:65536
+$ cat /proc/sys/user/max_user_namespaces
+254901
+$ unshare --user --map-root-user true; echo rc=$?
+rc=0
+$ podman --version
+podman version 4.9.4-rhel

@@ -1,0 +1,20 @@
+# 01-04 준비: 역할 컨테이너 기동 점검(2026-11-12T05:29:57Z). 모델 요청 0회, 토큰 없음
+$ sha256sum (원본 · 0755 사본)
+bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478  /home/heain/.local/share/claude/versions/2.1.322
+bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478  /opt/rust/ieo_poc_probe/bin/claude-2.1.322
+$ podman info --format rootless/network/uidmap
+true netavark [{0 1001 1} {1 165536 65536}]
+$ podman run --rm --user 20001:20001 --cap-drop ALL --security-opt no-new-privileges -v <scratch>/state:/state -v claude-2.1.322:/opt/claude/claude:ro --env HOME=/state --env CLAUDE_CONFIG_DIR=/state/claude golang:1.26.9-bookworm bash -c "id; claude --version; claude auth status; env names"
+uid=20001(20001) gid=20001(20001) groups=20001(20001)
+2.1.322 (Claude Code)
+{
+  "loggedIn": false,
+  "authMethod": "none",
+  "apiProvider": "firstParty",
+  "analyticsDisabled": false,
+  "projectsDirectory": "/state/claude/projects",
+  "configDirectory": "/state/claude",
+  "loginExpiresAt": null
+}
+#ENV_NAMES CLAUDE_CONFIG_DIR GOLANG_VERSION GOPATH GOTOOLCHAIN HOME HOSTNAME PATH PWD SHLVL _ container 
+# 해석: 수단(rootless podman·sub-UID·역할 UID 20001 실행) 가용성 증거. 호스트 로그인이 컨테이너에 보이지 않음(loggedIn=false). 역할 간 접근 차단 성공의 증거가 아니다(P2에서 별도 시험).
