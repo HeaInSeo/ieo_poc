@@ -1,0 +1,190 @@
+# 조회 시각 2026-11-12T08:20:07Z · gh api (인증 사용자 HeaInSeo) · 값 원문
+## GET repos/HeaInSeo/ieo_poc_test
+{
+ "id": 1455008847,
+ "node_id": "R_kgDOVrmsTw",
+ "name": "ieo_poc_test",
+ "full_name": "HeaInSeo/ieo_poc_test",
+ "private": false,
+ "description": "Synthetic GitHub integration sandbox for Console Coordinator PoC",
+ "fork": false,
+ "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test",
+ "created_at": "2026-11-12T08:10:42Z",
+ "updated_at": "2026-11-12T08:10:52Z",
+ "pushed_at": "2026-11-12T08:10:48Z",
+ "homepage": null,
+ "size": 0,
+ "stargazers_count": 0,
+ "watchers_count": 0,
+ "language": null,
+ "has_issues": true,
+ "has_projects": true,
+ "has_downloads": false,
+ "has_wiki": false,
+ "has_pages": false,
+ "has_discussions": false,
+ "forks_count": 0,
+ "archived": false,
+ "disabled": false,
+ "open_issues_count": 0,
+ "license": null,
+ "allow_forking": true,
+ "is_template": false,
+ "web_commit_signoff_required": false,
+ "has_pull_requests": true,
+ "pull_request_creation_policy": "all",
+ "topics": [],
+ "visibility": "public",
+ "forks": 0,
+ "open_issues": 0,
+ "watchers": 0,
+ "default_branch": "main",
+ "temp_clone_token": "",
+ "allow_squash_merge": true,
+ "allow_merge_commit": true,
+ "allow_rebase_merge": false,
+ "allow_auto_merge": false,
+ "delete_branch_on_merge": false,
+ "allow_update_branch": false,
+ "use_squash_pr_title_as_default": false,
+ "squash_merge_commit_message": "COMMIT_MESSAGES",
+ "squash_merge_commit_title": "COMMIT_OR_PR_TITLE",
+ "merge_commit_message": "PR_TITLE",
+ "merge_commit_title": "MERGE_MESSAGE",
+ "security_and_analysis": {
+  "secret_scanning": {
+   "status": "enabled"
+  },
+  "secret_scanning_push_protection": {
+   "status": "enabled"
+  },
+  "dependabot_security_updates": {
+   "status": "disabled"
+  },
+  "secret_scanning_non_provider_patterns": {
+   "status": "disabled"
+  },
+  "secret_scanning_validity_checks": {
+   "status": "disabled"
+  }
+ },
+ "network_count": 0,
+ "subscribers_count": 0
+}
+## GET repos/HeaInSeo/ieo_poc_test/branches/main/protection
+{
+ "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/branches/main/protection",
+ "required_status_checks": {
+  "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/branches/main/protection/required_status_checks",
+  "strict": true,
+  "contexts": [
+   "repository-smoke"
+  ],
+  "contexts_url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/branches/main/protection/required_status_checks/contexts",
+  "checks": [
+   {
+    "context": "repository-smoke",
+    "app_id": 15368
+   }
+  ]
+ },
+ "required_pull_request_reviews": {
+  "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/branches/main/protection/required_pull_request_reviews",
+  "dismiss_stale_reviews": true,
+  "require_code_owner_reviews": false,
+  "require_last_push_approval": false,
+  "required_approving_review_count": 0
+ },
+ "required_signatures": {
+  "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/branches/main/protection/required_signatures",
+  "enabled": false
+ },
+ "enforce_admins": {
+  "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/branches/main/protection/enforce_admins",
+  "enabled": true
+ },
+ "required_linear_history": {
+  "enabled": false
+ },
+ "allow_force_pushes": {
+  "enabled": false
+ },
+ "allow_deletions": {
+  "enabled": false
+ },
+ "block_creations": {
+  "enabled": false
+ },
+ "required_conversation_resolution": {
+  "enabled": true
+ },
+ "lock_branch": {
+  "enabled": false
+ },
+ "allow_fork_syncing": {
+  "enabled": false
+ }
+}
+## GET repos/HeaInSeo/ieo_poc_test/actions/permissions
+{
+ "enabled": true,
+ "allowed_actions": "all",
+ "sha_pinning_required": false
+}
+## GET repos/HeaInSeo/ieo_poc_test/actions/permissions/workflow
+{
+ "default_workflow_permissions": "read",
+ "can_approve_pull_request_reviews": false
+}
+## GET repos/HeaInSeo/ieo_poc_test/rulesets
+[]
+## GET repos/HeaInSeo/ieo_poc_test/hooks
+[]
+## GET repos/HeaInSeo/ieo_poc_test/keys
+[]
+## GET repos/HeaInSeo/ieo_poc_test/collaborators
+[
+ {
+  "login": "HeaInSeo",
+  "id": 126678443,
+  "role_name": "admin"
+ }
+]
+## GET repos/HeaInSeo/ieo_poc_test/actions/runs/43180843445
+{
+ "id": 43180843445,
+ "name": "sandbox-bootstrap",
+ "node_id": "WFR_kwLOVrmsT88AAAAKDcdhtQ",
+ "head_branch": "main",
+ "head_sha": "2ab9d8760012516f37674a9446ca2fb2699973c0",
+ "path": ".github/workflows/bootstrap.yml",
+ "display_title": "chore: bootstrap isolated GitHub integration sandbox",
+ "run_number": 1,
+ "event": "push",
+ "status": "completed",
+ "conclusion": "success",
+ "workflow_id": 415724673,
+ "check_suite_id": 116930413414,
+ "check_suite_node_id": "CS_kwDOVrmsT88AAAAbOZiDZg",
+ "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/actions/runs/43180843445",
+ "pull_requests": [],
+ "created_at": "2026-11-12T08:10:53Z",
+ "updated_at": "2026-11-12T08:11:01Z",
+ "run_attempt": 1,
+ "referenced_workflows": [],
+ "run_started_at": "2026-11-12T08:10:53Z"
+}
+## GET repos/HeaInSeo/ieo_poc_test/contents/.github/workflows/bootstrap.yml
+{
+ "name": "bootstrap.yml",
+ "path": ".github/workflows/bootstrap.yml",
+ "sha": "bc59437f25cf3cabd0d6954586dfad41c4d09dfb",
+ "size": 944,
+ "url": "https://api.github.com/repos/HeaInSeo/ieo_poc_test/contents/.github/workflows/bootstrap.yml?ref=main",
+ "type": "file",
+ "encoding": "base64",
+ "content_decoded": "name: sandbox-bootstrap\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\npermissions:\n  contents: read\njobs:\n  repository-smoke:\n    name: repository-smoke\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - name: Checkout exact candidate\n        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          ref: ${{ github.event.pull_request.head.sha || github.sha }}\n          persist-credentials: false\n      - name: Validate bootstrap files and SHA\n        env:\n          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          git diff --check\n          test -s README.md\n          python3 -m json.tool SANDBOX.json > /dev/null\n          actual_sha=\"$(git rev-parse HEAD)\"\n          test \"$actual_sha\" = \"$EXPECTED_SHA\"\n          printf 'bootstrap checkout: %s\\n' \"$actual_sha\"\n"
+}
+## local clone /opt/rust/src/github.com/HeaInSeo/ieo_poc_test
+2ab9d87 chore: bootstrap isolated GitHub integration sandbox
+## main...origin/main
