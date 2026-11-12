@@ -327,14 +327,21 @@ pub enum Denied {
     /// 409 `STALE_ASSIGNMENT`: a *new* execution request (repro) for a non-current
     /// assignment/generation, or a claim naming an assignment never issued to this (repo, role).
     StaleAssignment,
-    /// 409 `EVENT_CONTENT_CONFLICT`: the same event/request ID was already stored with different content.
+    /// 409 `EVENT_CONTENT_CONFLICT`: the same event/request ID was already stored (for this
+    /// repo and role) with different content.
+    #[serde(rename = "EVENT_CONTENT_CONFLICT")]
     ContentConflict,
+    /// 409 `ASSIGNMENT_SHA_MISMATCH`: the body names a `target_sha` other than the SHA the
+    /// coordinator recorded for that assignment; one claim never carries two SHAs.
+    AssignmentShaMismatch,
 }
 
 impl Denied {
     pub fn http_status(self) -> u16 {
         match self {
-            Denied::StaleAssignment | Denied::ContentConflict => 409,
+            Denied::StaleAssignment | Denied::ContentConflict | Denied::AssignmentShaMismatch => {
+                409
+            }
             _ => 403,
         }
     }
@@ -405,7 +412,14 @@ pub fn authorize_claim(
             Err(Denied::ContentConflict)
         };
     }
-    match book.lookup(r) {
+    let found = book.lookup(r);
+    // A body SHA, when present, must be the assignment's recorded SHA (current or late alike).
+    if let (Some((a, _)), Some(body_sha)) = (found, r["body"]["target_sha"].as_str())
+        && body_sha != a.target_sha
+    {
+        return Err(Denied::AssignmentShaMismatch);
+    }
+    match found {
         Some((a, true)) => Ok(ClaimDisposition::Current {
             target_sha: a.target_sha.clone(),
         }),

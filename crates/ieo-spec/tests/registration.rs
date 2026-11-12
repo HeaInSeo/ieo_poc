@@ -453,3 +453,29 @@ fn ready_with_unresolved_bindings_is_format_error() {
             .any(|r| r.code == Code::SchemaViolation && r.field == "unresolved_bindings")
     );
 }
+
+#[test]
+fn registry_never_overwrites_a_revision_or_narrows_its_mode() {
+    let s = redigest(bound_ready(sprint(0)));
+    let mut reg = registry("POC-01");
+    assert!(reg.add_spec_with_mode(&s, CheckMode::Executable));
+    // re-recording the same content as draft keeps the executable mode
+    assert!(reg.add_spec(&s));
+    assert_eq!(
+        check_registration(&s, &reg, CheckMode::Executable).state,
+        ieo_spec::CheckState::AlreadyRegistered
+    );
+    // same revision, different content: refused, stored digest unchanged
+    let mut other = s.clone();
+    other["title"] = json!("same revision, different content");
+    let other = redigest(other);
+    assert!(!reg.add_spec_with_mode(&other, CheckMode::Executable));
+    assert_eq!(
+        check_registration(&s, &reg, CheckMode::Executable).http_status(),
+        200
+    );
+    assert_eq!(
+        check_registration(&other, &reg, CheckMode::Draft).http_status(),
+        409
+    );
+}

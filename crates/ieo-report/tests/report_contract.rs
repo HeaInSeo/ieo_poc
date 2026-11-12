@@ -176,20 +176,24 @@ fn issued(id: &str, generation: u64, sha: &str) -> IssuedAssignment {
         target_sha: sha.into(),
     }
 }
-/// fixture-assignment gen 1 is current (SHA "c1"); gen 0 of it and "older" were issued before.
+/// SHA of the current assignment = the example bodies' `target_sha`.
+const CUR: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const OLD0: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const OLDER: &str = "cccccccccccccccccccccccccccccccccccccccc";
+/// fixture-assignment gen 1 is current (SHA CUR); gen 0 of it (OLD0) and "older" (OLDER) were issued before.
 fn book() -> AssignmentBook {
     AssignmentBook {
         issued: vec![
-            issued("older", 1, "a0"),
-            issued("fixture-assignment", 0, "b0"),
-            issued("fixture-assignment", 1, "c1"),
+            issued("older", 1, OLDER),
+            issued("fixture-assignment", 0, OLD0),
+            issued("fixture-assignment", 1, CUR),
         ],
         current: Some(("fixture-assignment".into(), 1)),
     }
 }
 fn current() -> Result<ClaimDisposition, Denied> {
     Ok(ClaimDisposition::Current {
-        target_sha: "c1".into(),
+        target_sha: CUR.into(),
     })
 }
 
@@ -248,31 +252,68 @@ fn late_claim_from_issued_old_assignment_is_preserved_not_judged() {
     // gen 0 of the same assignment, and a different older assignment: stored with their own SHA
     let mut r = ex("development_progress");
     r["generation"] = json!(0);
+    r["body"]["target_sha"] = json!(OLD0);
     let d = authorize_claim(&r, &dev, &book(), None).unwrap();
     assert_eq!(
         d,
         ClaimDisposition::PreservedLate {
             assignment_id: "fixture-assignment".into(),
             generation: 0,
-            target_sha: "b0".into()
+            target_sha: OLD0.into()
         }
     );
     assert_eq!(d.http_status(), 202);
     assert!(!d.counts_for_current_judgment());
     r["assignment_id"] = json!("older");
     r["generation"] = json!(1);
+    r["body"]["target_sha"] = Value::Null; // no body SHA: attributed to the assignment's recorded SHA
     let d = authorize_claim(&r, &dev, &book(), None).unwrap();
     assert!(
-        matches!(d, ClaimDisposition::PreservedLate { ref target_sha, .. } if target_sha == "a0")
+        matches!(d, ClaimDisposition::PreservedLate { ref target_sha, .. } if target_sha == OLDER)
     );
     assert!(!d.counts_for_current_judgment());
     // the current one counts
     let d = authorize_claim(&ex("development_progress"), &dev, &book(), None).unwrap();
     assert!(d.counts_for_current_judgment());
-    // a late claim does not change which assignment is current
-    let b = book();
-    let _ = authorize_claim(&r, &dev, &b, None);
-    assert_eq!(b.current, Some(("fixture-assignment".into(), 1)));
+    // (authorize_claim takes `&AssignmentBook`, so it cannot change which assignment is current.)
+}
+
+#[test]
+fn body_sha_must_match_the_assignment_sha() {
+    let (dev, guard) = (
+        agent("fixture-repo", "development"),
+        agent("fixture-repo", "guardrail"),
+    );
+    // an approve of another SHA must not become an approve of the current assignment
+    let mut g = ex("guardrail_review");
+    g["body"]["target_sha"] = json!(OLD0);
+    assert_eq!(
+        authorize_claim(&g, &guard, &book(), None),
+        Err(Denied::AssignmentShaMismatch)
+    );
+    assert_eq!(Denied::AssignmentShaMismatch.http_status(), 409);
+    // late claim naming the current SHA instead of its own assignment's SHA
+    let mut r = ex("development_progress");
+    r["generation"] = json!(0);
+    r["body"]["target_sha"] = json!(CUR);
+    assert_eq!(
+        authorize_claim(&r, &dev, &book(), None),
+        Err(Denied::AssignmentShaMismatch)
+    );
+    // matching SHA is accepted
+    assert_eq!(
+        authorize_claim(&ex("guardrail_review"), &guard, &book(), None),
+        current()
+    );
+    // serialized codes are the contract's codes
+    assert_eq!(
+        serde_json::to_value(Denied::ContentConflict).unwrap_or_default(),
+        json!("EVENT_CONTENT_CONFLICT")
+    );
+    assert_eq!(
+        serde_json::to_value(Denied::AssignmentShaMismatch).unwrap_or_default(),
+        json!("ASSIGNMENT_SHA_MISMATCH")
+    );
 }
 
 #[test]
@@ -324,6 +365,13 @@ fn same_id_replay_is_checked_before_assignment() {
     assert_eq!(d, ClaimDisposition::Replay);
     assert_eq!(d.http_status(), 200);
     assert!(!d.counts_for_current_judgment());
+    // same ID with a never-issued assignment: still a content conflict (replay check comes first)
+    let mut unissued = r.clone();
+    unissued["assignment_id"] = json!("never-issued");
+    assert_eq!(
+        authorize_claim(&unissued, &dev, &moved, Some(&r)),
+        Err(Denied::ContentConflict)
+    );
     // same ID, different content
     let mut changed = r.clone();
     changed["next_action"] = json!("다른 내용");
@@ -356,11 +404,11 @@ fn agents_cannot_read_client_views_and_repro_is_guardrail_only() {
         Err(Denied::RepoScopeDenied)
     );
 
-    let req = json!({"repo_id": "fixture-repo", "assignment_id": "fixture-assignment", "generation": 1, "target_sha": "c1"});
+    let req = json!({"repo_id": "fixture-repo", "assignment_id": "fixture-assignment", "generation": 1, "target_sha": CUR});
     assert_eq!(
         authorize_repro(&req, &guard, &book(), None),
         Ok(ReproDisposition::Queue {
-            target_sha: "c1".into()
+            target_sha: CUR.into()
         })
     );
     assert_eq!(
@@ -372,7 +420,7 @@ fn agents_cannot_read_client_views_and_repro_is_guardrail_only() {
         Err(Denied::RepoScopeDenied)
     );
     // a NEW repro request on an old (issued) generation would start stale work: 409
-    let old = json!({"repo_id": "fixture-repo", "assignment_id": "fixture-assignment", "generation": 0, "target_sha": "b0"});
+    let old = json!({"repo_id": "fixture-repo", "assignment_id": "fixture-assignment", "generation": 0, "target_sha": OLD0});
     assert_eq!(
         authorize_repro(&old, &guard, &book(), None),
         Err(Denied::StaleAssignment)

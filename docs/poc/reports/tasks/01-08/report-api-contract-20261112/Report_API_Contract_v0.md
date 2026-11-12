@@ -19,8 +19,9 @@
 | 코디네이터 → 사람/클라이언트 (`GET …/state`, `GET …/events`) | `coordinator_to_client` | **verified** | 코디네이터 | `coordinator_verdict`, `decision_request` |
 
 - 에이전트 자격은 (repo_id, role) 하나에 묶이고 `agent:*` 범위만 가진다. 본문의 `actor.name`·라벨은 인가 근거가 아니다. 역할 불일치 → 403 `ROLE_MISMATCH`, verified/코디네이터 보고 제출 → 403 `VERIFIED_FROM_AGENT_DENIED`, 다른 repo → 403 `REPO_SCOPE_DENIED`, `/v0/sprints*` 조회 → 403 `AGENT_READ_DENIED`(역할끼리 서로의 claim을 보지 못함, §1.2). 거부 시 상태 변화·사건 0건.
-- **같은 ID 재전송을 배정 검사보다 먼저** 본다(rev 3). 저장된 claim(`event_id`·`event_revision`)·재현 요청(`request_id`)과 내용이 같으면 200 재조회로 저장 결과를 돌려주고 상태를 바꾸지 않는다(배정이 그 사이 바뀌었어도 같음, 재현은 다시 대기열에 넣지 않음). 내용이 다르면 409 `EVENT_CONTENT_CONFLICT`.
-- 새 claim: `assignment_id`·`generation`이 그 (repo, role)의 **현재 배정**이면 202 `disposition=current`(현재 판정 입력 가능). 코디네이터가 같은 (repo, role)에 **실제로 발급했던 옛 배정·세대**면 202 `disposition=preserved_late`: 그 배정과 코디네이터 DB에 기록된 그 배정의 SHA에 귀속해 보존하고, 현재 판정에 쓰지 않으며 옛 배정을 다시 활성화하지 않는다(§1.9). 발급된 적 없는 배정·세대면 409 `STALE_ASSIGNMENT`.
+- **같은 ID 재전송을 배정 검사보다 먼저** 본다(rev 3). 조회 범위는 자격의 (repo, role)이며 다른 범위의 ID는 보지 않는다(존재 노출 없음). 재전송 영수증의 `counts_for_current_judgment`는 응답 시점에 다시 계산한다. 저장된 claim(`event_id`·`event_revision`)·재현 요청(`request_id`)과 내용이 같으면 200 재조회로 저장 결과를 돌려주고 상태를 바꾸지 않는다(배정이 그 사이 바뀌었어도 같음, 재현은 다시 대기열에 넣지 않음). 내용이 다르면 409 `EVENT_CONTENT_CONFLICT`.
+- 새 claim: `assignment_id`·`generation`이 그 (repo, role)의 **현재 배정**이면 202 `disposition=current`(현재 판정 입력 가능). 코디네이터가 같은 (repo, role)에 **실제로 발급했던 옛 배정·세대**면 202 `disposition=preserved_late`: 그 배정과 코디네이터 DB에 기록된 그 배정의 SHA에 귀속해 보존하고, 현재 판정에 쓰지 않으며 옛 배정을 다시 활성화하지 않는다(§1.9). 발급된 적 없는 배정·세대면 409 `STALE_ASSIGNMENT`. 본문에 `body.target_sha`가 있으면 그 배정에 코디네이터가 기록한 SHA와 같아야 하며 다르면 409 `ASSIGNMENT_SHA_MISMATCH`다(한 claim에 SHA 두 개 금지, rev 3 검토 반영).
+- 현재 판정(검토 최신성·완료 표현)의 입력은 `counts_for_current_judgment`가 참인 claim뿐이다. SHA만으로 거르지 않는다. 옛 세대가 현재와 같은 SHA를 가질 수 있기 때문이다.
 - 새 재현 요청은 실행을 새로 시작하므로 **현재 배정과 그 배정의 SHA**만 받는다. 옛 배정·세대나 다른 SHA는 409 `STALE_ASSIGNMENT`.
 - 검사 순서(에이전트 경로, rev 3): 401(자격) → 403(범위·역할, 본문의 repo/channel/report_type만 읽음) → 200/409 같은 ID 재전송(동일성) → 배정 분류(현재·옛 발급이면 계속, 발급 이력 없음이면 409 `STALE_ASSIGNMENT`) → 400(형식) → 422(의미) → 202 저장(`current`/`preserved_late`). 클라이언트 등록 경로는 401 → 403 → 400 → 409 → 422 그대로다.
 - claim 저장(202)은 판정이 아니다. 완료 판정은 GitHub·현재 SHA·실행 증거 대조로 코디네이터가 하며 에이전트의 별도 완료 메시지를 필수 입력으로 요구하지 않는다(02-07).

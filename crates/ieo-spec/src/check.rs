@@ -80,8 +80,9 @@ impl Registry {
     }
 
     /// Record a spec as registered in the given mode. Returns `false` and changes
-    /// nothing when a newer revision of the sprint is already registered: an older
-    /// revision is never (re)activated, so its tasks and mode stay as they were.
+    /// nothing when a newer revision of the sprint is already registered (an older
+    /// revision is never (re)activated) or when the same revision is stored with a
+    /// different digest. A stored executable mode is never narrowed back to draft.
     /// A newer revision replaces the sprint's task set (tasks it dropped disappear).
     pub fn add_spec_with_mode(&mut self, spec: &Value, mode: CheckMode) -> bool {
         let sprint_id = spec["sprint_id"].as_str().unwrap_or_default().to_string();
@@ -93,9 +94,16 @@ impl Registry {
         if self.latest_revision(&sprint_id).is_some_and(|l| l > rev) {
             return false;
         }
-        if let Some(d) = spec["digest"].as_str() {
-            self.revisions
-                .insert((sprint_id.clone(), rev), (d.to_string(), mode));
+        let digest = spec["digest"].as_str().unwrap_or_default().to_string();
+        let key = (sprint_id.clone(), rev);
+        match self.revisions.get(&key) {
+            // a stored revision is immutable: different content is never recorded over it
+            Some((d, _)) if *d != digest => return false,
+            // the stored mode only ever widens (draft → executable), never narrows
+            Some((_, CheckMode::Executable)) => {}
+            _ => {
+                self.revisions.insert(key, (digest, mode));
+            }
         }
         self.tasks.retain(|_, t| t.sprint_id != sprint_id);
         for t in spec["tasks"].as_array().into_iter().flatten() {
