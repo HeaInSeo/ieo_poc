@@ -136,6 +136,8 @@ def stop_signals(meta):
     rl = [s for s in meta["rate_limit_status"] if s and s != "allowed"]
     res = meta.get("result_event") or {}
     txt = str(res.get("result") or "") + " " + " ".join(meta["assistant_text"])
+    if not res and meta.get("exit_code") not in (0,):
+        sys.exit(f"STOP: attempt {meta['attempt']} ended with exit {meta.get('exit_code')} and no result event -> no new attempt (review c20e7e3 P3)")
     if rl or (res.get("is_error") and re.search(r"usage limit|rate.?limit|\b40[13]\b|authenticat|billing|credit balance|oauth", txt, re.I)):
         sys.exit(f"STOP SIGNAL in attempt {meta['attempt']}: rate_limit={rl}; see evidence (Probe_Budget_Rules §4)")
 
@@ -323,6 +325,43 @@ def list_markers(meta):
     init = meta.get("init") or {}
     blob = json.dumps({k: init.get(k) for k in ("mcp_servers", "slash_commands", "skills", "agents", "plugins", "memory_paths")})
     return sorted({m for m in ("marker-mcp", "marker-skill", "marker-cmd", "marker-agent") if m in blob})
+
+
+def cmd_e1b(ev):
+    """Added after review c20e7e3 P2-2 (ADDENDUM): E1 rebuilt so the development role cannot touch the repo files.
+    A forge container (UID 20005) owns the bare repos and serves them with `git daemon` on its own internal network;
+    the development container joins only that network and pushes over git://. No model requests."""
+    tests = []
+
+    def t(tid, desc, argv, expect):
+        r = sh(argv)
+        tests.append({"id": tid, "desc": desc, "expect": expect, "argv": argv, "rc": r.returncode, "output": (r.stdout + r.stderr)[-3000:]})
+        print(tid, r.returncode, (r.stdout + r.stderr).strip().splitlines()[-1:] if (r.stdout + r.stderr).strip() else "")
+    forge = ROOT / "forge"
+    fnet = "ieo-probe-forge"
+    unshare(f"rm -rf {forge}; mkdir -p {forge} && cp -r --no-preserve=all {TESTREPOS}/a.git {forge}/a.git && chmod 0755 {forge}/a.git/hooks/pre-receive "
+            f"&& chown -R 20005:20005 {forge} && chmod 0700 {forge} && chcon -R --reference={P.role_dir('development')}/state/home {forge}")
+    sh(["podman", "network", "exists", fnet]).returncode and sh(["podman", "network", "create", "--internal", fnet], check=True)
+    sh(["podman", "rm", "-f", "ieo-probe-forge"])
+    sh(["podman", "run", "-d", "--name", "ieo-probe-forge", "--network", fnet, "--user", "20005:20005", "--cap-drop", "ALL",
+        "-v", f"{forge}:/srv:z", P.IMAGE, "git", "daemon", "--reuseaddr", "--base-path=/srv", "--export-all", "--enable=receive-pack", "--listen=0.0.0.0", "/srv"], check=True)
+    time.sleep(3)
+    url = "git://ieo-probe-forge/a.git"
+    git = "git -c user.name=e1b -c user.email=e1b.invalid"
+    dev = lambda inner: role_cmd("development", inner, network=fnet)
+    t("E1b-dev-push-work", "개발 UID가 forge에서 clone, work/e1b push", dev(
+      f"set -e; rm -rf /state/work/e1b; git clone -q {url} /state/work/e1b; cd /state/work/e1b; git checkout -qb work/e1b; echo e1b > e1b.txt; {git} add e1b.txt; {git} commit -qm e1b; git push origin work/e1b 2>&1; echo PUSH_WORK_OK"), "allowed")
+    t("E1b-dev-push-main", "개발 UID가 main에 push", dev(f"cd /state/work/e1b && (git push origin HEAD:main 2>&1 && echo PUSH_MAIN_OK) || echo PUSH_MAIN_REJECTED"), "denied")
+    t("E1b-dev-force-main", "개발 UID가 main에 강제 push", dev(f"cd /state/work/e1b && (git push --force origin HEAD:main 2>&1 && echo FORCE_MAIN_OK) || echo FORCE_MAIN_REJECTED"), "denied")
+    t("E1b-dev-delete-main", "개발 UID가 main 삭제", dev(f"cd /state/work/e1b && (git push origin :main 2>&1 && echo DELETE_MAIN_OK) || echo DELETE_MAIN_REJECTED"), "denied")
+    t("E1b-dev-repo-files", "개발 컨테이너에서 repo 파일·hook 경로 접근", dev(
+      "for p in /srv /srv/a.git /srv/a.git/hooks/pre-receive; do (ls $p >/dev/null 2>&1 && echo VISIBLE $p) || echo ABSENT $p; done; mount | grep -c forge || true"), "denied")
+    t("E1b-gd-reach", "Guardrail 컨테이너에서 forge 접속", role_cmd("guardrail", f"(timeout 10 git ls-remote {url} 2>&1 && echo REACH_OK) || echo REACH_DENIED"), "denied")
+    t("E1b-main-unchanged", "forge의 main이 원래 SHA 그대로", ["podman", "exec", "ieo-probe-forge", "git", "--git-dir=/srv/a.git", "for-each-ref", "--format=%(refname) %(objectname)"], "main == seed SHA")
+    sh(["podman", "stop", "-t", "3", "ieo-probe-forge"])
+    seed = json.loads((ev / "E.json").read_text())["info"]["repo_a_main"]
+    save(ev, "E1b.json", {"at": P.now(), "seed_main": seed, "forge_owner_uid": 20005, "tests": tests,
+                          "limits": "git daemon without authentication: on the forge network the development role is the only client; authority is network membership + server-side hook"})
 
 
 def cmd_u(ev):
@@ -560,13 +599,13 @@ def cmd_r(ev):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["e", "u", "u-alt", "g", "g3", "n", "l", "c", "t", "r", "status"])
+    ap.add_argument("step", choices=["e", "e1b", "u", "u-alt", "g", "g3", "n", "l", "c", "t", "r", "status"])
     ap.add_argument("--evidence", type=Path, default=DEFAULT_EVIDENCE)
     a = ap.parse_args()
     a.evidence.mkdir(parents=True, exist_ok=True)
     if a.step == "status":
         led = Ledger2(a.evidence); n, w = led.remaining(); print(f"attempts used {P.MAX_ATTEMPTS - n}/30, wall remaining {int(w)}s"); return
-    {"e": cmd_e, "u": cmd_u, "u-alt": cmd_u_alt, "g": cmd_g, "g3": cmd_g3, "n": cmd_n, "l": cmd_l, "c": cmd_c, "t": cmd_t, "r": cmd_r}[a.step](a.evidence)
+    {"e": cmd_e, "e1b": cmd_e1b, "u": cmd_u, "u-alt": cmd_u_alt, "g": cmd_g, "g3": cmd_g3, "n": cmd_n, "l": cmd_l, "c": cmd_c, "t": cmd_t, "r": cmd_r}[a.step](a.evidence)
 
 
 if __name__ == "__main__":
