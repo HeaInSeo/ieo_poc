@@ -1,0 +1,1086 @@
+{
+ "scored_at": "2026-11-12T13:53:52Z",
+ "set": "authoring",
+ "set_file": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/sets/authoring.json",
+ "bin": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/dryrun/stub-silent.sh",
+ "totals": {
+  "determined_cases": 14,
+  "passed": 0,
+  "failed": 14,
+  "undetermined_cases_excluded": 0,
+  "undetermined_fields_excluded": 19,
+  "checked_fields": 234,
+  "failed_fields": 220
+ },
+ "cases": [
+  {
+   "id": "A-01",
+   "verdict": "FAIL",
+   "checked_fields": 10,
+   "failed_fields": [
+    {
+     "field": "record:at/x1/build#/role",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/artifacts/0/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/artifacts/0/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/artifacts/1/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/artifacts/1/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/artifacts/1/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/build#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-02",
+   "verdict": "FAIL",
+   "checked_fields": 8,
+   "failed_fields": [
+    {
+     "field": "record:at/x1/slow#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/slow#/process/timeout_ms",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/slow#/process/term_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/slow#/process/kill_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/slow#/duration_ms",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/slow#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/slow#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-03",
+   "verdict": "FAIL",
+   "checked_fields": 5,
+   "failed_fields": [
+    {
+     "field": "record:at/x1/nomark#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/nomark#/markers/0/pattern",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/nomark#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x1/nomark#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-04",
+   "verdict": "FAIL",
+   "checked_fields": 32,
+   "failed_fields": [
+    {
+     "field": "record:at/x2/agent#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/children/0/tool_use_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/children/0/agent_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/children/0/usage/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/children/0/usage/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x2/agent#/usage/children",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-05",
+   "verdict": "FAIL",
+   "checked_fields": 59,
+   "failed_fields": [
+    {
+     "field": "record:at/x3/r1#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x3/r1#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/resume_base/command_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/resume_base/attempt_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/resume_base/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x4/r2#/usage/resume_base/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[2]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[2]~tokens_measured_sum",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 4,
+   "exits": [
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "A-06",
+   "verdict": "FAIL",
+   "checked_fields": 21,
+   "failed_fields": [
+    {
+     "field": "record:at/x5/n2#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x5/n2#/usage/resume_base",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 3,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-07",
+   "verdict": "FAIL",
+   "checked_fields": 25,
+   "failed_fields": [
+    {
+     "field": "record:at/x6/err#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x6/err#/judgment/expected",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 3,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-08",
+   "verdict": "FAIL",
+   "checked_fields": 20,
+   "failed_fields": [
+    {
+     "field": "record:at/x7/cut#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/partial_observations",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/partial_observations/0/message_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/partial_observations/0/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x7/cut#/usage/partial_observations/1/tokens",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-09",
+   "verdict": "FAIL",
+   "checked_fields": 9,
+   "failed_fields": [
+    {
+     "field": "record:at/x8/sec#/redaction/stdout_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x8/sec#/redaction/stderr_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x8/sec#/redaction/argv_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x8/sec#/redaction/secret_value_seen",
+     "problem": "missing"
+    },
+    {
+     "field": "file:at/x8/sec/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x8/sec#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/x8/sec#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-10",
+   "verdict": "FAIL",
+   "checked_fields": 5,
+   "failed_fields": [
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    },
+    {
+     "field": "exit[1]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-11",
+   "verdict": "FAIL",
+   "checked_fields": 8,
+   "failed_fields": [
+    {
+     "field": "record:at/y1/env#/env_names",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y1/env#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y1/env#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:at/y1/env/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "recordtext:at/y1/env",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y1/env#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y1/env#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-12",
+   "verdict": "FAIL",
+   "checked_fields": 4,
+   "failed_fields": [
+    {
+     "field": "exit[1]",
+     "problem": "got 0"
+    },
+    {
+     "field": "file:at/y2/same/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[2]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "A-13",
+   "verdict": "FAIL",
+   "checked_fields": 6,
+   "failed_fields": [
+    {
+     "field": "record:at/y3/held#/process/output_incomplete",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y3/held#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y3/held#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y3/held#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y3/held#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "A-14",
+   "verdict": "FAIL",
+   "checked_fields": 22,
+   "failed_fields": [
+    {
+     "field": "record:at/y4/nouse#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:at/y4/nouse#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[1]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[1]~tokens_measured_sum",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[1]",
+     "problem": "$contains \"nouse\" failed; got "
+    }
+   ],
+   "undetermined_fields": 3,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  }
+ ],
+ "undetermined_cases": []
+}

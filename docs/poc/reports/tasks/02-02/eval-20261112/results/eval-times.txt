@@ -1,0 +1,8 @@
+EVAL_START 2026-11-12T13:55:01.235Z
+CMD: /opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -I score.py --set sets/public.json --bin /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/build/src/target/release/ieo-evidence --out results/public.json --work results/work-public
+rc=0
+CMD: /opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -I score.py --set sets/authoring.json --bin /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/build/src/target/release/ieo-evidence --out results/authoring.json --work results/work-authoring
+rc=0
+CMD: /opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -I score.py --set sets/validation.json --bin /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/build/src/target/release/ieo-evidence --out results/validation.json --work results/work-validation
+rc=1
+EVAL_END 2026-11-12T13:55:19.399Z

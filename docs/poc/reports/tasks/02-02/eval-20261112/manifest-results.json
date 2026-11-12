@@ -1,0 +1,73 @@
+{
+ "created_at": "2026-11-12T13:56:52Z",
+ "frozen_manifest_sha256": "ec486cc51cfb50aa41127a51fcaeb2c97139baca1a59a58f50ed8a6ac34be57c",
+ "freeze_commit": "61a27aa56fbc76f512f39ba4888984d88a649ed0",
+ "candidate_commit": "1785cb76e1b5456150865453a990b9b910d56a9e",
+ "candidate_binary_sha256": "8125cc4a370ec0c52ba1c45b1446b091f32179e8d884d3f76b5f25564211ce16",
+ "files": [
+  {
+   "path": "results/SUMMARY.md",
+   "sha256": "ceab74d67008ee242b81cb8aedaf6f7acf51703fc309afc6c3def6ba427e5a6c"
+  },
+  {
+   "path": "results/authoring.json",
+   "sha256": "5df512e5e2b67fa1c758ac62e62a9b9388565b46dd1ef215b2f6f77e18d99879"
+  },
+  {
+   "path": "results/authoring.txt",
+   "sha256": "196fe8787e2a5c6a844ec7061fa9360166064543de945ba1799bb6831609c1af"
+  },
+  {
+   "path": "results/build.txt",
+   "sha256": "2767b3ebefcf257e6be9d214fd08fa75cb08f3a0d6c450ff75b1170f3dc2f063"
+  },
+  {
+   "path": "results/diag-secret/out/d/a/c/record.json",
+   "sha256": "1a442ccbc74cd5349461bf395bec74783d4117ce079fda7d467b03ac955094df"
+  },
+  {
+   "path": "results/diag-secret/out/d/a/c/stderr",
+   "sha256": "0da2d61f0be544278b02e5ee2fea3f0661b36f0e54f260801cc622336a009703"
+  },
+  {
+   "path": "results/diag-secret/out/d/a/c/stdout",
+   "sha256": "9be3f8e31586cbac684fb81616de479357b946021c49e75b5f5a1ade00338fee"
+  },
+  {
+   "path": "results/diag-secret/work/s.txt",
+   "sha256": "768f6e7afeb5e036a70396a31f659693fd20cc860bed817d4322c5a821429302"
+  },
+  {
+   "path": "results/eval-times.txt",
+   "sha256": "3d1842cf3f0e099b4306c25d1ad4c6a724d43dc3c6b4a961519dbd94a1ebe252"
+  },
+  {
+   "path": "results/freeze-verify.txt",
+   "sha256": "3d6c726c40bcee96008b1d5de69fc8ef53739a3b4f04c52872dc60cd7811a038"
+  },
+  {
+   "path": "results/leak-check.md",
+   "sha256": "5089d61bc37b737ed3a0a7814e0ddd385f17bde13d13ffe3d9948e77f84e867e"
+  },
+  {
+   "path": "results/leak-grep.txt",
+   "sha256": "1db0c889e84d01bae02d3d815c79c7f089da3c7ad01ad7efe67550653855dcde"
+  },
+  {
+   "path": "results/public.json",
+   "sha256": "b68e9409ef4e9c77984fe75ca5bc760ec647cf830a678d1661f53b3a9773691d"
+  },
+  {
+   "path": "results/public.txt",
+   "sha256": "51336499b55335f384c9f76bc0fa67ca4678e292b7e93b26fb5a962bca9a1f81"
+  },
+  {
+   "path": "results/validation.json",
+   "sha256": "6274102d4ecd3b981ac415cf88f6c1ced031f17a09d56b148bf267bfeed676e0"
+  },
+  {
+   "path": "results/validation.txt",
+   "sha256": "0dfbf467aa796cd4af155ac076f4e2403f05d4d710a351fa7bff1ef025b1b1ce"
+  }
+ ]
+}

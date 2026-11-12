@@ -1,0 +1,16 @@
+{
+ "fx-01.jsonl": "docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/01-P1-development/stdout.jsonl",
+ "fx-02.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/23-T-development/stdout.jsonl",
+ "fx-03.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/11-N1-development/stdout.jsonl",
+ "fx-04.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/12-N2-development/stdout.jsonl",
+ "fx-05.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/13-N3-development/stdout.jsonl",
+ "fx-06.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/14-N4a-development/stdout.jsonl",
+ "fx-07.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/15-N4b-development/stdout.jsonl",
+ "fx-08.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/17-L2-development/stdout.jsonl",
+ "fx-09.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/18-L3-development/stdout.jsonl",
+ "fx-10.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/24-R1-development/stdout.jsonl",
+ "fx-11.jsonl": "docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/25-R2-development/stdout.jsonl",
+ "fx-12.jsonl": "docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/05-P2c-development/stdout.jsonl",
+ "fx-13.jsonl": "docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/04-P1-guardrail/stdout.jsonl",
+ "fx-14.jsonl": "docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/02-P1-guardrail/stdout.jsonl"
+}

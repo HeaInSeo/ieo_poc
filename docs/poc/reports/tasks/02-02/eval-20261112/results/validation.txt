@@ -1,0 +1,37 @@
+V-01   PASS  fields 19 checked, 0 failed, 0 undetermined  exits=[0]  0.0s
+V-02   PASS  fields 11 checked, 0 failed, 0 undetermined  exits=[1]  0.0s
+V-03   PASS  fields 8 checked, 0 failed, 1 undetermined  exits=[1]  0.0s
+V-04   PASS  fields 7 checked, 0 failed, 0 undetermined  exits=[1]  0.0s
+V-05   PASS  fields 9 checked, 0 failed, 0 undetermined  exits=[1]  1.0s
+V-06   PASS  fields 8 checked, 0 failed, 0 undetermined  exits=[0]  2.1s
+V-07   PASS  fields 8 checked, 0 failed, 1 undetermined  exits=[0]  2.1s
+V-08   PASS  fields 5 checked, 0 failed, 0 undetermined  exits=[0]  0.0s
+V-09   PASS  fields 7 checked, 0 failed, 0 undetermined  exits=[1, 1]  0.1s
+V-10   PASS  fields 7 checked, 0 failed, 1 undetermined  exits=[1]  0.0s
+V-11   PASS  fields 4 checked, 0 failed, 0 undetermined  exits=[1]  0.0s
+V-12   PASS  fields 32 checked, 0 failed, 2 undetermined  exits=[0]  0.0s
+V-13   PASS  fields 160 checked, 0 failed, 12 undetermined  exits=[0, 0, 0, 0, 0, 0, 0]  0.2s
+V-14   PASS  fields 44 checked, 0 failed, 8 undetermined  exits=[0, 0, 0, 0, 0, 0, 0]  0.2s
+V-15   PASS  fields 26 checked, 0 failed, 2 undetermined  exits=[0, 0, 0, 0]  0.1s
+V-16   PASS  fields 20 checked, 0 failed, 3 undetermined  exits=[0, 0]  0.1s
+V-17   PASS  fields 24 checked, 0 failed, 3 undetermined  exits=[1]  0.0s
+V-18   PASS  fields 22 checked, 0 failed, 2 undetermined  exits=[0, 0]  0.1s
+V-19   PASS  fields 36 checked, 0 failed, 4 undetermined  exits=[1, 0]  0.1s
+V-20   PASS  fields 21 checked, 0 failed, 3 undetermined  exits=[0, 0]  0.0s
+V-21   PASS  fields 56 checked, 0 failed, 4 undetermined  exits=[0, 0]  0.1s
+V-22   FAIL  fields 9 checked, 1 failed, 2 undetermined  exits=[0]  0.0s
+         - tree: secret-like value found in 1 file(s): ['vt/a22/c/record.json']
+V-23   PASS  fields 8 checked, 0 failed, 0 undetermined  exits=[1]  0.0s
+V-24   PASS  fields 9 checked, 0 failed, 0 undetermined  exits=[2, 2, 2]  0.0s
+V-25   PASS  fields 9 checked, 0 failed, 0 undetermined  exits=[0]  0.0s
+V-26   PASS  fields 4 checked, 0 failed, 0 undetermined  exits=[1, 2]  0.0s
+V-27   PASS  fields 6 checked, 0 failed, 0 undetermined  exits=[1, 0, 0, 0, 0, 0, 2]  0.1s
+V-28   PASS  fields 5 checked, 0 failed, 0 undetermined  exits=[0, 0, 0, 1, 0, 0]  0.1s
+V-29   PASS  fields 7 checked, 0 failed, 0 undetermined  exits=[1]  3.0s
+V-30   PASS  fields 20 checked, 0 failed, 0 undetermined  exits=[0, 1, 0]  2.5s
+V-31   PASS  fields 10 checked, 0 failed, 0 undetermined  exits=[0]  0.5s
+V-32   PASS  fields 1 checked, 0 failed, 0 undetermined  exits=[2]  0.0s
+V-33   PASS  fields 3 checked, 0 failed, 2 undetermined  exits=[0]  0.0s
+V-34   PASS  fields 3 checked, 0 failed, 2 undetermined  exits=[1]  1.0s
+V-35   UNDETERMINED (excluded): natural exit racing the timeout deadline (open item P3-6): which of exited/timed_out is recorded is not fixed and not reproducible deterministically; case not executed
+TOTAL set=validation determined=34 passed=33 failed=1 | undetermined cases excluded=1, undetermined fields excluded=52 | fields checked=628 failed=1

@@ -1,0 +1,72 @@
+P-01   FAIL  fields 19 checked, 18 failed, 0 undetermined  exits=[0]  0.0s
+         - record:pt/a1/c1#: missing
+         - record:pt/a1/c1#/format: missing
+         - record:pt/a1/c1#/task_id: missing
+         - record:pt/a1/c1#/started_at: missing
+         - record:pt/a1/c1#/model_request: missing
+         - record:pt/a1/c1#/result_event: missing
+         - record:pt/a1/c1#/usage/applicability: missing
+         - record:pt/a1/c1#/process/kind: missing
+         - record:pt/a1/c1#/process/exit_code: missing
+         - record:pt/a1/c1#/artifacts/0/present: missing
+         - record:pt/a1/c1#/artifacts/0/bytes: missing
+         - record:pt/a1/c1#/artifacts/0/sha256: missing
+         - record:pt/a1/c1#/markers/0/found: missing
+         - record:pt/a1/c1#/stdout/bytes: missing
+         - record:pt/a1/c1#/stdout/sha256: missing
+         - file:pt/a1/c1/stdout: missing
+         - record:pt/a1/c1#/judgment/status: missing
+         - record:pt/a1/c1#/judgment/counts_as_success: missing
+P-02   FAIL  fields 8 checked, 8 failed, 0 undetermined  exits=[0]  0.0s
+         - record:pt/a1/c2#/process/kind: missing
+         - record:pt/a1/c2#/process/exit_code: missing
+         - record:pt/a1/c2#/stderr/bytes: missing
+         - record:pt/a1/c2#/stderr/sha256: missing
+         - file:pt/a1/c2/stderr: missing
+         - record:pt/a1/c2#/judgment/status: missing
+         - record:pt/a1/c2#/judgment/counts_as_success: missing
+         - exit[0]: got 0
+P-03   FAIL  fields 5 checked, 5 failed, 1 undetermined  exits=[0]  0.0s
+         - record:pt/a1/c3#/process/kind: missing
+         - record:pt/a1/c3#/process/launch_error: missing
+         - record:pt/a1/c3#/judgment/status: missing
+         - record:pt/a1/c3#/judgment/counts_as_success: missing
+         - exit[0]: got 0
+P-04   FAIL  fields 29 checked, 28 failed, 2 undetermined  exits=[0]  0.0s
+         - record:pt/a1/c4#/model_request: missing
+         - record:pt/a1/c4#/result_event/count: missing
+         - record:pt/a1/c4#/result_event/present: missing
+         - record:pt/a1/c4#/result_event/subtype: missing
+         - record:pt/a1/c4#/result_event/is_error: missing
+         - record:pt/a1/c4#/result_event/session_id: missing
+         - record:pt/a1/c4#/result_event/num_turns: missing
+         - record:pt/a1/c4#/result_event/stop_reason: missing
+         - record:pt/a1/c4#/result_event/non_json_lines: missing
+         - record:pt/a1/c4#/result_event/rate_limit_statuses: missing
+         - record:pt/a1/c4#/result_event/compact_boundaries: missing
+         - record:pt/a1/c4#/usage/applicability: missing
+         - record:pt/a1/c4#/usage/session_mode: missing
+         - record:pt/a1/c4#/usage/internal_retries: missing
+         - record:pt/a1/c4#/usage/parent/state: missing
+         - record:pt/a1/c4#/usage/parent/tokens: missing
+         - record:pt/a1/c4#/usage/session/state: missing
+         - record:pt/a1/c4#/usage/session/tokens: missing
+         - record:pt/a1/c4#/usage/cost_usd_reported: missing
+         - record:pt/a1/c4#/usage/resume_base: missing
+         - record:pt/a1/c4#/usage/run/state: missing
+         - record:pt/a1/c4#/usage/run/tokens: missing
+         - record:pt/a1/c4#/usage/run_cost_usd: missing
+         - record:pt/a1/c4#/usage/attribution_check: missing
+         - record:pt/a1/c4#/judgment/status: missing
+         - record:pt/a1/c4#/judgment/counts_as_success: missing
+         - record:pt/a1/c4#/stdout/sha256: missing
+         - record:pt/a1/c4#/usage/children: missing
+P-05   FAIL  fields 7 checked, 7 failed, 0 undetermined  exits=[0]  0.0s
+         - record:pt/a1/c5#/artifacts/0/present: missing
+         - record:pt/a1/c5#/artifacts/0/bytes: missing
+         - record:pt/a1/c5#/artifacts/0/sha256: missing
+         - record:pt/a1/c5#/process/exit_code: missing
+         - record:pt/a1/c5#/judgment/status: missing
+         - record:pt/a1/c5#/judgment/counts_as_success: missing
+         - exit[0]: got 0
+TOTAL set=public determined=5 passed=0 failed=5 | undetermined cases excluded=0, undetermined fields excluded=3 | fields checked=68 failed=66

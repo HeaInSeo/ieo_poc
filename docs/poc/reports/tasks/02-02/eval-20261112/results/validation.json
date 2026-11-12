@@ -1,0 +1,473 @@
+{
+ "scored_at": "2026-11-12T13:55:19Z",
+ "set": "validation",
+ "set_file": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/sets/validation.json",
+ "bin": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/build/src/target/release/ieo-evidence",
+ "totals": {
+  "determined_cases": 34,
+  "passed": 33,
+  "failed": 1,
+  "undetermined_cases_excluded": 1,
+  "undetermined_fields_excluded": 52,
+  "checked_fields": 628,
+  "failed_fields": 1
+ },
+ "cases": [
+  {
+   "id": "V-01",
+   "verdict": "PASS",
+   "checked_fields": 19,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-02",
+   "verdict": "PASS",
+   "checked_fields": 11,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-03",
+   "verdict": "PASS",
+   "checked_fields": 8,
+   "failed_fields": [],
+   "undetermined_fields": 1,
+   "exits": [
+    1
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-04",
+   "verdict": "PASS",
+   "checked_fields": 7,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-05",
+   "verdict": "PASS",
+   "checked_fields": 9,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 1.03,
+   "workdir": null
+  },
+  {
+   "id": "V-06",
+   "verdict": "PASS",
+   "checked_fields": 8,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 2.06,
+   "workdir": null
+  },
+  {
+   "id": "V-07",
+   "verdict": "PASS",
+   "checked_fields": 8,
+   "failed_fields": [],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 2.07,
+   "workdir": null
+  },
+  {
+   "id": "V-08",
+   "verdict": "PASS",
+   "checked_fields": 5,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-09",
+   "verdict": "PASS",
+   "checked_fields": 7,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1,
+    1
+   ],
+   "seconds": 0.05,
+   "workdir": null
+  },
+  {
+   "id": "V-10",
+   "verdict": "PASS",
+   "checked_fields": 7,
+   "failed_fields": [],
+   "undetermined_fields": 1,
+   "exits": [
+    1
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-11",
+   "verdict": "PASS",
+   "checked_fields": 4,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-12",
+   "verdict": "PASS",
+   "checked_fields": 32,
+   "failed_fields": [],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-13",
+   "verdict": "PASS",
+   "checked_fields": 160,
+   "failed_fields": [],
+   "undetermined_fields": 12,
+   "exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.16,
+   "workdir": null
+  },
+  {
+   "id": "V-14",
+   "verdict": "PASS",
+   "checked_fields": 44,
+   "failed_fields": [],
+   "undetermined_fields": 8,
+   "exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.16,
+   "workdir": null
+  },
+  {
+   "id": "V-15",
+   "verdict": "PASS",
+   "checked_fields": 26,
+   "failed_fields": [],
+   "undetermined_fields": 2,
+   "exits": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.1,
+   "workdir": null
+  },
+  {
+   "id": "V-16",
+   "verdict": "PASS",
+   "checked_fields": 20,
+   "failed_fields": [],
+   "undetermined_fields": 3,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.05,
+   "workdir": null
+  },
+  {
+   "id": "V-17",
+   "verdict": "PASS",
+   "checked_fields": 24,
+   "failed_fields": [],
+   "undetermined_fields": 3,
+   "exits": [
+    1
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-18",
+   "verdict": "PASS",
+   "checked_fields": 22,
+   "failed_fields": [],
+   "undetermined_fields": 2,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.05,
+   "workdir": null
+  },
+  {
+   "id": "V-19",
+   "verdict": "PASS",
+   "checked_fields": 36,
+   "failed_fields": [],
+   "undetermined_fields": 4,
+   "exits": [
+    1,
+    0
+   ],
+   "seconds": 0.05,
+   "workdir": null
+  },
+  {
+   "id": "V-20",
+   "verdict": "PASS",
+   "checked_fields": 21,
+   "failed_fields": [],
+   "undetermined_fields": 3,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-21",
+   "verdict": "PASS",
+   "checked_fields": 56,
+   "failed_fields": [],
+   "undetermined_fields": 4,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.05,
+   "workdir": null
+  },
+  {
+   "id": "V-22",
+   "verdict": "FAIL",
+   "checked_fields": 9,
+   "failed_fields": [
+    {
+     "field": "tree",
+     "problem": "secret-like value found in 1 file(s): ['vt/a22/c/record.json']"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-23",
+   "verdict": "PASS",
+   "checked_fields": 8,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-24",
+   "verdict": "PASS",
+   "checked_fields": 9,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    2,
+    2,
+    2
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-25",
+   "verdict": "PASS",
+   "checked_fields": 9,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-26",
+   "verdict": "PASS",
+   "checked_fields": 4,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1,
+    2
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-27",
+   "verdict": "PASS",
+   "checked_fields": 6,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    2
+   ],
+   "seconds": 0.13,
+   "workdir": null
+  },
+  {
+   "id": "V-28",
+   "verdict": "PASS",
+   "checked_fields": 5,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "seconds": 0.11,
+   "workdir": null
+  },
+  {
+   "id": "V-29",
+   "verdict": "PASS",
+   "checked_fields": 7,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    1
+   ],
+   "seconds": 3.01,
+   "workdir": null
+  },
+  {
+   "id": "V-30",
+   "verdict": "PASS",
+   "checked_fields": 20,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    1,
+    0
+   ],
+   "seconds": 2.48,
+   "workdir": null
+  },
+  {
+   "id": "V-31",
+   "verdict": "PASS",
+   "checked_fields": 10,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.51,
+   "workdir": null
+  },
+  {
+   "id": "V-32",
+   "verdict": "PASS",
+   "checked_fields": 1,
+   "failed_fields": [],
+   "undetermined_fields": 0,
+   "exits": [
+    2
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-33",
+   "verdict": "PASS",
+   "checked_fields": 3,
+   "failed_fields": [],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-34",
+   "verdict": "PASS",
+   "checked_fields": 3,
+   "failed_fields": [],
+   "undetermined_fields": 2,
+   "exits": [
+    1
+   ],
+   "seconds": 1.03,
+   "workdir": null
+  }
+ ],
+ "undetermined_cases": [
+  {
+   "id": "V-35",
+   "reason": "natural exit racing the timeout deadline (open item P3-6): which of exited/timed_out is recorded is not fixed and not reproducible deterministically; case not executed"
+  }
+ ]
+}

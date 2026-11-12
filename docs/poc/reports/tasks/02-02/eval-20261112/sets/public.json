@@ -1,0 +1,306 @@
+{
+ "set": "public",
+ "format": "ieo-0202-caseset/v1",
+ "cases": [
+  {
+   "id": "P-01",
+   "set": "public",
+   "family": "success_markers_artifacts",
+   "title_for_author": "exit 0 + artifact + marker",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task pt --attempt a1 --command c1 --artifact '{TMP}/art.txt' --marker 'BUILD-OK \\d+' -- /bin/sh -c 'printf '\"'\"'payload'\"'\"' > {TMP}/art.txt; echo '\"'\"'BUILD-OK 7'\"'\"''"
+   ],
+   "post": [],
+   "expected": {
+    "record:pt/a1/c1#": {
+     "$has_keys": [
+      "format",
+      "task_id",
+      "attempt_id",
+      "command_id",
+      "role",
+      "retry_of",
+      "model_request",
+      "argv",
+      "cwd",
+      "env_names",
+      "started_at",
+      "ended_at",
+      "duration_ms",
+      "process",
+      "stdout",
+      "stderr",
+      "redaction",
+      "artifacts",
+      "markers",
+      "result_event",
+      "usage",
+      "judgment"
+     ]
+    },
+    "record:pt/a1/c1#/format": "ieo-evidence-record/v0",
+    "record:pt/a1/c1#/task_id": "pt",
+    "record:pt/a1/c1#/started_at": {
+     "$regex": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+    },
+    "record:pt/a1/c1#/model_request": false,
+    "record:pt/a1/c1#/result_event": null,
+    "record:pt/a1/c1#/usage/applicability": "not_applicable",
+    "record:pt/a1/c1#/process/kind": "exited",
+    "record:pt/a1/c1#/process/exit_code": 0,
+    "record:pt/a1/c1#/artifacts/0/present": true,
+    "record:pt/a1/c1#/artifacts/0/bytes": 7,
+    "record:pt/a1/c1#/artifacts/0/sha256": "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
+    "record:pt/a1/c1#/markers/0/found": true,
+    "record:pt/a1/c1#/stdout/bytes": 11,
+    "record:pt/a1/c1#/stdout/sha256": "188c143b102e057725e7f144d69125bfda4bfa235c1756fc897525c85a6bda0c",
+    "file:pt/a1/c1/stdout": {
+     "$text": "BUILD-OK 7\n"
+    },
+    "record:pt/a1/c1#/judgment/status": "succeeded",
+    "record:pt/a1/c1#/judgment/counts_as_success": true,
+    "exit[0]": 0
+   },
+   "basis": {
+    "record:pt/a1/c1#": "contracts/evidence-record-v0.schema.json required",
+    "record:pt/a1/c1#/format": "contracts/evidence-record-v0.schema.json",
+    "record:pt/a1/c1#/task_id": "contracts/evidence-record-v0.schema.json",
+    "record:pt/a1/c1#/started_at": "contracts/evidence-record-v0.schema.json UTC ms",
+    "record:pt/a1/c1#/model_request": "contracts/evidence-record-v0.schema.json",
+    "record:pt/a1/c1#/result_event": "contracts/evidence-record-v0.schema.json model_request false => null",
+    "record:pt/a1/c1#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:pt/a1/c1#/process/kind": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:pt/a1/c1#/process/exit_code": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:pt/a1/c1#/artifacts/0/present": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:pt/a1/c1#/artifacts/0/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('payload')=7",
+    "record:pt/a1/c1#/artifacts/0/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('payload')",
+    "record:pt/a1/c1#/markers/0/found": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:pt/a1/c1#/stdout/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('BUILD-OK 7\\n')",
+    "record:pt/a1/c1#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('BUILD-OK 7\\n')",
+    "file:pt/a1/c1/stdout": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:pt/a1/c1#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:pt/a1/c1#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "P-02",
+   "set": "public",
+   "family": "nonzero_exit",
+   "title_for_author": "exit 5 is failure, stderr kept",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task pt --attempt a1 --command c2 -- /bin/sh -c 'echo '\"'\"'bad input'\"'\"' >&2; exit 5'"
+   ],
+   "post": [],
+   "expected": {
+    "record:pt/a1/c2#/process/kind": "exited",
+    "record:pt/a1/c2#/process/exit_code": 5,
+    "record:pt/a1/c2#/stderr/bytes": 10,
+    "record:pt/a1/c2#/stderr/sha256": "a1e15d5eed80b24ecdbea49e2141e6bdaa9aa2f8e8669829f4020da8cecdfa4f",
+    "file:pt/a1/c2/stderr": {
+     "$text": "bad input\n"
+    },
+    "record:pt/a1/c2#/judgment/status": "failed",
+    "record:pt/a1/c2#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:pt/a1/c2#/process/kind": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:pt/a1/c2#/process/exit_code": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:pt/a1/c2#/stderr/bytes": "02-01 REPORT §1 row 원본 로그·digest; len('bad input\\n')",
+    "record:pt/a1/c2#/stderr/sha256": "02-01 REPORT §1 row 원본 로그·digest; sha256('bad input\\n')",
+    "file:pt/a1/c2/stderr": "02-01 REPORT §1 row 원본 로그·digest (raw log stored)",
+    "record:pt/a1/c2#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:pt/a1/c2#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  },
+  {
+   "id": "P-03",
+   "set": "public",
+   "family": "launch_failure",
+   "title_for_author": "nonexistent program still writes record",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task pt --attempt a1 --command c3 -- /nonexistent/ieo-no-such-prog"
+   ],
+   "post": [],
+   "expected": {
+    "record:pt/a1/c3#/process/kind": "launch_failed",
+    "record:pt/a1/c3#/process/launch_error": {
+     "$not_null": true
+    },
+    "record:pt/a1/c3#/judgment/status": "failed",
+    "record:pt/a1/c3#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:pt/a1/c3#/process/kind": "02-01 REPORT §1 row 실행(run.rs) (launch failure recorded)",
+    "record:pt/a1/c3#/process/launch_error": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:pt/a1/c3#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:pt/a1/c3#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {
+    "record:pt/a1/c3#/process/launch_error (value text)": "wording of the OS error text not fixed (only non-null checked)"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "P-04",
+   "set": "public",
+   "family": "model_new_session",
+   "title_for_author": "real 01-04 stream, new session",
+   "setup": {
+    "files": [
+     {
+      "path": "{FIX}/s.jsonl",
+      "fixture": "fx-01.jsonl"
+     }
+    ],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task pt --attempt a1 --command c4 --model-request --session new -- /bin/cat '{FIX}/s.jsonl'"
+   ],
+   "post": [],
+   "expected": {
+    "record:pt/a1/c4#/model_request": true,
+    "record:pt/a1/c4#/result_event/count": 1,
+    "record:pt/a1/c4#/result_event/present": true,
+    "record:pt/a1/c4#/result_event/subtype": "success",
+    "record:pt/a1/c4#/result_event/is_error": false,
+    "record:pt/a1/c4#/result_event/session_id": "c916a2bf-12b9-4309-88e8-6edf32dd2854",
+    "record:pt/a1/c4#/result_event/num_turns": 1,
+    "record:pt/a1/c4#/result_event/stop_reason": "end_turn",
+    "record:pt/a1/c4#/result_event/non_json_lines": 0,
+    "record:pt/a1/c4#/result_event/rate_limit_statuses": [
+     "allowed"
+    ],
+    "record:pt/a1/c4#/result_event/compact_boundaries": 0,
+    "record:pt/a1/c4#/usage/applicability": "model",
+    "record:pt/a1/c4#/usage/session_mode": "new",
+    "record:pt/a1/c4#/usage/internal_retries": "unmeasured",
+    "record:pt/a1/c4#/usage/parent/state": "measured",
+    "record:pt/a1/c4#/usage/parent/tokens": {
+     "input": 2,
+     "output": 6,
+     "cache_read": 649,
+     "cache_creation": 1900
+    },
+    "record:pt/a1/c4#/usage/session/state": "measured",
+    "record:pt/a1/c4#/usage/session/tokens": {
+     "input": 2,
+     "output": 6,
+     "cache_read": 649,
+     "cache_creation": 1900
+    },
+    "record:pt/a1/c4#/usage/cost_usd_reported": {
+     "$approx": 0.0077289
+    },
+    "record:pt/a1/c4#/usage/resume_base": null,
+    "record:pt/a1/c4#/usage/run/state": "measured",
+    "record:pt/a1/c4#/usage/run/tokens": {
+     "input": 2,
+     "output": 6,
+     "cache_read": 649,
+     "cache_creation": 1900
+    },
+    "record:pt/a1/c4#/usage/run_cost_usd": {
+     "$approx": 0.0077289
+    },
+    "record:pt/a1/c4#/usage/attribution_check": "consistent",
+    "record:pt/a1/c4#/judgment/status": "succeeded",
+    "record:pt/a1/c4#/judgment/counts_as_success": true,
+    "exit[0]": 0,
+    "record:pt/a1/c4#/stdout/sha256": "014c4d836f0db42e9e15347d8227cdb33f73c89cb4dbb124229b29c2b3dd8946",
+    "record:pt/a1/c4#/usage/children": []
+   },
+   "basis": {
+    "record:pt/a1/c4#/model_request": "contracts/evidence-record-v0.schema.json allOf model_request",
+    "record:pt/a1/c4#/result_event/count": "02-01 REPORT §1 row 사용량(stream.rs) (result events counted); oracle count=1",
+    "record:pt/a1/c4#/result_event/present": "02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:pt/a1/c4#/result_event/subtype": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:pt/a1/c4#/result_event/is_error": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:pt/a1/c4#/result_event/session_id": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:pt/a1/c4#/result_event/num_turns": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:pt/a1/c4#/result_event/stop_reason": "02-01 REPORT §1 row 사용량(stream.rs) selected result = last with num_turns>=1 else last; oracle",
+    "record:pt/a1/c4#/result_event/non_json_lines": "02-01 REPORT §1 row 사용량(stream.rs); oracle counts unparsable lines",
+    "record:pt/a1/c4#/result_event/rate_limit_statuses": "02-01 REPORT §1 row 판정(judge.rs) (rate_limit_event status list); oracle",
+    "record:pt/a1/c4#/result_event/compact_boundaries": "02-01 REPORT §1 row 귀속 대조; oracle counts system/compact_boundary",
+    "record:pt/a1/c4#/usage/applicability": "contracts/evidence-record-v0.schema.json",
+    "record:pt/a1/c4#/usage/session_mode": "contracts/evidence-record-v0.schema.json + CLI --session",
+    "record:pt/a1/c4#/usage/internal_retries": "02-01 REPORT §1 row 사용량(stream.rs) (internal_retries: unmeasured)",
+    "record:pt/a1/c4#/usage/parent/state": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage",
+    "record:pt/a1/c4#/usage/parent/tokens": "02-01 REPORT §1 row 사용량(stream.rs) parent=result.usage; oracle {'input': 2, 'output': 6, 'cache_read': 649, 'cache_creation': 1900}",
+    "record:pt/a1/c4#/usage/session/state": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage)",
+    "record:pt/a1/c4#/usage/session/tokens": "02-01 REPORT §1 row 사용량(stream.rs) session=sum(modelUsage); oracle {'input': 2, 'output': 6, 'cache_read': 649, 'cache_creation': 1900}",
+    "record:pt/a1/c4#/usage/cost_usd_reported": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd as reported (cumulative)",
+    "record:pt/a1/c4#/usage/resume_base": "contracts/evidence-record-v0.schema.json allOf new => resume_base null",
+    "record:pt/a1/c4#/usage/run/state": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속; 02-01 REPORT §1 row 사용량(stream.rs)",
+    "record:pt/a1/c4#/usage/run/tokens": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 run = session (new) or session - base session (resume); oracle",
+    "record:pt/a1/c4#/usage/run_cost_usd": "Runtime_Contract_v0 §11 item 7 + §4.2 row 자식 사건 귀속 total_cost_usd cumulative; run cost = cost - base cost = 0.0077289",
+    "record:pt/a1/c4#/usage/attribution_check": "02-01 REPORT §1 row 귀속 대조",
+    "record:pt/a1/c4#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:pt/a1/c4#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)",
+    "record:pt/a1/c4#/stdout/sha256": "02-01 REPORT §1 row 원본 로그·digest (no secret in stream -> stored bytes identical)",
+    "record:pt/a1/c4#/usage/children": "02-01 REPORT §1 row 사용량(stream.rs) (no Agent tool_use)"
+   },
+   "undetermined_fields": {
+    "record:pt/a1/c4#/usage/by_model": "per-model breakdown content (cumulative vs run share) not fixed by rules",
+    "record:pt/a1/c4#/result_event/runtime_version": "source event/field for runtime_version not fixed by rules"
+   },
+   "status": "determined"
+  },
+  {
+   "id": "P-05",
+   "set": "public",
+   "family": "missing_evidence",
+   "title_for_author": "exit 0 but required artifact absent",
+   "setup": {
+    "files": [],
+    "env": {}
+   },
+   "invocations": [
+    "'{BIN}' run --out '{OUT}' --task pt --attempt a1 --command c5 --artifact '{TMP}/never-created.bin' -- /bin/sh -c 'echo done'"
+   ],
+   "post": [],
+   "expected": {
+    "record:pt/a1/c5#/artifacts/0/present": false,
+    "record:pt/a1/c5#/artifacts/0/bytes": null,
+    "record:pt/a1/c5#/artifacts/0/sha256": null,
+    "record:pt/a1/c5#/process/exit_code": 0,
+    "record:pt/a1/c5#/judgment/status": "incomplete",
+    "record:pt/a1/c5#/judgment/counts_as_success": false,
+    "exit[0]": 1
+   },
+   "basis": {
+    "record:pt/a1/c5#/artifacts/0/present": "02-01 REPORT §1 row 원본 로그·digest",
+    "record:pt/a1/c5#/artifacts/0/bytes": "contracts/evidence-record-v0.schema.json + 02-01 REPORT §1 row 원본 로그·digest",
+    "record:pt/a1/c5#/artifacts/0/sha256": "contracts/evidence-record-v0.schema.json + 02-01 REPORT §1 row 원본 로그·digest",
+    "record:pt/a1/c5#/process/exit_code": "02-01 REPORT §1 row 실행(run.rs)",
+    "record:pt/a1/c5#/judgment/status": "02-01 REPORT §1 row 판정(judge.rs)",
+    "record:pt/a1/c5#/judgment/counts_as_success": "02-01 REPORT §1 row 판정(judge.rs)",
+    "exit[0]": "task brief item 6 (CLI exit: 0 success/expected_matched, 1 otherwise, 2 request error)"
+   },
+   "undetermined_fields": {},
+   "status": "determined"
+  }
+ ]
+}

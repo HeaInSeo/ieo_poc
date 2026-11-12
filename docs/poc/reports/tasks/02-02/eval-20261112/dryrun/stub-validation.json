@@ -1,0 +1,2886 @@
+{
+ "scored_at": "2026-11-12T13:53:52Z",
+ "set": "validation",
+ "set_file": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/sets/validation.json",
+ "bin": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/0202-eval/dryrun/stub-silent.sh",
+ "totals": {
+  "determined_cases": 34,
+  "passed": 0,
+  "failed": 34,
+  "undetermined_cases_excluded": 1,
+  "undetermined_fields_excluded": 52,
+  "checked_fields": 628,
+  "failed_fields": 596
+ },
+ "cases": [
+  {
+   "id": "V-01",
+   "verdict": "FAIL",
+   "checked_fields": 19,
+   "failed_fields": [
+    {
+     "field": "record:vt/a01/c#",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/role",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/retry_of",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/artifacts/0/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/artifacts/0/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/artifacts/1/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/artifacts/1/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/markers/1/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/process/term_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/process/kill_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/process/output_incomplete",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a01/c/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/stderr/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a01/c#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-02",
+   "verdict": "FAIL",
+   "checked_fields": 11,
+   "failed_fields": [
+    {
+     "field": "record:vt/a02/c#/process/exit_code",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a02/c#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a02/c#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a02/c#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a02/c/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a02/c#/stderr/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a02/c#/stderr/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a02/c/stderr",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a02/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a02/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-03",
+   "verdict": "FAIL",
+   "checked_fields": 8,
+   "failed_fields": [
+    {
+     "field": "record:vt/a03/c#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a03/c#/process/signal",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a03/c#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a03/c#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a03/c/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a03/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a03/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-04",
+   "verdict": "FAIL",
+   "checked_fields": 7,
+   "failed_fields": [
+    {
+     "field": "record:vt/a04/c#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a04/c#/process/launch_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a04/c#/process/exit_code",
+     "problem": "missing"
+    },
+    {
+     "field": "exists:vt/a04/c/record.json",
+     "problem": "got false"
+    },
+    {
+     "field": "record:vt/a04/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a04/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-05",
+   "verdict": "FAIL",
+   "checked_fields": 9,
+   "failed_fields": [
+    {
+     "field": "record:vt/a05/c#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a05/c#/process/timeout_ms",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a05/c#/process/term_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a05/c#/process/kill_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a05/c#/process/stray_group_killed",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a05/c#/duration_ms",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a05/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a05/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-06",
+   "verdict": "FAIL",
+   "checked_fields": 8,
+   "failed_fields": [
+    {
+     "field": "record:vt/a06/c#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a06/c#/process/term_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a06/c#/process/kill_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a06/c#/process/stray_group_killed",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a06/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a06/c#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.03,
+   "workdir": null
+  },
+  {
+   "id": "V-07",
+   "verdict": "FAIL",
+   "checked_fields": 8,
+   "failed_fields": [
+    {
+     "field": "record:vt/a07/c#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a07/c#/process/term_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a07/c#/process/kill_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a07/c#/duration_ms",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a07/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a07/c#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 0.02,
+   "workdir": null
+  },
+  {
+   "id": "V-08",
+   "verdict": "FAIL",
+   "checked_fields": 5,
+   "failed_fields": [
+    {
+     "field": "record:vt/a08/c#/process/exit_code",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a08/c#/judgment/expected",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a08/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a08/c#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-09",
+   "verdict": "FAIL",
+   "checked_fields": 7,
+   "failed_fields": [
+    {
+     "field": "record:vt/a09/c1#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a09/c1#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    },
+    {
+     "field": "record:vt/a09/c2#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a09/c2#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[1]",
+     "problem": "got 0"
+    },
+    {
+     "field": "record:vt/a09/c2#/markers/0/found",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-10",
+   "verdict": "FAIL",
+   "checked_fields": 7,
+   "failed_fields": [
+    {
+     "field": "record:vt/a10/c#/artifacts/0/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a10/c#/artifacts/0/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a10/c#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a10/c#/judgment/reasons",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a10/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a10/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 1,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-11",
+   "verdict": "FAIL",
+   "checked_fields": 4,
+   "failed_fields": [
+    {
+     "field": "record:vt/a11/c#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a11/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a11/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-12",
+   "verdict": "FAIL",
+   "checked_fields": 32,
+   "failed_fields": [
+    {
+     "field": "record:vt/a12/c#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/children/0/tool_use_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/children/0/agent_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/usage/children/0/usage/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a12/c#/stdout/bytes",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-13",
+   "verdict": "FAIL",
+   "checked_fields": 160,
+   "failed_fields": [
+    {
+     "field": "record:vt/a13-0/n1#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-0/n1#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-1/n2#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-2/n3#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-3/n4a#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-4/l2#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/usage/attribution_detail",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a13-5/l3#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[6]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[6]~tokens_measured_sum",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 12,
+   "exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-14",
+   "verdict": "FAIL",
+   "checked_fields": 44,
+   "failed_fields": [
+    {
+     "field": "record:vt/a14-4/n4b#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-4/n4b#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-5/l2#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a14-3/n4a#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[6]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[6]~tokens_measured_sum",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[6]",
+     "problem": "$contains_all [\"n4b\", \"a14-5\"] failed; got "
+    }
+   ],
+   "undetermined_fields": 8,
+   "exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-15",
+   "verdict": "FAIL",
+   "checked_fields": 26,
+   "failed_fields": [
+    {
+     "field": "record:vt/a15-3/n4b#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a15-3/n4b#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-16",
+   "verdict": "FAIL",
+   "checked_fields": 20,
+   "failed_fields": [
+    {
+     "field": "record:vt/a16-1/next#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a16-1/next#/usage/run/state",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 3,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-17",
+   "verdict": "FAIL",
+   "checked_fields": 24,
+   "failed_fields": [
+    {
+     "field": "record:vt/a17/c#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a17/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 3,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-18",
+   "verdict": "FAIL",
+   "checked_fields": 22,
+   "failed_fields": [
+    {
+     "field": "record:vt/a18-1/err#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a18-1/err#/usage/session/state",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-19",
+   "verdict": "FAIL",
+   "checked_fields": 36,
+   "failed_fields": [
+    {
+     "field": "record:vt/a19/c1#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    },
+    {
+     "field": "record:vt/a19/c2#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c2#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/partial_observations",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/partial_observations/1/message_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/partial_observations/2/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a19/c1#/usage/partial_observations/0/parent_tool_use_id",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 4,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-20",
+   "verdict": "FAIL",
+   "checked_fields": 21,
+   "failed_fields": [
+    {
+     "field": "record:vt/a20/c#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a20/c#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[1]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[1]~tokens_measured_sum",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 3,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-21",
+   "verdict": "FAIL",
+   "checked_fields": 56,
+   "failed_fields": [
+    {
+     "field": "record:vt/a21/rl#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/rl#/judgment/reasons",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/model_request",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/count",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/present",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/session_id",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/num_turns",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/stop_reason",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/non_json_lines",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/rate_limit_statuses",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/result_event/compact_boundaries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/applicability",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/session_mode",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/internal_retries",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/parent/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/parent/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/session/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/session/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/cost_usd_reported",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/resume_base",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/run/state",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/run_cost_usd",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/attribution_check",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/usage/attribution_detail",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a21/two#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 4,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-22",
+   "verdict": "FAIL",
+   "checked_fields": 9,
+   "failed_fields": [
+    {
+     "field": "record:vt/a22/c#/redaction/stdout_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a22/c#/redaction/stderr_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a22/c#/redaction/argv_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a22/c#/redaction/secret_value_seen",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a22/c#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a22/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a22/c#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-23",
+   "verdict": "FAIL",
+   "checked_fields": 8,
+   "failed_fields": [
+    {
+     "field": "record:vt/a23/c#/redaction/stdout_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a23/c#/redaction/argv_replacements",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a23/c#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a23/c/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a23/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a23/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-24",
+   "verdict": "FAIL",
+   "checked_fields": 9,
+   "failed_fields": [
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    },
+    {
+     "field": "exit[1]",
+     "problem": "got 0"
+    },
+    {
+     "field": "exit[2]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-25",
+   "verdict": "FAIL",
+   "checked_fields": 9,
+   "failed_fields": [
+    {
+     "field": "record:vt/a25/c#/env_names",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a25/c#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a25/c#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a25/c/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "recordtext:vt/a25/c",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a25/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a25/c#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-26",
+   "verdict": "FAIL",
+   "checked_fields": 4,
+   "failed_fields": [
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    },
+    {
+     "field": "exit[1]",
+     "problem": "got 0"
+    },
+    {
+     "field": "record:vt/a26/c#/process/exit_code",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a26/c/stdout",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-27",
+   "verdict": "FAIL",
+   "checked_fields": 6,
+   "failed_fields": [
+    {
+     "field": "record:vs/a2/main#/retry_of",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vs/a2/rev#/role",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vs/a1/main#/usage/run/tokens",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[5]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[5]~tokens_measured_sum",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[6]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-28",
+   "verdict": "FAIL",
+   "checked_fields": 5,
+   "failed_fields": [
+    {
+     "field": "summary[4]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[4]~tokens_measured_sum",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[4]",
+     "problem": "$contains \"loose-resume\" failed; got "
+    },
+    {
+     "field": "summary[5]~completeness",
+     "problem": "missing"
+    },
+    {
+     "field": "summary[5]~tokens_measured_sum",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-29",
+   "verdict": "FAIL",
+   "checked_fields": 7,
+   "failed_fields": [
+    {
+     "field": "record:vt/a29/c#/process/output_incomplete",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a29/c#/process/exit_code",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a29/c#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a29/c#/markers/0/found",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a29/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a29/c#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-30",
+   "verdict": "FAIL",
+   "checked_fields": 20,
+   "failed_fields": [
+    {
+     "field": "record:vt/a30/drain#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/drain#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a30/drain/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/drain#/process/output_incomplete",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/drain#/process/stray_group_killed",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/drain#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/drain#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/linger#/process/output_incomplete",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/linger#/process/stray_group_killed",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a30/linger/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/linger#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/linger#/judgment/counts_as_success",
+     "problem": "missing"
+    },
+    {
+     "field": "exit[1]",
+     "problem": "got 0"
+    },
+    {
+     "field": "record:vt/a30/quiet#/process/output_incomplete",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/quiet#/process/stray_group_killed",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/quiet#/judgment/reasons",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/quiet#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a30/quiet#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0,
+    0,
+    0
+   ],
+   "seconds": 0.01,
+   "workdir": null
+  },
+  {
+   "id": "V-31",
+   "verdict": "FAIL",
+   "checked_fields": 10,
+   "failed_fields": [
+    {
+     "field": "record:vt/a31/c#/stdout/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a31/c#/stdout/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a31/c/stdout",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a31/c#/stderr/bytes",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a31/c#/stderr/sha256",
+     "problem": "missing"
+    },
+    {
+     "field": "file:vt/a31/c/stderr",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a31/c#/process/output_incomplete",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a31/c#/judgment/status",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a31/c#/judgment/counts_as_success",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-32",
+   "verdict": "FAIL",
+   "checked_fields": 1,
+   "failed_fields": [
+    {
+     "field": "exit[0]",
+     "problem": "got 0"
+    }
+   ],
+   "undetermined_fields": 0,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-33",
+   "verdict": "FAIL",
+   "checked_fields": 3,
+   "failed_fields": [
+    {
+     "field": "record:vt/a33/c#/result_event/subtype",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a33/c#/result_event/is_error",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a33/c#/result_event/num_turns",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  },
+  {
+   "id": "V-34",
+   "verdict": "FAIL",
+   "checked_fields": 3,
+   "failed_fields": [
+    {
+     "field": "record:vt/a34/c#/process/kind",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a34/c#/process/term_sent",
+     "problem": "missing"
+    },
+    {
+     "field": "record:vt/a34/c#/result_event/present",
+     "problem": "missing"
+    }
+   ],
+   "undetermined_fields": 2,
+   "exits": [
+    0
+   ],
+   "seconds": 0.0,
+   "workdir": null
+  }
+ ],
+ "undetermined_cases": [
+  {
+   "id": "V-35",
+   "reason": "natural exit racing the timeout deadline (open item P3-6): which of exited/timed_out is recorded is not fixed and not reproducible deterministically; case not executed"
+  }
+ ]
+}
