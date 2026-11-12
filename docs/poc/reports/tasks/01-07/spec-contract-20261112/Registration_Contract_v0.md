@@ -1,6 +1,6 @@
 # 01-07 · 스프린트 명세 v0 · 등록 검사 계약
 
-2026-11-12 KST · 계획 v1.3.3 · contract_revision 4 · 문서 revision 2(독립 검토 fbe1f24 reject F1~F7·P3 반영). 기존 산출물을 재사용하고 빠진 부분만 고정한다. **SprintSpec v0 스키마(revision 4)는 바꾸지 않는다**: 표현하지 못하는 §1.4 요소는 §4의 공백 목록으로 고정하고 다음 contract revision 후보로 둔다.
+2026-11-12 KST · 계획 v1.3.3 · contract_revision 4 · 문서 revision 3(2026-11-12, 02-03 선행 교정: 검수 후속 N1 — 새 revision 뒤 옛 revision의 신규 실행 등록·승격 거부, 역사적 결과 조회의 재활성화 금지. [사용자 지시](../../../../User_Decisions_2026-11-12_0103.md)). revision 2(독립 검토 fbe1f24 reject F1~F7·P3 반영). 기존 산출물을 재사용하고 빠진 부분만 고정한다. **SprintSpec v0 스키마(revision 4)는 바꾸지 않는다**: 표현하지 못하는 §1.4 요소는 §4의 공백 목록으로 고정하고 다음 contract revision 후보로 둔다.
 
 | 구성 | 정본 | 이번 회차의 처리 |
 | --- | --- | --- |
@@ -13,9 +13,10 @@
 ## 1. 검사 층과 등록 응답의 의미
 
 1. **형식**: JSON Schema(2020-12, format 검증 포함) + **숫자는 64비트 정수만**(digest 정본 직렬화는 정수에 대해서만 구현 간 일치가 보장된다: 소수 표기 `1e-07`/`1e-7` 차이, 64비트 초과 정수의 부동소수 변환). 실패하면 참조 검사를 하지 않는다.
-2. **참조**: digest, 작업 ID 중복(명세 안) / 충돌(다른 등록 스프린트), 선행 해석(이 명세 안은 같은 plan_version만, 외부는 등록된 작업+요구 plan_version), 순환(등록 그래프 포함), 측정 예상 범위 순서, 승인 프로파일·항목 존재, revision 동일성·순서(같은 revision 다른 내용, 또는 이미 등록된 최신보다 낮은 revision은 충돌).
+2. **참조**: digest, 작업 ID 중복(명세 안) / 충돌(다른 등록 스프린트), 선행 해석(이 명세 안은 같은 plan_version만, 외부는 등록된 작업+요구 plan_version), 순환(등록 그래프 포함), 측정 예상 범위 순서, 승인 프로파일·항목 존재, revision 동일성·순서(같은 revision 다른 내용은 `REVISION_CONFLICT`, 이미 등록된 최신보다 낮은 revision의 신규 등록은 `REVISION_SUPERSEDED`).
 3. **바인딩**: 실행 가능 등록(`executable`)에서만 `registration_state=ready`를 요구하고, draft면 `UNBOUND_DRAFT`(상태 1건 + 미바인딩 항목마다 1건)로 거부한다. `ready`인데 repository_url·한도가 비었거나 `unresolved_bindings`가 남아 있으면 스키마 조건부 규칙이 **형식 층(400)**에서 거른다. 따라서 `UNBOUND_DRAFT`는 draft에만 해당한다.
    멱등 재제출은 저장된 등록 방식이 요청을 포괄할 때만 200이다: draft로 저장된 같은 내용을 executable로 내면 바인딩 검사를 다시 한다.
+   **활성 revision(rev 3)**: 한 스프린트에서 활성인 것은 등록된 최신 revision 하나다. 더 새 revision이 등록된 뒤에는 (a) 옛 revision의 신규 등록(방식 무관)과 (b) draft로 저장된 옛 revision의 executable 승격을 409 `REVISION_SUPERSEDED`로 거부한다. (c) 저장 방식이 요청을 포괄하는 옛 revision의 동일 재제출은 200 `SUPERSEDED`(+`superseded_by`)로 저장된 결과를 돌려주는 **역사적 조회**이며 상태를 바꾸지 않는다. 등록 상태(`Registry`)도 옛 revision을 다시 기록하지 않고, 새 revision 등록 시 그 스프린트의 작업 집합을 새 revision의 것으로 바꾼다(빠진 작업은 선행으로 해석되지 않음).
 4. **의미 검토(P01)는 여기서 하지 않는다.** 통과 응답은 `ACCEPTED_FOR_SEMANTIC_REVIEW`이며 실행 인수·완료가 아니다. 승인 프로파일에 없는 완료 기준은 `UNKNOWN_PROFILE_ITEM`으로 막고 의미 검토/정책 승인으로 보낸다. 형식 검사로 요구의 일관성을 승인하지 않는다.
 
 ## 2. 거부 코드(안정 계약값)
@@ -33,12 +34,13 @@
 | `DEPENDENCY_CYCLE` | 참조 | 422 | 선행 순환(등록 그래프 포함). message에 경로 | `tasks[0].prerequisites` |
 | `UNKNOWN_PROFILE_ITEM` | 참조 | 422 | 승인 프로파일(ID·revision) 없음, 또는 항목 ID가 그 프로파일에 없음 | `tasks[0].acceptance.item_ids[0]` |
 | `UNBOUND_DRAFT` | 바인딩 | 422 | 실행 가능 등록인데 draft 또는 미바인딩 항목 존재(항목마다 1건) | `registration_state`, `unresolved_bindings[2]` |
-| `REVISION_CONFLICT` | 충돌 | 409 | 같은 sprint_id·revision이 다른 digest로 이미 등록, 또는 최신 등록 revision보다 낮음 | `revision` |
+| `REVISION_CONFLICT` | 충돌 | 409 | 같은 sprint_id·revision이 다른 digest로 이미 등록 | `revision` |
+| `REVISION_SUPERSEDED` | 충돌 | 409 | 더 새 revision이 등록된 뒤 옛 revision의 신규 등록 또는 executable 승격(rev 3) | `revision` |
 | `UNRESOLVED_PREREQUISITE` | 변환 | 422 | 사람 입력 `after`가 입력 안 이름·등록 작업 ID 어디에도 없음(Human_Sprint_Authoring 예시와 같은 코드) | `tasks[1].after[0]` |
 | `DUPLICATE_TASK_NAME` | 변환 | 400 | 사람 입력 작업 이름 중복 | `tasks[1].name` |
 | `ESTIMATE_RANGE_REVERSED` | 참조·변환 | 422 | 예상 범위 min > max(사람 `expected_duration`, 명세 `estimate.range_seconds`; 스키마로 표현 불가) | `tasks[1].expected_duration`, `tasks[0].estimate.range_seconds` |
 
-- 같은 sprint_id·revision·digest 재제출은 거부가 아니라 **200 재조회**(멱등)다. 접수는 201.
+- 같은 sprint_id·revision·digest 재제출은 거부가 아니라 **200 재조회**(멱등)다. 접수는 201. 그 revision이 이미 대체됐으면 200 `SUPERSEDED`이며 실행 대상이 아니다.
 - 응답 상태는 거부 중 400 → 409 → 422 순으로 가장 앞선 것을 쓴다.
 - 인증/범위 거부(401/403, 다른 repo 무단 배정)는 주체 자격이 있어야 판정하므로 01-08 API 계약에서 고정한다.
 
@@ -84,7 +86,7 @@
 
 ## 5. 적합성 사례(참조 구현 `crates/ieo-spec`)
 
-- 등록 21건(`tests/registration.rs`): 패키지 9개 명세 digest 재현(9/9), POC-01 기준선 draft 접수(201), 필드 누락, 그 밖의 형식 위반, digest 불일치, 명세 안 ID 중복, 등록 스프린트와 ID 충돌, 미정의 선행, 다른 plan_version 선행, 순환, 없는 프로파일 항목/프로파일, draft의 실행 가능 등록 거부, 바인딩 완료 ready 접수, ready인데 URL 없음(형식 층), revision 충돌 409·동일 재제출 200, 모든 거부의 field/correction 존재, (검토 회귀) draft 저장분의 executable 재제출 거부·executable 저장분 멱등, 명세 예상 범위 역전, 정수 아닌 숫자 거부(소수·64비트 초과), 낮은 revision 충돌, ready+미바인딩의 400.
+- 등록 23건(`tests/registration.rs`, rev 3에서 2건 추가·1건 수정): 패키지 9개 명세 digest 재현(9/9), POC-01 기준선 draft 접수(201), 필드 누락, 그 밖의 형식 위반, digest 불일치, 명세 안 ID 중복, 등록 스프린트와 ID 충돌, 미정의 선행, 다른 plan_version 선행, 순환, 없는 프로파일 항목/프로파일, draft의 실행 가능 등록 거부, 바인딩 완료 ready 접수, ready인데 URL 없음(형식 층), revision 충돌 409·동일 재제출 200, 모든 거부의 field/correction 존재, (검토 회귀) draft 저장분의 executable 재제출 거부·executable 저장분 멱등, 명세 예상 범위 역전, 정수 아닌 숫자 거부(소수·64비트 초과), 낮은 revision의 `REVISION_SUPERSEDED`(draft·executable), ready+미바인딩의 400, (rev 3) 새 revision 뒤 옛 draft의 executable 승격 409·Registry 재기록 거부, 옛 revision 동일 재제출의 200 `SUPERSEDED`·재활성화 없음(빠진 작업 선행 미해석)·현재 revision의 200 `ALREADY_REGISTERED`.
 - 변환 16건(`tests/conversion.rs`): 유효 변환(ID·선행·초 환산·미산정·기한 none·digest·문구 보존·보존 필드·미바인딩)과 그 draft의 등록 검사 통과/실행 등록 거부, 프로파일 밖 기준의 의미 검토 회부, 문서 예시와 같은 `UNRESOLVED_PREREQUISITE`, 이름 중복, 역전 범위, 근거 없는 예상, 필수 누락, 기한 set 형식, undecided 이유 필수, 순환, 같은 입력의 같은 digest, (검토 회귀) `10.0` 분 환산, 초 환산 넘침 거부, 생성 ID 충돌, 스프린트 번호 범위, set 기한 이유·생성 필드 기록.
 - CLI `ieo-spec check-manifest`: 9개 명세 draft 모드 전부 201, 실행 가능 모드 전부 422(UNBOUND_DRAFT만, 각 6건).
 

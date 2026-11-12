@@ -280,11 +280,37 @@ pub enum Principal {
     Agent { repo_id: String, role: String },
 }
 
-/// The coordinator's current assignment for that (repo, role), from its DB.
+/// One assignment the coordinator legitimately issued to a (repo, role), from its DB.
+/// `target_sha` is the coordinator's record, never a value taken from an agent body.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CurrentAssignment {
+pub struct IssuedAssignment {
     pub assignment_id: String,
     pub generation: u64,
+    pub target_sha: String,
+}
+
+/// The coordinator's assignment history for one (repo, role): every issued
+/// (assignment, generation) and which one is current (at most one).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AssignmentBook {
+    pub issued: Vec<IssuedAssignment>,
+    pub current: Option<(String, u64)>,
+}
+
+impl AssignmentBook {
+    fn lookup(&self, body: &Value) -> Option<(&IssuedAssignment, bool)> {
+        let id = body["assignment_id"].as_str()?;
+        let generation = body["generation"].as_u64()?;
+        let a = self
+            .issued
+            .iter()
+            .find(|a| a.assignment_id == id && a.generation == generation)?;
+        let is_current = self
+            .current
+            .as_ref()
+            .is_some_and(|(cid, cg)| cid == id && *cg == generation);
+        Some((a, is_current))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -298,25 +324,61 @@ pub enum Denied {
     VerifiedFromAgentDenied,
     /// 403: agent credentials cannot use client read endpoints (§1.2: roles do not see each other).
     AgentReadDenied,
-    /// 409: claim for an assignment/generation that is not current (`STALE_ASSIGNMENT`).
+    /// 409 `STALE_ASSIGNMENT`: a *new* execution request (repro) for a non-current
+    /// assignment/generation, or a claim naming an assignment never issued to this (repo, role).
     StaleAssignment,
+    /// 409 `EVENT_CONTENT_CONFLICT`: the same event/request ID was already stored with different content.
+    ContentConflict,
 }
 
 impl Denied {
     pub fn http_status(self) -> u16 {
         match self {
-            Denied::StaleAssignment => 409,
+            Denied::StaleAssignment | Denied::ContentConflict => 409,
             _ => 403,
         }
     }
 }
 
+/// What the coordinator does with an authorized claim.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClaimDisposition {
+    /// 202: claim for the current assignment/generation; may feed the current judgment.
+    Current { target_sha: String },
+    /// 202: a late claim from a legitimately issued older assignment or generation.
+    /// Stored attributed to that assignment and its SHA, never used for the
+    /// current judgment and never reactivating the old assignment (§1.9).
+    PreservedLate {
+        assignment_id: String,
+        generation: u64,
+        target_sha: String,
+    },
+    /// 200: the same event ID with identical content is already stored. The stored
+    /// record is returned unchanged; no state change, whatever the assignment's status now.
+    Replay,
+}
+
+impl ClaimDisposition {
+    pub fn http_status(&self) -> u16 {
+        match self {
+            ClaimDisposition::Replay => 200,
+            _ => 202,
+        }
+    }
+    /// Whether this claim may be an input to the current judgment.
+    pub fn counts_for_current_judgment(&self) -> bool {
+        matches!(self, ClaimDisposition::Current { .. })
+    }
+}
+
 /// `POST /v0/agent/reports`. Runs on the parsed body before schema validation.
+/// `stored` is the record already stored under the same `event_id` (and `event_revision`), if any.
 pub fn authorize_claim(
     r: &Value,
     who: &Principal,
-    current: Option<&CurrentAssignment>,
-) -> Result<(), Denied> {
+    book: &AssignmentBook,
+    stored: Option<&Value>,
+) -> Result<ClaimDisposition, Denied> {
     let Principal::Agent { repo_id, role } = who else {
         return Err(Denied::RoleMismatch);
     };
@@ -334,22 +396,47 @@ pub fn authorize_claim(
     if r["actor"]["role"].as_str() != Some(role.as_str()) || r["report_type"] != allowed {
         return Err(Denied::RoleMismatch);
     }
-    let fresh = current.is_some_and(|c| {
-        r["assignment_id"].as_str() == Some(c.assignment_id.as_str())
-            && r["generation"].as_u64() == Some(c.generation)
-    });
-    if !fresh {
-        return Err(Denied::StaleAssignment);
+    // Same-ID replay is answered from storage before the assignment check, so a
+    // retry after the assignment moved on is a re-query, not a new stale claim.
+    if let Some(s) = stored {
+        return if s == r {
+            Ok(ClaimDisposition::Replay)
+        } else {
+            Err(Denied::ContentConflict)
+        };
     }
-    Ok(())
+    match book.lookup(r) {
+        Some((a, true)) => Ok(ClaimDisposition::Current {
+            target_sha: a.target_sha.clone(),
+        }),
+        Some((a, false)) => Ok(ClaimDisposition::PreservedLate {
+            assignment_id: a.assignment_id.clone(),
+            generation: a.generation,
+            target_sha: a.target_sha.clone(),
+        }),
+        None => Err(Denied::StaleAssignment),
+    }
 }
 
-/// `POST /v0/agent/repro-requests`: Guardrail of that repo, current assignment only.
+/// What the coordinator does with an authorized repro request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReproDisposition {
+    /// 202: new request for the current assignment; queued for the isolated runner.
+    Queue { target_sha: String },
+    /// 200: same request ID with identical content already exists; return its stored
+    /// status/result. Never re-queues, even if the assignment is no longer current.
+    Replay,
+}
+
+/// `POST /v0/agent/repro-requests`: Guardrail of that repo. A new request must be for
+/// the current assignment (a stale one would start new work); an identical re-submission
+/// of an existing request is an idempotent re-query.
 pub fn authorize_repro(
     req: &Value,
     who: &Principal,
-    current: Option<&CurrentAssignment>,
-) -> Result<(), Denied> {
+    book: &AssignmentBook,
+    stored: Option<&Value>,
+) -> Result<ReproDisposition, Denied> {
     let Principal::Agent { repo_id, role } = who else {
         return Err(Denied::RoleMismatch);
     };
@@ -359,14 +446,22 @@ pub fn authorize_repro(
     if req["repo_id"].as_str() != Some(repo_id.as_str()) {
         return Err(Denied::RepoScopeDenied);
     }
-    let fresh = current.is_some_and(|c| {
-        req["assignment_id"].as_str() == Some(c.assignment_id.as_str())
-            && req["generation"].as_u64() == Some(c.generation)
-    });
-    if fresh {
-        Ok(())
-    } else {
-        Err(Denied::StaleAssignment)
+    if let Some(s) = stored {
+        return if s == req {
+            Ok(ReproDisposition::Replay)
+        } else {
+            Err(Denied::ContentConflict)
+        };
+    }
+    match book.lookup(req) {
+        // the runner checks out the assignment's SHA from the coordinator DB; a body naming
+        // another SHA would be new work outside the current assignment
+        Some((a, true)) if req["target_sha"].as_str() == Some(a.target_sha.as_str()) => {
+            Ok(ReproDisposition::Queue {
+                target_sha: a.target_sha.clone(),
+            })
+        }
+        _ => Err(Denied::StaleAssignment),
     }
 }
 

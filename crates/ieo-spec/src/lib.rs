@@ -12,7 +12,7 @@ pub mod digest;
 pub mod rejection;
 pub mod schema;
 
-pub use check::{CheckMode, CheckOutcome, Registry, check_registration};
+pub use check::{CheckMode, CheckOutcome, CheckState, Registry, check_registration};
 pub use convert::{ConversionContext, ConversionRecord, convert_human_input};
 pub use digest::{canonical_json, spec_digest};
 pub use rejection::{Code, Rejection};

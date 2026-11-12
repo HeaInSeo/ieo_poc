@@ -1,6 +1,6 @@
 # 01-08 · 진행 보고 v0 · 등록/조회 API 계약
 
-2026-11-12 KST · 계획 v1.3.3 · contract_revision 4 · 문서 revision 2(독립 검토 8637403 reject F1~F12 반영) · 선행 01-07([등록 검사 계약](../../01-07/spec-contract-20261112/Registration_Contract_v0.md)).
+2026-11-12 KST · 계획 v1.3.3 · contract_revision 4 · 문서 revision 3(2026-11-12, 02-03 선행 교정: 검수 후속 N1 — 합법적인 옛 배정의 늦은 결과 보존·현재 판정 제외, 멱등 재조회와 새 stale 요청 구분. [사용자 지시](../../../../User_Decisions_2026-11-12_0103.md)) · revision 2(독립 검토 8637403 reject F1~F12 반영) · 선행 01-07([등록 검사 계약](../../01-07/spec-contract-20261112/Registration_Contract_v0.md)).
 
 | 구성 | 정본 | 이번 회차 |
 | --- | --- | --- |
@@ -19,8 +19,10 @@
 | 코디네이터 → 사람/클라이언트 (`GET …/state`, `GET …/events`) | `coordinator_to_client` | **verified** | 코디네이터 | `coordinator_verdict`, `decision_request` |
 
 - 에이전트 자격은 (repo_id, role) 하나에 묶이고 `agent:*` 범위만 가진다. 본문의 `actor.name`·라벨은 인가 근거가 아니다. 역할 불일치 → 403 `ROLE_MISMATCH`, verified/코디네이터 보고 제출 → 403 `VERIFIED_FROM_AGENT_DENIED`, 다른 repo → 403 `REPO_SCOPE_DENIED`, `/v0/sprints*` 조회 → 403 `AGENT_READ_DENIED`(역할끼리 서로의 claim을 보지 못함, §1.2). 거부 시 상태 변화·사건 0건.
-- claim·재현 요청의 `assignment_id`·`generation`은 코디네이터의 그 (repo, role) **현재 배정**과 같아야 한다. 아니면 409 `STALE_ASSIGNMENT`(§1.9 옛 세대 결과는 현재 판정에 쓰지 않음).
-- 검사 순서: 401(자격) → 403/409(범위·역할·현재 배정, 본문의 repo/channel/report_type/배정만 읽음) → 400(형식) → 409(동일성) → 422(참조·바인딩).
+- **같은 ID 재전송을 배정 검사보다 먼저** 본다(rev 3). 저장된 claim(`event_id`·`event_revision`)·재현 요청(`request_id`)과 내용이 같으면 200 재조회로 저장 결과를 돌려주고 상태를 바꾸지 않는다(배정이 그 사이 바뀌었어도 같음, 재현은 다시 대기열에 넣지 않음). 내용이 다르면 409 `EVENT_CONTENT_CONFLICT`.
+- 새 claim: `assignment_id`·`generation`이 그 (repo, role)의 **현재 배정**이면 202 `disposition=current`(현재 판정 입력 가능). 코디네이터가 같은 (repo, role)에 **실제로 발급했던 옛 배정·세대**면 202 `disposition=preserved_late`: 그 배정과 코디네이터 DB에 기록된 그 배정의 SHA에 귀속해 보존하고, 현재 판정에 쓰지 않으며 옛 배정을 다시 활성화하지 않는다(§1.9). 발급된 적 없는 배정·세대면 409 `STALE_ASSIGNMENT`.
+- 새 재현 요청은 실행을 새로 시작하므로 **현재 배정과 그 배정의 SHA**만 받는다. 옛 배정·세대나 다른 SHA는 409 `STALE_ASSIGNMENT`.
+- 검사 순서(에이전트 경로, rev 3): 401(자격) → 403(범위·역할, 본문의 repo/channel/report_type만 읽음) → 200/409 같은 ID 재전송(동일성) → 배정 분류(현재·옛 발급이면 계속, 발급 이력 없음이면 409 `STALE_ASSIGNMENT`) → 400(형식) → 422(의미) → 202 저장(`current`/`preserved_late`). 클라이언트 등록 경로는 401 → 403 → 400 → 409 → 422 그대로다.
 - claim 저장(202)은 판정이 아니다. 완료 판정은 GitHub·현재 SHA·실행 증거 대조로 코디네이터가 하며 에이전트의 별도 완료 메시지를 필수 입력으로 요구하지 않는다(02-07).
 - `(event_id, event_revision)`이 멱등 키다. 같은 내용 재전송 200, 다른 내용 409 `EVENT_CONTENT_CONFLICT`.
 - `GET …/state`는 verified와 `latest_claims`를 **다른 필드**로 돌려 클라이언트가 claim을 판정으로 오인하지 못하게 한다. 외부 전달 상태(`pending/sent/unknown`)는 작업 판정과 별도 필드다.
@@ -34,8 +36,8 @@
 | `GET /v0/sprints/{id}/revisions/{rev}` | `sprints:read` | 불변 명세·digest·검토/접수 상태 | 401/403/404 |
 | `GET /v0/sprints/{id}/state` | `sprints:read` | verified 현재 상태, claim 별도, 마지막 관측 시각, 전달 상태 | 401/403/404 |
 | `GET /v0/sprints/{id}/events?cursor=&limit=` | `sprints:read` | 추가 전용 커밋 순서. `next_cursor`는 항상 마지막 반환 사건 뒤 위치(빈 페이지면 입력 위치), `has_more`. 이미 돌려준 사건은 바뀌지 않고, 가득 차지 않은 페이지는 이후 새 사건을 더 담을 수 있다 | 400 `INVALID_CURSOR`, 401/403/404 |
-| `POST /v0/agent/reports` | `agent:report`(repo, role 고정) | 202 저장, 200 동일 재전송 | 403(위 §1), 409 `STALE_ASSIGNMENT`·내용 충돌, 400/422 |
-| `POST /v0/agent/repro-requests`, `GET …/{request_id}` | `agent:repro`(repo, **guardrail만**; 조회도 같은 repo Guardrail만) | 202 대기열, 200 동일 재요청; 상태·실행기 이미지 digest·종료 코드·원본 로그 참조 | 403(개발 자격·다른 repo·클라이언트), 409 `STALE_ASSIGNMENT`, 400/422 |
+| `POST /v0/agent/reports` | `agent:report`(repo, role 고정) | 202 저장(`current` 또는 `preserved_late`, 귀속 SHA·현재 판정 사용 여부 포함), 200 동일 재전송 | 403(위 §1), 409 `STALE_ASSIGNMENT`(발급 이력 없음)·`EVENT_CONTENT_CONFLICT`, 400/422 |
+| `POST /v0/agent/repro-requests`, `GET …/{request_id}` | `agent:repro`(repo, **guardrail만**; 조회도 같은 repo Guardrail만) | 202 대기열, 200 동일 재요청; 상태·실행기 이미지 digest·종료 코드·원본 로그 참조 | 403(개발 자격·다른 repo·클라이언트), 409 `STALE_ASSIGNMENT`(새 요청의 옛 배정·다른 SHA)·`EVENT_CONTENT_CONFLICT`, 400/422 |
 
 - 재현 요청은 01-02 계약 §2.1의 Guardrail 독립 재현 경로다. 코디네이터 소유·자격 없는 일회성 격리 실행기에서 대상 SHA로 실행하고 원본 로그를 Guardrail 입력 위치로 돌려준다. 실행 결과는 Guardrail claim의 증거이며 판정이 아니다. 실행기 구현 02-06, 검증 P07.
 - **§1.6과의 차이(명시)**: `ready`인데 미바인딩 항목이 남은 명세는 SprintSpec 스키마의 조건부 규칙에 걸리므로 **400**(형식)이다. §1.6의 “422 등록 바인딩 오류”는 draft를 실행 가능 등록으로 낸 경우(`UNBOUND_DRAFT`)에 해당한다. 작업 ID 충돌은 §1.6대로 409(`TASK_ID_CONFLICT`)다.

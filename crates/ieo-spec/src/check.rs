@@ -65,22 +65,39 @@ impl Registry {
         }
     }
 
-    /// Record a spec as registered in draft mode (its tasks become resolvable prerequisites).
-    pub fn add_spec(&mut self, spec: &Value) {
-        self.add_spec_with_mode(spec, CheckMode::Draft);
+    /// Highest registered revision of a sprint (the only one that can be active).
+    pub fn latest_revision(&self, sprint_id: &str) -> Option<u64> {
+        self.revisions
+            .keys()
+            .filter(|(id, _)| id == sprint_id)
+            .map(|(_, r)| *r)
+            .max()
     }
 
-    /// Record a spec as registered in the given mode.
-    pub fn add_spec_with_mode(&mut self, spec: &Value, mode: CheckMode) {
+    /// Record a spec as registered in draft mode (its tasks become resolvable prerequisites).
+    pub fn add_spec(&mut self, spec: &Value) -> bool {
+        self.add_spec_with_mode(spec, CheckMode::Draft)
+    }
+
+    /// Record a spec as registered in the given mode. Returns `false` and changes
+    /// nothing when a newer revision of the sprint is already registered: an older
+    /// revision is never (re)activated, so its tasks and mode stay as they were.
+    /// A newer revision replaces the sprint's task set (tasks it dropped disappear).
+    pub fn add_spec_with_mode(&mut self, spec: &Value, mode: CheckMode) -> bool {
         let sprint_id = spec["sprint_id"].as_str().unwrap_or_default().to_string();
         let plan_version = spec["plan_version"]
             .as_str()
             .unwrap_or_default()
             .to_string();
-        if let (Some(rev), Some(d)) = (spec["revision"].as_u64(), spec["digest"].as_str()) {
+        let rev = spec["revision"].as_u64().unwrap_or_default();
+        if self.latest_revision(&sprint_id).is_some_and(|l| l > rev) {
+            return false;
+        }
+        if let Some(d) = spec["digest"].as_str() {
             self.revisions
                 .insert((sprint_id.clone(), rev), (d.to_string(), mode));
         }
+        self.tasks.retain(|_, t| t.sprint_id != sprint_id);
         for t in spec["tasks"].as_array().into_iter().flatten() {
             let id = t["task_id"].as_str().unwrap_or_default().to_string();
             let prerequisites = t["prerequisites"]
@@ -98,6 +115,7 @@ impl Registry {
                 },
             );
         }
+        true
     }
 }
 
@@ -109,6 +127,10 @@ pub enum CheckState {
     AcceptedForSemanticReview,
     /// Same sprint_id/revision/digest already registered (idempotent re-submit, HTTP 200).
     AlreadyRegistered,
+    /// Same sprint_id/revision/digest was registered, but a newer revision now exists.
+    /// HTTP 200 historical lookup of the stored result: the old revision is not active
+    /// and this answer does not reactivate it (`superseded_by` names the newer revision).
+    Superseded,
     Rejected,
 }
 
@@ -117,6 +139,9 @@ pub struct CheckOutcome {
     pub state: CheckState,
     pub computed_digest: Option<String>,
     pub rejections: Vec<Rejection>,
+    /// Latest registered revision when this revision is no longer active.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub superseded_by: Option<u64>,
 }
 
 impl CheckOutcome {
@@ -124,7 +149,7 @@ impl CheckOutcome {
     pub fn http_status(&self) -> u16 {
         match self.state {
             CheckState::AcceptedForSemanticReview => 201,
-            CheckState::AlreadyRegistered => 200,
+            CheckState::AlreadyRegistered | CheckState::Superseded => 200,
             CheckState::Rejected => {
                 let codes: BTreeSet<u16> = self
                     .rejections
@@ -149,6 +174,7 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
             state: CheckState::Rejected,
             computed_digest: None,
             rejections: format,
+            superseded_by: None,
         };
     }
     // 1b. digest canonical form is defined for integer numbers only (Python and
@@ -172,6 +198,7 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
             state: CheckState::Rejected,
             computed_digest: None,
             rejections,
+            superseded_by: None,
         };
     }
     let mut rej = Vec::new();
@@ -189,7 +216,10 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
         ));
     }
 
-    // 3. revision identity
+    // 3. revision identity. Only the latest registered revision is active.
+    let superseded_by = registry
+        .latest_revision(sprint_id)
+        .filter(|latest| *latest > revision);
     if let Some((existing, stored_mode)) =
         registry.revisions.get(&(sprint_id.to_string(), revision))
     {
@@ -199,9 +229,14 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
         let covers = *stored_mode == CheckMode::Executable || mode == CheckMode::Draft;
         if *existing == digest && rej.is_empty() && covers {
             return CheckOutcome {
-                state: CheckState::AlreadyRegistered,
+                state: if superseded_by.is_some() {
+                    CheckState::Superseded
+                } else {
+                    CheckState::AlreadyRegistered
+                },
                 computed_digest: Some(digest),
                 rejections: vec![],
+                superseded_by,
             };
         }
         if *existing != digest {
@@ -211,17 +246,20 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
                 format!("{sprint_id} revision {revision}은(는) 다른 내용으로 이미 등록됐습니다."),
                 "기존 revision을 바꾸지 말고 revision을 올려 새로 제출하세요.",
             ));
+        } else if let Some(latest) = superseded_by {
+            // same content stored in a weaker mode: this would be a promotion of an old revision
+            rej.push(Rejection::new(
+                Code::RevisionSuperseded,
+                "revision",
+                format!(
+                    "{sprint_id} revision {revision}은(는) revision {latest}로 대체됐습니다. 옛 revision은 실행 등록으로 승격할 수 없습니다."
+                ),
+                format!("실행하려면 revision {latest} 이상을 제출하세요."),
+            ));
         }
-    } else if let Some(latest) = registry
-        .revisions
-        .keys()
-        .filter(|(id, _)| id == sprint_id)
-        .map(|(_, r)| *r)
-        .max()
-        .filter(|latest| *latest > revision)
-    {
+    } else if let Some(latest) = superseded_by {
         rej.push(Rejection::new(
-            Code::RevisionConflict,
+            Code::RevisionSuperseded,
             "revision",
             format!("{sprint_id}에는 이미 더 높은 revision {latest}이(가) 등록돼 있습니다."),
             format!("revision을 {latest}보다 크게 올려 제출하세요."),
@@ -394,6 +432,7 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
         state,
         computed_digest: Some(digest),
         rejections: rej,
+        superseded_by,
     }
 }
 

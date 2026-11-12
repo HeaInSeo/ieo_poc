@@ -2,9 +2,10 @@
 //! (`docs/poc/reports/contract_examples`), mutated per case.
 
 use ieo_report::{
-    CompletionFacts, CurrentAssignment, Denied, Notification, Principal, ReviewCurrency,
-    authorize_claim, authorize_repro, completion_summary, may_read_repro, may_read_sprint,
-    notification, render_human, review_currency, validate_report,
+    AssignmentBook, ClaimDisposition, CompletionFacts, Denied, IssuedAssignment, Notification,
+    Principal, ReproDisposition, ReviewCurrency, authorize_claim, authorize_repro,
+    completion_summary, may_read_repro, may_read_sprint, notification, render_human,
+    review_currency, validate_report,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -168,11 +169,28 @@ fn agent(repo: &str, role: &str) -> Principal {
         role: role.into(),
     }
 }
-fn cur() -> CurrentAssignment {
-    CurrentAssignment {
-        assignment_id: "fixture-assignment".into(),
-        generation: 1,
+fn issued(id: &str, generation: u64, sha: &str) -> IssuedAssignment {
+    IssuedAssignment {
+        assignment_id: id.into(),
+        generation,
+        target_sha: sha.into(),
     }
+}
+/// fixture-assignment gen 1 is current (SHA "c1"); gen 0 of it and "older" were issued before.
+fn book() -> AssignmentBook {
+    AssignmentBook {
+        issued: vec![
+            issued("older", 1, "a0"),
+            issued("fixture-assignment", 0, "b0"),
+            issued("fixture-assignment", 1, "c1"),
+        ],
+        current: Some(("fixture-assignment".into(), 1)),
+    }
+}
+fn current() -> Result<ClaimDisposition, Denied> {
+    Ok(ClaimDisposition::Current {
+        target_sha: "c1".into(),
+    })
 }
 
 #[test]
@@ -182,26 +200,27 @@ fn claim_authorization() {
         agent("fixture-repo", "guardrail"),
     );
     assert_eq!(
-        authorize_claim(&ex("development_progress"), &dev, Some(&cur())),
-        Ok(())
+        authorize_claim(&ex("development_progress"), &dev, &book(), None),
+        current()
     );
     assert_eq!(
-        authorize_claim(&ex("guardrail_review"), &guard, Some(&cur())),
-        Ok(())
+        authorize_claim(&ex("guardrail_review"), &guard, &book(), None),
+        current()
     );
     assert_eq!(
-        authorize_claim(&ex("guardrail_review"), &dev, Some(&cur())),
+        authorize_claim(&ex("guardrail_review"), &dev, &book(), None),
         Err(Denied::RoleMismatch)
     );
     assert_eq!(
-        authorize_claim(&ex("coordinator_verdict"), &guard, Some(&cur())),
+        authorize_claim(&ex("coordinator_verdict"), &guard, &book(), None),
         Err(Denied::VerifiedFromAgentDenied)
     );
     assert_eq!(
         authorize_claim(
             &ex("development_progress"),
             &agent("other", "development"),
-            Some(&cur())
+            &book(),
+            None
         ),
         Err(Denied::RepoScopeDenied)
     );
@@ -209,7 +228,7 @@ fn claim_authorization() {
     let mut r = ex("guardrail_review");
     r["actor"]["name"] = json!("development-agent");
     assert_eq!(
-        authorize_claim(&r, &dev, Some(&cur())),
+        authorize_claim(&r, &dev, &book(), None),
         Err(Denied::RoleMismatch)
     );
     // client credentials cannot submit claims
@@ -218,32 +237,105 @@ fn claim_authorization() {
         can_register: true,
     };
     assert_eq!(
-        authorize_claim(&ex("development_progress"), &client, Some(&cur())),
+        authorize_claim(&ex("development_progress"), &client, &book(), None),
         Err(Denied::RoleMismatch)
     );
 }
 
 #[test]
-fn stale_assignment_or_generation_is_409() {
+fn late_claim_from_issued_old_assignment_is_preserved_not_judged() {
     let dev = agent("fixture-repo", "development");
-    let old_gen = CurrentAssignment {
-        assignment_id: "fixture-assignment".into(),
-        generation: 2,
-    };
-    let other = CurrentAssignment {
-        assignment_id: "another".into(),
-        generation: 1,
-    };
-    let e = authorize_claim(&ex("development_progress"), &dev, Some(&old_gen));
-    assert_eq!(e, Err(Denied::StaleAssignment));
-    assert_eq!(Denied::StaleAssignment.http_status(), 409);
+    // gen 0 of the same assignment, and a different older assignment: stored with their own SHA
+    let mut r = ex("development_progress");
+    r["generation"] = json!(0);
+    let d = authorize_claim(&r, &dev, &book(), None).unwrap();
     assert_eq!(
-        authorize_claim(&ex("development_progress"), &dev, Some(&other)),
+        d,
+        ClaimDisposition::PreservedLate {
+            assignment_id: "fixture-assignment".into(),
+            generation: 0,
+            target_sha: "b0".into()
+        }
+    );
+    assert_eq!(d.http_status(), 202);
+    assert!(!d.counts_for_current_judgment());
+    r["assignment_id"] = json!("older");
+    r["generation"] = json!(1);
+    let d = authorize_claim(&r, &dev, &book(), None).unwrap();
+    assert!(
+        matches!(d, ClaimDisposition::PreservedLate { ref target_sha, .. } if target_sha == "a0")
+    );
+    assert!(!d.counts_for_current_judgment());
+    // the current one counts
+    let d = authorize_claim(&ex("development_progress"), &dev, &book(), None).unwrap();
+    assert!(d.counts_for_current_judgment());
+    // a late claim does not change which assignment is current
+    let b = book();
+    let _ = authorize_claim(&r, &dev, &b, None);
+    assert_eq!(b.current, Some(("fixture-assignment".into(), 1)));
+}
+
+#[test]
+fn never_issued_assignment_or_generation_is_409() {
+    let dev = agent("fixture-repo", "development");
+    let mut r = ex("development_progress");
+    r["generation"] = json!(2); // future/never issued
+    assert_eq!(
+        authorize_claim(&r, &dev, &book(), None),
         Err(Denied::StaleAssignment)
     );
+    assert_eq!(Denied::StaleAssignment.http_status(), 409);
+    r["assignment_id"] = json!("another");
+    r["generation"] = json!(1);
     assert_eq!(
-        authorize_claim(&ex("development_progress"), &dev, None),
+        authorize_claim(&r, &dev, &book(), None),
         Err(Denied::StaleAssignment)
+    );
+    // no assignment history at all
+    assert_eq!(
+        authorize_claim(
+            &ex("development_progress"),
+            &dev,
+            &AssignmentBook::default(),
+            None
+        ),
+        Err(Denied::StaleAssignment)
+    );
+    // an issued assignment of another role's book is not in this book
+    let other_role = AssignmentBook {
+        issued: vec![issued("guard-only", 1, "g1")],
+        current: Some(("guard-only".into(), 1)),
+    };
+    assert_eq!(
+        authorize_claim(&ex("development_progress"), &dev, &other_role, None),
+        Err(Denied::StaleAssignment)
+    );
+}
+
+#[test]
+fn same_id_replay_is_checked_before_assignment() {
+    let dev = agent("fixture-repo", "development");
+    let r = ex("development_progress");
+    // assignment has moved on to generation 2 since the claim was stored
+    let mut moved = book();
+    moved.issued.push(issued("fixture-assignment", 2, "d2"));
+    moved.current = Some(("fixture-assignment".into(), 2));
+    let d = authorize_claim(&r, &dev, &moved, Some(&r)).unwrap();
+    assert_eq!(d, ClaimDisposition::Replay);
+    assert_eq!(d.http_status(), 200);
+    assert!(!d.counts_for_current_judgment());
+    // same ID, different content
+    let mut changed = r.clone();
+    changed["next_action"] = json!("다른 내용");
+    assert_eq!(
+        authorize_claim(&changed, &dev, &moved, Some(&r)),
+        Err(Denied::ContentConflict)
+    );
+    assert_eq!(Denied::ContentConflict.http_status(), 409);
+    // authorization still comes first: another repo's agent cannot replay
+    assert_eq!(
+        authorize_claim(&r, &agent("other", "development"), &moved, Some(&r)),
+        Err(Denied::RepoScopeDenied)
     );
 }
 
@@ -264,24 +356,44 @@ fn agents_cannot_read_client_views_and_repro_is_guardrail_only() {
         Err(Denied::RepoScopeDenied)
     );
 
-    let req =
-        json!({"repo_id": "fixture-repo", "assignment_id": "fixture-assignment", "generation": 1});
-    assert_eq!(authorize_repro(&req, &guard, Some(&cur())), Ok(()));
+    let req = json!({"repo_id": "fixture-repo", "assignment_id": "fixture-assignment", "generation": 1, "target_sha": "c1"});
     assert_eq!(
-        authorize_repro(&req, &agent("fixture-repo", "development"), Some(&cur())),
+        authorize_repro(&req, &guard, &book(), None),
+        Ok(ReproDisposition::Queue {
+            target_sha: "c1".into()
+        })
+    );
+    assert_eq!(
+        authorize_repro(&req, &agent("fixture-repo", "development"), &book(), None),
         Err(Denied::RoleMismatch)
     );
     assert_eq!(
-        authorize_repro(&req, &agent("other", "guardrail"), Some(&cur())),
+        authorize_repro(&req, &agent("other", "guardrail"), &book(), None),
         Err(Denied::RepoScopeDenied)
     );
-    let stale = CurrentAssignment {
-        assignment_id: "fixture-assignment".into(),
-        generation: 9,
-    };
+    // a NEW repro request on an old (issued) generation would start stale work: 409
+    let old = json!({"repo_id": "fixture-repo", "assignment_id": "fixture-assignment", "generation": 0, "target_sha": "b0"});
     assert_eq!(
-        authorize_repro(&req, &guard, Some(&stale)),
+        authorize_repro(&old, &guard, &book(), None),
         Err(Denied::StaleAssignment)
+    );
+    // current assignment but a SHA other than the assignment's: new work outside it, 409
+    let mut other_sha = req.clone();
+    other_sha["target_sha"] = json!("ffff");
+    assert_eq!(
+        authorize_repro(&other_sha, &guard, &book(), None),
+        Err(Denied::StaleAssignment)
+    );
+    // ...but re-submitting an existing request is an idempotent re-query, even after the assignment moved on
+    assert_eq!(
+        authorize_repro(&old, &guard, &book(), Some(&old)),
+        Ok(ReproDisposition::Replay)
+    );
+    let mut altered = old.clone();
+    altered["generation"] = json!(1);
+    assert_eq!(
+        authorize_repro(&altered, &guard, &book(), Some(&old)),
+        Err(Denied::ContentConflict)
     );
     assert_eq!(may_read_repro(&guard, "fixture-repo"), Ok(()));
     assert_eq!(
