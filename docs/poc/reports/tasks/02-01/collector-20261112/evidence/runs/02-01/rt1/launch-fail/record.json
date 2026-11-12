@@ -1,0 +1,84 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "02-01",
+  "attempt_id": "rt1",
+  "command_id": "launch-fail",
+  "role": "other",
+  "retry_of": null,
+  "model_request": false,
+  "argv": [
+    "/nonexistent/ieo-tool"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "HOME",
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:46:12.349Z",
+  "ended_at": "2026-11-12T12:46:12.349Z",
+  "duration_ms": 0,
+  "process": {
+    "kind": "launch_failed",
+    "exit_code": null,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "output_incomplete": false,
+    "launch_error": "No such file or directory (os error 2)"
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [],
+  "result_event": null,
+  "usage": {
+    "applicability": "not_applicable",
+    "session_mode": "unknown",
+    "resume_base": null,
+    "run": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "session": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "parent": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "children": [],
+    "attribution_check": "not_checked",
+    "attribution_detail": null,
+    "by_model": {},
+    "cost_usd_reported": null,
+    "run_cost_usd": null,
+    "partial_observations": [],
+    "internal_retries": "not_applicable"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "failed",
+    "reasons": [
+      "기동 실패: No such file or directory (os error 2)"
+    ],
+    "counts_as_success": false
+  }
+}

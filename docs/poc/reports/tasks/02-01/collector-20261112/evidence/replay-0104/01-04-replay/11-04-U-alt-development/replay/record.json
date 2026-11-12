@@ -1,0 +1,121 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "01-04-replay",
+  "attempt_id": "11-04-U-alt-development",
+  "command_id": "replay",
+  "role": "other",
+  "retry_of": null,
+  "model_request": true,
+  "argv": [
+    "cat",
+    "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201/docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/04-U-alt-development/stdout.jsonl"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:46:01.047Z",
+  "ended_at": "2026-11-12T12:46:01.068Z",
+  "duration_ms": 21,
+  "process": {
+    "kind": "exited",
+    "exit_code": 0,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "output_incomplete": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 19144,
+    "sha256": "5f353650a99f42f7aa5535651b7f23cb54b04cd0632368634fe70d52b44d707e"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [],
+  "result_event": {
+    "count": 1,
+    "present": true,
+    "subtype": "success",
+    "is_error": false,
+    "session_id": "fdbfcd3d-51f2-4647-87a3-ac61d7a99438",
+    "num_turns": 5,
+    "stop_reason": "end_turn",
+    "runtime_version": "2.1.322",
+    "non_json_lines": 0,
+    "rate_limit_statuses": [
+      "allowed"
+    ],
+    "compact_boundaries": 0
+  },
+  "usage": {
+    "applicability": "model",
+    "session_mode": "new",
+    "resume_base": null,
+    "run": {
+      "state": "measured",
+      "tokens": {
+        "input": 4,
+        "output": 561,
+        "cache_read": 10524,
+        "cache_creation": 0
+      },
+      "source": "새 세션: result.modelUsage"
+    },
+    "session": {
+      "state": "measured",
+      "tokens": {
+        "input": 4,
+        "output": 561,
+        "cache_read": 10524,
+        "cache_creation": 0
+      },
+      "source": "result.modelUsage"
+    },
+    "parent": {
+      "state": "measured",
+      "tokens": {
+        "input": 4,
+        "output": 561,
+        "cache_read": 10524,
+        "cache_creation": 0
+      },
+      "source": "result.usage"
+    },
+    "children": [],
+    "attribution_check": "consistent",
+    "attribution_detail": null,
+    "by_model": {
+      "claude-sonnet-5-5": {
+        "input": 4,
+        "output": 561,
+        "cache_read": 10524,
+        "cache_creation": 0
+      }
+    },
+    "cost_usd_reported": 0.006670400000000001,
+    "run_cost_usd": 0.006670400000000001,
+    "partial_observations": [],
+    "internal_retries": "unmeasured"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "succeeded",
+    "reasons": [],
+    "counts_as_success": true
+  }
+}

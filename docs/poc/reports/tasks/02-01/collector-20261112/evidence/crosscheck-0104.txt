@@ -1,0 +1,39 @@
+stream | mode | base | run | unmeasured reason | attribution | judgment | failed checks
+first/01-P1-development | new | - | measured |  | consistent | succeeded | -
+first/02-P1-guardrail | new | - | measured |  | consistent | succeeded | -
+first/03-P1-development | new | - | measured |  | consistent | succeeded | -
+first/04-P1-guardrail | new | - | measured |  | consistent | succeeded | -
+first/05-P2c-development | resume | 03-04-P1-guardrail | unmeasured | result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자 | not_checked | failed | -
+first/06-P3-development | new | - | measured |  | consistent | succeeded | -
+first/07-P3-guardrail | new | - | measured |  | consistent | succeeded | -
+first/08-P3-development | new | - | measured |  | consistent | succeeded | -
+first/09-P3-guardrail | new | - | measured |  | consistent | succeeded | -
+remai/01-U-development | new | - | measured |  | consistent | succeeded | -
+remai/02-U-alt-development | new | - | measured |  | consistent | succeeded | -
+remai/04-U-alt-development | new | - | measured |  | consistent | succeeded | -
+remai/05-G1-guardrail | new | - | measured |  | consistent | succeeded | -
+remai/06-G2-development | new | - | measured |  | consistent | succeeded | -
+remai/07-G3a-development | new | - | measured |  | consistent | succeeded | -
+remai/08-G3b-development | resume | 14-07-G3a-development | measured |  | consistent | succeeded | -
+remai/09-G3a-rerun-development | new | - | measured |  | consistent | succeeded | -
+remai/10-G3b-rerun-development | resume | 16-09-G3a-rerun-development | measured |  | consistent | succeeded | -
+remai/11-N1-development | new | - | measured |  | consistent | succeeded | -
+remai/12-N2-development | resume | 18-11-N1-development | measured |  | consistent | succeeded | -
+remai/13-N3-development | resume | 19-12-N2-development | measured |  | consistent | succeeded | -
+remai/14-N4a-development | resume | 20-13-N3-development | measured |  | consistent | succeeded | -
+remai/15-N4b-development | resume | 21-14-N4a-development | unmeasured | 세션 누적이 기준 회차보다 작음: 기준이 직전 회차가 아님(동시 재개·분 | not_checked | succeeded | -
+remai/16-L1-development | new | - | measured |  | consistent | succeeded | -
+remai/17-L2-development | resume | 22-15-N4b-development | unmeasured | 재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제  | mismatch | succeeded | -
+remai/18-L3-development | resume | 24-17-L2-development | measured |  | mismatch | succeeded | -
+remai/19-C-development | new | - | measured |  | consistent | succeeded | -
+remai/20-C-development | new | - | measured |  | consistent | succeeded | -
+remai/21-C-guardrail | new | - | measured |  | consistent | succeeded | -
+remai/22-C-guardrail | new | - | measured |  | consistent | succeeded | -
+remai/23-T-development | new | - | measured |  | consistent | succeeded | -
+remai/24-R1-development | new | - | measured |  | consistent | succeeded | -
+remai/25-R2-development | resume | 31-24-R1-development | measured |  | consistent | succeeded | -
+remai/26-AM1-development | new | - | measured |  | consistent | succeeded | -
+remai/27-AM2-development | new | - | measured |  | consistent | succeeded | -
+
+{"new": 25, "resume": 10, "run_measured": 32, "run_unmeasured": 3, "semantic_checked": 30, "semantic_equal": 30}
+streams 35 · mismatches 0

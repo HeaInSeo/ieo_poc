@@ -1,0 +1,21 @@
+[package]
+name = "ieo-evidence"
+version = "0.1.0"
+description = "Command execution, evidence collection and usage metering (02-01, T03)"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
+sha2 = "0.11.1"
+hex = "0.4.3"
+regex = "1"
+
+[dev-dependencies]
+jsonschema = { version = "0.61.1", default-features = false }
+
+[lints]
+workspace = true

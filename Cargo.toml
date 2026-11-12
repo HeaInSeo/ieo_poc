@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/ieo-spec", "crates/ieo-report"]
+members = ["crates/ieo-spec", "crates/ieo-report", "crates/ieo-evidence"]
 
 [workspace.package]
 edition = "2024"

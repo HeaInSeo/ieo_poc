@@ -1,0 +1,101 @@
+{
+  "format": "ieo-evidence-summary/v0",
+  "records": 35,
+  "task_ids": [
+    "01-04-replay"
+  ],
+  "by_judgment": {
+    "failed": 1,
+    "succeeded": 34
+  },
+  "by_role": {
+    "other": 35
+  },
+  "retries": 0,
+  "timed_out": 0,
+  "wall_ms_sum": 735,
+  "usage": {
+    "completeness": "incomplete",
+    "model_runs": 35,
+    "measured_runs": 32,
+    "tokens_measured_sum": {
+      "input": 2120,
+      "output": 6291,
+      "cache_read": 144968,
+      "cache_creation": 28749
+    },
+    "unmeasured": [
+      {
+        "task_id": "01-04-replay",
+        "attempt_id": "04-05-P2c-development",
+        "command_id": "replay",
+        "role": "other",
+        "reason": "result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자식 합으로 대신할 수 없음"
+      },
+      {
+        "task_id": "01-04-replay",
+        "attempt_id": "22-15-N4b-development",
+        "command_id": "replay",
+        "role": "other",
+        "reason": "세션 누적이 기준 회차보다 작음: 기준이 직전 회차가 아님(동시 재개·분기 가능)"
+      },
+      {
+        "task_id": "01-04-replay",
+        "attempt_id": "24-17-L2-development",
+        "command_id": "replay",
+        "role": "other",
+        "reason": "재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제 재개 대상이 아닐 수 있음"
+      }
+    ],
+    "children_seen": 1,
+    "children_measured": 1,
+    "cost_usd_reported_sum": null,
+    "attribution_mismatches": [
+      "01-04-replay/24-17-L2-development/replay",
+      "01-04-replay/25-18-L3-development/replay"
+    ]
+  },
+  "usage_by_role": {
+    "other": {
+      "completeness": "incomplete",
+      "model_runs": 35,
+      "measured_runs": 32,
+      "tokens_measured_sum": {
+        "input": 2120,
+        "output": 6291,
+        "cache_read": 144968,
+        "cache_creation": 28749
+      },
+      "unmeasured": [
+        {
+          "task_id": "01-04-replay",
+          "attempt_id": "04-05-P2c-development",
+          "command_id": "replay",
+          "role": "other",
+          "reason": "result.modelUsage 비어 있음; 새 세션이 아니어서 부모·자식 합으로 대신할 수 없음"
+        },
+        {
+          "task_id": "01-04-replay",
+          "attempt_id": "22-15-N4b-development",
+          "command_id": "replay",
+          "role": "other",
+          "reason": "세션 누적이 기준 회차보다 작음: 기준이 직전 회차가 아님(동시 재개·분기 가능)"
+        },
+        {
+          "task_id": "01-04-replay",
+          "attempt_id": "24-17-L2-development",
+          "command_id": "replay",
+          "role": "other",
+          "reason": "재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제 재개 대상이 아닐 수 있음"
+        }
+      ],
+      "children_seen": 1,
+      "children_measured": 1,
+      "cost_usd_reported_sum": null,
+      "attribution_mismatches": [
+        "01-04-replay/24-17-L2-development/replay",
+        "01-04-replay/25-18-L3-development/replay"
+      ]
+    }
+  }
+}

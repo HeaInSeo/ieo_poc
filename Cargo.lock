@@ -232,6 +232,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ieo-evidence"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "jsonschema",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "ieo-report"
 version = "0.1.0"
 dependencies = [

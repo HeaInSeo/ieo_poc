@@ -2,7 +2,8 @@
 """01-06 verification of scripts/render_progress.py on temporary copies of docs/poc (never the real ledger).
 
 Cases: normal render and idempotence, hand-edit detection, invalid ledger (no write), evidence-link rules,
-interrupted generation and regeneration, separate main/follow-up counts, no timer or network use.
+interrupted generation and regeneration, separate main/follow-up counts, no timer or network use;
+02-01: the same snapshot_id/ledger digest in every view and no combined main+follow-up progress rate.
 Run from anywhere: python3 -I docs/poc/scripts/test_render_progress.py   (prints PASS/FAIL lines, exit 0 on all PASS)
 """
 import hashlib, json, shutil, subprocess, sys, tempfile
@@ -62,6 +63,14 @@ with tempfile.TemporaryDirectory() as td:
     check("main_and_followup_counted_separately",
           f"| 주계획 | {main_done}/{st['baselines']['main_tasks']} |" in status and f"| 후속 실험 | {fu_done}/{st['baselines']['followup_tasks']} |" in status)
     check("ledger_digest_in_views", hashlib.sha256((root / "progress/state.json").read_bytes()).hexdigest() in status)
+    # 02-01: every generated view carries the same snapshot_id and ledger digest; no combined progress
+    stamp = f"snapshot `{st['snapshot_id']}` · 원장 SHA-256 `{hashlib.sha256((root / 'progress/state.json').read_bytes()).hexdigest()}`"
+    views = {v: (root / "progress" / v).read_text() for v in ("STATUS.md", "TASKS.md", "RESULTS.md", "RESUME.md")}
+    check("same_snapshot_and_digest_in_all_views", all(stamp in t for t in views.values()),
+          ",".join(v for v, t in views.items() if stamp not in t))
+    total = st["baselines"]["main_tasks"] + st["baselines"]["followup_tasks"]
+    check("no_combined_progress_rate",
+          not any(f"/{total} |" in t or f"/{total})" in t or "합산 진행률 |" in t for t in views.values()))
 
     # 2. hand edit of a view is detected by --check (exit 1, names the file)
     p = root / "progress/TASKS.md"
