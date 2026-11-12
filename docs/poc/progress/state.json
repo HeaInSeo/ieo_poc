@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0004",
-  "snapshot_created_at": "2026-11-12T09:28:54+09:00",
-  "last_actual_work_observed_at": "2026-11-12T09:28:54+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0005",
+  "snapshot_created_at": "2026-11-12T09:52:31+09:00",
+  "last_actual_work_observed_at": "2026-11-12T09:52:31+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "01-08 · PR 준비(01-07 검수 완료 뒤)",
+  "phase": "01-03 · 사용자 결정 대기",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -13,7 +13,7 @@
     "main_experiments": 31,
     "followup_candidates": 5
   },
-  "current_task": "01-08",
+  "current_task": "01-03",
   "next_task": "01-03",
   "tasks": [
     {
@@ -59,13 +59,16 @@
       "track": "main",
       "group": "핵심",
       "kind": "설계",
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
-      "verification_level": "unverified",
-      "evidence": [],
-      "next_action": null
+      "status": "조건 대기",
+      "last_observed_at": "2026-11-12T09:52:31+09:00",
+      "latest_report": "reports/tasks/01-03/decision-proposal-20261112/REPORT.md",
+      "result_state": "결정안 제시 · 사용자 결정 미확인",
+      "verification_level": "claim",
+      "evidence": [
+        "reports/tasks/01-03/decision-proposal-20261112/REPORT.md"
+      ],
+      "next_action": "사용자 결정 D1~D12 → 동결 산출물 PR·독립 검토",
+      "unresolved": "D1 자격 방식, D2 01-04 예산, D3~D6 한도, D7 P12, D8 P26 표본·완료율, D9 P36 기준·봉인 위치, D10 기대값 순서, D11 PDF, D12 contract revision 5"
     },
     {
       "task_id": "01-04",
@@ -136,13 +139,20 @@
       "track": "main",
       "group": "핵심",
       "kind": "설계",
-      "status": "진행",
-      "last_observed_at": "2026-11-12T09:28:54+09:00",
-      "latest_report": null,
-      "result_state": "계약·참조 구현 작성(claim) · 01-07 검수 뒤 PR",
-      "verification_level": "claim",
-      "evidence": [],
-      "next_action": "main에 rebase → PR → 독립 검토"
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-12T09:52:31+09:00",
+      "latest_report": "reports/tasks/01-08/report-api-contract-20261112/REPORT.md",
+      "result_state": "PASS · 보고 v0·API 계약·참조 구현(ieo-report)",
+      "verification_level": "verified",
+      "evidence": [
+        "reports/tasks/01-08/report-api-contract-20261112/Report_API_Contract_v0.md",
+        "reports/tasks/01-08/report-api-contract-20261112/evidence/openapi-validate.log",
+        "reports/tasks/01-08/report-api-contract-20261112/reviews/review-pr5-f75ea87.md",
+        "reports/tasks/01-08/report-api-contract-20261112/evidence/cargo-test-workspace.log",
+        "https://github.com/HeaInSeo/ieo_poc/pull/5"
+      ],
+      "next_action": "후속 N1·N2를 02-03 구현 전에 반영",
+      "unresolved": "N1 늦은 옛 세대 결과 보존(409 폐기 대신 귀속 저장)·멱등 재생 우선·에이전트 재조회, N2 completion_summary 전체 범위 표시, P3 N3~N7, 공백 RG1~RG3"
     },
     {
       "task_id": "02-01",
@@ -1791,15 +1801,16 @@
     "last_sent_event_id": null
   },
   "unresolved": [
+    "01-03 사용자 결정 D1~D12 필요(reports/tasks/01-03/decision-proposal-20261112/REPORT.md). 결정 전 착수 가능한 독립 작업 없음.",
     "실제 개발 repo·모델/인증·역할별 자격/공급자 quota 분리·예산·표본·일정은 아직 미바인딩.",
     "01-03: P36 일치율/시간/질문 수 기준·표본·독립 정답 담당·비공개 보존 위치·제시 순서/예산 동결 필요.",
     "01-04 첫 두 probe 및 나머지 원격 런타임 probe, P36/P26/실제 보고 사람 평가는 미실행.",
     "역할별 상시 유지/idle 정지는 P34의 실측 뒤 결정.",
-    "01-04 첫 probe 전: 역할별 자격 방식 A(같은 구독 토큰)/B(별도 구독)/C(API key) 사용자 결정. 현재 자격은 구독 로그인 1개.",
     "01-02 후속(비차단): S1 개발 push 토큰의 API 병합 가능성→main에 개발이 만들 수 없는 판정 체크 요구(05-03/P07), S2 workflows 권한(P20/P23), S3 Guardrail GitHub 측 재현·설정 재조회 경로, S4 격리 실행기 범위(02-06/03-07)·의존성 캐시, S5 계약 문구 2곳.",
     "공개 repo에 제3자 논문 PDF(07_supporting_research/FoundationDB_SIGMOD21.pdf) 포함 — 사용자 확인 필요.",
     "GitHub 계정 1개: 독립 검토는 PR 댓글+원장 기록이며 GitHub Approve로 강제되지 않음. chatgpt-codex-connector[bot] 자동 검토는 보조 정보로만 취급.",
-    "01-07 후속(비차단): N1 더 새 revision 등록 뒤 옛 ready revision의 executable 등록 201(02-03 수정), N2 생성 ID 충돌 시 부수 순환 보고, N3 비현실적 예상값·2^53 초과, N4 ready+미바인딩 400 vs §1.6 422 명시(01-08), N5 소수 증거값 문자열화. §1.4 공백 G1~G8의 contract revision 5 여부는 사용자 결정."
+    "01-07 후속(비차단): N1 더 새 revision 등록 뒤 옛 ready revision의 executable 등록 201(02-03 수정), N2 생성 ID 충돌 시 부수 순환 보고, N3 비현실적 예상값·2^53 초과, N4 ready+미바인딩 400 vs §1.6 422 명시(01-08), N5 소수 증거값 문자열화. §1.4 공백 G1~G8의 contract revision 5 여부는 사용자 결정.",
+    "01-08 후속(02-03 구현 전 반영): N1 STALE_ASSIGNMENT 늦은 결과를 원 SHA·배정에 귀속 보존(§1.9)·멱등 재생을 배정 대조보다 먼저·에이전트 재조회 경로, N2 completion_summary가 첫 공백 뒤 확인 범위를 숨김; P3 N3 분수 9자리·음수 오프셋 시험, N4 순서·동일 시각 과다 알림, N5 Guardrail의 불변 명세 revision 조회, N6 ConversionResult additionalProperties·409 명시, N7 evidence 머리글 SHA."
   ],
   "notes": [
     "등록 전 분모는 73/12이며 현재 실행 진척은 이 원장에 기록한다.",
@@ -1899,23 +1910,45 @@
       "evidence": [
         "reports/workspace/github-repo-20261112/evidence/branch-protection-required-checks-3.json"
       ]
+    },
+    {
+      "event_id": "REPORT-API-01-08-20261112",
+      "event_revision": 1,
+      "task_id": "01-08",
+      "observed_at": "2026-11-12T09:52:31+09:00",
+      "state": "독립 검토 8637403 reject → f75ea87 approve → 조건부 병합 dfdf9b3 · main CI success(3 job)",
+      "evidence": [
+        "reports/tasks/01-08/report-api-contract-20261112/REPORT.md",
+        "reports/tasks/01-08/report-api-contract-20261112/reviews/review-pr5-f75ea87.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/5"
+      ]
+    },
+    {
+      "event_id": "DECISION-01-03-20261112",
+      "event_revision": 1,
+      "task_id": "01-03",
+      "observed_at": "2026-11-12T09:52:31+09:00",
+      "state": "사람 결정 대기 · 결정안 D1~D12 제시",
+      "evidence": [
+        "reports/tasks/01-03/decision-proposal-20261112/REPORT.md"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "01-07 검수 완료(PR #4 병합 ecd443f, main CI 3 job success)",
+    "last_verified_stage": "01-08 검수 완료(PR #5 병합 dfdf9b3, main CI 3 job success). 01 스프린트 설계 계약 01-01·01-02·01-07·01-08 완료",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main ecd443fb2e172f1c7253bde27f196d9c5e9b876d · 보고 PR #3(report/01-02-accepted) · 로컬 task/01-08-report-api 8fc8019(옛 01-07 위, rebase 필요)",
+    "branch_sha": "main dfdf9b30e5612bfce7572f9bb1230ffc8e9384ff (이 보고 PR 병합 전)",
     "plan_and_spec": "v1.3.3 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR #3 재검토·병합 대기. 런타임 세션 없음",
+    "running": "보고 PR(report/01-08-accepted-0103-proposal) 검토·병합. 런타임 세션 없음",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
       "reports/tasks/01-07/spec-contract-20261112/REPORT.md",
-      "reports/workspace/rust-toolchain-20261112/REPORT.md",
-      "reports/workspace/github-repo-20261112/REPORT.md"
+      "reports/tasks/01-08/report-api-contract-20261112/REPORT.md",
+      "reports/tasks/01-03/decision-proposal-20261112/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "보고 PR #3 병합 → 01-08 rebase(rejection.rs 충돌 해소)·PR → 독립 검토·CI·조건부 병합 → 원장 → 01-03 결정안 제시(사용자 결정 대기). 01-04는 01-03 검수와 자격 방식 결정 뒤.",
+    "next_action": "사용자 01-03 결정 수신 → 결정 원문을 01-03 rev 2에 기록 → 동결 산출물 PR·독립 검토·병합 → 01-04(D1 자격은 사용자가 준비) probe 1 동시 두 세션 → probe 2 자격 격리 → probe 3 한도 공유/분리/관측 불가. 불가·관측 불가면 중단·보고.",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
