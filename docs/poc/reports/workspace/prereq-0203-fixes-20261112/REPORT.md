@@ -24,3 +24,9 @@
 
 - 실제 DB·HTTP 서버는 없다. 배정 이력과 저장 레코드의 영속화, 동시성은 02-03·02-04에서 구현한다. 이 교정은 참조 구현과 계약이다.
 - 01-08 N2(`completion_summary`의 확인된 범위 전체 표시)와 D12의 권한·판정 의미(L07)는 이 PR에 넣지 않았다. 둘 다 02-03 착수 전에 따로 처리한다.
+
+## 4. 증거와 제출 SHA
+
+- 시험한 코드: 커밋 `e9b312ff79f98c074ea4f945a4564cc9627d78aa`(main 36bce10 위). 이 PR의 다음 커밋은 증거 파일만 더한다. `git diff e9b312f HEAD -- crates contracts`가 비어 있는지로 확인할 수 있다.
+- [cargo-test.log](evidence/cargo-test.log): `cargo fmt --check`·`clippy -D warnings` 통과, 시험 76건 통과(`^test … ok` 76줄).
+- [mutants.txt](evidence/mutants.txt): 같은 커밋에서 변이 12개를 실행했다. 의미 있는 변이 11개(M1~M6, M7b, M8~M11)는 모두 검출됐다. M7은 생존한 등가 변이다. 실행 뒤 `crates/`의 변경은 0건이다.

@@ -1,0 +1,27 @@
+# 변이 시험 · tested commit e9b312ff79f98c074ea4f945a4564cc9627d78aa
+# 방법: 교정 코드에 변이 하나를 적용 → cargo test → git checkout으로 원복(한 번에 하나). killed = 시험 실패로 검출됨
+# M1  ieo-spec: draft 저장 옛 revision의 executable 승격 거부 제거
+# M2  ieo-spec: 대체된 revision 재제출을 SUPERSEDED가 아닌 ALREADY_REGISTERED로 응답
+# M3  ieo-spec: Registry가 더 새 revision 뒤에도 옛 revision을 다시 기록(재활성화)
+# M4  ieo-spec: 새 revision 등록 시 그 스프린트의 옛 작업 집합을 지우지 않음
+# M5  ieo-report: 발급된 옛 배정의 늦은 claim을 409로 버림(교정 전 동작)
+# M6  ieo-report: preserved_late를 현재 판정 입력으로 셈
+# M7  ieo-report: 발급 이력 없는 배정이면 재전송 검사 전에 409 (등가 변이 예상: 저장된 claim은 항상 발급된 배정을 가리킴)
+# M7b ieo-report: 같은 ID 재전송을 현재 배정일 때만 인정
+# M8  ieo-report: 옛 세대의 새 재현 요청을 대기열에 넣음
+# M9  ieo-report: 재현 요청 동일 재전송을 다시 대기열에 넣음
+# M10 ieo-report: 늦은 claim을 현재 배정 SHA에 귀속
+# M11 ieo-report: 새 재현 요청의 target_sha를 배정 SHA와 대조하지 않음
+M1: killed
+M2: killed
+M3: killed
+M4: killed
+M5: killed
+M6: killed
+M7: SURVIVED
+M7b: killed
+M8: killed
+M9: killed
+M10: killed
+M11: killed
+# 원복 확인: git status --porcelain crates/ → 0 변경
