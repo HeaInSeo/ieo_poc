@@ -4,7 +4,7 @@
 
 ## 1. GitHub 시험 저장소 (사용자 생성)
 
-사용자 원문: [User_Decisions_2026-11-12_0104b.md](../../../User_Decisions_2026-11-12_0104b.md). 아래 값은 개발 에이전트가 GitHub API로 다시 조회한 것이다. 원본은 [evidence/github-ieo_poc_test-settings.txt](evidence/github-ieo_poc_test-settings.txt)에 있고, 조회 시각은 그 파일 첫 줄이다.
+사용자 원문: [User_Decisions_2026-11-12_0104b.md](../../../User_Decisions_2026-11-12_0104b.md). 아래 값은 개발 에이전트가 GitHub API로 다시 조회한 것이다. 원본은 [evidence/github-ieo_poc_test-settings.txt](evidence/github-ieo_poc_test-settings.txt)에 있고, 조회 시각은 그 파일 첫 줄이다. Actions secret·variable·environment 개수와 파일 목록(전체 tree)은 보완 조회 [evidence/github-ieo_poc_test-supplement.txt](evidence/github-ieo_poc_test-supplement.txt)에 있다(2026-11-12T08:39:59Z, PR #15 검토 P3-2). secret·variable·environment는 각 0개이고, tree는 `.github/workflows/bootstrap.yml`·`.gitignore`·`README.md`·`SANDBOX.json`이다.
 
 | 항목 | 조회 값 | 사용자 진술과의 대조 |
 | --- | --- | --- |
@@ -39,13 +39,27 @@
 
 ## 3. 05-03/P07 전에 필요한 연결 작업 (미완, 사용자 자격 발급 포함)
 
-| # | 작업 | 근거 | 연결 대상 |
-| --- | --- | --- | --- |
-| G1 | 개발 역할 GitHub App: 대상 repo 하나, contents/pull_requests 쓰기, 만료 ≤ 1시간의 단기 설치 토큰. 배정 단계가 `개발`/`교정`일 때만 발급하고 `REVIEW_PENDING`에 폐기 | 런타임 계약 §2.1(push 시점 제한) | 05-03, 04-07(P07) |
-| G2 | Guardrail 역할 자격: push 없음, 고정 SHA 읽기와 독립 판정 발행 경로만 | 계약 §2·§2.1 | 04-07(P07) |
-| G3 | 독립 판정 체크: Guardrail·코디네이터가 승인 head SHA에 발행하는 필수 상태 검사. 현재 필수 검사 `repository-smoke`와 구별한다. 개발 역할이 발행할 수 없어야 한다 | 계획 P07·P23, 01-08 계약 | 05-01·05-02(P23), 04-07(P07) |
-| G4 | `main` 보호에 G3 체크를 필수로 추가. 필요 승인 수 0과 허용 액션 `all`의 처분을 정한다 | 05-03 승인값↔적용값 대조 | 05-03 |
-| G5 | 설정 승인 주체(사람 정책 소유자)와 제안자 분리 기록 | 05-03 수용 기준 | 05-03 |
+**연결 확인용 CI와 독립 판정을 구분한다.**
+- 현재 필수 검사 `repository-smoke`는 저장소 연결과 정확한 SHA checkout만 확인한다. 독립 판정이 아니다.
+- 아래 GH1~GH5가 구성되기 전에는 P07/P23의 독립 판정 근거로 쓰지 않는다.
+- 이 표의 작업과 저장소 준비는 PoC 작업·실험 완료 수에 넣지 않는다.
+
+| # | 작업 | 근거 |
+| --- | --- | --- |
+| GH1 | 개발 역할 GitHub App: 대상 repo 하나, contents/pull_requests 쓰기, 만료 ≤ 1시간의 단기 설치 토큰. 배정 단계가 `개발`/`교정`일 때만 발급하고 `REVIEW_PENDING`에 폐기 | 런타임 계약 §2.1(push 시점 제한) |
+| GH2 | Guardrail 역할 자격: push 없음. 고정 SHA 읽기와 독립 판정 발행 경로만 | 계약 §2·§2.1 |
+| GH3 | 독립 판정 체크: Guardrail·코디네이터가 승인 head SHA에 발행하는 필수 상태 검사. `repository-smoke`와 구별하고, 개발 역할은 발행할 수 없어야 한다 | 계획 P07·P23, 01-08 계약 |
+| GH4 | `main` 보호에 GH3 체크를 필수로 추가하고, 필요 승인 수 0과 허용 액션 `all`의 처분을 정한다 | 05-03 승인값↔적용값 대조 |
+| GH5 | 설정 승인 주체(사람 정책 소유자)와 제안자 분리 기록 | 05-01·05-03 수용 기준 |
+
+**착수 조건 연결**(이 PR 병합 뒤 원장 보고 PR에서 각 작업의 `unresolved`에 기록한다. 이름 GH1~GH5는 01-07의 G1~G8, 01-04 probe G1~G3과 구별하려고 붙였다):
+
+| 작업 | 착수 전 필요 | 이유 |
+| --- | --- | --- |
+| 04-07 (P07 현재 SHA·숨긴 결함·검토 정지) | GH1·GH2·GH3 | 개발 역할의 Guardrail 자격 획득·명의 발행 거부와 독립 판정 경로를 실제 GitHub에서 시험한다 |
+| 05-01 (보호된 CI 실행·검사 발행 후보) | GH3·GH5 | 보호된 검사 발행 경로와, 승인 주체·제안자 분리를 구성한다 |
+| 05-02 (Actions 정상/거짓 성공 대조, P23) | GH3(05-01 경유) | 동일 이름 체크·이전 SHA 대조에는 독립 판정 체크가 있어야 한다 |
+| 05-03 (저장소 설정·브랜치·App·권한) | GH1·GH2·GH4·GH5 | 승인값과 적용값의 대조, App 권한, 보호 변형·복원 |
 
 - App 생성과 자격 발급은 사용자가 한다(F01·계약 §3 원칙 2). 개발 에이전트는 만들지 않는다.
-- 이 표의 어느 항목도 아직 구성되지 않았다. P07/P23 판정의 근거로 쓰지 않는다.
+- 위 작업들은 의존관계상 아직 착수할 수 없다. 04-07은 02-06·02-02 뒤, 05-01은 05-04·04-07 뒤다. 그래서 GH1~GH5는 현재 01-05~02의 차단 조건이 아니다.

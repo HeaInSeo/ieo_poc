@@ -1,0 +1,13 @@
+# 보완 조회 2026-11-12T08:39:59Z · gh api(인증 사용자 HeaInSeo) · ASSETS.md §1의 'Actions secret 0'·'내용' 행의 원본(PR #15 검토 P3-2). 비밀 값은 없음(개수와 이름 목록만)
+## GET repos/HeaInSeo/ieo_poc_test/actions/secrets  (total_count, names)
+{"names":[],"total_count":0}
+## GET repos/HeaInSeo/ieo_poc_test/actions/variables  (total_count, names)
+{"names":[],"total_count":0}
+## GET repos/HeaInSeo/ieo_poc_test/environments  (total_count)
+{"total_count":0}
+## GET repos/HeaInSeo/ieo_poc_test/contents  (top-level path/type/sha)
+[{"path":".github","sha":"3d96d680f6713888afe8a803dc8517930261c114","type":"dir"},{"path":".gitignore","sha":"f9b28ed169e5a5c9f1aa7b85e3c4730e3c013e9a","type":"file"},{"path":"README.md","sha":"0466d3c4df3e1628d1d80fc7275704136fc0c2db","type":"file"},{"path":"SANDBOX.json","sha":"a744838cdd9d3ac0780e0f46d90f909884fec105","type":"file"}]
+## GET repos/HeaInSeo/ieo_poc_test/git/trees/main?recursive=1  (path/type)
+{"sha":"2ab9d8760012516f37674a9446ca2fb2699973c0","tree":[{"path":".github","type":"tree"},{"path":".github/workflows","type":"tree"},{"path":".github/workflows/bootstrap.yml","type":"blob"},{"path":".gitignore","type":"blob"},{"path":"README.md","type":"blob"},{"path":"SANDBOX.json","type":"blob"}],"truncated":false}
+## GET repos/HeaInSeo/ieo_poc_test/commits/main  (sha)
+2ab9d8760012516f37674a9446ca2fb2699973c0
