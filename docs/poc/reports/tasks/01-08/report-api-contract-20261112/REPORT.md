@@ -24,7 +24,7 @@
 | 명령 | 결과 |
 | --- | --- |
 | `cargo test --locked -p ieo-report` | exit 0 · 단위 1 + 계약 21 passed ([log](evidence/cargo-test-ieo-report.log)) |
-| `cargo test --locked` (작업공간) | exit 0 · ieo-spec 31 + ieo-report 22 = 53 passed ([log](evidence/cargo-test-workspace.log)) |
+| `cargo test --locked` (작업공간) | exit 0 · ieo-spec 41 + ieo-report 22 = 63 passed ([log](evidence/cargo-test-workspace.log)) |
 | `cargo clippy --all-targets --locked -- -D warnings` / `cargo fmt --check` | exit 0 / exit 0 |
 | `openapi-spec-validator contracts/ieo-api-v0.openapi.yaml` | OK, exit 0; 깨진 `$ref` 사본은 exit 2 ([validate](evidence/openapi-validate.log) · [negative](evidence/openapi-negative.txt)) |
 | 수동 변이 3건 | 3/3 검출 ([mutation-check.txt](evidence/mutation-check.txt)) |

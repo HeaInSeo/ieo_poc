@@ -1,2 +1,4 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+    Checking ieo-spec v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc/crates/ieo-spec)
+    Checking ieo-report v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc/crates/ieo-report)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.49s
 exit=0

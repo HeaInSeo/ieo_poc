@@ -35,6 +35,7 @@
 | `POST /v0/agent/repro-requests`, `GET …/{request_id}` | `agent:repro`(repo, **guardrail만**) | 202 대기열, 200 동일 재요청; 상태·실행기 이미지 digest·종료 코드·원본 로그 참조 | 400/409, 403(개발 자격·다른 repo) |
 
 - 재현 요청은 01-02 계약 §2.1의 Guardrail 독립 재현 경로다. 코디네이터 소유·자격 없는 일회성 격리 실행기에서 대상 SHA로 실행하고 원본 로그를 Guardrail 입력 위치로 돌려준다. 실행 결과는 Guardrail claim의 증거이며 판정이 아니다. 실행기 구현 02-06, 검증 P07.
+- **§1.6과의 차이(명시)**: `ready`인데 미바인딩 항목이 남은 명세는 SprintSpec 스키마의 조건부 규칙에 걸리므로 **400**(형식)이다. §1.6의 “422 등록 바인딩 오류”는 draft를 실행 가능 등록으로 낸 경우(`UNBOUND_DRAFT`)에 해당한다. 작업 ID 충돌은 §1.6대로 409(`TASK_ID_CONFLICT`)다.
 - 거부 본문은 01-07의 `{code, field, message, correction, retryable_after_edit}` 목록이다. 01-08에서 `IDEMPOTENCY_KEY_CONFLICT`, `EVENT_CONTENT_CONFLICT`, `REPORT_SEMANTIC_VIOLATION`, `INVALID_CURSOR`를 추가했다.
 - **조회는 사건·알림·상태 전환을 만들지 않는다.** 재조회로 완료 수가 늘지 않는다.
 - 등록 접수(201)는 실행 인수나 완료가 아니다.

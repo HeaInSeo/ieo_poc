@@ -1,6 +1,5 @@
-   Compiling ieo-spec v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc/crates/ieo-spec)
    Compiling ieo-report v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc/crates/ieo-report)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.05s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.50s
      Running unittests src/lib.rs (target/debug/deps/ieo_report-d67be0fc981c12a4)
 
 running 1 test
@@ -14,23 +13,23 @@ running 21 tests
 test claim_authorization ... ok
 test input4_reobservation_is_suppressed ... ok
 test render_has_five_parts_in_order ... ok
-test estimated_without_measurement ... ok
-test undecided_shown_normal ... ok
-test reject_without_findings ... ok
-test delay_without_reason ... ok
-test decision_deadline_is_not_a_date ... ok
-test old_actor_string ... ok
-test reversed_forecast ... ok
-test input1_current_ci_with_old_sha_approval_needs_current_review ... ok
-test input2_lost_response_is_held_without_user_resend ... ok
-test input3_decision_request_is_actionable ... ok
-test late_before_deadline_rejected ... ok
-test finding_lacks_original_log ... ok
-test wrong_actor_role ... ok
 test missing_contract_revision ... ok
+test finding_lacks_original_log ... ok
+test undecided_shown_normal ... ok
+test decision_deadline_is_not_a_date ... ok
+test delay_without_reason ... ok
+test wrong_actor_role ... ok
+test input1_current_ci_with_old_sha_approval_needs_current_review ... ok
+test reject_without_findings ... ok
+test late_before_deadline_rejected ... ok
+test reversed_forecast ... ok
+test estimated_without_measurement ... ok
 test developer_claims_verified ... ok
-test decision_mismatch ... ok
+test old_actor_string ... ok
+test input2_lost_response_is_held_without_user_resend ... ok
 test recommendation_must_be_an_option ... ok
+test decision_mismatch ... ok
+test input3_decision_request_is_actionable ... ok
 test four_role_examples_are_valid ... ok
 
 test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
