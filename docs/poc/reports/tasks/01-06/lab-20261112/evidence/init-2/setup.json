@@ -1,0 +1,63 @@
+{
+  "at": "2026-11-12T09:14:44.969+00:00",
+  "info": {
+    "secrets_dir_mode": "0o700",
+    "token_file_modes": {
+      "development": "0o600",
+      "guardrail": "0o600"
+    },
+    "token_fingerprints": {
+      "development": "2456b85e9111",
+      "guardrail": "da968d393412"
+    },
+    "tokens_distinct": true,
+    "token_prefix_ok": {
+      "development": true,
+      "guardrail": true
+    }
+  },
+  "commands": [
+    {
+      "cmd": "podman unshare bash -c umask 077; cat /opt/rust/ieo_poc_secrets/development.token > /opt/rust/ieo_poc_probe/roles/development/cred/oauth_token && chown -R 20001:20001 /opt/rust/ieo_poc_probe/roles/development/state /opt/rust/ieo_poc_probe/roles/development/cred && chmod 0700 /opt/rust/ieo_poc_probe/roles/development/state /opt/rust/ieo_poc_probe/roles/development/cred /opt/rust/ieo_poc_probe/roles/development/state/* && chmod 0400 /opt/rust/ieo_poc_probe/roles/development/cred/oauth_token && chmod 0755 /opt/rust/ieo_poc_probe/roles/development/etc && chmod 0444 /opt/rust/ieo_poc_probe/roles/development/etc/mcp.json",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": "podman unshare bash -c umask 077; cat /opt/rust/ieo_poc_secrets/guardrail.token > /opt/rust/ieo_poc_probe/roles/guardrail/cred/oauth_token && chown -R 20002:20002 /opt/rust/ieo_poc_probe/roles/guardrail/state /opt/rust/ieo_poc_probe/roles/guardrail/cred && chmod 0700 /opt/rust/ieo_poc_probe/roles/guardrail/state /opt/rust/ieo_poc_probe/roles/guardrail/cred /opt/rust/ieo_poc_probe/roles/guardrail/state/* && chmod 0400 /opt/rust/ieo_poc_probe/roles/guardrail/cred/oauth_token && chmod 0755 /opt/rust/ieo_poc_probe/roles/guardrail/etc && chmod 0444 /opt/rust/ieo_poc_probe/roles/guardrail/etc/mcp.json",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": "podman info --format {{.Host.Security.Rootless}} {{.Host.NetworkBackend}} {{.Host.IDMappings.UIDMap}}",
+      "rc": 0,
+      "stdout": "true netavark [{0 1001 1} {1 165536 65536}]\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "grep heain /etc/subuid",
+      "rc": 0,
+      "stdout": "heain:165536:65536\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "stat -c %n uid=%u gid=%g mode=%a /opt/rust/ieo_poc_probe/roles/development/state /opt/rust/ieo_poc_probe/roles/development/cred /opt/rust/ieo_poc_probe/roles/guardrail/state /opt/rust/ieo_poc_probe/roles/guardrail/cred",
+      "rc": 0,
+      "stdout": "/opt/rust/ieo_poc_probe/roles/development/state uid=185536 gid=185536 mode=700\n/opt/rust/ieo_poc_probe/roles/development/cred uid=185536 gid=185536 mode=700\n/opt/rust/ieo_poc_probe/roles/guardrail/state uid=185537 gid=185537 mode=700\n/opt/rust/ieo_poc_probe/roles/guardrail/cred uid=185537 gid=185537 mode=700\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "podman image inspect --format {{.Id}} {{.RepoDigests}} docker.io/library/golang:1.26.9-bookworm",
+      "rc": 0,
+      "stdout": "6880d90c0623e6e55560894ff82266f5a06c0f7b1c9ee7f6e2def900d9bc2956 [docker.io/library/golang@sha256:bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c]\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "sha256sum /opt/rust/ieo_poc_probe/bin/claude-2.1.322",
+      "rc": 0,
+      "stdout": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478  /opt/rust/ieo_poc_probe/bin/claude-2.1.322\n",
+      "stderr": ""
+    }
+  ]
+}

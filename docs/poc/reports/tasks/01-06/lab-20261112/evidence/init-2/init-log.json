@@ -1,0 +1,17 @@
+[
+  {
+    "step": "setup",
+    "rc": 0,
+    "tail": "{\n  \"secrets_dir_mode\": \"0o700\",\n  \"token_file_modes\": {\n    \"development\": \"0o600\",\n    \"guardrail\": \"0o600\"\n  },\n  \"token_fingerprints\": {\n    \"development\": \"2456b85e9111\",\n    \"guardrail\": \"da968d393412\"\n  },\n  \"tokens_distinct\": true,\n  \"token_prefix_ok\": {\n    \"development\": true,\n    \"guardrail\": true\n  }\n}\n"
+  },
+  {
+    "step": "e",
+    "rc": 0,
+    "tail": "E1-dev-push-work 0 ['PUSH_WORK_OK']\nE1-dev-push-main 0 ['PUSH_MAIN_REJECTED']\nE1-gd-read-snapshot 0 ['READ_OK']\nE1-gd-write-snapshot 0 ['REPO_ABSENT', 'WRITE_DENIED']\nE2-coord-insert 0 ['COORD_OK']\nE2-reader-select 0 ['READER_SELECT_OK']\nE2-reader-insert 0 ['READER_INSERT_DENIED']\nE2-no-password 0 ['NOPW_DENIED']\nE2-development-reach 0 ['REACH_DENIED']\nE2-guardrail-reach 0 ['REACH_DENIED']\nE3-post-new 0 ['201']\nE3-post-replay 0 ['200']\nE3-post-conflict 0 ['409']\nE3-get 0 ['HTTP/1.1 200']\nE3-no-token 0 ['401']\nE3-other-token 0 ['401']\n"
+  },
+  {
+    "step": "e1b",
+    "rc": 0,
+    "tail": "E1b-dev-push-work 0 ['PUSH_WORK_OK']\nE1b-dev-push-main 0 ['PUSH_MAIN_REJECTED']\nE1b-dev-force-main 0 ['FORCE_MAIN_REJECTED']\nE1b-dev-delete-main 0 ['DELETE_MAIN_REJECTED']\nE1b-dev-repo-files 0 ['ABSENT', 'VISIBLE']\nE1b-gd-reach 0 ['REACH_DENIED']\nE1b-main-unchanged 0 ['refs/heads/main 5e50ac07921ce155934985c4e9ef17f0dfcf254f']\n"
+  }
+]

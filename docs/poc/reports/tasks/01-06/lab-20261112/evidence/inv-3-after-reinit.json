@@ -1,0 +1,95 @@
+{
+  "at": "2026-11-12T09:15:18+00:00",
+  "lab": "/opt/rust/ieo_poc_probe",
+  "dirs": {
+    "bin": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 2,
+      "names_digest": "f48a049eca542e97"
+    },
+    "e-secrets": {
+      "mode": "700",
+      "uid_in_ns": 0,
+      "entries": 5,
+      "names_digest": "8923534787ecf6ec"
+    },
+    "forge": {
+      "mode": "700",
+      "uid_in_ns": 20005,
+      "entries": 51,
+      "names_digest": "a25489d03ddaf587"
+    },
+    "roles": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 151,
+      "names_digest": "6d59f2ccf6a3dc46"
+    },
+    "rx-data": {
+      "mode": "775",
+      "uid_in_ns": 20010,
+      "entries": 2,
+      "names_digest": "467b3e0c9822b211"
+    },
+    "snapshots": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 2,
+      "names_digest": "2929bfe5716011f9"
+    },
+    "testrepos": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 80,
+      "names_digest": "9d399df80fc8facb"
+    }
+  },
+  "containers": {
+    "ieo-probe-pg": "exited",
+    "ieo-probe-rx": "exited",
+    "ieo-probe-forge": "exited"
+  },
+  "networks": [
+    "ieo-probe-coord",
+    "ieo-probe-forge"
+  ],
+  "timers": {
+    "claude-operator-tick": "ActiveState=active SubState=waiting UnitFileState=enabled",
+    "claude-guardrail-tick": "ActiveState=active SubState=waiting UnitFileState=enabled",
+    "claude-report-bridge": "ActiveState=active SubState=elapsed UnitFileState=enabled"
+  },
+  "roles": {
+    "development": {
+      "state": "700 20001",
+      "cred": "700 20001",
+      "etc": "755 0",
+      "state/claude": "700 20001",
+      "state/home": "700 20001",
+      "state/work": "700 20001",
+      "cred/oauth_token": "400 20001",
+      "sessions": "0"
+    },
+    "guardrail": {
+      "state": "700 20002",
+      "cred": "700 20002",
+      "etc": "755 0",
+      "state/claude": "700 20002",
+      "state/home": "700 20002",
+      "state/work": "700 20002",
+      "cred/oauth_token": "400 20002",
+      "sessions": "0"
+    }
+  },
+  "other_containers_not_touched": [
+    "local-registry"
+  ],
+  "secrets_dir": {
+    "exists": true,
+    "mode": "0o700",
+    "files": [
+      "development.token",
+      "guardrail.token"
+    ]
+  }
+}

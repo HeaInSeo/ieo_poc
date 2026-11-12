@@ -1,0 +1,137 @@
+{
+  "at": "2026-11-12T09:14:28+00:00",
+  "inventory": "docs/poc/reports/tasks/01-06/lab-20261112/evidence/inv-2-after-init.json",
+  "checks": [
+    {
+      "check": "dir bin present",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir e-secrets present",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir forge present",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir roles present",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir rx-data present",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir snapshots present",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir testrepos present",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir roles-recreated absent (probe scratch not part of initial state)",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir snapshots-g absent (probe scratch not part of initial state)",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir snapshots-galt absent (probe scratch not part of initial state)",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir g2-src absent (probe scratch not part of initial state)",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "dir g3-cfg absent (probe scratch not part of initial state)",
+      "ok": true,
+      "got": null
+    },
+    {
+      "check": "development state mode 700 uid 20001",
+      "ok": true,
+      "got": "700 20001"
+    },
+    {
+      "check": "development cred mode 700 uid 20001",
+      "ok": true,
+      "got": "700 20001"
+    },
+    {
+      "check": "development cred/oauth_token mode 400 uid 20001",
+      "ok": true,
+      "got": "400 20001"
+    },
+    {
+      "check": "development no session records",
+      "ok": true,
+      "got": "0"
+    },
+    {
+      "check": "guardrail state mode 700 uid 20002",
+      "ok": true,
+      "got": "700 20002"
+    },
+    {
+      "check": "guardrail cred mode 700 uid 20002",
+      "ok": true,
+      "got": "700 20002"
+    },
+    {
+      "check": "guardrail cred/oauth_token mode 400 uid 20002",
+      "ok": true,
+      "got": "400 20002"
+    },
+    {
+      "check": "guardrail no session records",
+      "ok": true,
+      "got": "0"
+    },
+    {
+      "check": "container ieo-probe-pg exited",
+      "ok": true,
+      "got": "exited"
+    },
+    {
+      "check": "container ieo-probe-rx exited",
+      "ok": true,
+      "got": "exited"
+    },
+    {
+      "check": "container ieo-probe-forge exited",
+      "ok": true,
+      "got": "exited"
+    },
+    {
+      "check": "networks",
+      "ok": true,
+      "got": [
+        "ieo-probe-coord",
+        "ieo-probe-forge"
+      ]
+    },
+    {
+      "check": "only ieo-probe-* touched (others listed, not removed)",
+      "ok": true,
+      "got": [
+        "local-registry"
+      ]
+    }
+  ],
+  "all_ok": true
+}

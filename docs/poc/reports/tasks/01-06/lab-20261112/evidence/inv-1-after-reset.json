@@ -1,0 +1,44 @@
+{
+  "at": "2026-11-12T09:13:50+00:00",
+  "lab": "/opt/rust/ieo_poc_probe",
+  "dirs": {
+    "bin": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 2,
+      "names_digest": "f48a049eca542e97"
+    },
+    "e-secrets": {
+      "mode": "700",
+      "uid_in_ns": 0,
+      "entries": 5,
+      "names_digest": "8923534787ecf6ec"
+    }
+  },
+  "containers": {},
+  "networks": [],
+  "timers": {
+    "claude-operator-tick": "ActiveState=active SubState=waiting UnitFileState=enabled",
+    "claude-guardrail-tick": "ActiveState=active SubState=waiting UnitFileState=enabled",
+    "claude-report-bridge": "ActiveState=active SubState=elapsed UnitFileState=enabled"
+  },
+  "roles": {
+    "development": {
+      "sessions": "0"
+    },
+    "guardrail": {
+      "sessions": "0"
+    }
+  },
+  "other_containers_not_touched": [
+    "local-registry"
+  ],
+  "secrets_dir": {
+    "exists": true,
+    "mode": "0o700",
+    "files": [
+      "development.token",
+      "guardrail.token"
+    ]
+  }
+}

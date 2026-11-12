@@ -1,0 +1,14 @@
+# 열람 경로 확인 2026-11-12T09:15:42Z
+## 호스트 공유 작업공간 고정 경로
+/opt/rust/src/github.com/HeaInSeo/ieo_poc/docs/poc/progress/STATUS.md
+/opt/rust/src/github.com/HeaInSeo/ieo_poc/docs/poc/progress/STATUS.md mode=664 owner=heain size=10296
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0010` · 원장 SHA-256 `bd9abbe7b444e0f2287e74842de3e6610c7fc7fc1f7b9f00963d43497936a0ea`
+## main 브랜치 기준 원격(익명 HTTP, 인증 없음)
+200 https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md
+200 https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/RESULTS.md
+200 https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/TASKS.md
+200 https://raw.githubusercontent.com/HeaInSeo/ieo_poc/main/docs/poc/progress/STATUS.md
+## 원격 raw STATUS.md 머리(익명)
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0010` · 원장 SHA-256 `bd9abbe7b444e0f2287e74842de3e6610c7fc7fc1f7b9f00963d43497936a0ea`
+## 공유 작업공간을 main으로 되돌린 뒤(재확인 2026-11-12T09:16:02Z): branch main HEAD 417d6e3
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0010` · 원장 SHA-256 `bd9abbe7b444e0f2287e74842de3e6610c7fc7fc1f7b9f00963d43497936a0ea`

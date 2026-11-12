@@ -1,0 +1,119 @@
+{
+  "at": "2026-11-12T09:13:32+00:00",
+  "lab": "/opt/rust/ieo_poc_probe",
+  "dirs": {
+    "bin": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 2,
+      "names_digest": "f48a049eca542e97"
+    },
+    "e-secrets": {
+      "mode": "700",
+      "uid_in_ns": 0,
+      "entries": 5,
+      "names_digest": "8923534787ecf6ec"
+    },
+    "forge": {
+      "mode": "700",
+      "uid_in_ns": 20005,
+      "entries": 51,
+      "names_digest": "1f3c1502873f4fec"
+    },
+    "g2-src": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 12,
+      "names_digest": "892758636a399016"
+    },
+    "g3-cfg": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 9,
+      "names_digest": "1bcc80d4362abf8b"
+    },
+    "roles": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 269,
+      "names_digest": "87862c9de5207caa"
+    },
+    "roles-recreated": {
+      "mode": "755",
+      "uid_in_ns": 0,
+      "entries": 121,
+      "names_digest": "7434449d72fa008e"
+    },
+    "rx-data": {
+      "mode": "775",
+      "uid_in_ns": 20010,
+      "entries": 2,
+      "names_digest": "467b3e0c9822b211"
+    },
+    "snapshots": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 2,
+      "names_digest": "022106035739da01"
+    },
+    "snapshots-g": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 13,
+      "names_digest": "2ae98448cdc70514"
+    },
+    "testrepos": {
+      "mode": "775",
+      "uid_in_ns": 0,
+      "entries": 80,
+      "names_digest": "7eb59e1f18f79f2e"
+    }
+  },
+  "containers": {
+    "ieo-probe-pg": "exited",
+    "ieo-probe-rx": "exited",
+    "ieo-probe-forge": "exited"
+  },
+  "networks": [
+    "ieo-probe-coord",
+    "ieo-probe-forge"
+  ],
+  "timers": {
+    "claude-operator-tick": "ActiveState=active SubState=waiting UnitFileState=enabled",
+    "claude-guardrail-tick": "ActiveState=active SubState=waiting UnitFileState=enabled",
+    "claude-report-bridge": "ActiveState=active SubState=elapsed UnitFileState=enabled"
+  },
+  "roles": {
+    "development": {
+      "state": "700 20001",
+      "cred": "700 20001",
+      "etc": "755 0",
+      "state/claude": "700 20001",
+      "state/home": "700 20001",
+      "state/work": "700 20001",
+      "cred/oauth_token": "400 20001",
+      "sessions": "19"
+    },
+    "guardrail": {
+      "state": "700 20002",
+      "cred": "700 20002",
+      "etc": "755 0",
+      "state/claude": "700 20002",
+      "state/home": "700 20002",
+      "state/work": "700 20002",
+      "cred/oauth_token": "400 20002",
+      "sessions": "7"
+    }
+  },
+  "other_containers_not_touched": [
+    "local-registry"
+  ],
+  "secrets_dir": {
+    "exists": true,
+    "mode": "0o700",
+    "files": [
+      "development.token",
+      "guardrail.token"
+    ]
+  }
+}
