@@ -1997,13 +1997,14 @@
       "event_id": "01-04-FIRST-PROBES-20261112",
       "event_revision": 2,
       "task_id": "01-04",
-      "observed_at": "2026-11-12T16:23:54+09:00",
+      "observed_at": "2026-11-12T16:30:08+09:00",
       "state": "P1 지원 · P2 성립 확인 · P3 공유 확인(판정표 진행). PR #12 독립 검토 0303f3e reject(P2-1) → 4ada612 approve → 조건부 병합 64750e5 · main CI success · 자동 검토 P2(4547423210) 유효, 판정 영향 없음, 하네스 교정은 나머지 범위 PR",
       "evidence": [
         "reports/tasks/01-04/first-probes-20261112/REPORT.md",
         "reports/tasks/01-04/first-probes-20261112/reviews/review-pr12-0303f3e.md",
         "reports/tasks/01-04/first-probes-20261112/reviews/review-pr12-4ada612.md",
-        "https://github.com/HeaInSeo/ieo_poc/pull/12"
+        "https://github.com/HeaInSeo/ieo_poc/pull/12",
+        "https://github.com/HeaInSeo/ieo_poc/pull/12#discussion_r4547547000"
       ]
     }
   ],

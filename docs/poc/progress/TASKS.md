@@ -1,6 +1,6 @@
 # 주계획·후속 작업 상태
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0008` · 원장 SHA-256 `2ea758870bc6dc17f45ecd287280c7bd3423b79c9effa755d072b371c6c1da9c`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0008` · 원장 SHA-256 `fb89c7a7375a4aaa46e4af6423b73fcff2a60b02fbece33988816a22e90f168f`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
