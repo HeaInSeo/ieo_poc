@@ -1,0 +1,2 @@
+외부 $ref 해석 확인(2026-11-12, 로컬): SprintSpec_v0.schema.json 참조를 NoSuch.schema.json으로 바꾼 사본 검사
+→ "Error: ../docs/poc/NoSuch.schema.json", exit=2. 원본은 OK, exit=0.

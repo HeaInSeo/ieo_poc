@@ -1,0 +1,5 @@
+수동 변이 확인(2026-11-12, 로컬, crates/ieo-report). 각 변이 후 `cargo test -q -p ieo-report`, 확인 뒤 원본 복원.
+M1 decision/body 일치 검사 비활성        → FAILED 20 passed; 1 failed (decision_mismatch)
+M2 재알림 조건에서 새 증거 제거          → FAILED 20 passed; 1 failed (input4_reobservation_is_suppressed)
+M3 기한 전 late 검사 비활성              → FAILED 20 passed; 1 failed (late_before_deadline_rejected)
+복원 후: ok 1 / 21 passed

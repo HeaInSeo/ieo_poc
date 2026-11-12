@@ -1,0 +1,104 @@
+   Compiling ieo-spec v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc/crates/ieo-spec)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.60s
+     Running unittests src/lib.rs (target/debug/deps/ieo_report-d67be0fc981c12a4)
+
+running 1 test
+test tests::timestamps ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/report_contract.rs (target/debug/deps/report_contract-64065bdcc68d7bab)
+
+running 21 tests
+test claim_authorization ... ok
+test input4_reobservation_is_suppressed ... ok
+test render_has_five_parts_in_order ... ok
+test missing_contract_revision ... ok
+test finding_lacks_original_log ... ok
+test recommendation_must_be_an_option ... ok
+test estimated_without_measurement ... ok
+test developer_claims_verified ... ok
+test reversed_forecast ... ok
+test input2_lost_response_is_held_without_user_resend ... ok
+test reject_without_findings ... ok
+test decision_deadline_is_not_a_date ... ok
+test late_before_deadline_rejected ... ok
+test undecided_shown_normal ... ok
+test old_actor_string ... ok
+test delay_without_reason ... ok
+test wrong_actor_role ... ok
+test decision_mismatch ... ok
+test input1_current_ci_with_old_sha_approval_needs_current_review ... ok
+test input3_decision_request_is_actionable ... ok
+test four_role_examples_are_valid ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/ieo_spec-69758e7ab3e5903e)
+
+running 4 tests
+test digest::tests::keys_sorted_and_unicode_raw ... ok
+test digest::tests::digest_ignores_digest_field ... ok
+test rejection::tests::pointer_conversion ... ok
+test rejection::tests::code_serializes_screaming ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/ieo-spec.rs (target/debug/deps/ieo_spec-b5e3d5424d6b29ff)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/conversion.rs (target/debug/deps/conversion-cb3e4728bf5eacaa)
+
+running 11 tests
+test undecided_deadline_needs_reason ... ok
+test cycle_among_human_tasks ... ok
+test duplicate_task_names ... ok
+test reversed_estimate ... ok
+test missing_required_human_field ... ok
+test estimate_without_evidence_is_format_error ... ok
+test unresolved_prerequisite_matches_documented_example ... ok
+test deadline_set_requires_timestamp ... ok
+test ids_are_stable_for_same_input ... ok
+test criteria_outside_profile_go_to_semantic_review_not_approved ... ok
+test converts_to_valid_draft_with_ids_estimates_and_digest ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/registration.rs (target/debug/deps/registration-45c6659ec39b5dde)
+
+running 16 tests
+test all_nine_package_digests_reproduce ... ok
+test ready_without_repository_url_fails_format_layer ... ok
+test missing_field_is_distinguished ... ok
+test schema_violation_other_than_missing ... ok
+test digest_mismatch ... ok
+test baseline_poc01_draft_accepted_and_digest_matches_package ... ok
+test bound_ready_spec_accepted_for_executable_registration ... ok
+test prerequisite_with_wrong_plan_version_is_undefined ... ok
+test dependency_cycle ... ok
+test undefined_prerequisite ... ok
+test duplicate_task_id_within_spec ... ok
+test duplicate_task_id_across_registered_sprint ... ok
+test unknown_profile_item_and_unknown_profile ... ok
+test every_rejection_has_field_and_correction ... ok
+test revision_identity_conflict_and_idempotent_resubmit ... ok
+test unbound_draft_rejected_only_for_executable_registration ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+   Doc-tests ieo_report
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ieo_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0

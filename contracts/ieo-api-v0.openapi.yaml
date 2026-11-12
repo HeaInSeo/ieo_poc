@@ -1,0 +1,285 @@
+openapi: 3.1.0
+info:
+  title: ieo coordinator API v0
+  version: 0.4.0
+  summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
+  description: |
+    Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
+    - Registration acceptance is intake for semantic review, not execution intake or completion.
+    - Every non-2xx response leaves server state unchanged (0 state transitions, 0 events).
+    - `coordinator_to_client` data is `verified`; agent submissions are stored as `claim` only.
+    - The CLI test client uses only these endpoints. No UI is built in the PoC.
+servers:
+  - url: http://127.0.0.1:8080
+    description: PoC local (same-host phase); real binding decided in 01-04
+security:
+  - bearer: []
+tags:
+  - name: sprints
+  - name: agent
+paths:
+  /v0/sprints:
+    post:
+      tags: [sprints]
+      operationId: registerSprint
+      summary: Register a SprintSpec v0 revision
+      description: |
+        Required scope `sprints:register` for `target.repo_id`. Checks run in the 01-07 order
+        (format → reference → binding for `mode=executable`).
+        Same Idempotency-Key + same body → 200 with the stored result; same key + different body → 409.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: mode
+          in: query
+          required: false
+          schema: { type: string, enum: [draft, executable], default: draft }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '../docs/poc/SprintSpec_v0.schema.json' }
+      responses:
+        '201':
+          description: Accepted for semantic review (P01). Not execution intake.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistrationResult' }
+        '200':
+          description: Same sprint_id/revision/digest (or same Idempotency-Key + body) already registered.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistrationResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
+  /v0/sprints/{sprint_id}/revisions/{revision}:
+    get:
+      tags: [sprints]
+      operationId: getSprintRevision
+      summary: Read an immutable registered revision with its digest and review/intake state
+      description: Required scope `sprints:read` for the sprint's repo.
+      parameters:
+        - $ref: '#/components/parameters/SprintId'
+        - name: revision
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Registered revision
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [spec, digest, registration_state, review_state, registered_at]
+                properties:
+                  spec: { $ref: '../docs/poc/SprintSpec_v0.schema.json' }
+                  digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+                  registration_state: { type: string, enum: [draft, ready] }
+                  review_state: { type: string, enum: [pending_semantic_review, semantic_review_passed, semantic_review_rejected] }
+                  registered_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v0/sprints/{sprint_id}/state:
+    get:
+      tags: [sprints]
+      operationId: getSprintState
+      summary: Current verified state rebuilt from events; agent claims in a separate field
+      description: Required scope `sprints:read`. Reading never creates events or notifications.
+      parameters:
+        - $ref: '#/components/parameters/SprintId'
+      responses:
+        '200':
+          description: Current state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SprintState' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v0/sprints/{sprint_id}/events:
+    get:
+      tags: [sprints]
+      operationId: listSprintEvents
+      summary: Ordered event page (event_id + event_revision), cursor-based
+      description: |
+        Required scope `sprints:read`. Order is the server commit order and is stable across reads.
+        Repeated reads with the same cursor return the same page and never create notifications or state transitions.
+      parameters:
+        - $ref: '#/components/parameters/SprintId'
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Event page
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [events, next_cursor]
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: '../docs/poc/ProgressReport_v0.schema.json' }
+                  next_cursor: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v0/agent/reports:
+    post:
+      tags: [agent]
+      operationId: submitAgentReport
+      summary: Agent progress/checkpoint/review claim (role credential only)
+      description: |
+        Required scope `agent:report` bound to exactly one (repo_id, role) by the credential.
+        Accepted only with `channel=agent_to_coordinator`, `evidence_level=claim`,
+        `actor.role` equal to the credential's role, and `report_type` allowed for that role
+        (development → development_progress, guardrail → guardrail_review).
+        `verified`, `coordinator_verdict` and `decision_request` from an agent credential → 403, state unchanged.
+        `(event_id, event_revision)` is the idempotency key: same content → 200, different content → 409.
+        A stored claim is never a completion verdict.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '../docs/poc/ProgressReport_v0.schema.json' }
+      responses:
+        '202':
+          description: Claim stored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClaimReceipt' }
+        '200':
+          description: Same event_id/event_revision and same content already stored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClaimReceipt' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: |
+        Opaque token mapped server-side to {principal, kind: user|service|agent, scopes, repo_ids, role?}.
+        Names/labels inside request bodies are never trusted for authorization.
+  parameters:
+    SprintId:
+      name: sprint_id
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  responses:
+    Rejected:
+      description: Rejected; no state change. Body lists every correctable problem (01-07 codes).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RejectionList' }
+    Unauthenticated:
+      description: Missing/invalid credential; no state change.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Credential lacks the scope, repo or role (e.g. agent claiming verified); no state change.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Unknown sprint/revision, or not visible to this principal.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [UNAUTHENTICATED, SCOPE_DENIED, REPO_SCOPE_DENIED, ROLE_MISMATCH, VERIFIED_FROM_AGENT_DENIED, NOT_FOUND]
+        message: { type: string, minLength: 1 }
+    Rejection:
+      type: object
+      additionalProperties: false
+      required: [code, field, message, correction, retryable_after_edit]
+      properties:
+        code:
+          type: string
+          enum: [MISSING_FIELD, SCHEMA_VIOLATION, DIGEST_MISMATCH, DUPLICATE_TASK_ID, UNDEFINED_PREREQUISITE,
+                 DEPENDENCY_CYCLE, UNKNOWN_PROFILE_ITEM, UNBOUND_DRAFT, REVISION_CONFLICT,
+                 UNRESOLVED_PREREQUISITE, DUPLICATE_TASK_NAME, ESTIMATE_RANGE_REVERSED,
+                 IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR]
+        field: { type: string }
+        message: { type: string, minLength: 1 }
+        correction: { type: string, minLength: 1 }
+        retryable_after_edit: { type: boolean }
+    RejectionList:
+      type: object
+      additionalProperties: false
+      required: [rejections]
+      properties:
+        rejections:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Rejection' }
+    RegistrationResult:
+      type: object
+      additionalProperties: false
+      required: [sprint_id, revision, digest, state]
+      properties:
+        sprint_id: { type: string }
+        revision: { type: integer, minimum: 1 }
+        digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        state: { type: string, enum: [ACCEPTED_FOR_SEMANTIC_REVIEW, ALREADY_REGISTERED] }
+    ClaimReceipt:
+      type: object
+      additionalProperties: false
+      required: [event_id, event_revision, stored_at, evidence_level]
+      properties:
+        event_id: { type: string }
+        event_revision: { type: integer, minimum: 1 }
+        stored_at: { type: string, format: date-time }
+        evidence_level: { const: claim }
+    SprintState:
+      type: object
+      additionalProperties: false
+      required: [sprint_id, sprint_revision, verified, latest_claims, last_observed_at, delivery]
+      properties:
+        sprint_id: { type: string }
+        sprint_revision: { type: integer, minimum: 1 }
+        verified:
+          description: Latest coordinator_to_client report per task (evidence_level=verified), or null before any verdict.
+          type: array
+          items: { $ref: '../docs/poc/ProgressReport_v0.schema.json' }
+        latest_claims:
+          description: Latest agent claims, kept separate so a client cannot mistake them for verdicts.
+          type: array
+          items: { $ref: '../docs/poc/ProgressReport_v0.schema.json' }
+        last_observed_at: { type: [string, 'null'], format: date-time }
+        delivery:
+          description: External delivery of the latest verified report; independent of task verdicts.
+          type: string
+          enum: [pending, sent, unknown]

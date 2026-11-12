@@ -37,14 +37,29 @@ pub enum Code {
     DuplicateTaskName,
     /// Estimate range with min > max (human `expected_duration` or spec `estimate.range_seconds`).
     EstimateRangeReversed,
+    // --- API / report layer (01-08) ---
+    /// Same Idempotency-Key with a different request body (HTTP 409).
+    IdempotencyKeyConflict,
+    /// Same (event_id, event_revision) with different content (HTTP 409).
+    EventContentConflict,
+    /// Report passes JSON Schema but breaks a rule the schema cannot express (HTTP 422).
+    ReportSemanticViolation,
+    /// Unknown or expired event cursor (HTTP 400).
+    InvalidCursor,
 }
 
 impl Code {
     /// HTTP status the registration API (01-08 / plan §1.6) maps this code to.
     pub fn http_status(self) -> u16 {
         match self {
-            Code::MissingField | Code::SchemaViolation | Code::DuplicateTaskName => 400,
-            Code::RevisionConflict | Code::TaskIdConflict => 409,
+            Code::MissingField
+            | Code::SchemaViolation
+            | Code::DuplicateTaskName
+            | Code::InvalidCursor => 400,
+            Code::RevisionConflict
+            | Code::TaskIdConflict
+            | Code::IdempotencyKeyConflict
+            | Code::EventContentConflict => 409,
             Code::DigestMismatch
             | Code::DuplicateTaskId
             | Code::UndefinedPrerequisite
@@ -52,7 +67,8 @@ impl Code {
             | Code::UnknownProfileItem
             | Code::UnboundDraft
             | Code::UnresolvedPrerequisite
-            | Code::EstimateRangeReversed => 422,
+            | Code::EstimateRangeReversed
+            | Code::ReportSemanticViolation => 422,
         }
     }
 }
