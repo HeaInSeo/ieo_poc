@@ -108,7 +108,7 @@
     "main_denominator": 73,
     "followup_denominator": 12
   },
-  "current_internal_links_checked": 184,
+  "current_internal_links_checked": 193,
   "report_contract_checks": {
     "human_input_checks": {
       "valid_without_estimate": true,
@@ -136,7 +136,7 @@
   "package_integrity": {
     "delivered": 120,
     "amended": 11,
-    "gitignored_paper_pdfs_absent": 4,
+    "gitignored_paper_pdfs_absent": 0,
     "amendment": "v1.3.3-A1"
   }
 }

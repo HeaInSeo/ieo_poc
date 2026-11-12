@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0006",
-  "snapshot_created_at": "2026-11-12T14:22:39+09:00",
-  "last_actual_work_observed_at": "2026-11-12T14:22:39+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0007",
+  "snapshot_created_at": "2026-11-12T14:43:24+09:00",
+  "last_actual_work_observed_at": "2026-11-12T14:43:24+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "01-04 · 역할별 자격(A) 사용자 발급 대기 · 02-03 선행 교정(L08) PR 준비",
+  "phase": "01-04 · 역할별 자격(A) 사용자 발급 대기 · 계획·하네스 실행 전 고정(a321cd2)",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -73,7 +73,7 @@
         "https://github.com/HeaInSeo/ieo_poc/pull/7"
       ],
       "next_action": "later 항목은 각 첫 실행 전 동결 증거. L08 교정 PR(02-03 전)",
-      "unresolved": "L01 토큰 포함 누적 한도, L02 EARLY-01 계측·기대값, L03 실험별 기대값, L04 P26 표본(NodeKit 후보 3건뿐·정책 대기 이슈·분할 후보 계수 — 07-01 동결 전 사용자 결정), L05 P36 봉인 방식·표본, L06 07-04 별도 표본, L07 D12 권한·판정 의미, L08 두 결함 교정, L09 P12 치명적 오해 정의(F07 분리는 사용자 확인 대상)"
+      "unresolved": "L01 토큰 포함 누적 한도, L02 EARLY-01 계측·기대값, L03 실험별 기대값, L04 P26 표본(NodeKit 후보 3건뿐·정책 대기 이슈·분할 후보 계수 — 07-01 동결 전 사용자 결정), L05 P36 봉인 방식·표본, L06 07-04 별도 표본, L07 D12 권한·판정 의미, L08 두 결함 교정 완료(PR #10 병합 066f5fb), L09 P12 치명적 오해 정의(F07 분리는 사용자 확인 대상)"
     },
     {
       "task_id": "01-04",
@@ -82,15 +82,15 @@
       "group": "핵심",
       "kind": "준비",
       "status": "조건 대기",
-      "last_observed_at": "2026-11-12T14:22:39+09:00",
+      "last_observed_at": "2026-11-12T14:43:24+09:00",
       "latest_report": null,
-      "result_state": "미실행 · 선행 01-03 검수 완료. 역할별 자격 2개(A: 같은 구독의 역할별 장기 토큰) 사용자 발급 대기",
+      "result_state": "미실행(모델 요청 0회) · 계획·하네스 실행 전 고정(브랜치 task/01-04-probes a321cd2) · 역할별 자격 2개(A) 사용자 발급 대기 · 계획·준비 증거는 01-04 결과 PR에서 main에 들어옴(PROBE_PLAN.md, container-smoke.txt)",
       "verification_level": "unverified",
       "evidence": [
         "reports/tasks/01-03/staged-freeze-20261112/evidence/host-isolation-check.txt"
       ],
       "next_action": "사용자가 개발·Guardrail 토큰 2개를 비밀 기록 없이 전달 → P1 동시 두 세션 → P2 자격·세션·저장소 격리 → P3 한도 구조(판정표 A1-GATE-01-04, 30회·7,200초·시도당 300초)",
-      "unresolved": "역할별 자격 미발급. 호스트 sudo 없음, rootless podman·sub-UID 있음(P2 UID 경계 후보, 동작 미확인)"
+      "unresolved": "역할별 토큰 미발급(/opt/rust/ieo_poc_secrets/{development,guardrail}.token). 수단 가용성(rootless podman·sub-UID·UID 20001 실행·호스트 로그인 비노출)은 확인, 역할 간 접근 차단 성공은 미시험(P2)"
     },
     {
       "task_id": "01-05",
@@ -1817,10 +1817,11 @@
     "01-02 후속(비차단): S1 개발 push 토큰의 API 병합 가능성→main에 개발이 만들 수 없는 판정 체크 요구(05-03/P07), S2 workflows 권한(P20/P23), S3 Guardrail GitHub 측 재현·설정 재조회 경로, S4 격리 실행기 범위(02-06/03-07)·의존성 캐시, S5 계약 문구 2곳.",
     "D11 반영: 제3자 PDF는 현재 파일 목록에서 삭제·원문 링크 대체(공개본 SHA-256 동일). 커밋 d92b414~PR #7 이전 이력에는 남음(이력 재작성 안 함).",
     "GitHub 계정 1개: 독립 검토는 PR 댓글+원장 기록이며 GitHub Approve로 강제되지 않음. chatgpt-codex-connector[bot] 자동 검토는 보조 정보로만 취급.",
-    "01-07 후속(비차단): N1 옛 revision 실행 등록·승격(L08 교정 PR로 진행), N2 생성 ID 충돌 시 부수 순환 보고, N3 비현실적 예상값·2^53 초과, N4 ready+미바인딩 400 vs §1.6 422 명시(01-08), N5 소수 증거값 문자열화. §1.4 공백 G1~G8의 contract revision 5 여부는 사용자 결정.",
-    "01-08 후속(02-03 구현 전 반영): N1(L08 교정 PR로 진행) STALE_ASSIGNMENT 늦은 결과를 원 SHA·배정에 귀속 보존(§1.9)·멱등 재생을 배정 대조보다 먼저·에이전트 재조회 경로, N2 completion_summary가 첫 공백 뒤 확인 범위를 숨김; P3 N3 분수 9자리·음수 오프셋 시험, N4 순서·동일 시각 과다 알림, N5 Guardrail의 불변 명세 revision 조회, N6 ConversionResult additionalProperties·409 명시, N7 evidence 머리글 SHA.",
+    "01-07 후속(비차단): N1 옛 revision 실행 등록·승격(L08 교정 완료, PR #10), N2 생성 ID 충돌 시 부수 순환 보고, N3 비현실적 예상값·2^53 초과, N4 ready+미바인딩 400 vs §1.6 422 명시(01-08), N5 소수 증거값 문자열화. §1.4 공백 G1~G8의 contract revision 5 여부는 사용자 결정.",
+    "01-08 후속(02-03 구현 전 반영): N1(L08 교정 완료, PR #10) STALE_ASSIGNMENT 늦은 결과를 원 SHA·배정에 귀속 보존(§1.9)·멱등 재생을 배정 대조보다 먼저·에이전트 재조회 경로, N2 completion_summary가 첫 공백 뒤 확인 범위를 숨김; P3 N3 분수 9자리·음수 오프셋 시험, N4 순서·동일 시각 과다 알림, N5 Guardrail의 불변 명세 revision 조회, N6 ConversionResult additionalProperties·409 명시, N7 evidence 머리글 SHA.",
     "01-03 검토 P3(비차단): N1 검증기의 rev4→5 차이 집합이 개정 색인 의존(rev 4 프로파일 digest 고정 권고), N2 명세 최상위 amendments가 스프린트 digest에 묶이지 않음, N3 배정 경로 차단 주체 미기재, N4 낡은 문구 3곳, N5 동결 대장에 체크포인트 임계값·idle 정책 항목 없음, N6 probe 구간 F06 재개는 7,200초 안에서 실질 3회·'CLI 기동' 표현, N7 p26-raw 커밋 JSON의 이메일·서명 축약 권고, N8 호스트 점검 기록 최소화, N9 P26 근거의 shallow clone 줄 번호.",
-    "PR #7 자동 검토 P2(814a5fb): validate_package.py --write가 전달본 v1_3_3_validation.json을 덮어써 다음 검산 실패(재현). 별도 경로 저장으로 교정 PR 예정."
+    "PR #9 검토 P3: 쓰기 거부가 assert라 python -O로 우회, validation/ mkdir 없음, write-fixed 증거의 결과 SHA가 최종 파일과 다름(재현은 됨), L04 기록에 sori S6 약함 미기재.",
+    "PR #10 검토 P3(02-03 착수 시 처리): N1 01-08 계약 검사 순서·409 목록에 ASSIGNMENT_SHA_MISMATCH 누락·OpenAPI 'An An' 오타·null 본문 SHA 규칙 미기재, N2 Registry가 digest 재계산 없이 호출자 문자열 신뢰, N3 Replay 영수증 counts_for_current_judgment 재계산 미구현(항상 false), N4 판정 입력은 판정 시점의 현재 배정으로 정의·시험 필요, N5 cargo-test 로그 머리줄 '1 changes' 설명 없음. review_currency는 처분을 모름(F6)."
   ],
   "notes": [
     "등록 전 분모는 73/12이며 현재 실행 진척은 이 원장에 기록한다.",
@@ -1829,7 +1830,8 @@
     "2026-11-12 원격 개발 서버 /opt/rust/src/github.com/HeaInSeo/ieo_poc/docs/poc 로 배치. 작업공간 준비는 작업 완료로 세지 않는다. 문서 검산 PASS는 런타임 검증이 아니다.",
     "이 대화를 수행하는 Claude Code 세션은 PoC 개발 도구이며 01-02의 제품 런타임 선택/승인으로 간주하지 않는다.",
     "01-08 초안은 01-07 검토 중 로컬 브랜치(task/01-08-report-api)에 먼저 작성했다. PR 제출·수용은 01-07 검수 완료 뒤에만 한다.",
-    "v1.3.3-A1(2026-11-12 사용자 결정): 01-03 단계별 동결, 01-04 판정표 A1-GATE-01-04, 9개 명세·프로파일 rev 5. 작업 수 73/31·12/5 불변. 01-03 검수 완료는 모든 실험값 동결이 아니다."
+    "v1.3.3-A1(2026-11-12 사용자 결정): 01-03 단계별 동결, 01-04 판정표 A1-GATE-01-04, 9개 명세·프로파일 rev 5. 작업 수 73/31·12/5 불변. 01-03 검수 완료는 모든 실험값 동결이 아니다.",
+    "2026-11-12 사용자 후속 지시(User_Decisions_2026-11-12_followup.md): --write 처분(PR #9), L08 착지(PR #10), P26 6+6 유지·부족분 기록·01-04 비차단, 수단 가용성과 실제 차단 성공의 증거 구분."
   ],
   "events": [
     {
@@ -1956,24 +1958,50 @@
         "reports/tasks/01-03/staged-freeze-20261112/reviews/review-pr7-814a5fb.md",
         "https://github.com/HeaInSeo/ieo_poc/pull/7"
       ]
+    },
+    {
+      "event_id": "VALIDATOR-WRITE-20261112",
+      "event_revision": 1,
+      "task_id": null,
+      "observed_at": "2026-11-12T14:43:24+09:00",
+      "state": "자동 검토 P2 유효(재현) → PR #9 독립 검토 2fc943c approve → 조건부 병합 36bce10 · main CI success",
+      "evidence": [
+        "reports/workspace/validate-write-20261112/REPORT.md",
+        "reports/workspace/validate-write-20261112/reviews/review-pr9-2fc943c.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/9"
+      ]
+    },
+    {
+      "event_id": "L08-PREREQ-0203-20261112",
+      "event_revision": 1,
+      "task_id": null,
+      "observed_at": "2026-11-12T14:43:24+09:00",
+      "state": "PR #10 독립 검토 e691dfa reject(F1 본문 SHA) → ea902dd approve → 조건부 병합 066f5fb · main CI success(3 job). 시험 78·변이 15/15 @8eb2f98",
+      "evidence": [
+        "reports/workspace/prereq-0203-fixes-20261112/REPORT.md",
+        "reports/workspace/prereq-0203-fixes-20261112/reviews/review-pr10-ea902dd.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/10"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "01-03 검수 완료(PR #7 병합 4bd4eaf, 단계별 동결 v1.3.3-A1, main CI 3 job success). 01 스프린트 01-01·01-02·01-03·01-07·01-08 완료",
+    "last_verified_stage": "01-03 검수 완료(PR #7). 후속 PR #8(원장)·#9(--write)·#10(L08) 병합, main 066f5fb CI 3 job success",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main 4bd4eaf00ccab1307e651a6eebb9475f7f30cff6 (이 보고 PR 병합 전) · fix/02-03-prereq-stale-revision 3fbe970(4bd4eaf 위, L08 교정, PR 전) · fix/validate-write-path(4bd4eaf 위, 자동 검토 P2 --write 교정, 커밋 전)",
+    "branch_sha": "main 066f5fb64d6e972dd8d6e8b5a5a593422020565d (이 보고 PR 병합 전) · task/01-04-probes a321cd2(계획·하네스 고정, PR 전)",
     "plan_and_spec": "v1.3.3-A1 · 명세 9개 rev 5 · 프로파일 poc-acceptance-v1.3.3 rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR(report/01-03-accepted) 검토·병합. 런타임 세션 없음(01-04 모델 호출 0회)",
+    "running": "보고 PR(report/l08-landed). 런타임 세션 없음(01-04 모델 요청 0회)",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
       "reports/tasks/01-07/spec-contract-20261112/REPORT.md",
       "reports/tasks/01-08/report-api-contract-20261112/REPORT.md",
       "reports/tasks/01-03/decision-proposal-20261112/REPORT.md",
-      "reports/tasks/01-03/staged-freeze-20261112/REPORT.md"
+      "reports/tasks/01-03/staged-freeze-20261112/REPORT.md",
+      "reports/workspace/validate-write-20261112/REPORT.md",
+      "reports/workspace/prereq-0203-fixes-20261112/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "보고 PR 병합 → --write 교정 PR(사용자 후속 지시 1) → L08 교정 PR → 사용자 역할별 토큰 2개 수령 → 01-04 P1→P2→P3(판정표 A1-GATE-01-04, 예산 30회·7,200초·300초)",
+    "next_action": "사용자 역할별 토큰 2개 수령 → probe.py setup → P1 → P2 → P3(판정표 A1-GATE-01-04) → 01-04 결과 PR·독립 검토",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
