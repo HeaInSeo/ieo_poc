@@ -86,7 +86,7 @@ def claude_cmd(prompt_path, args, binary="/opt/claude/claude", pre=""):
             "rc=$?; echo \"#T_END $(date +%s.%N)\" >&2; exit $rc")
 
 
-def record(led, n, probe, role, argv, started, ended, rc, out, err, extra=None):
+def record(led, n, probe, role, argv, started, ended, rc, out, err, extra=None, check_stop=True):
     d = led.ev / "attempts" / f"{n:02d}-{probe}-{role}"
     d.mkdir(parents=True, exist_ok=True)
     out, l1 = led.mask(out)
@@ -128,7 +128,8 @@ def record(led, n, probe, role, argv, started, ended, rc, out, err, extra=None):
           f"err={meta['result_event'] and meta['result_event'].get('is_error')} leak={meta['token_in_output']} "
           f"marker={meta['marker_in_text']} denials={len((meta['result_event'] or {}).get('permission_denials') or [])} "
           f"rl={meta['rate_limit_status']}", flush=True)
-    stop_signals(meta)
+    if check_stop:
+        stop_signals(meta)
     return meta
 
 
@@ -160,12 +161,19 @@ def attempt(led, probe, role, prompt_key, prompt, args, label=None, background=F
 
 
 def finish(led, probe, role, bg, extra=None):
+    """Collect one attempt of a concurrent batch without the stop check; call stop_batch() after every member is
+    recorded, so a stop signal never leaves launched attempts unrecorded (PR #14 automated review 4547641003)."""
     n, argv, started, p = bg
     try:
         out, err = p.communicate(timeout=P.PER_ATTEMPT + 30)
     except subprocess.TimeoutExpired:
         p.kill(); out, err = p.communicate()
-    return record(led, n, probe, role, argv, started, P.now(), p.returncode, out, err, extra)
+    return record(led, n, probe, role, argv, started, P.now(), p.returncode, out, err, extra, check_stop=False)
+
+
+def stop_batch(metas):
+    for m in metas:
+        stop_signals(m)
 
 
 def save(ev, name, obj):
@@ -515,6 +523,7 @@ def cmd_n(ev):
     time.sleep(12)
     b = attempt(led, "N4b", "development", "n4b", q, f"{base} --resume {s['S_N']}", background=True)
     mb = finish(led, "N4b", "development", b); ma = finish(led, "N4a", "development", a)
+    stop_batch([mb, ma])
     lines = unshare(f"find {P.role_dir('development')}/state/claude/projects -name '{s['S_N']}*.jsonl' -exec wc -l {{}} +; find {P.role_dir('development')}/state/claude/projects -newer {P.role_dir('development')}/etc/prompts/n4a.txt -name '*.jsonl' -printf '%f\\n'", check=False).stdout
     out["N4"] = {k: {"attempt": x["attempt"], "exit_code": x["exit_code"], "session_id": (x["result_event"] or {}).get("session_id"), "result": (x["result_event"] or {}).get("result"),
                      "interval": x["claude_process_interval_epoch"]} for k, x in (("long", ma), ("concurrent", mb))}
@@ -554,6 +563,7 @@ def cmd_c(ev):
     for i, role in enumerate(("development", "development", "guardrail", "guardrail")):
         bgs.append((role, attempt(led, "C", role, f"c{i}", f"Reply with exactly: ok-c{i}", f"{NOTOOLS} --session-id {s['S_C'][i]}", background=True), s["S_C"][i]))
     ms = [(role, finish(led, "C", role, bg, {"issued_session_id": sid})) for role, bg, sid in bgs]
+    stop_batch([m for _, m in ms])
     iv = [m["claude_process_interval_epoch"] for _, m in ms]
     ok = all(m["result_event"] and not m["result_event"].get("is_error") and m["result_event"].get("session_id") == m["issued_session_id"] for _, m in ms)
     overlap = None if any(None in v for v in iv) else round(min(v[1] for v in iv) - max(v[0] for v in iv), 3)
