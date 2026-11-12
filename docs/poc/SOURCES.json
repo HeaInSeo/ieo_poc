@@ -267,7 +267,10 @@
     {
       "path": "07_supporting_research/FoundationDB_SIGMOD21.pdf",
       "size_bytes": 1053117,
-      "sha256": "ce786e9965dbc04f3e5ae1d57d6a895ee2dafb1b89f8f9c82355502895562b26"
+      "sha256": "ce786e9965dbc04f3e5ae1d57d6a895ee2dafb1b89f8f9c82355502895562b26",
+      "repository_state": "현재 공개 저장소 파일 목록에서 삭제(v1.3.3-A1, 사용자 결정 D11, 2026-11-12). 전달 ZIP·이전 커밋 이력에는 남음",
+      "public_url": "https://www.foundationdb.org/files/fdb-paper.pdf",
+      "public_url_sha256_matches": true
     },
     {
       "path": "07_supporting_research/References.md",

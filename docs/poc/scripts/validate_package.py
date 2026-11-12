@@ -37,7 +37,8 @@ def validate(root):
     removed=sorted((k,p['task_id']) for k in old for p in old[k]['prerequisites'] if p['task_id'] not in g[k])
     assert added==[('07-01','04-16')] and not removed and g['04-16']==['04-09','01-03']
     out['dependency_delta']={'existing_added':added,'removed':removed,'new_task':{'04-16':g['04-16']}}
-    changed=sorted(k for k in old if old[k]['acceptance']['criteria']!=byid[k]['acceptance']['criteria'])
+    p4items=next(q for q in spec['inspection_profiles'] if q['revision']==4)['items']
+    changed=sorted(k for k in old if old[k]['acceptance']['criteria']!=p4items[k+'.accept'])
     assert changed==sorted(['01-02','01-03','01-04','01-07','01-08','02-01','07-01','07-04','09-02','09-03'])
     for k in old:
         if k not in ['01-07','01-08']:assert byid[k]['outputs']==old[k]['outputs']
@@ -45,17 +46,21 @@ def validate(root):
     assert '04-16' in ancestors(g,'07-02') and '04-16' in ancestors(g,'07-03')
     assert '04-15' not in ancestors(g,'07-02')
     out['ancestor_counts']={k:len(ancestors(g,k)) for k in ['04-03','05-05','07-01','07-02']};out['changed_acceptance_ids']=changed
-    profile=spec['inspection_profiles'][0];digests=[]
+    amend=json.loads((root/'Amendment_v1.3.3-A1.json').read_text());profiles={(q['profile_id'],q['revision']):q for q in spec['inspection_profiles']}
+    assert sorted(profiles)==[('poc-acceptance-v1.3.3',4),('poc-acceptance-v1.3.3',5)];p4=profiles[('poc-acceptance-v1.3.3',4)];p5=profiles[('poc-acceptance-v1.3.3',5)]
+    assert sorted(k for k in p4['items'] if p4['items'][k]!=p5['items'][k])==sorted(c+'.accept' for c in amend['changed_acceptance']) and set(p4['items'])==set(p5['items'])
+    revs={x['sprint_id']:x['revision'] for x in amend['sprint_revisions']};digests=[]
     for s in spec['sprints']:
         jsonschema.Draft202012Validator(schema,format_checker=jsonschema.FormatChecker()).validate(s)
-        assert s['revision']==4 and s['contract_revision']==4 and s['registration_state']=='draft'
+        assert s['revision']==revs.get(s['sprint_id'],4) and s['contract_revision']==4 and s['registration_state']=='draft'
         assert canonical_digest({k:v for k,v in s.items() if k!='digest'})==s['digest']
         for ref in s['sources']:assert hashlib.sha256((root/ref['ref']).read_bytes()).hexdigest()==ref['digest']
         for t in s['tasks']:
-            a=t['acceptance'];assert a['profile_id']==profile['profile_id'] and a['profile_revision']==profile['revision']==4
+            a=t['acceptance'];profile=profiles[(a['profile_id'],a['profile_revision'])]
+            assert a['profile_revision']==(5 if t['task_id'] in amend['changed_acceptance'] else 4)
             assert a['criteria']==t['exit_condition']==profile['items'][a['item_ids'][0]]
             assert all(d['plan_version']=='v1.3.3' for d in t['prerequisites'])
-        digests.append({'sprint_id':s['sprint_id'],'revision':4,'digest':s['digest']})
+        digests.append({'sprint_id':s['sprint_id'],'revision':s['revision'],'digest':s['digest']})
     out['sprint_digests']=digests;out['schema_errors']=0
     ledger={}
     for line in (root/'Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md').read_text().splitlines():
@@ -82,6 +87,18 @@ def validate(root):
             assert (p.parent/unquote(ref)).exists(),(str(p),ref);links+=1
     out['current_internal_links_checked']=links
     out['report_contract_checks']=module(root/'scripts/validate_contracts.py','contracts').check(root)
+    sums={l[66:]:l[:64] for l in (root/'SHA256SUMS.txt').read_text().splitlines() if l.strip()};changed={c['path']:c for c in amend['files']};absent=0
+    assert set(changed)<=set(sums),'amendment lists a file outside the delivered package'
+    for path,orig in sums.items():
+        f=root/path
+        if path.startswith('progress/'):continue
+        if not f.exists() and path.startswith('03_paper_repo_pairs/') and path.endswith('.pdf'):absent+=1;continue
+        if path in changed:
+            c=changed[path];assert c['original_sha256']==orig,path
+            if c['change']=='removed_from_repository':continue
+            assert hashlib.sha256(f.read_bytes()).hexdigest()==c['sha256'],path
+        else:assert hashlib.sha256(f.read_bytes()).hexdigest()==orig,path
+    out['package_integrity']={'delivered':len(sums),'amended':len(changed),'gitignored_paper_pdfs_absent':absent,'amendment':amend['id']}
     return out
 if __name__=='__main__':
     ap=argparse.ArgumentParser();ap.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[1]);ap.add_argument('--write',action='store_true');a=ap.parse_args()

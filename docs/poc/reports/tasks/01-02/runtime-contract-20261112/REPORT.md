@@ -8,6 +8,7 @@
 | 사용자 선택 | **Claude Code CLI 우선 검증** — 2026-11-12 대화 원문 “01-02는 기존 권고대로 Claude Code CLI를 우선 검증 대상으로 선택할게. 설치 버전에서 실제 지원을 확인하고, 역할·인증·세션·재개 계약을 구체화해줘.” |
 | 산출물 | [Runtime_Contract_v0.md](Runtime_Contract_v0.md) (문서 revision 4) |
 | 검토 이력 | 7a39452 독립 검토 reject(F1 P1: 역할별 설정 신뢰·고정 인자 미정, F2~F4 P2, F5~F9 P3) → 교정 rev 2 → bf854bb reject(N1 P1: Guardrail이 검토 대상 실행 시 같은 UID로 Guardrail 자격 노출, N2~N4 P2, N5~N7 P3) → 교정 rev 3 → 2e5a5ef reject(R1 P1: 읽기 전용 Guardrail이 P07/P20/P24의 독립 재현·재실행 의무와 모순, R2 P2 push 시점 제한 수단 없음, R3~R4 P3) → 교정 rev 4 |
+| 검수 뒤 개정 | 문서 revision 5(2026-11-12, [개정 v1.3.3-A1](../../../../Amendment_v1.3.3-A1.md), 01-03 PR): 사용자 결정 D1·D2에 따라 §3 자격 방식 A, §8 판정표 A1-GATE-01-04, §9만 변경. 01-02의 검수 기록(rev 4)은 그대로 두며, 변경 범위는 01-03 독립 검수에서 재검증한다 |
 
 ## 수용 기준 대조
 

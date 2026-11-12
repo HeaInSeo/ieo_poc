@@ -1,0 +1,262 @@
+{
+  "schema": "ieo.poc.freeze_register.v0",
+  "plan_version": "v1.3.3",
+  "amendment": "v1.3.3-A1",
+  "task_id": "01-03",
+  "run_id": "staged-freeze-20261112",
+  "decision_source": {
+    "ref": "User_Decisions_2026-11-12_0103.md",
+    "proposal_ref": "reports/tasks/01-03/decision-proposal-20261112/REPORT.md"
+  },
+  "rules": [
+    "단계별 동결: 01-03 검수 완료는 stage_0 항목의 동결과 later 항목의 담당·시점·차단 조건 인수만을 뜻한다. 모든 실험값이 동결됐다는 뜻이 아니다.",
+    "later 항목은 해당 첫 실행 전에 동결 증거(값 또는 값 문서의 SHA-256, 독립 담당, 동결 시각, 이 대장 항목 ID)가 원장에 있어야 하며 없으면 그 실행을 시작하지 않는다.",
+    "결과를 본 뒤 바꾼 기준은 새 revision으로 기록하고 최초 기준으로 소급하지 않는다.",
+    "상한·횟수는 재개·회차 ID 변경·브랜치 교체로 초기화하지 않는다.",
+    "이 대장은 작업 수를 늘리지 않는다(주계획 73·후속 12 유지)."
+  ],
+  "stage_0": [
+    {
+      "id": "F01",
+      "decision": "D1",
+      "item": "역할별 자격 방식",
+      "value": "A: 같은 구독 계정의 역할별 자격(역할마다 별도 장기 토큰). A+C·B·추가 API 과금은 채택하지 않음",
+      "owner": "사용자(자격 발급·교체·폐기). 런타임/에이전트는 발급하지 않음",
+      "applies_to": [
+        "01-04"
+      ]
+    },
+    {
+      "id": "F02",
+      "decision": "D1",
+      "item": "01-04 첫 세 probe 판정표",
+      "value_ref": "probe_gate_table.json",
+      "applies_to": [
+        "01-04"
+      ]
+    },
+    {
+      "id": "F03",
+      "decision": "D2",
+      "item": "01-04 첫 세 probe 예산·집계 방법",
+      "value": {
+        "model_request_attempts_total": 30,
+        "wall_clock_seconds_total": 7200,
+        "per_attempt_seconds": 300,
+        "additional_api_spend_usd": 0
+      },
+      "value_ref": "Probe_Budget_Rules.md",
+      "applies_to": [
+        "01-04"
+      ]
+    },
+    {
+      "id": "F04",
+      "decision": "D3",
+      "item": "작업당 독립 검토·교정 상한",
+      "value": {
+        "reviews_per_task_max": 4,
+        "corrections_per_task_max": 3
+      },
+      "on_limit": "해당 작업과 그 의존 작업을 보류하고 사람 결정을 요청한다. 의존 없는 작업은 계속한다",
+      "applies_to": [
+        "01-03 이후 모든 주계획·후속 작업(현재 외부 절차 포함)"
+      ]
+    },
+    {
+      "id": "F05",
+      "decision": "D4",
+      "item": "작업별 초기 시간 상한(스프린트 누적 상한과 별개)",
+      "value": {
+        "design_task_seconds": 3600,
+        "implementation_task_seconds": 14400,
+        "external_01_04_total_seconds": 14400,
+        "external_01_04_first_three_probes_seconds": 7200,
+        "external_02_01_implementation_seconds": 14400
+      },
+      "enforcement": "현재 개발 에이전트가 상한 도달 시 중단·원장 기록, 독립 검토자가 결과를 확인. 측정 구간: 작업 브랜치 첫 커밋 또는 첫 실행 명령 시각부터 검토 요청까지의 벽시계(검토 대기 제외)",
+      "applies_to": [
+        "01-04",
+        "01-05",
+        "01-06",
+        "02-01",
+        "이후 설계·구현 작업"
+      ]
+    },
+    {
+      "id": "F06",
+      "decision": "D6",
+      "item": "한도 해소 재개 probe",
+      "value": {
+        "provider_signal_first": true,
+        "fallback_first_after_seconds": 1800,
+        "fallback_interval_seconds": 1800,
+        "fallback_max_attempts": 10
+      },
+      "carry_over": "원 요청 대조와 누적 예산은 재개 후에도 유지",
+      "applies_to": [
+        "01-04",
+        "04-15",
+        "모든 실제 실행"
+      ]
+    },
+    {
+      "id": "F07",
+      "decision": "D7",
+      "item": "최소 P12 초안",
+      "value": {
+        "participants": 1,
+        "questions": 4,
+        "pass_correct": 4,
+        "critical_misreads_max": 0
+      },
+      "note": "이번에 동결한 것은 사용자가 유지를 결정한 수치(1명·4문항·4/4·치명적 오해 0건)뿐이다. 결정안 D7의 치명적 오해 정의는 사용자가 명시적으로 채택하지 않았으므로 제안 상태로 두고 L09에서 04-09 첫 실행 전에 동결한다(이 분리는 개발 에이전트의 해석이며 사용자 확인 대상)",
+      "applies_to": [
+        "04-09"
+      ]
+    },
+    {
+      "id": "F08",
+      "decision": "D11",
+      "item": "공개 repo의 제3자 PDF",
+      "value": "현재 파일 목록에서 삭제·원문 링크 대체·출처 색인 갱신. 이력 재작성 없음(이력 잔존 사실을 기록)",
+      "applies_to": [
+        "저장소"
+      ]
+    }
+  ],
+  "later": [
+    {
+      "id": "L01",
+      "decision": "D4",
+      "item": "토큰을 포함한 스프린트·실험 계열 누적 한도",
+      "adopted_now": "값 없음. 명세의 total_tokens=null(draft)은 유지하며 ready로 만들거나 등록 검사를 우회하지 않는다",
+      "owner": "개발 에이전트 제안(02-01 실측 근거) → 사용자 승인 → 독립 검토",
+      "freeze_before": "자기 repo를 포함한 코디네이터의 모든 실제 실행 등록(executable)·배정(첫 건만이 아니라 각 건 전에 해당 한도가 바인딩돼 있어야 함)",
+      "blocks": "한도가 바인딩되지 않은 모든 실제 실행 등록·배정",
+      "enforced_by": "등록 검사 UNBOUND_DRAFT(한도 null이면 실행 등록 거부) + 명세 limits.unresolved_reason"
+    },
+    {
+      "id": "L02",
+      "decision": "D5",
+      "item": "EARLY-01 예산·계측·기대값",
+      "adopted_now": {
+        "wall_clock_seconds": 28800,
+        "reviews_max": 4,
+        "total_tokens_max": 3000000,
+        "nature": "임시 예산, 완료 시간 예측 아님"
+      },
+      "owner": "계측: 02-01 산출물. 기대값: 개발 맥락 없는 독립 담당",
+      "freeze_before": "EARLY-01 첫 실행",
+      "blocks": "EARLY-01 착수",
+      "enforced_by": "실행 장부 EARLY-01 문단"
+    },
+    {
+      "id": "L03",
+      "decision": "D10",
+      "item": "실험별 정상/위반/경계 기대값(정상·실패 대조, 부트스트랩 시험 포함)",
+      "owner": "개발 맥락 없는 독립 담당",
+      "freeze_before": "해당 실험·회차의 첫 실행",
+      "blocks": "그 실행",
+      "enforced_by": "실행 장부·명세의 A1 읽기 규칙"
+    },
+    {
+      "id": "L04",
+      "decision": "D8",
+      "item": "P26 최초 표본",
+      "adopted_now": {
+        "nodekit": 6,
+        "sori": 6,
+        "unassisted_completion_target": "8/12",
+        "wrong_completion_max": 0,
+        "out_of_scope_effect_max": 0,
+        "denominator_rule": "실패·한도 대기 표본을 분모에서 빼지 않음"
+      },
+      "owner": "후보·선정 근거: 개발 에이전트(현재 백로그에서 기존 담당 작업 제외, 이번 회차에 스냅샷 준비, 07-01 진입 시 재대조). 선정·승인: 사용자. 확인: 독립 검토",
+      "freeze_items": [
+        "표본 목록",
+        "난도",
+        "처리시간 상한",
+        "비용 상한",
+        "보류 한도",
+        "공통 관측 기간"
+      ],
+      "freeze_before": "07-02·07-03 첫 실행",
+      "blocks": "07-02·07-03",
+      "candidate_snapshot": "후보·선정 근거는 사용자 요청에 따라 지금 준비해 이 회차에 첨부한다(P26_Candidates.md, 관측 시각·HEAD SHA 포함 스냅샷). 백로그가 바뀌므로 07-01 진입 시 다시 대조하며, 스냅샷은 동결 표본이 아니다",
+      "enforced_by": "실행 장부·명세 rev 5의 해당 작업 수용 기준(“첫 실행 전에 … 동결 증거가 없으면 시작하지 않는다”)"
+    },
+    {
+      "id": "L05",
+      "decision": "D9",
+      "item": "P36(04-16) 합성 평가",
+      "adopted_now": {
+        "authoring_sprints": 3,
+        "decision_scenarios": 12,
+        "standard_match_min": "5/6",
+        "decision_time_median": "표준 ≤ 자유×1.2, 건당 ≤ 300초",
+        "additional_questions": "표준 합 ≤ 자유 합",
+        "non_inferiority": "일치 수 표준 ≥ 자유−1",
+        "critical_misreads_max": 0,
+        "retest": "새 형식 버전·새 12건으로 1회까지",
+        "nature": "초기 탐색 기준. 속도 개선·일반 효과 입증으로 확대하지 않음"
+      },
+      "owner": "시나리오·정답·채점: 독립 출제·채점 담당만 접근. 개발·형식 작성 주체·평가 대상·참가자는 차단",
+      "sealing": "동일 UID의 0700 디렉터리만으로 봉인 완료를 주장하지 않는다. 봉인 방식(접근 주체가 다른 계정·호스트 등)과 접근 차단 증거를 함께 동결한다",
+      "freeze_items": [
+        "표본(작성 3·결정 12)",
+        "배정·제시 순서 seed",
+        "치명적 오해 정의",
+        "집계식",
+        "봉인 방식·증거",
+        "기한·예산"
+      ],
+      "freeze_before": "04-16 첫 실행",
+      "blocks": "04-16",
+      "enforced_by": "실행 장부·명세 rev 5의 해당 작업 수용 기준(“첫 실행 전에 … 동결 증거가 없으면 시작하지 않는다”)"
+    },
+    {
+      "id": "L06",
+      "decision": "D9",
+      "item": "07-04 실제 보고 재측정",
+      "owner": "독립 출제·채점 담당",
+      "freeze_items": [
+        "별도 표본",
+        "기한",
+        "예산"
+      ],
+      "freeze_before": "07-04 첫 실행",
+      "blocks": "07-04",
+      "enforced_by": "실행 장부·명세 rev 5의 해당 작업 수용 기준(“첫 실행 전에 … 동결 증거가 없으면 시작하지 않는다”)"
+    },
+    {
+      "id": "L07",
+      "decision": "D12",
+      "item": "계약 공백 중 권한·판정 의미(선행 증거·SHA 귀속·독립 판정·누적 재시도/한도·승인 및 제외 범위)",
+      "method": "구조화 필드 또는 버전·digest 고정 기계 판독 정책 참조 중 최소 방식",
+      "owner": "개발 에이전트(계약 revision) → 독립 검토",
+      "freeze_before": "02-03이 해당 의미를 사용하는 구현 착수",
+      "blocks": "02-03의 해당 의미 사용",
+      "deferred_part": "권한·판정에 영향이 없음을 확인한 표현 개선만 후속",
+      "enforced_by": "02-03 착수 전 확인(동결 대장)"
+    },
+    {
+      "id": "L08",
+      "decision": "사용자 지시(결함 교정)",
+      "item": "두 결함 교정. 01-08 N1: 합법적인 옛 배정의 늦은 결과는 원 SHA·배정에 보존하되 현재 판정에 사용하지 않고, 기존 요청의 멱등 재조회와 새 stale 실행 요청을 구분한다. 01-07 N1: 새 revision 뒤의 옛 revision 신규 실행 등록·승격을 거부하고, 기존 동일 요청의 역사적 결과 조회가 재활성화로 이어지지 않게 한다",
+      "owner": "개발 에이전트 → 독립 검토",
+      "freeze_before": "02-03 착수",
+      "blocks": "02-03",
+      "enforced_by": "02-03 착수 전 확인(동결 대장)"
+    },
+    {
+      "id": "L09",
+      "decision": "D7",
+      "item": "최소 P12의 치명적 오해 정의·문항",
+      "owner": "독립 담당",
+      "freeze_before": "04-09 첫 실행",
+      "blocks": "04-09",
+      "enforced_by": "실행 장부·명세 rev 5의 해당 작업 수용 기준(“첫 실행 전에 … 동결 증거가 없으면 시작하지 않는다”)"
+    }
+  ]
+}

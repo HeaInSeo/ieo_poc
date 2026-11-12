@@ -1,0 +1,153 @@
+{
+  "id": "v1.3.3-A1",
+  "date": "2026-11-12",
+  "plan_version": "v1.3.3",
+  "decision_ref": "User_Decisions_2026-11-12_0103.md",
+  "baselines_unchanged": {
+    "main_tasks": 73,
+    "main_experiments": 31,
+    "followup_tasks": 12,
+    "followup_candidates": 5
+  },
+  "profile_revisions": [
+    {
+      "profile_id": "poc-acceptance-v1.3.3",
+      "revision": 5,
+      "changed_items": [
+        "01-03.accept",
+        "01-04.accept",
+        "04-09.accept",
+        "04-16.accept",
+        "07-02.accept",
+        "07-03.accept",
+        "07-04.accept"
+      ]
+    }
+  ],
+  "sprint_revisions": [
+    {
+      "sprint_id": "POC-01",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-02",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-03",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-04",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-05",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-06",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-07",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-08",
+      "revision": 5
+    },
+    {
+      "sprint_id": "POC-09",
+      "revision": 5
+    }
+  ],
+  "changed_acceptance": [
+    "01-03",
+    "01-04",
+    "04-09",
+    "04-16",
+    "07-02",
+    "07-03",
+    "07-04"
+  ],
+  "note": "progress/ 아래 파일은 생성 화면이므로 이 대조에서 제외한다(원본은 state.json).",
+  "files": [
+    {
+      "path": "00_READ_FIRST.md",
+      "original_sha256": "1fd8a9a1e519eaa9d61486c771c76142734c428ebeacfcecf4a784d4d3a7753b",
+      "sha256": "984ff429366fb4da16f81a3583e185c833f1988a83bfc15732e2890817bd3091",
+      "change": "amended",
+      "reason": "A1 판정표 안내 문장"
+    },
+    {
+      "path": "06_remaining_checks/Runtime_and_Operational_Probe_Checklist.md",
+      "original_sha256": "1e01b82adfbfbfac7d709a4479c1f1695348e8c34352e29fc207c1c80c6e60b7",
+      "sha256": "70c9e06942bf7e5b5c43ee10067fb11484cbaa7eb93ccdcf1d217cea4a502a72",
+      "change": "amended",
+      "reason": "A1 판정표 안내 문장"
+    },
+    {
+      "path": "07_supporting_research/FoundationDB_SIGMOD21.pdf",
+      "original_sha256": "ce786e9965dbc04f3e5ae1d57d6a895ee2dafb1b89f8f9c82355502895562b26",
+      "change": "removed_from_repository",
+      "reason": "D11 공개 저장소 파일 목록에서 삭제(작업공간 사본은 .gitignore)"
+    },
+    {
+      "path": "07_supporting_research/References.md",
+      "original_sha256": "eb2ae7b34b225a540dca1eb6d59c18a6b340172aa7ac927d221149bb8a242588",
+      "sha256": "18eba5afc30d8ad8149891f8febd55eb586fa61fd2732bad8907a351beef04c7",
+      "change": "amended",
+      "reason": "D11 원문 링크 대체"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md",
+      "original_sha256": "23f6b3245f9894670ddbd0dab5318a3af80ab4808d0c45c7acfa16a9ff079962",
+      "sha256": "e0003625f11dae8e8e6bd3fcf48564c95c34065e2bf13f68c1caae9410b69ac4",
+      "change": "amended",
+      "reason": "7개 수용 기준을 명세 rev 5와 같은 문장으로, A1 읽기 규칙, EARLY-01 문단"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Validation_Plan.md",
+      "original_sha256": "96b6950273d7f1b4f0e7ea7da1253eb67230c2b4f12a29fa047ba7f38273fa1d",
+      "sha256": "4d483cf80f506b7fa542a24340686f4bd92ad2c5f401f861a205b8b5e6ff34b5",
+      "change": "amended",
+      "reason": "A1 개정 문단(단계별 동결·판정표)"
+    },
+    {
+      "path": "Console_Coordinator_Sprints_v0.json",
+      "original_sha256": "e12e07ee5d027371b4af6a58b197cff382737751caafc55699a0d15fd2b0a763",
+      "sha256": "0a29a8237081ac4368c4839fe684cbb82561e7d18cf303d526c5e6cc92182e56",
+      "change": "amended",
+      "reason": "프로파일 rev 5 추가, POC-01 rev 5(01-03·01-04 수용 기준, 출처, limits 사유)"
+    },
+    {
+      "path": "DEV_AGENT_HANDOFF.md",
+      "original_sha256": "45e4bc8be294a939a0302b1d8cb3ad0d88ad9151e6e15e9d8d768fac485f6720",
+      "sha256": "f028b0912c0026bf43278606662331783d924b0965205a731571c2851a003cf0",
+      "change": "amended",
+      "reason": "A1 판정표 안내 문장"
+    },
+    {
+      "path": "P36_Protocol_and_Measurement.md",
+      "original_sha256": "095fa1474bca42541d612a92f3b3f98152f30b4dd186ee95a3e93d3973ad3693",
+      "sha256": "00e5ac6c5be9e1e52daf94138af131b4a5efdcc63596efefdcd08bd66177fc27",
+      "change": "amended",
+      "reason": "A1 단계별 동결·D9 초기 탐색 기준"
+    },
+    {
+      "path": "SOURCES.json",
+      "original_sha256": "0d499fca1cd53ec17f5f0a8aa3444be9d146064a31afd0a6787a76dd49e950ce",
+      "sha256": "1c161d29a74932ddd0d11d0dffe429fefe44986647ebdadae11b51580c50a18d",
+      "change": "amended",
+      "reason": "D11 저장소 상태·공개 URL 표기"
+    },
+    {
+      "path": "scripts/validate_package.py",
+      "original_sha256": "bd43577b73f090c9f89c6685660e0f2063d546521661f8dc79f816b8ecc2448c",
+      "sha256": "b77439b0b984effce1efa9ec310176e12b11aceffa7395d131a80077de3dee1c",
+      "change": "amended",
+      "reason": "A1 revision·패키지 무결성 대조"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# D11 원문 링크 대조 (2026-11-12T04:53:36Z)
+$ curl -sIL -o /dev/null -w "%{http_code} %{content_type} %{url_effective}" https://www.foundationdb.org/files/fdb-paper.pdf
+200 application/pdf https://www.foundationdb.org/files/fdb-paper.pdf
+$ curl -sL https://www.foundationdb.org/files/fdb-paper.pdf | sha256sum
+ce786e9965dbc04f3e5ae1d57d6a895ee2dafb1b89f8f9c82355502895562b26  -
+$ grep FoundationDB docs/poc/SHA256SUMS.txt
+ce786e9965dbc04f3e5ae1d57d6a895ee2dafb1b89f8f9c82355502895562b26  07_supporting_research/FoundationDB_SIGMOD21.pdf
+$ git log --format="%h %ad %s" --date=iso-strict -- docs/poc/07_supporting_research/FoundationDB_SIGMOD21.pdf
+d92b414 2026-11-12T08:33:15+09:00 docs/poc: import Console Coordinator package v1.3.3 baseline
