@@ -1,0 +1,8 @@
+# 이 회차 evidence 생성 명령 (2026-11-12, 개발 서버, 사용자 heain). 모델 호출·세션 생성·로그인 없음.
+claude --version                       > claude-version.txt
+claude --help                          > claude-help.txt   (끝에 exit= 줄 추가)
+claude auth --help                     > claude-auth-help.txt
+claude auth status | sed -E '<메일·UUID 가림>' > claude-auth-status.redacted.txt
+strings "$(readlink -f "$(which claude)")" | grep -oE 'CLAUDE_CONFIG_DIR|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY|CLAUDE_CODE_ENABLE_TELEMETRY|OTEL_METRICS_EXPORTER' | sort | uniq -c > env-var-strings.txt
+codex --version                        > codex-version.txt
+# 공개 repo 노출: 호스트 사용자명(/home/heain 경로), 로그인 만료 시각, 구독 등급이 auth status에 남는다(비밀 아님). 메일·org ID·org 이름은 가렸다.
