@@ -1,0 +1,19 @@
+{
+  "old_binary": {
+    "path": "/opt/rust/ieo_poc_probe/bin/claude-2.1.316",
+    "sha256": "fd13c70000fec3f2116dfbcbb6121210b4a29328bf0e46210a59dd594a67d824",
+    "source_sha256": "fd13c70000fec3f2116dfbcbb6121210b4a29328bf0e46210a59dd594a67d824"
+  },
+  "R1": {
+    "attempt": 24,
+    "version": "2.1.316",
+    "session_id": "228beaa8-5a42-46ef-b9a7-93c418719718"
+  },
+  "R2": {
+    "attempt": 25,
+    "version": "2.1.322",
+    "session_id": "228beaa8-5a42-46ef-b9a7-93c418719718",
+    "result": "KESTREL-62F61D-R",
+    "codeword_recalled": true
+  }
+}

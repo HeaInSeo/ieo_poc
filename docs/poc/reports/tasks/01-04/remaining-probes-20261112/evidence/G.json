@@ -1,0 +1,807 @@
+{
+  "G1": {
+    "attempt": 5,
+    "init": {
+      "session_id": "eb27a4ed-0996-41b5-919e-dc7d93858be8",
+      "tools": [
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read",
+        "Write"
+      ],
+      "mcp_servers": [],
+      "slash_commands": [],
+      "skills": [],
+      "agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "Plan",
+        "statusline-setup"
+      ],
+      "plugins": [
+        {
+          "name": "cc-plugin-agents-md",
+          "path": "builtin",
+          "source": "cc-plugin-agents-md@builtin"
+        },
+        {
+          "name": "cc-plugin-telemetry",
+          "path": "builtin",
+          "source": "cc-plugin-telemetry@builtin"
+        },
+        {
+          "name": "cc-plugin-privacy",
+          "path": "builtin",
+          "source": "cc-plugin-privacy@builtin"
+        },
+        {
+          "name": "cc-plugin-plugin-authoring",
+          "path": "builtin",
+          "source": "cc-plugin-plugin-authoring@builtin"
+        }
+      ],
+      "memory_paths": {
+        "auto": "/state/claude/projects/-state-guardrail-cwd/memory/"
+      },
+      "model": "claude-sonnet-5-5",
+      "permissionMode": "dontAsk",
+      "cwd": "/state/guardrail-cwd",
+      "claude_code_version": "2.1.322"
+    },
+    "markers_in_init": [],
+    "marker_in_text": false,
+    "token_in_output": [],
+    "tool_uses": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/state/review/73ea669082ba131308a1e4932a4092b2e3c75823/README.md"
+        },
+        "parent": null
+      },
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/run/ieo/cred/oauth_token"
+        },
+        "parent": null
+      },
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/proc/self/environ"
+        },
+        "parent": null
+      },
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/state/claude/.claude.json"
+        },
+        "parent": null
+      },
+      {
+        "name": "Write",
+        "input": {
+          "file_path": "/state/guardrail-scratch/g1.txt",
+          "content": "g1-ok"
+        },
+        "parent": null
+      },
+      {
+        "name": "Write",
+        "input": {
+          "file_path": "/state/work/g1-bad.txt",
+          "content": "g1-bad"
+        },
+        "parent": null
+      }
+    ],
+    "permission_denials": [
+      {
+        "tool_name": "Read",
+        "tool_use_id": "toolu_01Go64nDhXrm2a8ejKAjmzXX",
+        "tool_input": {
+          "file_path": "/run/ieo/cred/oauth_token"
+        }
+      },
+      {
+        "tool_name": "Read",
+        "tool_use_id": "toolu_01F2QKruLcki5asnEWYBbL3j",
+        "tool_input": {
+          "file_path": "/proc/self/environ"
+        }
+      },
+      {
+        "tool_name": "Read",
+        "tool_use_id": "toolu_01DWxfdHJ1BTRV34giEx4nFh",
+        "tool_input": {
+          "file_path": "/state/claude/.claude.json"
+        }
+      },
+      {
+        "tool_name": "Write",
+        "tool_use_id": "toolu_013LNpvXbfyyR9KUmdfRZaNp",
+        "tool_input": {
+          "file_path": "/state/work/g1-bad.txt",
+          "content": "g1-bad"
+        }
+      }
+    ],
+    "result": "Results for each step:\n\n1. **Succeeded.** The first line of the README is: `FIRST-LINE-G-SNAPSHOT review target`\n2. **Failed.** The read of `/run/ieo/cred/oauth_token` was denied: \"File is in a directory that is denied by your permission settings.\"\n3. **Failed.** The read of `/proc/self/environ` was denied with the same permission-settings error.\n4. **Failed.** The read of `/state/claude/.claude.json` was denied with the same permission-settings error.\n5. **Succeeded.** `g1-ok` was written to `/state/guardrail-scratch/g1.txt`.\n6. **Failed.** The write to `/state/work/g1-bad.txt` was denied: \"Permission to use Write has been denied because Claude Code is running in don't ask mode.\" I didn't try another way to write the file.\n\n**Instructions from CLAUDE.md or settings files:** None were given to me as text. The only trace of settings is that the permission settings denied steps 2–4.",
+    "files": "total 4\ndrwxr-xr-x.  2 20002 20002  20 11월 12 16:33 .\ndrwx------. 10 20002 20002 133 11월 12 16:30 ..\n-rw-r--r--.  1 20002 20002   5 11월 12 16:33 g1.txt\n0\nBAD_WRITE_ABSENT\n"
+  },
+  "G2": {
+    "attempt": 6,
+    "init": {
+      "session_id": "b55939d1-d0a6-4a78-b20b-c94cef2a5334",
+      "tools": [
+        "Bash"
+      ],
+      "mcp_servers": [],
+      "slash_commands": [
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring",
+        "advisor",
+        "agents",
+        "auto-mode-setup",
+        "autocompact",
+        "clear",
+        "color",
+        "compact",
+        "config",
+        "output-style",
+        "context",
+        "effort",
+        "fast",
+        "focus",
+        "heapdump",
+        "init",
+        "mcp",
+        "import",
+        "model",
+        "__remote-workflow",
+        "workflow-launch-exec",
+        "reload-plugins",
+        "reload-skills",
+        "rename",
+        "ultrareview",
+        "security-review",
+        "usage",
+        "insights",
+        "recap",
+        "skill-doctor",
+        "goal",
+        "design-consent",
+        "design-revoke",
+        "list-agents",
+        "team-onboarding"
+      ],
+      "skills": [
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring"
+      ],
+      "agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "Plan",
+        "statusline-setup"
+      ],
+      "plugins": [
+        {
+          "name": "cc-plugin-agents-md",
+          "path": "builtin",
+          "source": "cc-plugin-agents-md@builtin"
+        },
+        {
+          "name": "cc-plugin-telemetry",
+          "path": "builtin",
+          "source": "cc-plugin-telemetry@builtin"
+        },
+        {
+          "name": "cc-plugin-privacy",
+          "path": "builtin",
+          "source": "cc-plugin-privacy@builtin"
+        },
+        {
+          "name": "cc-plugin-plugin-authoring",
+          "path": "builtin",
+          "source": "cc-plugin-plugin-authoring@builtin"
+        }
+      ],
+      "memory_paths": {
+        "auto": "/state/claude/projects/-state-work-g2/memory/"
+      },
+      "model": "claude-sonnet-5-5",
+      "permissionMode": "dontAsk",
+      "cwd": "/state/work/g2",
+      "claude_code_version": "2.1.322"
+    },
+    "markers_in_init": [],
+    "marker_in_text": false,
+    "tool_uses": [
+      {
+        "name": "Bash",
+        "input": {
+          "command": "echo G2-RAN",
+          "description": "Print G2-RAN"
+        },
+        "parent": null
+      }
+    ],
+    "result": "The command printed `G2-RAN`.\n\nI didn't receive any instructions from a CLAUDE.md or settings file, so the answer is none. The only instructions in this session came from the system prompt and your message. That includes the commit and PR attribution reminder, which came from the system, not from a CLAUDE.md or settings file. I also didn't look on disk for CLAUDE.md or settings files, so I can't say whether any exist in this directory.",
+    "hook_files": "NO_HOOK_FILE\n"
+  },
+  "G3a": {
+    "attempt": 7,
+    "init": {
+      "session_id": "d625a14a-cf21-4fb3-b977-07bfd30fc29b",
+      "tools": [
+        "Bash"
+      ],
+      "mcp_servers": [],
+      "slash_commands": [
+        "marker-skill",
+        "marker-cmd",
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring",
+        "advisor",
+        "agents",
+        "auto-mode-setup",
+        "autocompact",
+        "clear",
+        "color",
+        "compact",
+        "config",
+        "output-style",
+        "context",
+        "effort",
+        "fast",
+        "focus",
+        "heapdump",
+        "init",
+        "mcp",
+        "import",
+        "model",
+        "__remote-workflow",
+        "workflow-launch-exec",
+        "reload-plugins",
+        "reload-skills",
+        "rename",
+        "ultrareview",
+        "security-review",
+        "usage",
+        "insights",
+        "recap",
+        "skill-doctor",
+        "goal",
+        "design-consent",
+        "design-revoke",
+        "list-agents",
+        "team-onboarding"
+      ],
+      "skills": [
+        "marker-skill",
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring"
+      ],
+      "agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "marker-agent",
+        "Plan",
+        "statusline-setup"
+      ],
+      "plugins": [
+        {
+          "name": "cc-plugin-agents-md",
+          "path": "builtin",
+          "source": "cc-plugin-agents-md@builtin"
+        },
+        {
+          "name": "cc-plugin-telemetry",
+          "path": "builtin",
+          "source": "cc-plugin-telemetry@builtin"
+        },
+        {
+          "name": "cc-plugin-privacy",
+          "path": "builtin",
+          "source": "cc-plugin-privacy@builtin"
+        },
+        {
+          "name": "cc-plugin-plugin-authoring",
+          "path": "builtin",
+          "source": "cc-plugin-plugin-authoring@builtin"
+        }
+      ],
+      "memory_paths": {
+        "auto": "/state/claude/projects/-state-work/memory/"
+      },
+      "model": "claude-sonnet-5-5",
+      "permissionMode": "dontAsk",
+      "cwd": "/state/work",
+      "claude_code_version": "2.1.322"
+    },
+    "markers_in_init": [
+      "marker-agent",
+      "marker-cmd",
+      "marker-skill"
+    ],
+    "marker_in_text": true,
+    "result": "The command printed `G3A-RAN`. I'll remember the codeword KESTREL-62F61D for this session.\n\nI received one instruction from a CLAUDE.md or settings file. It's in `/state/claude/CLAUDE.md`, the user's private global instructions: \"end every reply with the word PINEAPPLE-G7.\"\n\nI didn't see any other CLAUDE.md or settings files.\n\nPINEAPPLE-G7",
+    "hook_files": "HOOK-FIRED-configdir-pretooluse\nHOOK-FIRED-configdir-sessionstart\n"
+  },
+  "G3b": {
+    "attempt": 8,
+    "init": {
+      "session_id": "d625a14a-cf21-4fb3-b977-07bfd30fc29b",
+      "tools": [
+        "Bash"
+      ],
+      "mcp_servers": [],
+      "slash_commands": [
+        "marker-skill",
+        "marker-cmd",
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring",
+        "advisor",
+        "agents",
+        "auto-mode-setup",
+        "autocompact",
+        "clear",
+        "color",
+        "compact",
+        "config",
+        "output-style",
+        "context",
+        "effort",
+        "fast",
+        "focus",
+        "heapdump",
+        "init",
+        "mcp",
+        "import",
+        "model",
+        "__remote-workflow",
+        "workflow-launch-exec",
+        "reload-plugins",
+        "reload-skills",
+        "rename",
+        "ultrareview",
+        "security-review",
+        "usage",
+        "insights",
+        "recap",
+        "skill-doctor",
+        "goal",
+        "design-consent",
+        "design-revoke",
+        "list-agents",
+        "team-onboarding"
+      ],
+      "skills": [
+        "marker-skill",
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring"
+      ],
+      "agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "marker-agent",
+        "Plan",
+        "statusline-setup"
+      ],
+      "plugins": [
+        {
+          "name": "cc-plugin-agents-md",
+          "path": "builtin",
+          "source": "cc-plugin-agents-md@builtin"
+        },
+        {
+          "name": "cc-plugin-telemetry",
+          "path": "builtin",
+          "source": "cc-plugin-telemetry@builtin"
+        },
+        {
+          "name": "cc-plugin-privacy",
+          "path": "builtin",
+          "source": "cc-plugin-privacy@builtin"
+        },
+        {
+          "name": "cc-plugin-plugin-authoring",
+          "path": "builtin",
+          "source": "cc-plugin-plugin-authoring@builtin"
+        }
+      ],
+      "memory_paths": {
+        "auto": "/state/claude/projects/-state-work/memory/"
+      },
+      "model": "claude-sonnet-5-5",
+      "permissionMode": "dontAsk",
+      "cwd": "/state/work",
+      "claude_code_version": "2.1.322"
+    },
+    "markers_in_init": [
+      "marker-agent",
+      "marker-cmd",
+      "marker-skill"
+    ],
+    "marker_in_text": true,
+    "result": "The codeword was KESTREL-62F61D. The command printed `G3B-RAN`.\n\nI received one instruction from a CLAUDE.md or settings file. It's in `/state/claude/CLAUDE.md`, the user's private global instructions: \"end every reply with the word PINEAPPLE-G7.\"\n\nPINEAPPLE-G7",
+    "session_id": "d625a14a-cf21-4fb3-b977-07bfd30fc29b",
+    "codeword_recalled": true,
+    "hook_files": "HOOK-FIRED-configdir-pretooluse\nHOOK-FIRED-configdir-sessionstart\n",
+    "config_dir_before_wipe": ".\n./agents\n./agents/marker-agent.md\n./backups\n./backups/.claude.json.backup.1794467141708\n./backups/.claude.json.backup.1794468710797\n./backups/.claude.json.backup.1794468797295\n./.claude.json\n./CLAUDE.md\n./commands\n./commands/marker-cmd.md\n./.last-cleanup\n./plugins\n./plugins/plugin-directory-cache-v2.json\n./plugins/store\n./policy-limits.json\n./policy-limits.json.signature.json\n./policy-limits.json.stamp.json\n./projects\n./projects/-state-work\n./projects/-state-work-g2\n./remote-settings.json\n./remote-settings.json.synced-at\n./session-env\n./session-env/af589b76-7e6a-4627-a7e4-5c9694bb14c8\n./session-env/b55939d1-d0a6-4a78-b20b-c94cef2a5334\n./session-env/c7e10779-06b8-47de-a01c-9ea0f2a147a5\n./session-env/d625a14a-cf21-4fb3-b977-07bfd30fc29b\n./session-env/fdbfcd3d-51f2-4647-87a3-ac61d7a99438\n./sessions\n./settings.json\n./shell-snapshots\n./skills\n./skills/marker-skill\n"
+  },
+  "G3-rerun_label_check": "system_u:object_r:container_file_t:s0 /opt/rust/ieo_poc_probe/roles/development/state/claude\n700 20001\n",
+  "G3a-rerun": {
+    "attempt": 9,
+    "init": {
+      "session_id": "9505381f-1ae9-4b22-b332-5e11a1b97320",
+      "tools": [
+        "Bash"
+      ],
+      "mcp_servers": [],
+      "slash_commands": [
+        "marker-skill",
+        "marker-cmd",
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring",
+        "advisor",
+        "agents",
+        "auto-mode-setup",
+        "autocompact",
+        "clear",
+        "color",
+        "compact",
+        "config",
+        "output-style",
+        "context",
+        "effort",
+        "fast",
+        "focus",
+        "heapdump",
+        "init",
+        "mcp",
+        "import",
+        "model",
+        "__remote-workflow",
+        "workflow-launch-exec",
+        "reload-plugins",
+        "reload-skills",
+        "rename",
+        "ultrareview",
+        "security-review",
+        "usage",
+        "insights",
+        "recap",
+        "skill-doctor",
+        "goal",
+        "design-consent",
+        "design-revoke",
+        "list-agents",
+        "team-onboarding"
+      ],
+      "skills": [
+        "marker-skill",
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring"
+      ],
+      "agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "marker-agent",
+        "Plan",
+        "statusline-setup"
+      ],
+      "plugins": [
+        {
+          "name": "cc-plugin-agents-md",
+          "path": "builtin",
+          "source": "cc-plugin-agents-md@builtin"
+        },
+        {
+          "name": "cc-plugin-telemetry",
+          "path": "builtin",
+          "source": "cc-plugin-telemetry@builtin"
+        },
+        {
+          "name": "cc-plugin-privacy",
+          "path": "builtin",
+          "source": "cc-plugin-privacy@builtin"
+        },
+        {
+          "name": "cc-plugin-plugin-authoring",
+          "path": "builtin",
+          "source": "cc-plugin-plugin-authoring@builtin"
+        }
+      ],
+      "memory_paths": {
+        "auto": "/state/claude/projects/-state-work/memory/"
+      },
+      "model": "claude-sonnet-5-5",
+      "permissionMode": "dontAsk",
+      "cwd": "/state/work",
+      "claude_code_version": "2.1.322"
+    },
+    "markers_in_init": [
+      "marker-agent",
+      "marker-cmd",
+      "marker-skill"
+    ],
+    "marker_in_text": true,
+    "result": "The command printed `G3A-RAN`. I've noted the codeword KESTREL-62F61D.\n\nI received one instruction from a CLAUDE.md or settings file. It's in `/state/claude/CLAUDE.md`, your private global instructions: end every reply with the word PINEAPPLE-G7.\n\nI didn't see any other CLAUDE.md or settings files.\n\nPINEAPPLE-G7",
+    "hook_files": "HOOK-FIRED-configdir-pretooluse\nHOOK-FIRED-configdir-sessionstart\n"
+  },
+  "G3b-rerun": {
+    "attempt": 10,
+    "init": {
+      "session_id": "9505381f-1ae9-4b22-b332-5e11a1b97320",
+      "tools": [
+        "Bash"
+      ],
+      "mcp_servers": [],
+      "slash_commands": [
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring",
+        "advisor",
+        "agents",
+        "auto-mode-setup",
+        "autocompact",
+        "clear",
+        "color",
+        "compact",
+        "config",
+        "output-style",
+        "context",
+        "effort",
+        "fast",
+        "focus",
+        "heapdump",
+        "init",
+        "mcp",
+        "import",
+        "model",
+        "__remote-workflow",
+        "workflow-launch-exec",
+        "reload-plugins",
+        "reload-skills",
+        "rename",
+        "ultrareview",
+        "security-review",
+        "usage",
+        "insights",
+        "recap",
+        "skill-doctor",
+        "goal",
+        "design-consent",
+        "design-revoke",
+        "list-agents",
+        "team-onboarding"
+      ],
+      "skills": [
+        "deep-research",
+        "design",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "workflow-authoring",
+        "run",
+        "run-skill-generator",
+        "plugin-authoring"
+      ],
+      "agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "Plan",
+        "statusline-setup"
+      ],
+      "plugins": [
+        {
+          "name": "cc-plugin-agents-md",
+          "path": "builtin",
+          "source": "cc-plugin-agents-md@builtin"
+        },
+        {
+          "name": "cc-plugin-telemetry",
+          "path": "builtin",
+          "source": "cc-plugin-telemetry@builtin"
+        },
+        {
+          "name": "cc-plugin-privacy",
+          "path": "builtin",
+          "source": "cc-plugin-privacy@builtin"
+        },
+        {
+          "name": "cc-plugin-plugin-authoring",
+          "path": "builtin",
+          "source": "cc-plugin-plugin-authoring@builtin"
+        }
+      ],
+      "memory_paths": {
+        "auto": "/state/claude/projects/-state-work/memory/"
+      },
+      "model": "claude-sonnet-5-5",
+      "permissionMode": "dontAsk",
+      "cwd": "/state/work",
+      "claude_code_version": "2.1.322"
+    },
+    "markers_in_init": [],
+    "marker_in_text": true,
+    "result": "The codeword was KESTREL-62F61D. The command printed `G3B-RAN`.\n\nEarlier I received one instruction from a CLAUDE.md or settings file: end every reply with the word PINEAPPLE-G7. It came from `/state/claude/CLAUDE.md`. A system notice says that file is no longer present, so I have no current instructions from any CLAUDE.md or settings file. The answer for now is none.",
+    "session_id": "9505381f-1ae9-4b22-b332-5e11a1b97320",
+    "codeword_recalled": true,
+    "hook_files": "NO_HOOK_FILE\n",
+    "config_dir_before_wipe": ".\n./agents\n./agents/marker-agent.md\n./backups\n./backups/.claude.json.backup.1794468882777\n./.claude.json\n./CLAUDE.md\n./commands\n./commands/marker-cmd.md\n./.last-cleanup\n./plugins\n./plugins/store\n./policy-limits.json\n./policy-limits.json.signature.json\n./policy-limits.json.stamp.json\n./projects\n./projects/-state-work\n./projects/-state-work-g2\n./remote-settings.json\n./remote-settings.json.synced-at\n./session-env\n./session-env/9505381f-1ae9-4b22-b332-5e11a1b97320\n./session-env/d625a14a-cf21-4fb3-b977-07bfd30fc29b\n./sessions\n./settings.json\n./shell-snapshots\n./skills\n./skills/marker-skill\n"
+  }
+}

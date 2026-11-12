@@ -1,0 +1,55 @@
+{
+  "L1": {
+    "attempt": 16,
+    "session_id": "27b12b88-b012-444c-9741-d76b03e899b2",
+    "podman_diff": "C /etc\nC /etc/group\nA /etc/ieo\nA /etc/ieo/role\nC /etc/passwd\nC /opt\nA /opt/claude\nA /opt/claude/claude\nA /run/ieo\nA /run/ieo/cred\nA /state\nC /tmp\nA /tmp/cc-socks\nA /tmp/claude-20001\n",
+    "volume_files_written": "./claude/backups/.claude.json.backup.1794469016790\n./claude/.claude.json\n./claude/plugins/store/cc-plugin-agents-md_builtin-b049b47b3618.json\n./claude/policy-limits.json.signature.json\n./claude/policy-limits.json.stamp.json\n./claude/projects/-state-work/27b12b88-b012-444c-9741-d76b03e899b2.jsonl\n./claude/remote-settings.json\n./claude/remote-settings.json.synced-at\n"
+  },
+  "L2": {
+    "attempt": 17,
+    "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "result": "KESTREL-62F61D",
+    "codeword_recalled": true,
+    "state_dir": "/opt/rust/ieo_poc_probe/roles-recreated/development/state"
+  },
+  "L3": {
+    "attempt": 18,
+    "system_subtypes": [
+      "compact_boundary",
+      "init",
+      "session_title_changed",
+      "status"
+    ],
+    "compact_boundary_events": [
+      {
+        "type": "system",
+        "subtype": "compact_boundary",
+        "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+        "uuid": "6f282196-1ea0-48fc-82c0-8b7994aa0aba",
+        "compact_metadata": {
+          "trigger": "manual",
+          "pre_tokens": 3819,
+          "post_tokens": 950,
+          "cumulative_dropped_tokens": 2869,
+          "duration_ms": 13513,
+          "preserved_segment": {
+            "head_uuid": "c9a1deb2-e780-44d3-910c-bfc369d0b1d7",
+            "anchor_uuid": "07410828-2c11-4da9-87a6-0d60edb70148",
+            "tail_uuid": "c9a1deb2-e780-44d3-910c-bfc369d0b1d7"
+          },
+          "preserved_messages": {
+            "anchor_uuid": "07410828-2c11-4da9-87a6-0d60edb70148",
+            "uuids": [
+              "c9a1deb2-e780-44d3-910c-bfc369d0b1d7"
+            ],
+            "all_uuids": [
+              "c9a1deb2-e780-44d3-910c-bfc369d0b1d7"
+            ]
+          }
+        },
+        "logical_parent_uuid": "c9a1deb2-e780-44d3-910c-bfc369d0b1d7"
+      }
+    ],
+    "result": ""
+  }
+}

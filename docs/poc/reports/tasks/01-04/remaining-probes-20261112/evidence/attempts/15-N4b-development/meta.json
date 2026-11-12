@@ -1,0 +1,255 @@
+{
+  "attempt": 15,
+  "probe": "N4b",
+  "role": "development",
+  "argv": [
+    "podman",
+    "run",
+    "--rm",
+    "--user",
+    "20001:20001",
+    "--network",
+    "slirp4netns",
+    "--security-opt",
+    "no-new-privileges",
+    "--cap-drop",
+    "ALL",
+    "-v",
+    "/opt/rust/ieo_poc_probe/roles/development/state:/state:z",
+    "-v",
+    "/opt/rust/ieo_poc_probe/roles/development/cred:/run/ieo/cred:ro,z",
+    "-v",
+    "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+    "-v",
+    "/opt/rust/ieo_poc_probe/roles/development/etc:/etc/ieo/role:ro,z",
+    "--env",
+    "HOME=/state/home",
+    "--env",
+    "CLAUDE_CONFIG_DIR=/state/claude",
+    "--env",
+    "LANG=C.UTF-8",
+    "--workdir",
+    "/state/work",
+    "docker.io/library/golang:1.26.9-bookworm",
+    "bash",
+    "-c",
+    "set -u; export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; echo \"#ENV_NAMES $(env | cut -d= -f1 | sort | tr '\\n' ' ')\" >&2; echo \"#UID $(id -u) GID $(id -g) CWD $(pwd)\" >&2; echo \"#T_START $(date +%s.%N)\" >&2; timeout -k 10 290 /opt/claude/claude -p \"$(cat /etc/ieo/role/prompts/n4b.txt)\" --output-format stream-json --verbose --strict-mcp-config --mcp-config /etc/ieo/role/mcp.json --forward-subagent-text --tools '' --setting-sources user --permission-mode dontAsk --permission-prompts none --resume fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54; rc=$?; echo \"#T_END $(date +%s.%N)\" >&2; exit $rc"
+  ],
+  "started_at": "2026-11-12T07:35:43.849+00:00",
+  "ended_at": "2026-11-12T07:35:49.850+00:00",
+  "exit_code": 0,
+  "timeout": false,
+  "claude_process_interval_epoch": [
+    1794468944.1456838,
+    1794468949.5542
+  ],
+  "token_in_output": [],
+  "token_fingerprint": "2456b85e9111",
+  "init": {
+    "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "tools": [],
+    "mcp_servers": [],
+    "slash_commands": [
+      "deep-research",
+      "design",
+      "design-sync",
+      "dataviz",
+      "update-config",
+      "verify",
+      "debug",
+      "code-review",
+      "simplify",
+      "batch",
+      "fewer-permission-prompts",
+      "doctor",
+      "loop",
+      "schedule",
+      "claude-api",
+      "workflow-authoring",
+      "run",
+      "run-skill-generator",
+      "plugin-authoring",
+      "advisor",
+      "agents",
+      "auto-mode-setup",
+      "autocompact",
+      "clear",
+      "color",
+      "compact",
+      "config",
+      "output-style",
+      "context",
+      "effort",
+      "fast",
+      "focus",
+      "heapdump",
+      "init",
+      "mcp",
+      "import",
+      "model",
+      "__remote-workflow",
+      "workflow-launch-exec",
+      "reload-plugins",
+      "reload-skills",
+      "rename",
+      "ultrareview",
+      "security-review",
+      "usage",
+      "insights",
+      "recap",
+      "skill-doctor",
+      "goal",
+      "design-consent",
+      "design-revoke",
+      "list-agents",
+      "team-onboarding"
+    ],
+    "skills": [
+      "deep-research",
+      "design",
+      "design-sync",
+      "dataviz",
+      "update-config",
+      "verify",
+      "debug",
+      "code-review",
+      "simplify",
+      "batch",
+      "fewer-permission-prompts",
+      "doctor",
+      "loop",
+      "schedule",
+      "claude-api",
+      "workflow-authoring",
+      "run",
+      "run-skill-generator",
+      "plugin-authoring"
+    ],
+    "agents": [
+      "claude",
+      "Explore",
+      "general-purpose",
+      "Plan",
+      "statusline-setup"
+    ],
+    "plugins": [
+      {
+        "name": "cc-plugin-agents-md",
+        "path": "builtin",
+        "source": "cc-plugin-agents-md@builtin"
+      },
+      {
+        "name": "cc-plugin-telemetry",
+        "path": "builtin",
+        "source": "cc-plugin-telemetry@builtin"
+      },
+      {
+        "name": "cc-plugin-privacy",
+        "path": "builtin",
+        "source": "cc-plugin-privacy@builtin"
+      },
+      {
+        "name": "cc-plugin-plugin-authoring",
+        "path": "builtin",
+        "source": "cc-plugin-plugin-authoring@builtin"
+      }
+    ],
+    "memory_paths": {
+      "auto": "/state/claude/projects/-state-work/memory/"
+    },
+    "model": "claude-sonnet-5-5",
+    "permissionMode": "dontAsk",
+    "cwd": "/state/work",
+    "claude_code_version": "2.1.322"
+  },
+  "result_event": {
+    "subtype": "success",
+    "is_error": false,
+    "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "num_turns": 0,
+    "result": "",
+    "permission_denials": [],
+    "usage": {
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 0,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "modelUsage": {
+      "claude-sonnet-5-5": {
+        "inputTokens": 10,
+        "outputTokens": 159,
+        "thinkingTokens": 131,
+        "cacheReadInputTokens": 7514,
+        "cacheCreationInputTokens": 537,
+        "cacheCreationEphemeral5mInputTokens": 0,
+        "cacheCreationEphemeral1hInputTokens": 537,
+        "webSearchRequests": 0,
+        "costUSD": 0.0045094,
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000
+      }
+    },
+    "subagent_stats": {
+      "spawned": 0,
+      "requested": {
+        "background": 0,
+        "foreground": 0,
+        "unset": 0
+      },
+      "started_in_background": 0,
+      "max_depth": 0,
+      "spawned_by_subagents": 0,
+      "completed": 0,
+      "failed": 0,
+      "killed": {
+        "parent": 0,
+        "user": 0,
+        "system": 0
+      },
+      "refused": {
+        "depth_limit": 0,
+        "concurrency_limit": 0,
+        "budget": 0
+      },
+      "by_type": {}
+    },
+    "total_cost_usd": 0.0045094,
+    "stop_reason": null
+  },
+  "assistant_text": [
+    "KESTREL-62F61D"
+  ],
+  "marker_in_text": false,
+  "tool_uses": [],
+  "parent_tool_use_events": 0,
+  "system_subtypes": [
+    "init",
+    "session_title_changed",
+    "task_notification"
+  ],
+  "rate_limit_status": [
+    "allowed"
+  ],
+  "budget_after": {
+    "attempts_used": 15,
+    "attempts_max": 30,
+    "probe_wall_remaining_s": 6930
+  }
+}

@@ -1,0 +1,22 @@
+rm: cannot remove '/state/claude/.claude.json': Permission denied
+rm: cannot remove '/state/claude/backups': Permission denied
+rm: cannot remove '/state/claude/remote-settings.json': Permission denied
+rm: cannot remove '/state/claude/policy-limits.json.stamp.json': Permission denied
+rm: cannot remove '/state/claude/policy-limits.json': Permission denied
+rm: cannot remove '/state/claude/policy-limits.json.signature.json': Permission denied
+rm: cannot remove '/state/claude/remote-settings.json.synced-at': Permission denied
+rm: cannot remove '/state/claude/sessions': Permission denied
+rm: cannot remove '/state/claude/plugins': Permission denied
+rm: cannot remove '/state/claude/shell-snapshots': Permission denied
+rm: cannot remove '/state/claude/session-env': Permission denied
+rm: cannot remove '/state/claude/.last-cleanup': Permission denied
+rm: cannot remove '/state/claude/commands/marker-cmd.md': Permission denied
+rm: cannot remove '/state/claude/agents/marker-agent.md': Permission denied
+rm: cannot remove '/state/claude/CLAUDE.md': Permission denied
+rm: cannot remove '/state/claude/settings.json': Permission denied
+rm: cannot remove '/state/claude/skills/marker-skill/SKILL.md': Permission denied
+#AFTER_WIPE .claude.json .last-cleanup CLAUDE.md agents backups commands plugins policy-limits.json policy-limits.json.signature.json policy-limits.json.stamp.json projects remote-settings.json remote-settings.json.synced-at session-env sessions settings.json shell-snapshots skills 
+#ENV_NAMES CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CONFIG_DIR GOLANG_VERSION GOPATH GOTOOLCHAIN HOME HOSTNAME LANG PATH PWD SHLVL _ container 
+#UID 20001 GID 20001 CWD /state/work
+#T_START 1794468810.125894941
+#T_END 1794468815.142773750

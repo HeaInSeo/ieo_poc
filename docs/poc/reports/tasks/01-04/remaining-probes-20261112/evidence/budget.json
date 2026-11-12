@@ -1,0 +1,275 @@
+{
+  "attempts": [
+    {
+      "n": 1,
+      "label": "U development",
+      "reserved_at": "2026-11-12T07:31:20.024+00:00",
+      "probe": "U",
+      "role": "development",
+      "started_at": "2026-11-12T07:31:20.025+00:00",
+      "ended_at": "2026-11-12T07:31:28.410+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 2,
+      "label": "U-alt development",
+      "reserved_at": "2026-11-12T07:31:49.634+00:00",
+      "probe": "U-alt",
+      "role": "development",
+      "started_at": "2026-11-12T07:31:49.634+00:00",
+      "ended_at": "2026-11-12T07:31:58.493+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 3,
+      "label": "U-alt development",
+      "reserved_at": "2026-11-12T07:32:09.677+00:00",
+      "probe": "U-alt",
+      "role": "development",
+      "launched": false,
+      "note": "reserved, then the harness failed writing the prompt file (PermissionError on the 0444 file from attempt 02) before podman/claude started; counted conservatively, no model request was made"
+    },
+    {
+      "n": 4,
+      "label": "U-alt development",
+      "reserved_at": "2026-11-12T07:32:27.750+00:00",
+      "probe": "U-alt",
+      "role": "development",
+      "started_at": "2026-11-12T07:32:27.751+00:00",
+      "ended_at": "2026-11-12T07:32:35.671+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 5,
+      "label": "G1 guardrail",
+      "reserved_at": "2026-11-12T07:33:04.848+00:00",
+      "probe": "G1",
+      "role": "guardrail",
+      "started_at": "2026-11-12T07:33:04.849+00:00",
+      "ended_at": "2026-11-12T07:33:15.978+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 6,
+      "label": "G2 development",
+      "reserved_at": "2026-11-12T07:33:16.133+00:00",
+      "probe": "G2",
+      "role": "development",
+      "started_at": "2026-11-12T07:33:16.134+00:00",
+      "ended_at": "2026-11-12T07:33:23.177+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 7,
+      "label": "G3a development",
+      "reserved_at": "2026-11-12T07:33:23.300+00:00",
+      "probe": "G3a",
+      "role": "development",
+      "started_at": "2026-11-12T07:33:23.301+00:00",
+      "ended_at": "2026-11-12T07:33:29.618+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 8,
+      "label": "G3b development",
+      "reserved_at": "2026-11-12T07:33:29.769+00:00",
+      "probe": "G3b",
+      "role": "development",
+      "started_at": "2026-11-12T07:33:29.771+00:00",
+      "ended_at": "2026-11-12T07:33:35.438+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 9,
+      "label": "G3a-rerun development",
+      "reserved_at": "2026-11-12T07:34:41.460+00:00",
+      "probe": "G3a-rerun",
+      "role": "development",
+      "started_at": "2026-11-12T07:34:41.461+00:00",
+      "ended_at": "2026-11-12T07:34:47.755+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 10,
+      "label": "G3b-rerun development",
+      "reserved_at": "2026-11-12T07:34:47.906+00:00",
+      "probe": "G3b-rerun",
+      "role": "development",
+      "started_at": "2026-11-12T07:34:47.908+00:00",
+      "ended_at": "2026-11-12T07:34:54.450+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 11,
+      "label": "N1 development",
+      "reserved_at": "2026-11-12T07:35:17.648+00:00",
+      "probe": "N1",
+      "role": "development",
+      "started_at": "2026-11-12T07:35:17.649+00:00",
+      "ended_at": "2026-11-12T07:35:23.317+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 12,
+      "label": "N2 development",
+      "reserved_at": "2026-11-12T07:35:23.319+00:00",
+      "probe": "N2",
+      "role": "development",
+      "started_at": "2026-11-12T07:35:23.321+00:00",
+      "ended_at": "2026-11-12T07:35:27.675+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 13,
+      "label": "N3 development",
+      "reserved_at": "2026-11-12T07:35:27.677+00:00",
+      "probe": "N3",
+      "role": "development",
+      "started_at": "2026-11-12T07:35:27.678+00:00",
+      "ended_at": "2026-11-12T07:35:31.845+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 14,
+      "label": "N4a development",
+      "reserved_at": "2026-11-12T07:35:31.847+00:00",
+      "probe": "N4a",
+      "role": "development",
+      "started_at": "2026-11-12T07:35:31.848+00:00",
+      "ended_at": "2026-11-12T07:36:23.578+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 15,
+      "label": "N4b development",
+      "reserved_at": "2026-11-12T07:35:43.848+00:00",
+      "probe": "N4b",
+      "role": "development",
+      "started_at": "2026-11-12T07:35:43.849+00:00",
+      "ended_at": "2026-11-12T07:35:49.850+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 16,
+      "label": "L1 development",
+      "reserved_at": "2026-11-12T07:36:55.478+00:00",
+      "probe": "L1",
+      "role": "development",
+      "started_at": "2026-11-12T07:36:55.479+00:00",
+      "ended_at": "2026-11-12T07:37:01.106+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 17,
+      "label": "L2 development",
+      "reserved_at": "2026-11-12T07:37:01.466+00:00",
+      "probe": "L2",
+      "role": "development",
+      "started_at": "2026-11-12T07:37:01.467+00:00",
+      "ended_at": "2026-11-12T07:37:05.515+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 18,
+      "label": "L3 development",
+      "reserved_at": "2026-11-12T07:37:05.517+00:00",
+      "probe": "L3",
+      "role": "development",
+      "started_at": "2026-11-12T07:37:05.517+00:00",
+      "ended_at": "2026-11-12T07:37:21.217+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 19,
+      "label": "C development",
+      "reserved_at": "2026-11-12T07:37:30.200+00:00",
+      "probe": "C",
+      "role": "development",
+      "started_at": "2026-11-12T07:37:30.201+00:00",
+      "ended_at": "2026-11-12T07:37:34.541+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 20,
+      "label": "C development",
+      "reserved_at": "2026-11-12T07:37:30.202+00:00",
+      "probe": "C",
+      "role": "development",
+      "started_at": "2026-11-12T07:37:30.203+00:00",
+      "ended_at": "2026-11-12T07:37:35.992+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 21,
+      "label": "C guardrail",
+      "reserved_at": "2026-11-12T07:37:30.203+00:00",
+      "probe": "C",
+      "role": "guardrail",
+      "started_at": "2026-11-12T07:37:30.204+00:00",
+      "ended_at": "2026-11-12T07:37:35.993+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 22,
+      "label": "C guardrail",
+      "reserved_at": "2026-11-12T07:37:30.205+00:00",
+      "probe": "C",
+      "role": "guardrail",
+      "started_at": "2026-11-12T07:37:30.205+00:00",
+      "ended_at": "2026-11-12T07:37:37.311+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 23,
+      "label": "T development",
+      "reserved_at": "2026-11-12T07:37:43.223+00:00",
+      "probe": "T",
+      "role": "development",
+      "started_at": "2026-11-12T07:37:43.224+00:00",
+      "ended_at": "2026-11-12T07:37:51.038+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 24,
+      "label": "R1 development",
+      "reserved_at": "2026-11-12T07:38:04.531+00:00",
+      "probe": "R1",
+      "role": "development",
+      "started_at": "2026-11-12T07:38:04.533+00:00",
+      "ended_at": "2026-11-12T07:38:13.560+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 25,
+      "label": "R2 development",
+      "reserved_at": "2026-11-12T07:38:13.562+00:00",
+      "probe": "R2",
+      "role": "development",
+      "started_at": "2026-11-12T07:38:13.563+00:00",
+      "ended_at": "2026-11-12T07:38:17.499+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 26,
+      "label": "AM1 development",
+      "reserved_at": "2026-11-12T08:05:44.949+00:00",
+      "probe": "AM1",
+      "role": "development",
+      "started_at": "2026-11-12T08:05:44.950+00:00",
+      "ended_at": "2026-11-12T08:05:49.117+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 27,
+      "label": "AM2 development",
+      "reserved_at": "2026-11-12T08:05:49.119+00:00",
+      "probe": "AM2",
+      "role": "development",
+      "started_at": "2026-11-12T08:05:49.121+00:00",
+      "ended_at": "2026-11-12T08:05:53.021+00:00",
+      "exit_code": 0
+    }
+  ],
+  "first_attempt_at": 1794468680.024365,
+  "cli_runs": []
+}
