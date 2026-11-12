@@ -59,7 +59,13 @@ last_by_sid, rows, fails = {}, [], 0
 stats = {"new": 0, "resume": 0, "run_measured": 0, "run_unmeasured": 0, "semantic_checked": 0, "semantic_equal": 0}
 for i, out in enumerate(streams):
     meta = json.loads((out.parent / "meta.json").read_text())
-    argv = " ".join(str(a) for a in meta["argv"])
+    # first-probes meta.json stores argv as one JSON string, remaining-probes as a list (PR #21 review P2-1)
+    argv_v = meta["argv"]
+    if isinstance(argv_v, str):
+        argv_v = json.loads(argv_v)
+    if not isinstance(argv_v, list) or not all(isinstance(a, str) for a in argv_v):
+        sys.exit(f"argv 형식을 알 수 없음: {out}")
+    argv = " ".join(argv_v)
     mode = "resume" if (" --resume " in f" {argv} " or " -r " in f" {argv} ") else "new"
     stats[mode] += 1
     rf = ref(out)

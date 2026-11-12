@@ -776,3 +776,60 @@ fn wrong_resume_base_is_withdrawn_and_compaction_is_counted() {
     assert_eq!(l3.usage.attribution_check, "mismatch");
     assert_eq!(summarize(&[l3]).usage.attribution_mismatches.len(), 1);
 }
+
+/// PR #21 review P2-2: a descendant outside the process group keeps stdout open.
+/// The bytes already written must be kept and the run must not count as success.
+#[test]
+fn output_held_by_detached_descendant_is_kept_and_flagged() {
+    let out = tmp();
+    let mut s = spec(&out, "echo hello-marker; setsid sleep 20 & exit 0");
+    s.required_markers = vec!["hello-marker".into()];
+    let r = execute(&s).unwrap();
+    assert!(r.process.output_incomplete);
+    assert_eq!(r.stdout.bytes, 13, "already-read output kept");
+    assert!(r.markers[0].found);
+    assert_eq!(r.judgment.status, JudgmentStatus::Incomplete);
+    assert!(!r.judgment.counts_as_success);
+    assert!(r.judgment.reasons.iter().any(|x| x.contains("출력 관")));
+    assert!(r.duration_ms < 8_000, "{}", r.duration_ms);
+}
+
+/// PR #21 review P2-3: after a timeout, a group member that ignores TERM must be
+/// killed after the grace period even when the leader already exited.
+#[test]
+fn group_member_ignoring_term_is_killed_after_grace() {
+    let out = tmp();
+    let marker = format!("ieo-p23-{}", std::process::id());
+    let mut s = spec(
+        &out,
+        &format!("(trap '' TERM; exec -a {marker} sleep 47) >/dev/null 2>&1 & sleep 60"),
+    );
+    s.timeout = Some(Duration::from_secs(1));
+    s.grace = Duration::from_secs(1);
+    s.expected = Expected::Timeout;
+    let r = execute(&s).unwrap();
+    assert_eq!(r.process.kind, ProcessKind::TimedOut);
+    assert!(r.process.term_sent && r.process.kill_sent && r.process.stray_group_killed);
+    std::thread::sleep(Duration::from_millis(300));
+    let ps = std::process::Command::new("pgrep")
+        .args(["-f", &marker])
+        .output()
+        .unwrap();
+    assert!(ps.stdout.is_empty(), "TERM-ignoring member survived");
+}
+
+/// A member left behind by a normal exit (not holding the pipes) is killed and recorded,
+/// without turning the run into a failure.
+#[test]
+fn leftover_member_after_normal_exit_is_killed_and_recorded() {
+    let out = tmp();
+    let r = execute(&spec(&out, "sleep 30 >/dev/null 2>&1 & echo done")).unwrap();
+    assert!(r.process.stray_group_killed);
+    assert_eq!(r.judgment.status, JudgmentStatus::Succeeded);
+    assert!(
+        r.judgment
+            .reasons
+            .iter()
+            .any(|x| x.contains("남은 프로세스"))
+    );
+}

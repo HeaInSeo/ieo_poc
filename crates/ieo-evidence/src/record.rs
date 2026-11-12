@@ -58,9 +58,12 @@ pub struct ProcessOutcome {
     pub term_sent: bool,
     /// SIGKILL sent after the grace period (or to stray group members).
     pub kill_sent: bool,
-    /// The command exited but members of its process group still held the
-    /// output pipes and were killed.
+    /// Members of the command's process group were still alive after the
+    /// command (or after TERM and the grace period) and were killed.
     pub stray_group_killed: bool,
+    /// The output pipes were still held open (by a descendant outside the
+    /// process group) when collection stopped: stored output may be truncated.
+    pub output_incomplete: bool,
     pub launch_error: Option<String>,
 }
 

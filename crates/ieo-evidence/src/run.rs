@@ -15,7 +15,7 @@ use std::io::Read;
 use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -91,14 +91,52 @@ fn signal_group(pgid: u32, sig: &str) {
         .status();
 }
 
-fn spawn_reader<R: Read + Send + 'static>(mut r: R) -> mpsc::Receiver<Vec<u8>> {
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let mut buf = Vec::new();
-        let _ = r.read_to_end(&mut buf);
-        let _ = tx.send(buf);
-    });
-    rx
+fn group_alive(pgid: u32) -> bool {
+    // Signal 0 to the group: success means at least one member still exists.
+    Command::new("kill")
+        .args(["-s", "0", "--", &format!("-{pgid}")])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+/// Reads a pipe incrementally into a shared buffer so that bytes already read
+/// are kept even when the pipe never reaches EOF (PR #21 review P2-2).
+struct Reader {
+    buf: Arc<Mutex<Vec<u8>>>,
+    done: mpsc::Receiver<()>,
+}
+
+impl Reader {
+    fn spawn<R: Read + Send + 'static>(mut r: R) -> Self {
+        let buf = Arc::new(Mutex::new(Vec::new()));
+        let (tx, done) = mpsc::channel();
+        let b = Arc::clone(&buf);
+        thread::spawn(move || {
+            let mut chunk = [0u8; 8192];
+            loop {
+                match r.read(&mut chunk) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => b
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .extend_from_slice(&chunk[..n]),
+                }
+            }
+            let _ = tx.send(());
+        });
+        Reader { buf, done }
+    }
+    fn wait(&self, d: Duration) -> bool {
+        !matches!(
+            self.done.recv_timeout(d),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        )
+    }
+    fn take(&self) -> Vec<u8> {
+        std::mem::take(&mut *self.buf.lock().unwrap_or_else(|e| e.into_inner()))
+    }
 }
 
 pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
@@ -139,13 +177,21 @@ pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
         &spec.attempt_id,
         &spec.command_id,
     );
-    if dir.exists() {
-        return Err(RunError::Invalid(format!(
-            "증거 디렉터리가 이미 있음(덮어쓰지 않음): {}",
-            dir.display()
-        )));
+    if let Some(parent) = dir.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| RunError::Io(format!("{}: {e}", parent.display())))?;
     }
-    fs::create_dir_all(&dir).map_err(|e| RunError::Io(format!("{}: {e}", dir.display())))?;
+    // Exclusive creation: two runs with the same IDs cannot both proceed (review P3-1).
+    match fs::create_dir(&dir) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Err(RunError::Invalid(format!(
+                "증거 디렉터리가 이미 있음(덮어쓰지 않음): {}",
+                dir.display()
+            )));
+        }
+        Err(e) => return Err(RunError::Io(format!("{}: {e}", dir.display()))),
+    }
 
     let mut cmd = Command::new(&spec.argv[0]);
     cmd.args(&spec.argv[1..])
@@ -174,6 +220,7 @@ pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
         term_sent: false,
         kill_sent: false,
         stray_group_killed: false,
+        output_incomplete: false,
         launch_error: None,
     };
     let (out_raw, err_raw) = match cmd.spawn() {
@@ -184,8 +231,8 @@ pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
         }
         Ok(mut child) => {
             let pgid = child.id();
-            let out_rx = spawn_reader(child.stdout.take().expect("piped"));
-            let err_rx = spawn_reader(child.stderr.take().expect("piped"));
+            let out_r = Reader::spawn(child.stdout.take().expect("piped"));
+            let err_r = Reader::spawn(child.stderr.take().expect("piped"));
             let mut term_at: Option<Instant> = None;
             let status = loop {
                 match child.try_wait() {
@@ -228,21 +275,35 @@ pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
                     process.launch_error = Some("종료 상태를 얻지 못함".into());
                 }
             }
-            // Group members that outlive the command keep the pipes open; give them
-            // a moment, then kill the group and record it.
-            let collect = |rx: &mpsc::Receiver<Vec<u8>>, p: &mut ProcessOutcome| match rx
-                .recv_timeout(Duration::from_secs(2))
-            {
-                Ok(b) => b,
-                Err(_) => {
+            // Group members that outlive the leader (review P2-3): after a timeout they
+            // get the rest of the grace period, then KILL; after a normal exit they
+            // are killed at once. Either way it is recorded.
+            if group_alive(pgid) {
+                if let Some(t0) = term_at {
+                    while !process.kill_sent && t0.elapsed() < spec.grace && group_alive(pgid) {
+                        thread::sleep(Duration::from_millis(20));
+                    }
+                    if group_alive(pgid) {
+                        signal_group(pgid, "KILL");
+                        process.kill_sent = true;
+                        process.stray_group_killed = true;
+                    }
+                } else {
                     signal_group(pgid, "KILL");
-                    p.stray_group_killed = true;
-                    p.kill_sent = true;
-                    rx.recv_timeout(Duration::from_secs(10)).unwrap_or_default()
+                    process.kill_sent = true;
+                    process.stray_group_killed = true;
                 }
-            };
-            let o = collect(&out_rx, &mut process);
-            let e = collect(&err_rx, &mut process);
+            }
+            // A descendant outside the group (setsid) can still hold the pipes.
+            // Keep what was read and record that the output may be incomplete
+            // (review P2-2) instead of discarding it.
+            let o_done = out_r.wait(Duration::from_secs(2));
+            let e_done = err_r.wait(Duration::from_millis(200));
+            if !(o_done && e_done) {
+                process.output_incomplete = true;
+            }
+            let o = out_r.take();
+            let e = err_r.take();
             (o, e)
         }
     };

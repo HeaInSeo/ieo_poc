@@ -103,6 +103,7 @@
         "term_sent",
         "kill_sent",
         "stray_group_killed",
+        "output_incomplete",
         "launch_error"
       ],
       "properties": {
@@ -147,6 +148,9 @@
             "string",
             "null"
           ]
+        },
+        "output_incomplete": {
+          "type": "boolean"
         }
       }
     },

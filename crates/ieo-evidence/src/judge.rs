@@ -61,10 +61,20 @@ pub fn judge(i: &Inputs) -> Judgment {
     for m in i.markers.iter().filter(|m| !m.found) {
         missing.push(format!("필수 표식 없음: /{}/", m.pattern));
     }
+    if p.output_incomplete {
+        missing.push(
+            "출력 관이 수집 종료 뒤에도 열려 있음(그룹 밖 자손): 저장된 출력이 잘렸을 수 있음"
+                .to_owned(),
+        );
+    }
+    if p.stray_group_killed {
+        // Recorded, not blocking: the command itself finished.
+        missing.push("명령 뒤에 남은 프로세스 그룹 구성원을 KILL함".to_owned());
+    }
     // A rate-limit line is informational; it must not turn success into incomplete.
     let blocking_missing: Vec<&String> = missing
         .iter()
-        .filter(|m| !m.starts_with("한도 신호"))
+        .filter(|m| !m.starts_with("한도 신호") && !m.starts_with("명령 뒤에 남은"))
         .collect();
 
     let (status, extra) = match i.expected {

@@ -32,6 +32,19 @@ impl Redactor {
                     "비밀 값이 {MIN_SECRET_LEN}바이트보다 짧아 가릴 수 없음(값은 출력하지 않음)"
                 ));
             }
+            // JSON output escapes these bytes, so a raw-byte match would miss the
+            // value inside stream-json (review P2-4): refuse instead of masking badly.
+            if v.iter()
+                .any(|&b| b < 0x20 || b == 0x7f || b == b'"' || b == b'\\')
+            {
+                return Err(
+                    "비밀 값에 JSON이 이스케이프하는 문자(제어 문자·\"·\\)가 있어 가림을 보장할 수 없음(값은 출력하지 않음)"
+                        .into(),
+                );
+            }
+            if std::str::from_utf8(&v).is_err() {
+                return Err("비밀 값이 UTF-8이 아님(값은 출력하지 않음)".into());
+            }
             hashes.push(hex::encode(Sha256::digest(&v)).into_bytes());
             values.push(v);
         }
@@ -117,6 +130,21 @@ mod tests {
         assert!(!s.contains("ABCDEFGHIJKL"));
         assert_eq!(m.replacements, 3);
         assert!(m.secret_value_seen);
+    }
+
+    #[test]
+    fn rejects_secrets_that_json_would_escape() {
+        for v in [
+            &b"abc\"defghij"[..],
+            b"abc\\defghij",
+            b"abc\tdefghij",
+            b"abc\x01defghij",
+            b"\xff\xfeabcdefgh",
+        ] {
+            assert!(Redactor::new(&[v.to_vec()]).is_err(), "{v:?}");
+        }
+        // a trailing newline (token files) is trimmed, not rejected
+        assert!(Redactor::new(&[b"abcdefghijkl\n".to_vec()]).is_ok());
     }
 
     #[test]
