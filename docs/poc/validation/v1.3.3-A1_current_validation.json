@@ -108,7 +108,7 @@
     "main_denominator": 73,
     "followup_denominator": 12
   },
-  "current_internal_links_checked": 184,
+  "current_internal_links_checked": 193,
   "report_contract_checks": {
     "human_input_checks": {
       "valid_without_estimate": true,
