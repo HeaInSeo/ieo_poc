@@ -2,12 +2,12 @@
 
 | 필드 | 기록 |
 | --- | --- |
-| 계획·작업·회차 | v1.3.3 · 01-02 · run `runtime-contract-20261112` rev 3 · 이전 회차 [runtime-comparison-20261112](../runtime-comparison-20261112/REPORT.md)(후보 비교·사용자 선택 대기) |
+| 계획·작업·회차 | v1.3.3 · 01-02 · run `runtime-contract-20261112` rev 4 · 이전 회차 [runtime-comparison-20261112](../runtime-comparison-20261112/REPORT.md)(후보 비교·사용자 선택 대기) |
 | 담당·단계 | 개발 에이전트(설계) → 독립 검토 세션 · 2026-11-12 KST |
 | 수용 기준 | `poc-acceptance-v1.3.3` rev 4 `01-02.accept` |
 | 사용자 선택 | **Claude Code CLI 우선 검증** — 2026-11-12 대화 원문 “01-02는 기존 권고대로 Claude Code CLI를 우선 검증 대상으로 선택할게. 설치 버전에서 실제 지원을 확인하고, 역할·인증·세션·재개 계약을 구체화해줘.” |
-| 산출물 | [Runtime_Contract_v0.md](Runtime_Contract_v0.md) (문서 revision 3) |
-| 검토 이력 | 7a39452 독립 검토 reject(F1 P1: 역할별 설정 신뢰·고정 인자 미정, F2~F4 P2, F5~F9 P3) → 교정 rev 2 → bf854bb reject(N1 P1: Guardrail이 검토 대상 실행 시 같은 UID로 Guardrail 자격 노출, N2~N4 P2, N5~N7 P3) → 교정 rev 3 |
+| 산출물 | [Runtime_Contract_v0.md](Runtime_Contract_v0.md) (문서 revision 4) |
+| 검토 이력 | 7a39452 독립 검토 reject(F1 P1: 역할별 설정 신뢰·고정 인자 미정, F2~F4 P2, F5~F9 P3) → 교정 rev 2 → bf854bb reject(N1 P1: Guardrail이 검토 대상 실행 시 같은 UID로 Guardrail 자격 노출, N2~N4 P2, N5~N7 P3) → 교정 rev 3 → 2e5a5ef reject(R1 P1: 읽기 전용 Guardrail이 P07/P20/P24의 독립 재현·재실행 의무와 모순, R2 P2 push 시점 제한 수단 없음, R3~R4 P3) → 교정 rev 4 |
 
 ## 수용 기준 대조
 
@@ -15,7 +15,9 @@
 | --- | --- |
 | 런타임 후보·권고·사용자 선택 | 이전 회차 비교표 + 계약 §1 |
 | 역할·U3 두 Pod(각 컨테이너 하나)·역할별 UID·파일시스템·자격·영속 볼륨 | §2, 같은 UID 한계 §2.1 |
-| 역할별 설정 신뢰·실행 범위·고정 인자 | §4.1 (Guardrail 읽기 전용·검토 대상 미실행, probe G) |
+| 역할별 설정 신뢰·실행 범위·고정 인자 | §4.1 (Guardrail 검토 대상 미실행·scratch 쓰기·자격 경로 읽기 거부, probe G) |
+| Guardrail 독립 재현 경로 | §2.1 격리 실행기 재현 요청(API는 01-08, 구현 02-06, 검증 P07) |
+| push 시점 제한 | §2.1 단계별 단기 토큰 + main 보호 + 탐지·조건부 병합 |
 | 인증 | §3 계약 3항 + 후보 방식 A/B/C(선택은 사용자 바인딩, 01-04 첫 probe 전) |
 | 이름↔session ID·체크포인트 | §4.2·§5 |
 | 자식 경계 | §6 |
