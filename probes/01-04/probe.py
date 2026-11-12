@@ -12,8 +12,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROLES = {"development": 20001, "guardrail": 20002}
-SECRETS = Path("/opt/rust/ieo_poc_secrets")
-BASE = Path("/opt/rust/ieo_poc_probe")  # role volumes (owned by mapped sub-UIDs)
+# overridable only for the harness dry run with dummy tokens (no model calls); real runs use the defaults
+SECRETS = Path(os.environ.get("IEO_PROBE_SECRETS", "/opt/rust/ieo_poc_secrets"))
+BASE = Path(os.environ.get("IEO_PROBE_BASE", "/opt/rust/ieo_poc_probe/roles"))  # role volumes (owned by mapped sub-UIDs)
 CLAUDE_BIN = Path("/opt/rust/ieo_poc_probe/bin/claude-2.1.322")  # 0755 copy of ~/.local/share/claude/versions/2.1.322 (same SHA-256)
 IMAGE = "docker.io/library/golang:1.26.9-bookworm"
 MAX_ATTEMPTS, WALL, PER_ATTEMPT = 30, 7200, 300
@@ -79,9 +80,11 @@ def podman_role_cmd(role, inner: str, extra_mounts=(), name=None):
     d = role_dir(role)
     cmd = ["podman", "run", "--rm", "--user", f"{uid}:{uid}", "--network", "slirp4netns",
            "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
-           "-v", f"{d}/state:/state", "-v", f"{d}/cred:/run/ieo/cred:ro",
-           "-v", f"{CLAUDE_BIN}:/opt/claude/claude:ro",
-           "-v", f"{d}/etc:/etc/ieo/role:ro",
+           # ":z" = shared SELinux label, so that SELinux never decides role-to-role access;
+           # only UID ownership and modes do (P2 must not mistake an SELinux denial for UID isolation)
+           "-v", f"{d}/state:/state:z", "-v", f"{d}/cred:/run/ieo/cred:ro,z",
+           "-v", f"{CLAUDE_BIN}:/opt/claude/claude:ro,z",
+           "-v", f"{d}/etc:/etc/ieo/role:ro,z",
            "--env", "HOME=/state/home", "--env", "CLAUDE_CONFIG_DIR=/state/claude", "--env", "LANG=C.UTF-8",
            "--workdir", "/state/work"]
     for m in extra_mounts:
@@ -96,10 +99,12 @@ def claude_inner(session_id: str, prompt_role: str, extra=""):
     return ("set -u; export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; "
             "echo \"#ENV_NAMES $(env | cut -d= -f1 | sort | tr '\\n' ' ')\" >&2; "
             "echo \"#UID $(id -u) GID $(id -g)\" >&2; "
-            f"exec timeout -k 10 290 /opt/claude/claude -p 'Reply with exactly: ok-{prompt_role}' "
+            "echo \"#T_START $(date +%s.%N)\" >&2; "
+            f"timeout -k 10 290 /opt/claude/claude -p 'Reply with exactly: ok-{prompt_role}' "
             "--output-format stream-json --verbose "
             f"--session-id {session_id} --tools '' --strict-mcp-config --mcp-config /etc/ieo/role/mcp.json "
-            "--forward-subagent-text --setting-sources user --permission-mode dontAsk " + extra)
+            "--forward-subagent-text --setting-sources user --permission-mode dontAsk " + extra +
+            "; rc=$?; echo \"#T_END $(date +%s.%N)\" >&2; exit $rc")
 
 
 def record_attempt(led: Ledger, n: int, probe: str, role: str, argv, started, ended, proc_rc, out, err, extra=None):
@@ -109,9 +114,11 @@ def record_attempt(led: Ledger, n: int, probe: str, role: str, argv, started, en
     (d / "stdout.jsonl").write_text(out)
     (d / "stderr.txt").write_text(err)
     events = [json.loads(l) for l in out.splitlines() if l.strip().startswith("{")]
+    marks = dict(re.findall(r"#(T_START|T_END) ([0-9.]+)", err))
     result = next((e for e in events if e.get("type") == "result"), None)
     meta = {"attempt": n, "probe": probe, "role": role, "argv": led.scrub(json.dumps(argv)),
-            "started_at": started, "ended_at": ended, "exit_code": proc_rc, "timeout": proc_rc in (124, 137),
+            "started_at": started, "ended_at": ended, "exit_code": proc_rc,
+            "claude_process_interval_epoch": [float(marks["T_START"]) if "T_START" in marks else None, float(marks["T_END"]) if "T_END" in marks else None], "timeout": proc_rc in (124, 137),
             "token_fingerprint": fp(led.tokens.get(role, b"")) if role in led.tokens else None,
             "result_event": {k: result.get(k) for k in ("subtype", "is_error", "session_id", "num_turns", "duration_ms", "usage", "total_cost_usd") if result and k in result} if result else None,
             "rate_limit_events": [e for e in events if e.get("type") == "rate_limit_event"],
@@ -186,16 +193,21 @@ def cmd_p1(ev):
     for i in (1, 2):
         m = attempt_pair(led, "P1", f"P1 round {i}")
         ok = all(x["result_event"] and not x["result_event"].get("is_error") and x["result_event"].get("session_id") == x["issued_session_id"] for x in m.values())
-        overlap = max(x["started_at"] for x in m.values()) < min(x["ended_at"] for x in m.values())
-        rounds.append({"round": i, "both_ok_with_issued_session": ok, "intervals_overlap": overlap,
-                       "intervals": {r: [x["started_at"], x["ended_at"]] for r, x in m.items()}})
+        iv = {r: x["claude_process_interval_epoch"] for r, x in m.items()}
+        # overlap judged from timestamps taken inside the containers right around the claude process
+        # (same host clock); host-side Popen/communicate times are kept only for reference
+        overlap = None if any(None in v for v in iv.values()) else max(v[0] for v in iv.values()) < min(v[1] for v in iv.values())
+        overlap_s = None if overlap is None else round(min(v[1] for v in iv.values()) - max(v[0] for v in iv.values()), 3)
+        rounds.append({"round": i, "both_ok_with_issued_session": ok, "claude_intervals_overlap": overlap, "overlap_seconds": overlap_s,
+                       "claude_process_intervals_epoch": iv,
+                       "host_wrapper_intervals": {r: [x["started_at"], x["ended_at"]] for r, x in m.items()}})
         if not ok:
             break
     (ev / "P1.json").write_text(json.dumps({"rounds": rounds}, indent=2) + "\n")
     print(json.dumps(rounds, indent=2))
 
 
-def cmd_p2(ev):
+def cmd_p2(ev, files_only=False):
     led = Ledger(ev)
     tests = []
     def t(tid, desc, argv, expect_denied=True):
@@ -204,7 +216,14 @@ def cmd_p2(ev):
         tests.append({"id": tid, "desc": desc, "argv": argv, "rc": r.returncode, "output": txt[-3000:], "expect": "denied" if expect_denied else "n/a"})
     dev, gd = role_dir("development"), role_dir("guardrail")
     # 2a: guardrail paths do not exist inside the development container
-    t("2a", "개발 컨테이너에서 Guardrail 자격·상태 경로 존재·읽기", podman_role_cmd("development", "ls -la /run/ieo/cred /state; for p in /guardrail /state/../guardrail; do ls $p 2>&1; done; cat /run/ieo/cred/* >/dev/null && echo OWN_CRED_READABLE; mount | grep -c guardrail || true"))
+    g = role_dir("guardrail")
+    t("2a", "개발 컨테이너에서 Guardrail 자격·상태 경로 목록·읽기·쓰기", podman_role_cmd("development",
+      f"ls -la /run/ieo/cred /state; for p in {g} {g}/cred {g}/state; do printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED_OR_ABSENT; done; "
+      f"(cat {g}/cred/oauth_token >/dev/null 2>&1 && echo READ_OK) || echo READ_DENIED_OR_ABSENT; "
+      f"(mkdir -p {g}/state 2>/dev/null && touch {g}/state/intrusion 2>/dev/null && echo WRITE_INSIDE_CONTAINER_FS_ONLY) || echo WRITE_DENIED; "
+      "cat /run/ieo/cred/* >/dev/null && echo OWN_CRED_READABLE; grep -c guardrail /proc/self/mountinfo || true"))
+    # a write into the container's own filesystem is not the guardrail volume; confirm on the host it did not appear
+    t("2a-host", "2a의 쓰기 시도가 호스트의 Guardrail 볼륨에 나타나지 않음", ["podman", "unshare", "bash", "-c", f"ls -la {g}/state; test -e {g}/state/intrusion && echo INTRUSION_PRESENT || echo INTRUSION_ABSENT"])
     # 2b: both volumes mounted into one test container; cross-UID access in each direction
     for me, other in (("development", "guardrail"), ("guardrail", "development")):
         o = role_dir(other)
@@ -212,19 +231,37 @@ def cmd_p2(ev):
                  "printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED; "
                  "printf '%s ' $p; (cat $p >/dev/null 2>&1 && echo READ_OK) || echo READ_DENIED; done; "
                  "(touch /x/state/intrusion 2>/dev/null && echo WRITE_OK) || echo WRITE_DENIED")
-        argv = podman_role_cmd(me, inner, extra_mounts=(f"{o}/cred:/x/cred:ro", f"{o}/state:/x/state"))
+        argv = podman_role_cmd(me, inner, extra_mounts=(f"{o}/cred:/x/cred:ro,z", f"{o}/state:/x/state:z"))
         t(f"2b-{me}->{other}", f"{me} UID가 {other} 소유 0700 볼륨에 접근", argv)
+        # positive control: the owner UID reaches the same paths in the same kind of container, so a denial above
+        # is caused by the UID boundary and not by mounts/SELinux
+        own = ("for p in /run/ieo/cred /run/ieo/cred/oauth_token /state /state/claude /state/scratch; do "
+               "printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED; "
+               "printf '%s ' $p; (test -d $p || cat $p >/dev/null 2>&1) && echo READ_OK || echo READ_DENIED; done; "
+               "(touch /state/scratch/owner-write && rm /state/scratch/owner-write && echo WRITE_OK) || echo WRITE_DENIED")
+        t(f"2p-{other}-owner", f"양성 대조: {other} UID가 자기 볼륨에 접근", podman_role_cmd(other, own), expect_denied=False)
     # 2d: guardrail token absent from development container (fingerprint comparison inside, no value printed)
-    gfp = fp(led.tokens["guardrail"])
-    t("2d", "개발 컨테이너 안 파일·환경에 Guardrail 토큰 지문 부재",
-      podman_role_cmd("development", f"export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; "
-                      f"h=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -c1-12); echo own_fp=$h; "
-                      f"[ \"$h\" = {gfp} ] && echo GUARDRAIL_TOKEN_PRESENT || echo GUARDRAIL_TOKEN_ABSENT; "
-                      f"grep -rIl -F \"$(printf %s {gfp})\" /state /run/ieo 2>/dev/null | head -1; true"))
+    def token_scan(target_hex):
+        return podman_role_cmd("development", "export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; "
+                      f"G={target_hex}; hit=0; n=0; "
+                      "e=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -d' ' -f1); [ \"$e\" = \"$G\" ] && { echo ENV_MATCH; hit=1; }; "
+                      "while IFS= read -r -d '' f; do n=$((n+1)); a=$(sha256sum < \"$f\" | cut -d' ' -f1); b=$(head -c -1 \"$f\" 2>/dev/null | sha256sum | cut -d' ' -f1); "
+                      "if [ \"$a\" = \"$G\" ] || [ \"$b\" = \"$G\" ]; then echo FILE_MATCH $f; hit=1; fi; done < <(find /state /run/ieo /etc/ieo -type f -readable -print0 2>/dev/null); "
+                      "echo files_hashed=$n; [ $hit = 0 ] && echo TOKEN_ABSENT || echo TOKEN_PRESENT")
+    # positive control: the same scan finds the development container's own token
+    t("2d-control", "양성 대조: 같은 검사로 개발 자신의 토큰은 찾음", token_scan(hashlib.sha256(led.tokens["development"]).hexdigest()), expect_denied=False)
+    gfull = hashlib.sha256(led.tokens["guardrail"]).hexdigest()
+    # every readable file (whole content, and content without trailing newline) and the token env var are hashed
+    # inside the development container and compared with the guardrail token's SHA-256; no value is passed in
+    t("2d", "개발 컨테이너의 파일·환경 어디에도 Guardrail 토큰과 같은 값이 없음", token_scan(gfull))
     # 2e: unprivileged host user (same as the dev conversation) reading role volumes
     for r in ROLES:
         d = role_dir(r)
         t(f"2e-{r}", f"호스트 비특권 사용자 heain이 {r} 0700 볼륨 읽기", ["bash", "-c", f"ls {d}/cred {d}/state/claude 2>&1; cat {d}/cred/oauth_token >/dev/null 2>&1 && echo READ_OK || echo READ_DENIED"])
+    if files_only:
+        (ev / "P2-files.json").write_text(json.dumps({"at": now(), "tests": tests}, ensure_ascii=False, indent=2) + "\n")
+        print(json.dumps([{k: x.get(k) for k in ("id", "rc")} for x in tests], indent=2))
+        return
     # 2c: development tries to resume the guardrail's P1 session id (one model-request attempt)
     p1 = json.loads((ev / "P1.json").read_text())
     gsid = None
@@ -270,13 +307,13 @@ def cmd_p3(ev):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["setup", "p1", "p2", "p3", "status"])
+    ap.add_argument("step", choices=["setup", "p1", "p2", "p2-files", "p3", "status"])
     ap.add_argument("--evidence", type=Path, default=DEFAULT_EVIDENCE)
     a = ap.parse_args()
     a.evidence.mkdir(parents=True, exist_ok=True)
     if a.step == "status":
         led = Ledger(a.evidence); n, w = led.remaining(); print(f"attempts used {MAX_ATTEMPTS - n}/30, wall remaining {int(w)}s"); return
-    {"setup": cmd_setup, "p1": cmd_p1, "p2": cmd_p2, "p3": cmd_p3}[a.step](a.evidence)
+    {"setup": cmd_setup, "p1": cmd_p1, "p2": cmd_p2, "p2-files": lambda e: cmd_p2(e, files_only=True), "p3": cmd_p3}[a.step](a.evidence)
 
 
 if __name__ == "__main__":
