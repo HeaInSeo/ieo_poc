@@ -6,9 +6,9 @@
 | 수용 기준 | `poc-acceptance-v1.3.3` rev 4 `02-01.accept`(장부 02-01 행과 같음) |
 | 선행 | 01-03·01-06 검수 완료(원장 snapshot `v1.3.3-EXEC-0011`, main `c0c5dc4`에서 착수 확인) |
 | 산출물 | Rust crate [`crates/ieo-evidence`](../../../../../../crates/ieo-evidence)(라이브러리 + CLI `ieo-evidence`) · 기록 형식 [`contracts/evidence-record-v0.schema.json`](../../../../../../contracts/evidence-record-v0.schema.json) · 생성기 시험 보강 [`scripts/test_render_progress.py`](../../../../scripts/test_render_progress.py) · 런타임 계약 revision 7(§11 항목 7) |
-| 상한 | F05 구현 14,400초. 시작 2026-11-12T11:34:57Z, 이 보고 작성 시점 12:36Z(약 3,700초). 검토·교정은 F04(4회·3회) |
+| 상한 | F05 구현 14,400초. 시작 2026-11-12T11:34:57Z, rev 1 보고 12:36Z(약 3,700초), rev 2 증거 12:46Z, 병합 12:59Z(약 5,100초). 검토·교정은 F04(4회·3회) |
 | 모델 호출 | **0회**. 02-01에 동결된 모델 요청 예산이 없고 01-04 예산은 전용하지 않는다. 실제 모델 출력은 01-04에 보존된 실제 stream으로 대조했다(§3) |
-| 상태 | rev 2. 독립 검토 2df3c35 reject(P2-1~P2-4) 교정 → 재검토 대기(02-01 검토 1/4·교정 1/3). 이 보고는 claim이다 |
+| 상태 | rev 2. 독립 검토 2df3c35 reject(P2-1~P2-4) 교정 → [273907b approve](reviews/review-pr21-273907b.md)(02-01 검토 2/4·교정 1/3) → 병합 a0c59fd·main CI success. 검토 273907b P3-1·P3-2는 원장 02-01·02-02 미해결 |
 
 ## 1. 구현 결과
 
