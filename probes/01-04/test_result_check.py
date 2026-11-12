@@ -30,7 +30,7 @@ def exits(fn):
 
 with tempfile.TemporaryDirectory() as td:
     led = P2.Ledger2(Path(td))
-    led.reserve(3, "synthetic")
+    led.reserve(3, "synthetic")  # attempts 1-3; 4-6 reserved below
     argv = ["true"]
     # 1. exit 0, empty stream -> no result event -> not judgeable, stop
     m = P2.record(led, 1, "SYN", "development", argv, "t0", "t1", 0, "", "", {"expected_outcome": "result"}, check_stop=False)
@@ -48,6 +48,29 @@ with tempfile.TemporaryDirectory() as td:
     # 4. probe.py round check: missing result event stops even with exit 0
     check("probe_py_round_without_result_stops", exits(lambda: P.stop_on_signal({"development": {"result_event": None, "exit_code": 0, "rate_limit_events": []}}, "SYN")))
     check("probe_py_round_with_result_passes", not exits(lambda: P.stop_on_signal({"development": {"result_event": {"subtype": "success", "is_error": False}, "exit_code": 0, "rate_limit_events": []}}, "SYN")))
+
+    # 6. background/batch path keeps expected_outcome (PR #16 review P3-2)
+    import subprocess
+    led.reserve(3, "synthetic-bg")
+    bg = (4, ["true"], "t0", subprocess.Popen(["true"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True), "result")
+    mb = P2.finish(led, "SYN", "development", bg)
+    check("batch_no_result_not_judgeable", mb["result_missing"] and not mb["judgeable"])
+    check("batch_no_result_stops_in_stop_batch", exits(lambda: P2.stop_batch([mb])))
+    bg2 = (5, ["true"], "t0", subprocess.Popen(["true"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True), "no_result")
+    mb2 = P2.finish(led, "SYN", "development", bg2)
+    check("batch_intended_no_result_judgeable", mb2["judgeable"] and not exits(lambda: P2.stop_batch([mb2])))
+    # 7. last substantive result event is used (PR #16 review P3-1: N4b emitted an empty 0-turn result first)
+    two = ('{"type":"result","subtype":"success","is_error":false,"session_id":"s","num_turns":0,"result":""}\n'
+           '{"type":"result","subtype":"success","is_error":false,"session_id":"s","num_turns":1,"result":"CODE"}\n')
+    m6 = P2.record(led, 6, "SYN", "development", ["true"], "t0", "t1", 0, two, "", {"expected_outcome": "result"}, check_stop=False)
+    check("last_substantive_result_used", m6["result_event"]["result"] == "CODE")
+
+# 8. artifact checks: an artifact without its explicit markers is unobservable (PR #16 review P2-1)
+check("artifact_empty_output_stops", exits(lambda: P2.artifact("true", [r"^HOOK_COUNT=\d+$"], "syn")))
+check("artifact_nonzero_rc_stops", exits(lambda: P2.artifact("echo HOOK_COUNT=0; exit 3", [r"^HOOK_COUNT=\d+$"], "syn")))
+check("artifact_with_markers_ok", not exits(lambda: P2.artifact("echo HOOK_COUNT=0", [r"^HOOK_COUNT=\d+$"], "syn")))
+check("hook_block_parsed_empty", P2.hook_files("HOOKS_BEGIN\nHOOKS_END\n") == [])
+check("hook_block_parsed_files", P2.hook_files("HOOKS_BEGIN\nHOOK-FIRED-x\nHOOKS_END\n") == ["HOOK-FIRED-x"])
 
 # 5. decisive markers: empty / unrelated output is unobservable; every recorded 01-04 no-model test has a marker
 check("empty_output_unobservable", not P2.observe("")["observed"])

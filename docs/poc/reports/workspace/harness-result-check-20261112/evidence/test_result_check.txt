@@ -9,6 +9,18 @@ PASS result_present_judgeable
 PASS result_present_no_stop
 PASS probe_py_round_without_result_stops
 PASS probe_py_round_with_result_passes
+[04 SYN development] rc=0 sid=None err=None leak=[] marker=False denials=0 rl=[]
+PASS batch_no_result_not_judgeable
+PASS batch_no_result_stops_in_stop_batch
+[05 SYN development] rc=0 sid=None err=None leak=[] marker=False denials=0 rl=[]
+PASS batch_intended_no_result_judgeable
+[06 SYN development] rc=0 sid=s err=False leak=[] marker=False denials=0 rl=[]
+PASS last_substantive_result_used
+PASS artifact_empty_output_stops
+PASS artifact_nonzero_rc_stops
+PASS artifact_with_markers_ok
+PASS hook_block_parsed_empty
+PASS hook_block_parsed_files
 PASS empty_output_unobservable
 PASS unrelated_output_unobservable
 PASS recorded_2a_observed

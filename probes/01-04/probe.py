@@ -119,7 +119,8 @@ def record_attempt(led: Ledger, n: int, probe: str, role: str, argv, started, en
     (d / "stderr.txt").write_text(err)
     events = [json.loads(l) for l in out.splitlines() if l.strip().startswith("{")]
     marks = dict(re.findall(r"#(T_START|T_END) ([0-9.]+)", err))
-    result = next((e for e in events if e.get("type") == "result"), None)
+    results = [e for e in events if e.get("type") == "result"]
+    result = next((e for e in reversed(results) if (e.get("num_turns") or 0) >= 1), results[-1] if results else None)
     meta = {"attempt": n, "probe": probe, "role": role, "argv": led.scrub(json.dumps(argv)),
             "started_at": started, "ended_at": ended, "exit_code": proc_rc,
             "claude_process_interval_epoch": [float(marks["T_START"]) if "T_START" in marks else None, float(marks["T_END"]) if "T_END" in marks else None], "timeout": proc_rc in (124, 137),
