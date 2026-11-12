@@ -1,0 +1,12 @@
+diff --git a/crates/ieo-spec/src/check.rs b/crates/ieo-spec/src/check.rs
+index cc52426..0585178 100644
+--- a/crates/ieo-spec/src/check.rs
++++ b/crates/ieo-spec/src/check.rs
+@@ -98,7 +98,6 @@ impl Registry {
+         let key = (sprint_id.clone(), rev);
+         match self.revisions.get(&key) {
+             // a stored revision is immutable: different content is never recorded over it
+-            Some((d, _)) if *d != digest => return false,
+             // the stored mode only ever widens (draft → executable), never narrows
+             Some((_, CheckMode::Executable)) => {}
+             _ => {

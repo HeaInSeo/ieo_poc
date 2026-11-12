@@ -1,0 +1,12 @@
+diff --git a/crates/ieo-spec/src/check.rs b/crates/ieo-spec/src/check.rs
+index cc52426..f09d9b7 100644
+--- a/crates/ieo-spec/src/check.rs
++++ b/crates/ieo-spec/src/check.rs
+@@ -100,7 +100,6 @@ impl Registry {
+             // a stored revision is immutable: different content is never recorded over it
+             Some((d, _)) if *d != digest => return false,
+             // the stored mode only ever widens (draft → executable), never narrows
+-            Some((_, CheckMode::Executable)) => {}
+             _ => {
+                 self.revisions.insert(key, (digest, mode));
+             }
