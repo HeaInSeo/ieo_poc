@@ -1,0 +1,204 @@
+{
+  "captured_at": "2026-11-12T07:18:21+00:00",
+  "command": "podman unshare .venv-poc/bin/python -I probes/01-04/identity_claims.py --host-login ~/.claude.json /opt/rust/ieo_poc_probe/roles/development/state/claude /opt/rust/ieo_poc_probe/roles/guardrail/state/claude",
+  "development": {
+    "sources": [
+      {
+        "file": "policy-limits.json.signature.json",
+        "sha256_12": "ee8a51efdf59",
+        "size": 3006,
+        "mtime": "2026-11-12T07:06:44+00:00"
+      },
+      {
+        "file": "policy-limits.json",
+        "sha256_12": "d81ac49dc74e",
+        "size": 284,
+        "mtime": "2026-11-12T07:05:42+00:00"
+      },
+      {
+        "file": "policy-limits.json.stamp.json",
+        "sha256_12": "a45409eb765e",
+        "size": 225,
+        "mtime": "2026-11-12T07:06:45+00:00"
+      }
+    ],
+    "jws_alg": "ES256",
+    "jws_header_keys": [
+      "alg",
+      "kid",
+      "typ",
+      "x5c"
+    ],
+    "signature": {
+      "checked": true,
+      "signature_by_leaf": "Verified OK",
+      "leaf": [
+        "subject=CN = claude-code-managed-settings-signing",
+        "issuer=O = Anthropic, CN = Claude Code Signed Cache Issuing CA",
+        "notAfter=Nov 13 05:54:47 2026 GMT"
+      ],
+      "x5c_len": 2,
+      "chain_verify_system_ca": "error leaf: verification failed\nO = Anthropic, CN = Claude Code Signed Cache Issuing CA\nerror 20 at 1 depth lookup: unable to get local issuer certificate",
+      "leaf_cert_fp": "0ccbadc2f7ed",
+      "kid_fp": "b35864b48867"
+    },
+    "signature_fp": "c70c1251b58a",
+    "claims": {
+      "v": {
+        "shape": "int",
+        "fp": "6b86b273ff34"
+      },
+      "typ": {
+        "shape": "policy-limits",
+        "fp": "3ac60654f412"
+      },
+      "aud": {
+        "shape": "<uuid>",
+        "fp": "d9f8580fc621"
+      },
+      "sub": {
+        "shape": "<uuid>",
+        "fp": "006c378fb8a8"
+      },
+      "ws": {
+        "shape": "<uuid>",
+        "fp": "ad742103a1f4"
+      },
+      "plan": {
+        "shape": "consumer",
+        "fp": "100eaff0266a"
+      },
+      "iat": {
+        "shape": "int",
+        "fp": "637ce5cc11fa"
+      },
+      "exp": {
+        "shape": "int",
+        "fp": "7b38ac1464f2"
+      },
+      "sha": {
+        "shape": "str",
+        "fp": "caa87d391421"
+      }
+    },
+    "local_only": {
+      "claude.json userID fp": "91c50115b496",
+      "stamp.identity fp": "561dda757b5e",
+      "stamp.kind": "token"
+    },
+    "claim_meaning_vs_host_login": {
+      "sub==accountUuid": true,
+      "sub==organizationUuid": false,
+      "aud==accountUuid": false,
+      "aud==organizationUuid": true,
+      "ws==accountUuid": false,
+      "ws==organizationUuid": false
+    }
+  },
+  "guardrail": {
+    "sources": [
+      {
+        "file": "policy-limits.json.signature.json",
+        "sha256_12": "676918238bd8",
+        "size": 3006,
+        "mtime": "2026-11-12T07:06:44+00:00"
+      },
+      {
+        "file": "policy-limits.json",
+        "sha256_12": "d81ac49dc74e",
+        "size": 284,
+        "mtime": "2026-11-12T07:05:46+00:00"
+      },
+      {
+        "file": "policy-limits.json.stamp.json",
+        "sha256_12": "f45f8c891566",
+        "size": 225,
+        "mtime": "2026-11-12T07:06:44+00:00"
+      }
+    ],
+    "jws_alg": "ES256",
+    "jws_header_keys": [
+      "alg",
+      "kid",
+      "typ",
+      "x5c"
+    ],
+    "signature": {
+      "checked": true,
+      "signature_by_leaf": "Verified OK",
+      "leaf": [
+        "subject=CN = claude-code-managed-settings-signing",
+        "issuer=O = Anthropic, CN = Claude Code Signed Cache Issuing CA",
+        "notAfter=Nov 13 05:57:03 2026 GMT"
+      ],
+      "x5c_len": 2,
+      "chain_verify_system_ca": "error leaf: verification failed\nO = Anthropic, CN = Claude Code Signed Cache Issuing CA\nerror 20 at 1 depth lookup: unable to get local issuer certificate",
+      "leaf_cert_fp": "1ded9d41be3a",
+      "kid_fp": "0e9f8f6a1ca4"
+    },
+    "signature_fp": "e08e6c44b4fe",
+    "claims": {
+      "v": {
+        "shape": "int",
+        "fp": "6b86b273ff34"
+      },
+      "typ": {
+        "shape": "policy-limits",
+        "fp": "3ac60654f412"
+      },
+      "aud": {
+        "shape": "<uuid>",
+        "fp": "d9f8580fc621"
+      },
+      "sub": {
+        "shape": "<uuid>",
+        "fp": "006c378fb8a8"
+      },
+      "ws": {
+        "shape": "<uuid>",
+        "fp": "ad742103a1f4"
+      },
+      "plan": {
+        "shape": "consumer",
+        "fp": "100eaff0266a"
+      },
+      "iat": {
+        "shape": "int",
+        "fp": "637ce5cc11fa"
+      },
+      "exp": {
+        "shape": "int",
+        "fp": "7b38ac1464f2"
+      },
+      "sha": {
+        "shape": "str",
+        "fp": "caa87d391421"
+      }
+    },
+    "local_only": {
+      "claude.json userID fp": "a3a1fe1e60df",
+      "stamp.identity fp": "8c1a8b095323",
+      "stamp.kind": "token"
+    },
+    "claim_meaning_vs_host_login": {
+      "sub==accountUuid": true,
+      "sub==organizationUuid": false,
+      "aud==accountUuid": false,
+      "aud==organizationUuid": true,
+      "ws==accountUuid": false,
+      "ws==organizationUuid": false
+    }
+  },
+  "comparison": {
+    "aud": "same",
+    "exp": "same",
+    "iat": "same",
+    "plan": "same",
+    "sha": "same",
+    "sub": "same",
+    "typ": "same",
+    "v": "same",
+    "ws": "same",
+    "signature": "different"
+  }
+}

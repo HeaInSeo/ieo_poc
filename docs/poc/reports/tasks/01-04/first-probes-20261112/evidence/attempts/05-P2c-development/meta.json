@@ -1,0 +1,49 @@
+{
+  "attempt": 5,
+  "probe": "P2c",
+  "role": "development",
+  "argv": "[\"podman\", \"run\", \"--rm\", \"--user\", \"20001:20001\", \"--network\", \"slirp4netns\", \"--security-opt\", \"no-new-privileges\", \"--cap-drop\", \"ALL\", \"-v\", \"/opt/rust/ieo_poc_probe/roles/development/state:/state:z\", \"-v\", \"/opt/rust/ieo_poc_probe/roles/development/cred:/run/ieo/cred:ro,z\", \"-v\", \"/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z\", \"-v\", \"/opt/rust/ieo_poc_probe/roles/development/etc:/etc/ieo/role:ro,z\", \"--env\", \"HOME=/state/home\", \"--env\", \"CLAUDE_CONFIG_DIR=/state/claude\", \"--env\", \"LANG=C.UTF-8\", \"--workdir\", \"/state/work\", \"docker.io/library/golang:1.26.9-bookworm\", \"bash\", \"-c\", \"set -u; export CLAUDE_CODE_OAUTH_TOKEN=\\\"$(cat /run/ieo/cred/oauth_token)\\\"; exec timeout -k 10 290 /opt/claude/claude -p 'Reply with exactly: ok-resume' --output-format stream-json --verbose --resume 73305c11-cd0f-4d86-83e4-585fb858ab1a --tools '' --strict-mcp-config --mcp-config /etc/ieo/role/mcp.json --setting-sources user --permission-mode dontAsk\"]",
+  "started_at": "2026-11-12T07:06:10.987+00:00",
+  "ended_at": "2026-11-12T07:06:12.785+00:00",
+  "exit_code": 1,
+  "claude_process_interval_epoch": [
+    null,
+    null
+  ],
+  "timeout": false,
+  "token_fingerprint": "2456b85e9111",
+  "result_event": {
+    "subtype": "error_during_execution",
+    "is_error": true,
+    "session_id": "73305c11-cd0f-4d86-83e4-585fb858ab1a",
+    "num_turns": 0,
+    "duration_ms": 0,
+    "usage": {
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 0,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "total_cost_usd": 0
+  },
+  "rate_limit_events": [],
+  "tool_use_events": 0,
+  "parent_tool_use_events": 0,
+  "target_session_id": "73305c11-cd0f-4d86-83e4-585fb858ab1a"
+}

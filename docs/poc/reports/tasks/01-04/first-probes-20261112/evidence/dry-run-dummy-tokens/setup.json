@@ -1,0 +1,63 @@
+{
+  "at": "2026-11-12T05:48:11.538+00:00",
+  "info": {
+    "secrets_dir_mode": "0o700",
+    "token_file_modes": {
+      "development": "0o600",
+      "guardrail": "0o600"
+    },
+    "token_fingerprints": {
+      "development": "c984739a3ed8",
+      "guardrail": "5ea397e574e9"
+    },
+    "tokens_distinct": true,
+    "token_prefix_ok": {
+      "development": true,
+      "guardrail": true
+    }
+  },
+  "commands": [
+    {
+      "cmd": "podman unshare bash -c umask 077; cat /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/secrets/development.token > /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/cred/oauth_token && chown -R 20001:20001 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/state /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/cred && chmod 0700 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/state /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/cred /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/state/* && chmod 0400 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/cred/oauth_token && chmod 0755 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/etc && chmod 0444 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/etc/mcp.json",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": "podman unshare bash -c umask 077; cat /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/secrets/guardrail.token > /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/cred/oauth_token && chown -R 20002:20002 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/state /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/cred && chmod 0700 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/state /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/cred /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/state/* && chmod 0400 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/cred/oauth_token && chmod 0755 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/etc && chmod 0444 /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/etc/mcp.json",
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": "podman info --format {{.Host.Security.Rootless}} {{.Host.NetworkBackend}} {{.Host.IDMappings.UIDMap}}",
+      "rc": 0,
+      "stdout": "true netavark [{0 1001 1} {1 165536 65536}]\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "grep heain /etc/subuid",
+      "rc": 0,
+      "stdout": "heain:165536:65536\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "stat -c %n uid=%u gid=%g mode=%a /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/state /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/cred /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/state /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/cred",
+      "rc": 0,
+      "stdout": "/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/state uid=185536 gid=185536 mode=700\n/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/development/cred uid=185536 gid=185536 mode=700\n/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/state uid=185537 gid=185537 mode=700\n/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/dry/roles/guardrail/cred uid=185537 gid=185537 mode=700\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "podman image inspect --format {{.Id}} {{.RepoDigests}} docker.io/library/golang:1.26.9-bookworm",
+      "rc": 0,
+      "stdout": "6880d90c0623e6e55560894ff82266f5a06c0f7b1c9ee7f6e2def900d9bc2956 [docker.io/library/golang@sha256:bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c]\n",
+      "stderr": ""
+    },
+    {
+      "cmd": "sha256sum /opt/rust/ieo_poc_probe/bin/claude-2.1.322",
+      "rc": 0,
+      "stdout": "bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478  /opt/rust/ieo_poc_probe/bin/claude-2.1.322\n",
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "auth_status": {
+    "development": {
+      "rc": 0,
+      "identity_fingerprints": {
+        "email": null,
+        "orgId": null,
+        "accountUuid": null,
+        "orgName": null
+      },
+      "fields_present": [
+        "analyticsDisabled",
+        "apiProvider",
+        "authMethod",
+        "configDirectory",
+        "loggedIn",
+        "loginExpiresAt",
+        "projectsDirectory"
+      ],
+      "non_identity": {
+        "authMethod": "oauth_token",
+        "apiProvider": "firstParty"
+      },
+      "raw_if_unparsed": null
+    },
+    "guardrail": {
+      "rc": 0,
+      "identity_fingerprints": {
+        "email": null,
+        "orgId": null,
+        "accountUuid": null,
+        "orgName": null
+      },
+      "fields_present": [
+        "analyticsDisabled",
+        "apiProvider",
+        "authMethod",
+        "configDirectory",
+        "loggedIn",
+        "loginExpiresAt",
+        "projectsDirectory"
+      ],
+      "non_identity": {
+        "authMethod": "oauth_token",
+        "apiProvider": "firstParty"
+      },
+      "raw_if_unparsed": null
+    }
+  },
+  "rounds": [
+    {
+      "development": {
+        "rate_limit_events": [
+          {
+            "type": "rate_limit_event",
+            "rate_limit_info": {
+              "status": "allowed",
+              "resetsAt": 1794479400,
+              "rateLimitType": "five_hour",
+              "overageStatus": "rejected",
+              "overageDisabledReason": "out_of_credits",
+              "isUsingOverage": false,
+              "unifiedWindows": {
+                "five_hour": {
+                  "utilization": 0.12,
+                  "resetsAt": 1794479400,
+                  "status": "allowed"
+                },
+                "seven_day": {
+                  "utilization": 0.29,
+                  "resetsAt": 1794729600,
+                  "status": "allowed"
+                }
+              }
+            },
+            "uuid": "803a33f3-31b2-45a0-87bc-6bfa8eb4c506",
+            "session_id": "b127ed46-fcad-4ab1-9fe1-1a0473dec229"
+          }
+        ],
+        "result_ok": true
+      },
+      "guardrail": {
+        "rate_limit_events": [
+          {
+            "type": "rate_limit_event",
+            "rate_limit_info": {
+              "status": "allowed",
+              "resetsAt": 1794479400,
+              "rateLimitType": "five_hour",
+              "overageStatus": "rejected",
+              "overageDisabledReason": "out_of_credits",
+              "isUsingOverage": false,
+              "unifiedWindows": {
+                "five_hour": {
+                  "utilization": 0.12,
+                  "resetsAt": 1794479400,
+                  "status": "allowed"
+                },
+                "seven_day": {
+                  "utilization": 0.29,
+                  "resetsAt": 1794729600,
+                  "status": "allowed"
+                }
+              }
+            },
+            "uuid": "52718cfb-a295-4739-8edc-9180b83b9396",
+            "session_id": "3dd79533-7894-480e-ab08-fca624796842"
+          }
+        ],
+        "result_ok": true
+      }
+    },
+    {
+      "development": {
+        "rate_limit_events": [
+          {
+            "type": "rate_limit_event",
+            "rate_limit_info": {
+              "status": "allowed",
+              "resetsAt": 1794479400,
+              "rateLimitType": "five_hour",
+              "overageStatus": "rejected",
+              "overageDisabledReason": "out_of_credits",
+              "isUsingOverage": false,
+              "unifiedWindows": {
+                "five_hour": {
+                  "utilization": 0.12,
+                  "resetsAt": 1794479400,
+                  "status": "allowed"
+                },
+                "seven_day": {
+                  "utilization": 0.29,
+                  "resetsAt": 1794729600,
+                  "status": "allowed"
+                }
+              }
+            },
+            "uuid": "e2939538-a1ae-42e4-8c65-2bde070d799e",
+            "session_id": "5fd98501-9c37-489d-99ee-8d250dc99156"
+          }
+        ],
+        "result_ok": true
+      },
+      "guardrail": {
+        "rate_limit_events": [
+          {
+            "type": "rate_limit_event",
+            "rate_limit_info": {
+              "status": "allowed",
+              "resetsAt": 1794479400,
+              "rateLimitType": "five_hour",
+              "overageStatus": "rejected",
+              "overageDisabledReason": "out_of_credits",
+              "isUsingOverage": false,
+              "unifiedWindows": {
+                "five_hour": {
+                  "utilization": 0.12,
+                  "resetsAt": 1794479400,
+                  "status": "allowed"
+                },
+                "seven_day": {
+                  "utilization": 0.29,
+                  "resetsAt": 1794729600,
+                  "status": "allowed"
+                }
+              }
+            },
+            "uuid": "718aa7fa-51ca-4c9f-92fb-82dd652f79b3",
+            "session_id": "7299c149-2659-4e21-8631-e7fa7075e075"
+          }
+        ],
+        "result_ok": true
+      }
+    }
+  ]
+}
