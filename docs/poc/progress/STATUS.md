@@ -1,10 +1,10 @@
 # PoC 진행과 최근 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0008` · 원장 SHA-256 `b7e6daea979cc616ee79e9499f50f4c2ed5c0ea8624e98bf9500d4b8ed8091eb`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0008` · 원장 SHA-256 `2ea758870bc6dc17f45ecd287280c7bd3423b79c9effa755d072b371c6c1da9c`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
-**현재: 01-04 · 첫 세 probe 판정표 통과(PR #12) · 나머지 범위 계획 고정·실행 중 · 다음 작업: 01-04**
+**현재: 01-04 · 첫 세 probe 판정표 통과(PR #12) · 나머지 범위 계획을 브랜치 task/01-04-remaining c4c4113에 실행 전 커밋(미실행·미병합) · 다음 작업: 01-04**
 
 주계획과 조건부 후속은 별도 진행률이다. 실험 평가 종료·공수·제품 완성률과 구분한다. ZIP은 전달 시점 스냅샷이다.
 
@@ -29,8 +29,8 @@
 | --- | --- |
 | 현재 작업 | 01-04 |
 | 다음 작업 | 01-04 |
-| 마지막 실제 작업 관측 | 2026-11-12T16:23:54+09:00 |
-| 화면 snapshot 작성 | 2026-11-12T16:23:54+09:00 |
+| 마지막 실제 작업 관측 | 2026-11-12T16:30:08+09:00 |
+| 화면 snapshot 작성 | 2026-11-12T16:30:08+09:00 |
 | 보고 owner | 개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님) |
 | 열람 상태 | GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면) |
 | 고정 사용자 링크 | https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md |
@@ -74,6 +74,7 @@
 - PR #9 검토 P3: 쓰기 거부가 assert라 python -O로 우회, validation/ mkdir 없음, write-fixed 증거의 결과 SHA가 최종 파일과 다름(재현은 됨), L04 기록에 sori S6 약함 미기재.
 - PR #10 검토 P3(02-03 착수 시 처리): N1 01-08 계약 검사 순서·409 목록에 ASSIGNMENT_SHA_MISMATCH 누락·OpenAPI 'An An' 오타·null 본문 SHA 규칙 미기재, N2 Registry가 digest 재계산 없이 호출자 문자열 신뢰, N3 Replay 영수증 counts_for_current_judgment 재계산 미구현(항상 false), N4 판정 입력은 판정 시점의 현재 배정으로 정의·시험 필요, N5 cargo-test 로그 머리줄 '1 changes' 설명 없음. review_currency는 처분을 모름(F6).
 - PR #12 검토 P3(01-04 나머지 계획에서 반영): P3-3 2d가 파일 전체 일치만 탐지, P3-4 2b가 errno를 버림, P3-6 budget.log 명칭·meta 누적값·시도 05 표식·auth status 원문 미보존, P3-9 해시는 argv 대신 RO 파일로 전달 권고. P3-8 토큰 SHA-256 전체값의 공개 이력 잔존과 교체 여부를 사용자에게 보고.
+- PR #12 자동 검토 P2(codex 4547423210, probe.py P3 2회차가 1회차의 한도·인증 신호를 보지 않고 기동 — Probe_Budget_Rules §4): 유효. 이번 실행은 모든 rate_limit_event가 allowed·오류 없음이라 판정 영향 없음. 하네스 교정(probe.py stop_on_signal, probe2.py stop_signals)은 task/01-04-remaining c4c4113, 01-04 나머지 결과 PR에서 검토. 처분 답글 https://github.com/HeaInSeo/ieo_poc/pull/12#discussion_r4547547000
 
 다음 의존 작업 착수 전·제어를 돌려받는 지점마다 원장을 갱신하고 재생성한다. 응답 없는 동안 새 관측을 추정하지 않는다. 강제 종료 뒤 실제 외부 효과를 대조한다.
 
