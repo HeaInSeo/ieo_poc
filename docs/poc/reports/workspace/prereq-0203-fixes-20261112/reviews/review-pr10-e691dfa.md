@@ -119,3 +119,5 @@ probe 시험(임시, 원복): body SHA 불일치(F1), 같은 SHA 옛 세대(F6),
 git checkout --detach e691dfa; .venv-poc/bin/python docs/poc/scripts/validate_package.py   # EXIT=0
 git worktree remove --force <scratch>/wt-e9b
 ```
+
+→ 교정 커밋 8eb2f98(코드)·ea902dd(증거). 새 head를 다시 독립 검토한다. (PR #10 댓글 끝줄)

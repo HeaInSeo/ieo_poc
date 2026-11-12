@@ -90,7 +90,7 @@
         "reports/tasks/01-03/staged-freeze-20261112/evidence/host-isolation-check.txt"
       ],
       "next_action": "사용자가 개발·Guardrail 토큰 2개를 비밀 기록 없이 전달 → P1 동시 두 세션 → P2 자격·세션·저장소 격리 → P3 한도 구조(판정표 A1-GATE-01-04, 30회·7,200초·시도당 300초)",
-      "unresolved": "역할별 토큰 미발급(/opt/rust/ieo_poc_secrets/{development,guardrail}.token). 수단 가용성(rootless podman·sub-UID·UID 20001 실행·호스트 로그인 비노출)은 확인, 역할 간 접근 차단 성공은 미시험(P2)"
+      "unresolved": "역할별 토큰 미발급(/opt/rust/ieo_poc_secrets/{development,guardrail}.token). 수단 가용성(rootless podman·sub-UID는 host-isolation-check.txt, UID 20001 실행·호스트 로그인 비노출은 브랜치 task/01-04-probes a321cd2의 reports/tasks/01-04/first-probes-20261112/evidence/container-smoke.txt)은 확인, 역할 간 접근 차단 성공은 미시험(P2)"
     },
     {
       "task_id": "01-05",

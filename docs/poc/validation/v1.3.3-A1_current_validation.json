@@ -136,7 +136,7 @@
   "package_integrity": {
     "delivered": 120,
     "amended": 11,
-    "gitignored_paper_pdfs_absent": 0,
+    "gitignored_paper_pdfs_absent": 4,
     "amendment": "v1.3.3-A1"
   }
 }
