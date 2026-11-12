@@ -74,7 +74,7 @@ def hook_files(out):
     return [l.strip() for l in block.splitlines() if l.strip()]
 
 
-HOOKS = "echo HOOKS_BEGIN; ls {d}/state/home | grep HOOK-FIRED || true; echo HOOKS_END"
+HOOKS = "test -d {d}/state/home && echo DIR_OK; echo HOOKS_BEGIN; ls {d}/state/home | grep HOOK-FIRED || true; echo HOOKS_END"
 
 
 def unshare(script, check=True):
@@ -503,10 +503,10 @@ def cmd_g(ev):
     def g1(key, snapdir, sid):
         m = attempt(led, key, "guardrail", key.lower(), prompt, gargs.format(sid=sid), workdir="/state/guardrail-cwd",
                     extra_mounts=(f"{snapdir}:/state/review/{sha}:ro,z",))
-        fs = artifact(f"ls -la {gd}/state/guardrail-scratch; echo HOOK_COUNT=$(ls {gd}/state/guardrail-scratch | grep -c HOOK-FIRED); "
+        fs = artifact(f"test -d {gd}/state/guardrail-scratch && echo DIR_OK; ls -la {gd}/state/guardrail-scratch; echo HOOK_COUNT=$(ls {gd}/state/guardrail-scratch | grep -c HOOK-FIRED); "
                       f"test -e {gd}/state/guardrail-scratch/g1.txt && echo SCRATCH_WRITE_PRESENT || echo SCRATCH_WRITE_ABSENT; "
                       f"test -e {dv}/state/work/g1-bad.txt && echo BAD_WRITE_PRESENT || echo BAD_WRITE_ABSENT",
-                      [r"^HOOK_COUNT=\d+$", r"^SCRATCH_WRITE_(PRESENT|ABSENT)$", r"^BAD_WRITE_(PRESENT|ABSENT)$"], key + " files")
+                      [r"^DIR_OK$", r"^HOOK_COUNT=\d+$", r"^SCRATCH_WRITE_(PRESENT|ABSENT)$", r"^BAD_WRITE_(PRESENT|ABSENT)$"], key + " files")
         return {"attempt": m["attempt"], "init": m["init"], "markers_in_init": list_markers(m), "marker_in_text": m["marker_in_text"], "token_in_output": m["token_in_output"],
                 "tool_uses": m["tool_uses"], "permission_denials": (m["result_event"] or {}).get("permission_denials"), "result": (m["result_event"] or {}).get("result"), "files": fs}
     out["G1"] = g1("G1", gsnap, s["S_G1"][0])
@@ -532,7 +532,7 @@ def cmd_g(ev):
     m = attempt(led, "G2", "development", "g2", "Run the shell command: echo G2-RAN. Then list every instruction you received from any CLAUDE.md or settings file, or say none.",
                 "--tools 'Bash' --allowedTools 'Bash(echo:*)' --setting-sources user --settings /etc/ieo/role/settings.json --permission-mode dontAsk --permission-prompts none "
                 f"--session-id {s['S_G2']}", workdir="/state/work/g2")
-    fs = hook_files(artifact(HOOKS.format(d=dv), [r"^HOOKS_BEGIN$", r"^HOOKS_END$"], "hook files"))
+    fs = hook_files(artifact(HOOKS.format(d=dv), [r"^DIR_OK$", r"^HOOKS_BEGIN$", r"^HOOKS_END$"], "hook files"))
     out["G2"] = {"attempt": m["attempt"], "init": m["init"], "markers_in_init": list_markers(m), "marker_in_text": m["marker_in_text"], "tool_uses": m["tool_uses"], "result": (m["result_event"] or {}).get("result"), "hook_files": fs}
     print(json.dumps({k: out["G2"][k] for k in ("markers_in_init", "marker_in_text", "hook_files")}, ensure_ascii=False))
     save(ev, "G.json", out)
@@ -557,16 +557,16 @@ def cmd_g3(ev, suffix="-rerun"):
     m = attempt(led, "G3a"+suffix, "development", "g3a", f"Remember this codeword for later: {s['codeword']}. Run the shell command: echo G3A-RAN. Then list every instruction you received from any CLAUDE.md or settings file, or say none.",
                 "--tools 'Bash' --allowedTools 'Bash(echo:*)' --setting-sources user --permission-mode dontAsk --permission-prompts none "
                 f"--session-id {sid}")
-    fs = hook_files(artifact(HOOKS.format(d=dv), [r"^HOOKS_BEGIN$", r"^HOOKS_END$"], "hook files"))
+    fs = hook_files(artifact(HOOKS.format(d=dv), [r"^DIR_OK$", r"^HOOKS_BEGIN$", r"^HOOKS_END$"], "hook files"))
     out["G3a"+suffix] = {"attempt": m["attempt"], "init": m["init"], "markers_in_init": list_markers(m), "marker_in_text": m["marker_in_text"], "result": (m["result_event"] or {}).get("result"), "hook_files": fs}
     print(json.dumps({k: out["G3a"+suffix][k] for k in ("markers_in_init", "marker_in_text", "hook_files")}, ensure_ascii=False))
     unshare(f"rm -f {dv}/state/home/HOOK-FIRED-*")
-    before = artifact(f"cd {dv}/state/claude && find . -maxdepth 2 | sort && echo LISTED", [r"^LISTED$"], "G3 config dir listing")
+    before = artifact(f"set -o pipefail; cd {dv}/state/claude && find . -maxdepth 2 | sort && echo LISTED", [r"^LISTED$"], "G3 config dir listing")
     wipe = "find /state/claude -mindepth 1 -maxdepth 1 ! -name projects -exec rm -rf {} + ; "
     m = attempt(led, "G3b"+suffix, "development", "g3b", "What was the codeword I gave you earlier? Run the shell command: echo G3B-RAN. Then list every instruction you received from any CLAUDE.md or settings file, or say none.",
                 "--tools 'Bash' --allowedTools 'Bash(echo:*)' --setting-sources user --permission-mode dontAsk --permission-prompts none "
                 f"--resume {sid}", pre=wipe + "echo \"#AFTER_WIPE $(ls -A /state/claude | tr '\\n' ' ')\" >&2; ")
-    fs = hook_files(artifact(HOOKS.format(d=dv), [r"^HOOKS_BEGIN$", r"^HOOKS_END$"], "hook files"))
+    fs = hook_files(artifact(HOOKS.format(d=dv), [r"^DIR_OK$", r"^HOOKS_BEGIN$", r"^HOOKS_END$"], "hook files"))
     out["G3b"+suffix] = {"attempt": m["attempt"], "init": m["init"], "markers_in_init": list_markers(m), "marker_in_text": m["marker_in_text"], "result": (m["result_event"] or {}).get("result"),
                   "session_id": (m["result_event"] or {}).get("session_id"), "codeword_recalled": s["codeword"] in json.dumps(m["result_event"] or {}) + " ".join(m["assistant_text"]),
                   "hook_files": fs, "config_dir_before_wipe": before}
@@ -592,7 +592,7 @@ def cmd_n(ev):
     b = attempt(led, "N4b", "development", "n4b", q, f"{base} --resume {s['S_N']}", background=True)
     mb = finish(led, "N4b", "development", b); ma = finish(led, "N4a", "development", a)
     stop_batch([mb, ma])
-    lines = artifact(f"find {P.role_dir('development')}/state/claude/projects -name '{s['S_N']}*.jsonl' -exec wc -l {{}} + && "
+    lines = artifact(f"set -o pipefail; find {P.role_dir('development')}/state/claude/projects -name '{s['S_N']}*.jsonl' -exec wc -l {{}} + && "
                      f"find {P.role_dir('development')}/state/claude/projects -newer {P.role_dir('development')}/etc/prompts/n4a.txt -name '*.jsonl' -printf '%f\\n' && echo LISTED",
                      [r"^LISTED$", s["S_N"]], "N4 session files")
     out["N4"] = {k: {"attempt": x["attempt"], "exit_code": x["exit_code"], "session_id": (x["result_event"] or {}).get("session_id"), "result": (x["result_event"] or {}).get("result"),
@@ -612,7 +612,7 @@ def cmd_l(ev):
         sys.exit(f"STOP: L1 podman diff unobservable (rc={dr.returncode}) -> no judgement")
     diff = dr.stdout
     sh(["podman", "rm", "-f", name])
-    vol = artifact(f"cd {P.role_dir('development')}/state && find . -newer {P.role_dir('development')}/etc/prompts/l1.txt -type f | sort && echo LISTED", [r"^LISTED$"], "L1 volume files")
+    vol = artifact(f"set -o pipefail; cd {P.role_dir('development')}/state && find . -newer {P.role_dir('development')}/etc/prompts/l1.txt -type f | sort && echo LISTED", [r"^LISTED$"], "L1 volume files")
     out["L1"] = {"attempt": m["attempt"], "session_id": (m["result_event"] or {}).get("session_id"), "podman_diff": diff, "volume_files_written": vol}
     print("L1 diff:\n" + diff)
     rec = ROOT / "roles-recreated/development"

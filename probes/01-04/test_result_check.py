@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """No-model regression check for the result-event / decisive-marker rules (harness check 2026-11-12).
 
-Run: .venv-poc/bin/python -I probes/01-04/test_result_check.py   (no podman, no claude, no tokens printed)
+Run: .venv-poc/bin/python -I probes/01-04/test_result_check.py   (no claude/model call, no tokens printed; the artifact() cases run trivial `podman unshare bash -c` commands)
 """
 import json, sys, tempfile
 from pathlib import Path
@@ -68,6 +68,7 @@ with tempfile.TemporaryDirectory() as td:
 # 8. artifact checks: an artifact without its explicit markers is unobservable (PR #16 review P2-1)
 check("artifact_empty_output_stops", exits(lambda: P2.artifact("true", [r"^HOOK_COUNT=\d+$"], "syn")))
 check("artifact_nonzero_rc_stops", exits(lambda: P2.artifact("echo HOOK_COUNT=0; exit 3", [r"^HOOK_COUNT=\d+$"], "syn")))
+check("artifact_missing_dir_marker_stops", exits(lambda: P2.artifact("test -d /nonexistent-dir-xyz && echo DIR_OK; echo HOOKS_BEGIN; echo HOOKS_END", [r"^DIR_OK$", r"^HOOKS_BEGIN$"], "syn")))
 check("artifact_with_markers_ok", not exits(lambda: P2.artifact("echo HOOK_COUNT=0", [r"^HOOK_COUNT=\d+$"], "syn")))
 check("hook_block_parsed_empty", P2.hook_files("HOOKS_BEGIN\nHOOKS_END\n") == [])
 check("hook_block_parsed_files", P2.hook_files("HOOKS_BEGIN\nHOOK-FIRED-x\nHOOKS_END\n") == ["HOOK-FIRED-x"])

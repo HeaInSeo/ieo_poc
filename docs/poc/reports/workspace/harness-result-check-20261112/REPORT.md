@@ -32,9 +32,9 @@ PR #14 검토 a3d01ce §5가 남긴 잔여 위험이다.
   - `probe.py`는 이 두 필드를 기록하지 않는다. 회차 검사 `stop_on_signal`에서 결과 사건이 없으면 같은 방식으로 정지한다.
   - 의도적인 중단 시험은 `attempt(..., expected_outcome="no_result")`로 표시한다. 이런 시험은 정지하지 않고 자기 기대 결과로 판정한다. 이 표시는 동시 묶음(`finish`)에도 전달된다. 의도적인 거부 시험(예: P2c)은 오류 결과 사건이 기대 결과다.
   - 결과 사건이 여럿이면 마지막의 `num_turns ≥ 1` 결과를 쓴다(N4b의 빈 0턴 결과 대응).
-- **모델 probe의 산출물 확인**: 새 `artifact()`는 명시 표식을 요구한다. 예: `OK_FILE_*`, `DENIED_FILE_*`, `HOOK_COUNT=n`, `SCRATCH_WRITE_*`, `BAD_WRITE_*`, `HOOKS_BEGIN/END`, `LISTED`. 종료 코드가 0이 아니거나 표식이 빠지면 관측 불가로 정지한다. 이때 판정과 새 시도는 없다. G1 대안 분기도 `HOOK_COUNT`로 판단한다(빈 출력이 “hook 없음”으로 읽히던 경로를 막았다). `podman diff` 실패도 정지한다.
+- **모델 probe의 산출물 확인**: 새 `artifact()`는 명시 표식을 요구한다. 예: `OK_FILE_*`, `DENIED_FILE_*`, `HOOK_COUNT=n`, `SCRATCH_WRITE_*`, `BAD_WRITE_*`, `HOOKS_BEGIN/END`, `LISTED`. 대상 디렉터리가 있다는 `DIR_OK`와 `set -o pipefail`도 요구한다(빈 디렉터리와 없는 디렉터리를 구별). 종료 코드가 0이 아니거나 표식이 빠지면 관측 불가로 정지한다. 이때 판정과 새 시도는 없다. G1 대안 분기도 `HOOK_COUNT`로 판단한다(빈 출력이 “hook 없음”으로 읽히던 경로를 막았다). `podman diff` 실패도 정지한다.
 - **모델 없는 시험**: 출력에서 판정 표식(`DECISIVE`)을 찾아 `markers`와 `judgement_basis`를 기록한다. 표식이 없으면 `UNOBSERVABLE`이고 종료 코드는 쓰지 않는다(`probe2.py` E·E1b, `probe.py` P2). 한계: 표식이 있는지만 확인하고 기대값과의 일치는 사람이 판정한다. `ABSENT`·HTTP 코드 같은 짧은 표식은 해당 시험의 출력 형식 안에서만 의미가 있다.
-- **회귀 시험**: [test_result_check.py](../../../../../probes/01-04/test_result_check.py). 모델·podman·토큰 출력 없이 실행한다.
+- **회귀 시험**: [test_result_check.py](../../../../../probes/01-04/test_result_check.py). 모델 요청과 토큰 출력 없이 실행한다(`artifact()` 사례만 `podman unshare bash -c`로 간단한 명령을 돌린다).
   - 합성 시도: 종료 0·결과 없음은 정지·판정 불가, 의도적 무결과는 판정 가능·비정지, 정상은 통과.
   - `probe.py` 회차 검사의 두 경우.
   - 빈 출력·무관한 출력은 관측 불가.
@@ -74,3 +74,9 @@ PR #14 검토 a3d01ce §5가 남긴 잔여 위험이다.
   - 항목 1의 근거를 직접·간접으로 나누고, rev-6 Guardrail 규칙 집합의 시험을 02-04로 넘겼다(P3-6).
   - GH 이름으로 바꾸고 원장 기록 시점을 명시했다(P3-7).
   - 잠금 파일의 한계를 명시했다(P3-8).
+
+## 5. 검토 d579f97(reject) 반영
+
+- P2-A: §5-6의 변조 digest를 지시성 항목으로 한정했다. 대상 목록, `.claude.json`의 지시성 키, 정상 실행이 쓰는 제외 항목(01-04 L1·G3b 관측), 한계를 적었다. 시험 (c)는 정상 실행 뒤의 reconnect로 명시했다.
+- P3-A: 산출물 스크립트에 `DIR_OK`와 `pipefail`을 넣었다.
+- P3-B: 회귀 시험의 podman 사용 서술을 정정했다.

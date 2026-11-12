@@ -18,6 +18,7 @@ PASS batch_intended_no_result_judgeable
 PASS last_substantive_result_used
 PASS artifact_empty_output_stops
 PASS artifact_nonzero_rc_stops
+PASS artifact_missing_dir_marker_stops
 PASS artifact_with_markers_ok
 PASS hook_block_parsed_empty
 PASS hook_block_parsed_files
