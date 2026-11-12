@@ -103,5 +103,11 @@ def validate(root):
 if __name__=='__main__':
     ap=argparse.ArgumentParser();ap.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[1]);ap.add_argument('--write',action='store_true');a=ap.parse_args()
     result=validate(a.root)
-    if a.write:(a.root/'v1_3_3_validation.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
+    if a.write:
+        # v1_3_3_validation.json is the delivered (frozen) result listed in SHA256SUMS.txt and is kept as is.
+        # Current results go to a separate path that is not part of the delivered package (v1.3.3-A1).
+        out=a.root/'validation/v1.3.3-A1_current_validation.json'
+        sums={l[66:] for l in (a.root/'SHA256SUMS.txt').read_text().splitlines() if l.strip()}
+        assert out.relative_to(a.root).as_posix() not in sums,'refusing to overwrite a delivered package file'
+        out.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(result,ensure_ascii=False,indent=2))
