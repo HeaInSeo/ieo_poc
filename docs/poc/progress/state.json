@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0009",
-  "snapshot_created_at": "2026-11-12T17:21:21+09:00",
-  "last_actual_work_observed_at": "2026-11-12T17:21:21+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0010",
+  "snapshot_created_at": "2026-11-12T18:08:43+09:00",
+  "last_actual_work_observed_at": "2026-11-12T18:08:43+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "01-04 검수 완료(PR #12·#14) · 다음 01-05",
+  "phase": "01-05 검수 완료(PR #17) · 01-04 후속 보완(PR #16) 병합 · 다음 01-06",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -13,8 +13,8 @@
     "main_experiments": 31,
     "followup_candidates": 5
   },
-  "current_task": "01-05",
-  "next_task": "01-05",
+  "current_task": "01-06",
+  "next_task": "01-06",
   "tasks": [
     {
       "task_id": "01-01",
@@ -112,13 +112,24 @@
       "track": "main",
       "group": "핵심",
       "kind": "준비",
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
-      "verification_level": "unverified",
-      "evidence": [],
-      "next_action": null
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-12T18:08:43+09:00",
+      "latest_report": "reports/tasks/01-05/baseline-20261112/REPORT.md",
+      "result_state": "NPG 고정 e5075aff 사본 10개=고정 커밋 blob(sha256), CI 41469168311 success 재조회 일치. 정책·책임 대응표 v0 17행(직접 10·좁음 4·공백 3, 독립 기대값은 L03 연결). 현재 운영 별도 조회: timer 3 enabled·active(report bridge elapsed), NPG 작업 사본 HEAD 0d03bf6은 고정 커밋 비조상. 겹치는 외부 효과 8종 분리. PR #17 검토 efa4a5d reject(P2 report bridge 상태) → 00a7566 approve(01-05 검토 2/4) → 조건부 병합 4bcba6a · main CI success",
+      "verification_level": "verified",
+      "evidence": [
+        "reports/tasks/01-05/baseline-20261112/REPORT.md",
+        "reports/tasks/01-05/baseline-20261112/Source_Baseline.md",
+        "reports/tasks/01-05/baseline-20261112/Policy_Responsibility_Map_v0.md",
+        "reports/tasks/01-05/baseline-20261112/Current_Operations_20261112.md",
+        "reports/tasks/01-05/baseline-20261112/evidence/fixed-source-compare.txt",
+        "reports/tasks/01-05/baseline-20261112/evidence/current-operations.txt",
+        "reports/tasks/01-05/baseline-20261112/evidence/npg-clauses-e5075aff.md",
+        "reports/tasks/01-05/baseline-20261112/reviews/review-pr17-00a7566.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/17"
+      ],
+      "next_action": "01-06 착수",
+      "unresolved": "대응표 공백·좁은 행(6·9·13·14·15·16·17)은 해당 P 독립 기대값(L03)에서 새 기준으로 정함. NPG runtime 현재 설치 상태 미조회(P27). 검토 00a7566 P3: 대응표 :43 인계 목록에 P12 누락, 현재 운영 actor 수 라벨(PR review 객체 미포함). efa4a5d 첫 조회본의 세부(포트 등)는 공개 이력에 남음(비밀 아님)"
     },
     {
       "task_id": "01-06",
@@ -132,7 +143,8 @@
       "result_state": "미실행",
       "verification_level": "unverified",
       "evidence": [],
-      "next_action": null
+      "next_action": null,
+      "unresolved": "착수 전제(01-05 Current_Operations §2): PoC 자원은 ieo-probe-* 이름만, 기존 컨테이너(local-registry) 비접촉, 재부팅·사용자 systemd 관리자 비접촉. claude-report-bridge.timer(enabled·elapsed, OnBootSec 1min·5min 주기)를 01-06과 각 실험 첫 실행 전에 재조회"
     },
     {
       "task_id": "01-07",
@@ -230,7 +242,8 @@
       "result_state": "미실행",
       "verification_level": "unverified",
       "evidence": [],
-      "next_action": null
+      "next_action": null,
+      "unresolved": "착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인"
     },
     {
       "task_id": "02-05",
@@ -314,7 +327,8 @@
       "result_state": "미실행",
       "verification_level": "unverified",
       "evidence": [],
-      "next_action": null
+      "next_action": null,
+      "unresolved": "런타임 계약 rev 6 §10 항목 1(Edit(//path) 표기, Write( 미사용)·항목 6(개발 Bash 허용 목록은 경계 아님)을 정책 문서에 반영"
     },
     {
       "task_id": "03-03",
@@ -497,7 +511,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "GitHub 시험 저장소 HeaInSeo/ieo_poc_test(사용자 생성, reports/workspace/test-env-assets-20261112/ASSETS.md §3): 역할별 GitHub App 자격(G1·G2)·독립 판정 필수 체크(G3·G4)·설정 승인 주체 분리(G5) 미연결 — 현재 필수 검사 repository-smoke는 연결 확인용이며 독립 판정 아님. 착수 전 연결 필요, App·자격 발급은 사용자"
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH1·GH2·GH3 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음 · 런타임 계약 rev 6 §10 항목 6(개발 Bash 허용 목록을 P07 위협 모형의 경계로 세지 않음)"
     },
     {
       "task_id": "04-08",
@@ -638,7 +652,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "GitHub 시험 저장소 HeaInSeo/ieo_poc_test(사용자 생성, reports/workspace/test-env-assets-20261112/ASSETS.md §3): 역할별 GitHub App 자격(G1·G2)·독립 판정 필수 체크(G3·G4)·설정 승인 주체 분리(G5) 미연결 — 현재 필수 검사 repository-smoke는 연결 확인용이며 독립 판정 아님. 착수 전 연결 필요, App·자격 발급은 사용자"
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH3·GH5 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음"
     },
     {
       "task_id": "05-02",
@@ -653,7 +667,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "GitHub 시험 저장소 HeaInSeo/ieo_poc_test(사용자 생성, reports/workspace/test-env-assets-20261112/ASSETS.md §3): 역할별 GitHub App 자격(G1·G2)·독립 판정 필수 체크(G3·G4)·설정 승인 주체 분리(G5) 미연결 — 현재 필수 검사 repository-smoke는 연결 확인용이며 독립 판정 아님. 착수 전 연결 필요, App·자격 발급은 사용자"
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH3(05-01 경유) 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음"
     },
     {
       "task_id": "05-03",
@@ -668,7 +682,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "GitHub 시험 저장소 HeaInSeo/ieo_poc_test(사용자 생성, reports/workspace/test-env-assets-20261112/ASSETS.md §3): 역할별 GitHub App 자격(G1·G2)·독립 판정 필수 체크(G3·G4)·설정 승인 주체 분리(G5) 미연결 — 현재 필수 검사 repository-smoke는 연결 확인용이며 독립 판정 아님. 착수 전 연결 필요, App·자격 발급은 사용자"
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH1·GH2·GH4·GH5 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음"
     },
     {
       "task_id": "05-04",
@@ -1842,8 +1856,10 @@
     "PR #10 검토 P3(02-03 착수 시 처리): N1 01-08 계약 검사 순서·409 목록에 ASSIGNMENT_SHA_MISMATCH 누락·OpenAPI 'An An' 오타·null 본문 SHA 규칙 미기재, N2 Registry가 digest 재계산 없이 호출자 문자열 신뢰, N3 Replay 영수증 counts_for_current_judgment 재계산 미구현(항상 false), N4 판정 입력은 판정 시점의 현재 배정으로 정의·시험 필요, N5 cargo-test 로그 머리줄 '1 changes' 설명 없음. review_currency는 처분을 모름(F6).",
     "PR #12 검토 P3(01-04 나머지 계획에서 반영): P3-3 2d가 파일 전체 일치만 탐지, P3-4 2b가 errno를 버림, P3-6 budget.log 명칭·meta 누적값·시도 05 표식·auth status 원문 미보존, P3-9 해시는 argv 대신 RO 파일로 전달 권고. P3-8 토큰 SHA-256 전체값의 공개 이력 잔존과 교체 여부를 사용자에게 보고.",
     "PR #12 자동 검토 P2(codex 4547423210, probe.py P3 2회차가 1회차의 한도·인증 신호를 보지 않고 기동 — Probe_Budget_Rules §4): 유효. 이번 실행은 모든 rate_limit_event가 allowed·오류 없음이라 판정 영향 없음. 하네스 교정(probe.py stop_on_signal, probe2.py stop_signals)은 task/01-04-remaining c4c4113, 01-04 나머지 결과 PR에서 검토. 처분 답글 https://github.com/HeaInSeo/ieo_poc/pull/12#discussion_r4547547000",
-    "PR #14 병합 처리 근거: F04 상한(검토 4/4) 도달 뒤 branch protection 최신 base 요건으로 승인 head a3d01ce 병합 불가 → 사용자 결정(이번 건 한정): main 병합 head 7c365d1의 추가 변경이 PR #13과 동일함을 독립 검토자가 대조(5번째 작업 검토 아님)·필수 CI 통과 뒤 그 SHA 조건 병합. 재발 방지: 작업 브랜치를 보고 PR 병합 뒤 최신 main에서 만들거나 검토 요청 전에 main을 반영한다.",
-    "PR #14 자동 검토 P2 2건(auto-memory 보존, 동시 묶음 정지 시 미기록): 유효, 결과 영향 없음, 하네스 교정 bc09fe4, 답글 discussion_r4547713346·r4547713614."
+    "PR #14 병합 처리 근거: F04 상한(검토 4/4) 도달 뒤 branch protection 최신 base 요건으로 승인 head a3d01ce 병합 불가 → 사용자 결정(이번 건 한정): main 병합 head 7c365d1의 추가 변경이 PR #13과 동일함을 독립 검토자가 대조(5번째 작업 검토 아님)·필수 CI 통과 뒤 그 SHA 조건 병합. 재발 방지: 작업 브랜치를 보고 PR 병합 뒤 최신 main에서 만들거나 검토 요청 전에 main을 반영한다. base 갱신 head 7c365d1의 필수 CI run 43181686192(success).",
+    "PR #14 자동 검토 P2 2건(auto-memory 보존, 동시 묶음 정지 시 미기록): 유효, 결과 영향 없음, 하네스 교정 bc09fe4, 답글 discussion_r4547713346·r4547713614.",
+    "하네스 잔여 위험(결과 사건 없이 종료 0, 산출물 빈 출력) — 처분: 교정(probe.py·probe2.py, PR #16 cd19663)·01-04 판정 영향 없음(harness-result-check-20261112). 회귀 시험 test_result_check.py PASS.",
+    "PR #16 검토 P3(이월): f73ac13 P3-C projects/*/memory 빈 디렉터리 digest 처리, P3-D 정리가 subagents 기록 삭제 — 02-04 시험 (c)에서 확인(02-04 unresolved에 연결)."
   ],
   "notes": [
     "등록 전 분모는 73/12이며 현재 실행 진척은 이 원장에 기록한다.",
@@ -2021,10 +2037,10 @@
     },
     {
       "event_id": "01-04-ACCEPTED-20261112",
-      "event_revision": 1,
+      "event_revision": 2,
       "task_id": "01-04",
-      "observed_at": "2026-11-12T17:21:21+09:00",
-      "state": "01-04 검수 완료. PR #14: c20e7e3 reject(P2 3건, U 결정 조건) → 사용자 결정(Edit 형식 채택·자동 기억 확인·토큰 미교체) → a3d01ce approve(검토 4/4) → branch protection 최신 base 거부 → 사용자 결정(이번 건 한정 base 갱신+차이 대조) → 7c365d1 ATTEST identical(PR #13 차이와 sha256 동일)·필수 CI success → 조건부 병합 74a1fa3 · main CI success",
+      "observed_at": "2026-11-12T18:08:43+09:00",
+      "state": "01-04 검수 완료. PR #14: c20e7e3 reject(P2 3건, U 결정 조건) → 사용자 결정(Edit 형식 채택·자동 기억 확인·토큰 미교체) → a3d01ce approve(검토 4/4) → branch protection 최신 base 거부 → 사용자 결정(이번 건 한정 base 갱신+차이 대조) → 7c365d1 ATTEST identical(PR #13 차이와 sha256 동일)·필수 CI success → 조건부 병합 74a1fa3 · main CI success · base 갱신 head 7c365d1 필수 CI run 43181686192(3 job success, 08:17:57Z)",
       "evidence": [
         "reports/tasks/01-04/remaining-probes-20261112/REPORT.md",
         "User_Decisions_2026-11-12_0104.md",
@@ -2033,7 +2049,8 @@
         "https://github.com/HeaInSeo/ieo_poc/pull/14#issuecomment-6818470602",
         "reports/tasks/01-04/remaining-probes-20261112/reviews/review-pr14-c20e7e3.md",
         "reports/tasks/01-04/remaining-probes-20261112/reviews/review-pr14-a3d01ce.md",
-        "reports/tasks/01-04/remaining-probes-20261112/reviews/attest-pr14-7c365d1.md"
+        "reports/tasks/01-04/remaining-probes-20261112/reviews/attest-pr14-7c365d1.md",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/43181686192"
       ]
     },
     {
@@ -2047,14 +2064,44 @@
         "reports/workspace/test-env-assets-20261112/evidence/github-ieo_poc_test-settings.txt",
         "User_Decisions_2026-11-12_0104b.md"
       ]
+    },
+    {
+      "event_id": "01-04-FOLLOWUPS-20261112",
+      "event_revision": 1,
+      "task_id": null,
+      "observed_at": "2026-11-12T18:08:43+09:00",
+      "state": "01-04 후속 보완(작업 수 아님): 하네스 결과 사건·산출물 표식 요구(01-04 판정 영향 없음: 모델 시도 35건 모두 결과 사건, 모델 없는 시험 33건·산출물 모두 표식), 런타임 계약 rev 6(01-04 실측 6건·§10 완료 조건), ieo_poc_test 보완 조회, GH1~GH5 착수 조건. PR #16 검토 f64c413·d579f97·8cd805e reject → f73ac13 approve → 조건부 병합 cd19663 · main CI success",
+      "evidence": [
+        "reports/workspace/harness-result-check-20261112/REPORT.md",
+        "reports/workspace/harness-result-check-20261112/evidence/audit_result_events.txt",
+        "reports/workspace/harness-result-check-20261112/evidence/test_result_check.txt",
+        "reports/tasks/01-02/runtime-contract-20261112/Runtime_Contract_v0.md",
+        "reports/workspace/test-env-assets-20261112/ASSETS.md",
+        "reports/workspace/test-env-assets-20261112/evidence/github-ieo_poc_test-supplement.txt",
+        "reports/workspace/harness-result-check-20261112/reviews/review-pr16-f73ac13.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/16"
+      ]
+    },
+    {
+      "event_id": "01-05-ACCEPTED-20261112",
+      "event_revision": 1,
+      "task_id": "01-05",
+      "observed_at": "2026-11-12T18:08:43+09:00",
+      "state": "01-05 검수 완료. PR #17: efa4a5d reject(P2 report bridge timer 상태) → 00a7566 approve(01-05 검토 2/4) → 조건부 병합 4bcba6a · main CI success",
+      "evidence": [
+        "reports/tasks/01-05/baseline-20261112/REPORT.md",
+        "reports/tasks/01-05/baseline-20261112/reviews/review-pr17-efa4a5d.md",
+        "reports/tasks/01-05/baseline-20261112/reviews/review-pr17-00a7566.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/17"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "01-04 검수 완료(PR #14 병합 74a1fa3, main CI success). 6/73 · 0/12",
+    "last_verified_stage": "01-05 검수 완료(PR #17 병합 4bcba6a, main CI success). 7/73 · 0/12",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main 74a1fa3f5708afe5c5bb5b3693295c5f4f0a6949 (이 보고 PR 병합 전)",
+    "branch_sha": "main 4bcba6ac2151d94e846143e87f51797c056262fc (이 보고 PR 병합 전)",
     "plan_and_spec": "v1.3.3-A1 · 명세 9개 rev 5 · 프로파일 poc-acceptance-v1.3.3 rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR(report/01-04-accepted). 런타임 세션 없음. 시험 컨테이너(pg·rx·forge) 정지",
+    "running": "보고 PR(report/01-05-accepted). 런타임 세션 없음",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2066,10 +2113,12 @@
       "reports/workspace/prereq-0203-fixes-20261112/REPORT.md",
       "reports/tasks/01-04/first-probes-20261112/REPORT.md",
       "reports/tasks/01-04/remaining-probes-20261112/REPORT.md",
-      "reports/workspace/test-env-assets-20261112/ASSETS.md"
+      "reports/workspace/test-env-assets-20261112/ASSETS.md",
+      "reports/workspace/harness-result-check-20261112/REPORT.md",
+      "reports/tasks/01-05/baseline-20261112/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "01-05 원본·기준선·운영 충돌 범위 기록 착수. 01-02 계약 개정(01-04 반영 6건)을 02 구현 전에 처리. GitHub App 자격·독립 판정 체크 연결은 05-03/P07 전(사용자 발급)",
+    "next_action": "01-06 시험실 초기화·증거 보존 경로 착수(선행 01-04·01-05 충족)",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [

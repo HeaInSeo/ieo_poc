@@ -1,6 +1,6 @@
 # 주계획·후속 작업 상태
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0009` · 원장 SHA-256 `18bb9e1ad92288b26990524bb7cc258410b300b7b3d38020a7a545644d650b91`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0010` · 원장 SHA-256 `bd9abbe7b444e0f2287e74842de3e6610c7fc7fc1f7b9f00963d43497936a0ea`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -12,7 +12,7 @@
 | 01-02 · 에이전트 런타임·역할·인증·재개 계약 | 설계 / 핵심 | 검수 완료 | PASS · 설계 계약(실제 지원은 01-04 probe) / verified | 2026-11-12T09:13:53+09:00 | [보고](../reports/tasks/01-02/runtime-contract-20261112/REPORT.md) | 01-04 첫 probe 전 역할별 자격 방식(A/B/C) 사용자 결정 |
 | 01-03 · 표본·독립 기대값·예산·기한 | 설계 / 핵심 | 검수 완료 | PASS · 단계별 동결(v1.3.3-A1): stage_0 F01~F08 동결, later L01~L09 담당·시점·차단 조건 인수. 후속 실험값 전체 동결 아님 / verified | 2026-11-12T14:22:39+09:00 | [보고](../reports/tasks/01-03/staged-freeze-20261112/REPORT.md) | later 항목은 각 첫 실행 전 동결 증거. L08 교정 PR(02-03 전) |
 | 01-04 · 시험 repo·DB·수신기·역할 자격 | 준비 / 핵심 | 검수 완료 | 첫 세 probe: P1 지원 · P2 격리 성립 확인 · P3 공유 quota 확인(분리 아님). 나머지: E 성립 확인(E1b forge 포함) · U 고정 Write(path) 미지원→사용자 결정으로 Edit(//path) 채택·지원 · G 합격 · N session-id 재개 지원(동시 재개 CLI 미차단) · L 지원 · C 4 동시 · T 세션/자식별 지원 · R 2.1.316→2.1.322 지원 · 자동 기억 비활성 2방법 확인. 모델 요청 9/30 + 27/30(B2). PR #14 검토 c20e7e3 reject → 사용자 결정 → a3d01ce approve(01-04 검토 4/4) → base 갱신 7c365d1(PR #13과 동일 차이 대조·사용자 결정) → 조건부 병합 74a1fa3 · main CI success / verified | 2026-11-12T17:21:21+09:00 | [보고](../reports/tasks/01-04/remaining-probes-20261112/REPORT.md) | 01-05 착수. 01-04 결과의 계약 반영 6건은 01-02 계약 개정(별도 작업)으로 처리 |
-| 01-05 · 원본·기준선·운영 충돌 범위 기록 | 준비 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |
+| 01-05 · 원본·기준선·운영 충돌 범위 기록 | 준비 / 핵심 | 검수 완료 | NPG 고정 e5075aff 사본 10개=고정 커밋 blob(sha256), CI 41469168311 success 재조회 일치. 정책·책임 대응표 v0 17행(직접 10·좁음 4·공백 3, 독립 기대값은 L03 연결). 현재 운영 별도 조회: timer 3 enabled·active(report bridge elapsed), NPG 작업 사본 HEAD 0d03bf6은 고정 커밋 비조상. 겹치는 외부 효과 8종 분리. PR #17 검토 efa4a5d reject(P2 report bridge 상태) → 00a7566 approve(01-05 검토 2/4) → 조건부 병합 4bcba6a · main CI success / verified | 2026-11-12T18:08:43+09:00 | [보고](../reports/tasks/01-05/baseline-20261112/REPORT.md) | 01-06 착수 |
 | 01-06 · 시험실 초기화·증거 보존 경로 | 준비 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |
 | 01-07 · 스프린트 명세 v0·등록 검사 계약 | 설계 / 핵심 | 검수 완료 | PASS · 등록 검사 계약·참조 구현(ieo-spec) / verified | 2026-11-12T09:28:54+09:00 | [보고](../reports/tasks/01-07/spec-contract-20261112/REPORT.md) | 01-08 PR |
 | 01-08 · 진행 보고 v0·등록/조회 API 계약 | 설계 / 핵심 | 검수 완료 | PASS · 보고 v0·API 계약·참조 구현(ieo-report) / verified | 2026-11-12T09:52:31+09:00 | [보고](../reports/tasks/01-08/report-api-contract-20261112/REPORT.md) | 후속 N1·N2를 02-03 구현 전에 반영 |
