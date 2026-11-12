@@ -9,6 +9,8 @@ info:
     - Every non-2xx response leaves server state unchanged (0 state transitions, 0 events).
     - `coordinator_to_client` data is `verified`; agent submissions are stored as `claim` only.
     - The CLI test client uses only these endpoints. No UI is built in the PoC.
+    - Check order: 401 (credential) → 403/409 (scope, role, current assignment) → 400 (format) → 409 (identity) → 422 (reference/binding).
+    - Agent credentials carry only `agent:*` scopes; every `/v0/sprints*` endpoint answers 403 `AGENT_READ_DENIED` to them.
 servers:
   - url: http://127.0.0.1:8080
     description: PoC local (same-host phase); real binding decided in 01-04
@@ -26,7 +28,11 @@ paths:
       description: |
         Required scope `sprints:register` for `target.repo_id`. Checks run in the 01-07 order
         (format → reference → binding for `mode=executable`).
-        Same Idempotency-Key + same body → 200 with the stored result; same key + different body → 409.
+        The idempotent request identity is (Idempotency-Key, body digest, mode). Same key + same body
+        + same mode → 200 with the stored result. Same key with a different body **or a different mode**
+        → 409 `IDEMPOTENCY_KEY_CONFLICT` (a draft registration is never replayed as executable intake).
+        Without an idempotent replay, a revision already stored in draft mode and now submitted with
+        `mode=executable` goes through the binding check again (01-07 rule).
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - name: mode
@@ -49,6 +55,39 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RegistrationResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
+  /v0/sprint-inputs:
+    post:
+      tags: [sprints]
+      operationId: convertHumanInput
+      summary: Convert a human sprint input to a SprintSpec v0 draft on the server and register it as draft
+      description: |
+        Required scope `sprints:register` for the input's repo. The server applies the repo's approved
+        binding (sprint number, delegation, sources, profile, limits); the user never supplies them
+        (01-07 §3). Response carries the conversion record (name↔ID map, generated fields, preserved
+        unrepresented fields, semantic-review list, unresolved bindings) and the draft registration result.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '../docs/poc/HumanSprintInput_v0.schema.json' }
+      responses:
+        '201':
+          description: Converted and registered as draft (semantic review pending)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversionResult' }
+        '200':
+          description: Idempotent replay (same key, same body)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversionResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -107,8 +146,12 @@ paths:
       operationId: listSprintEvents
       summary: Ordered event page (event_id + event_revision), cursor-based
       description: |
-        Required scope `sprints:read`. Order is the server commit order and is stable across reads.
-        Repeated reads with the same cursor return the same page and never create notifications or state transitions.
+        Required scope `sprints:read`. Events are append-only in server commit order. A cursor is an opaque
+        position; a page holds the events committed after it, up to `limit`. `next_cursor` is always the
+        position after the last returned event (or the input position when the page is empty), so a client
+        can poll the end of the stream. Events already returned for a cursor never change or disappear;
+        a page that was not full may gain newly committed events on a later read. Reads never create
+        events, notifications or state transitions.
       parameters:
         - $ref: '#/components/parameters/SprintId'
         - name: cursor
@@ -127,12 +170,13 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [events, next_cursor]
+                required: [events, next_cursor, has_more]
                 properties:
                   events:
                     type: array
                     items: { $ref: '../docs/poc/ProgressReport_v0.schema.json' }
-                  next_cursor: { type: [string, 'null'] }
+                  next_cursor: { type: string, minLength: 1 }
+                  has_more: { type: boolean }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -148,6 +192,8 @@ paths:
         `actor.role` equal to the credential's role, and `report_type` allowed for that role
         (development → development_progress, guardrail → guardrail_review).
         `verified`, `coordinator_verdict` and `decision_request` from an agent credential → 403, state unchanged.
+        `assignment_id` and `generation` must equal the coordinator's current assignment for that
+        (repo, role); otherwise 409 `STALE_ASSIGNMENT`, state unchanged (§1.9 old-generation results).
         `(event_id, event_revision)` is the idempotency key: same content → 200, different content → 409.
         A stored claim is never a completion verdict.
       requestBody:
@@ -178,6 +224,7 @@ paths:
       summary: Guardrail asks the coordinator to run a reproduction on an isolated runner
       description: |
         Required scope `agent:repro` bound to (repo_id, role=guardrail). Development credentials → 403.
+        `assignment_id`/`generation` must be current, else 409 `STALE_ASSIGNMENT`.
         The coordinator runs the bundle on a coordinator-owned, credential-less, single-use runner at
         `target_sha` (network blocked by default, time/resource caps) and returns raw logs to the
         Guardrail input location (01-02 contract §2.1). `request_id` is the idempotency key.
@@ -202,12 +249,13 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
   /v0/agent/repro-requests/{request_id}:
     get:
       tags: [agent]
       operationId: getReproRequest
       summary: Status and raw-log references of a reproduction run
-      description: Same credential scope as the submitter.
+      description: Only a Guardrail credential of the request's repo; any other credential → 403 (unknown ids also 404 only after this check).
       parameters:
         - name: request_id
           in: path
@@ -270,7 +318,8 @@ components:
       properties:
         code:
           type: string
-          enum: [UNAUTHENTICATED, SCOPE_DENIED, REPO_SCOPE_DENIED, ROLE_MISMATCH, VERIFIED_FROM_AGENT_DENIED, NOT_FOUND]
+          enum: [UNAUTHENTICATED, SCOPE_DENIED, REPO_SCOPE_DENIED, ROLE_MISMATCH, VERIFIED_FROM_AGENT_DENIED,
+                 AGENT_READ_DENIED, NOT_FOUND]
         message: { type: string, minLength: 1 }
     Rejection:
       type: object
@@ -282,7 +331,8 @@ components:
           enum: [MISSING_FIELD, SCHEMA_VIOLATION, DIGEST_MISMATCH, DUPLICATE_TASK_ID, UNDEFINED_PREREQUISITE,
                  DEPENDENCY_CYCLE, UNKNOWN_PROFILE_ITEM, UNBOUND_DRAFT, REVISION_CONFLICT, TASK_ID_CONFLICT,
                  UNRESOLVED_PREREQUISITE, DUPLICATE_TASK_NAME, ESTIMATE_RANGE_REVERSED,
-                 IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR]
+                 IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR,
+                 STALE_ASSIGNMENT]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }
@@ -299,12 +349,30 @@ components:
     RegistrationResult:
       type: object
       additionalProperties: false
-      required: [sprint_id, revision, digest, state]
+      required: [sprint_id, revision, digest, state, mode]
       properties:
+        mode: { type: string, enum: [draft, executable] }
         sprint_id: { type: string }
         revision: { type: integer, minimum: 1 }
         digest: { type: string, pattern: '^[a-f0-9]{64}$' }
         state: { type: string, enum: [ACCEPTED_FOR_SEMANTIC_REVIEW, ALREADY_REGISTERED] }
+    ConversionResult:
+      type: object
+      additionalProperties: false
+      required: [conversion, registration]
+      properties:
+        conversion:
+          type: object
+          required: [input_digest, spec, name_to_task_id, generated_fields, preserved_unrepresented, semantic_review_required, unresolved_bindings]
+          properties:
+            input_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+            spec: { $ref: '../docs/poc/SprintSpec_v0.schema.json' }
+            name_to_task_id: { type: object, additionalProperties: { type: string } }
+            generated_fields: { type: array, items: { type: string } }
+            preserved_unrepresented: { type: object }
+            semantic_review_required: { type: array, items: { type: string } }
+            unresolved_bindings: { type: array, items: { type: string } }
+        registration: { $ref: '#/components/schemas/RegistrationResult' }
     ClaimReceipt:
       type: object
       additionalProperties: false
@@ -351,13 +419,27 @@ components:
         sprint_id: { type: string }
         sprint_revision: { type: integer, minimum: 1 }
         verified:
-          description: Latest coordinator_to_client report per task (evidence_level=verified), or null before any verdict.
+          description: Latest coordinator_to_client report per task; empty before any verdict.
           type: array
-          items: { $ref: '../docs/poc/ProgressReport_v0.schema.json' }
+          items:
+            allOf:
+              - $ref: '../docs/poc/ProgressReport_v0.schema.json'
+              - type: object
+                required: [evidence_level, channel]
+                properties:
+                  evidence_level: { const: verified }
+                  channel: { const: coordinator_to_client }
         latest_claims:
           description: Latest agent claims, kept separate so a client cannot mistake them for verdicts.
           type: array
-          items: { $ref: '../docs/poc/ProgressReport_v0.schema.json' }
+          items:
+            allOf:
+              - $ref: '../docs/poc/ProgressReport_v0.schema.json'
+              - type: object
+                required: [evidence_level, channel]
+                properties:
+                  evidence_level: { const: claim }
+                  channel: { const: agent_to_coordinator }
         last_observed_at: { type: [string, 'null'], format: date-time }
         delivery:
           description: External delivery of the latest verified report; independent of task verdicts.
