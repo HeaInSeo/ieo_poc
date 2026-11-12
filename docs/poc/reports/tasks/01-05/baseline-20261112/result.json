@@ -5,7 +5,7 @@
   "task_id": "01-05",
   "experiment_id": null,
   "run_id": "baseline-20261112",
-  "revision": 1,
+  "revision": 2,
   "previous_run_ref": null,
   "actor": {
     "role": "development",
@@ -23,7 +23,7 @@
     ]
   },
   "expected": "고정 원본·기존 CI·설계의 버전 기록, 17행 정책·책임 대응표(조항 출처·검증 범위·독립 기대값 연결·공백), 현재 운영 별도 확인, 겹치는 외부 효과 분리, 고정 원본을 현재 설치 증거로 쓰지 않음",
-  "observed": "패키지 사본 10개 = 고정 커밋 blob(sha256 전체), CI run 41469168311 success @e5075aff 재조회 일치; 대응표 17행(직접 11·좁음 3·공백 3); 현재 운영: timer 2 활성·report bridge 비활성·NPG 작업 사본 HEAD 0d03bf6(고정 커밋 비조상); 겹침 6종 처리",
+  "observed": "패키지 사본 10개 = 고정 커밋 blob(sha256 전체), CI run 41469168311 success @e5075aff 재조회 일치; 대응표 17행(직접 10·좁음 4·공백 3); 현재 운영(09:03:56Z 재조회): timer 3 모두 enabled·active(report bridge는 elapsed, 재부팅 시 재기동 가능)·NPG 작업 사본 HEAD 0d03bf6(고정 커밋 비조상); 겹침 8종 처리",
   "verdict": "미판정",
   "verification": {
     "level": "claim",
@@ -42,9 +42,10 @@
   "adoption": "미판정",
   "reuse_assets": [],
   "unresolved": [
-    "대응표 공백·좁은 행(6·9·13·14·16·17)은 해당 P의 독립 기대값(L03)에서 새 기준으로 정함",
+    "대응표 공백·좁은 행(6·9·13·14·15·16·17)은 해당 P의 독립 기대값(L03)에서 새 기준으로 정함",
     "NPG runtime 현재 설치 상태 미조회(P27)",
-    "quota group 공유는 기술적 분리 불가 — 04-15에서 영향 측정"
+    "quota group 공유는 기술적 분리 불가 — 04-15에서 영향 측정",
+    "report bridge timer enabled·elapsed — 01-06과 각 실험 첫 실행 전 상태 재조회"
   ],
   "next_action": "독립 검토 → 조건부 병합·main CI → 원장 갱신 → 01-06",
   "evidence_refs": [

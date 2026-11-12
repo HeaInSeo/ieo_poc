@@ -28,16 +28,16 @@
 | 12 | 검토 timeout·대체 한도·늦은 결과 연결 | 보존·보완 | OPERATIONS.md:126-162. REVIEW_TIMEOUT_OPERATIONS.md:165-168 (remote) | 작업 ID·후보 SHA·배정 세대별 timeout·대체 정책(02-06, 01-08 늦은 결과 보존) | P07 | L03. 시험 프로파일 제안값(30분 경고·60분 초과·대체 1회)은 T01에서 확정. 역사적: `review_timeout_policy_cases.cjs`·ledger·operational cases | **원본에서 미채택**: OPERATIONS.md:126 “(미채택 정책)”, deployment/review-timeout-operational.json:3 `OPERATIONAL_CANDIDATE_NOT_DEPLOYED`(remote). 운영 근거가 아니라 후보 설계 근거다 |
 | 13 | 사용량 게이트와 해소 후 재기동 | 형태 변경 | SOURCE_REVIEW_BOOTSTRAP.md:33, :35-36. AUTOMATIC_FOLLOWTHROUGH.md:287-289 | 런타임 어댑터 한도 분류, 재개 스케줄러(런타임 계약 §7, F06) | P05·1.2절 | L03. F06 재개 간격(공급자 신호 우선, 30분·30분·최대 10회)은 동결값 | **공백(해소 후 재기동)**: 원본은 기존 게이트에 맡기고 바꾸지 않는다(README.md:268-269). 재기동 규칙의 원본 근거가 없다. F06과 계약 §7이 새 기준이다 |
 | 14 | 읽기 전용 큐 감시와 코디네이터 정지 알림 | 형태 변경 | templates/queue-watch.md:1, :7-8, :16-17 (remote). AUTOMATIC_FOLLOWTHROUGH.md:200-201 | 별도 수명·권한의 외부 감시기(02-08) | P28 | L03(감지 기한·재조회 간격은 T01·T05) | **부분 공백(정지 알림)**: 코디네이터 자체가 멈췄을 때 알리는 조항과 알림 채널이 없다. REVIEW_TIMEOUT_TRANSITION.md:97(remote) “no scheduler or notification is provided” |
-| 15 | 사람이 보는 큐·허브·대시보드 | 형태 변경 | README.md:164-165. AUTOMATIC_FOLLOWTHROUGH.md:228-229 | DB 읽기 전용 현황 조회와 보고 수신기(01-04 E3, 02-07) | P12·P13·P26 | L03(P12는 L09) | 원본에서 이것들은 NPG가 쓰는 Notion 대상일 뿐, 사람용 내용 정의가 없다. 현황 내용은 계획 1.5절과 P12 기준을 따른다 |
+| 15 | 사람이 보는 큐·허브·대시보드 | 형태 변경 | README.md:164-165. AUTOMATIC_FOLLOWTHROUGH.md:228-229 | DB 읽기 전용 현황 조회와 보고 수신기(01-04 E3, 02-07) | P12·P13·P26 | L03(P12는 L09) | **이름보다 좁다**: 원본에서 이것들은 NPG가 쓰는 Notion 대상일 뿐, 사람용 내용 정의가 없다. 현황 내용은 계획 1.5절과 P12 기준(L09·L03)으로 새로 정한다 |
 | 16 | 역할별 지침·템플릿 | 형태 변경(P21: 버전 고정 역할·repo 지침) | AGENTS.md:13. central-supervisor.md:17-18 (remote). OPERATIONS.md:92-98. source_review_request.cjs:37-42 (remote) | 버전이 고정된 역할·repo 지침(03-02, 런타임 계약 §4.1 RO 설정) | P21·P25 | L03 | **공백**: Operator·Guardrail worker 역할 지침 파일이 저장소에 없다. 실제 프롬프트는 비공개다(OPERATIONS.md:14). 템플릿은 중앙 감독·큐 감시 둘뿐이다 |
-| 17 | 브로커의 공통 권한 원칙 | 형태 변경(P21: GitHub/수신기 외부 쓰기 허용 검사) | broker.cjs:224-229, :242-244, :355-357 (remote). policy.json:3-35 (remote). README.md:280, :319-325, :339-342. OPERATIONS.md:213-216 | GitHub·수신기 외부 쓰기 허용 검사(01-08, 05-03) | P21 | L03. 대상 API가 바뀐 쓰기 정책은 독립 기대값으로 재검증(P21) | **이름보다 좁다**: 허용 목록은 Notion 본문 편집만 다룬다. GitHub 등 일반 외부 쓰기 허용 목록은 원본에 없다. 배치된 정책은 비공개이고 저장소 사본과 다르다(OPERATIONS.md:29-31) |
+| 17 | 브로커의 공통 권한 원칙 | 형태 변경(P21: GitHub/수신기 외부 쓰기 허용 검사) | broker.cjs:224-229, :242-244, :355-357 (remote). policy.json:3-35 (remote). README.md:280, :319-325, :339-342. OPERATIONS.md:213-216 | GitHub·수신기 외부 쓰기 허용 검사(01-08, 05-03) | P21 | L03. 대상 API가 바뀐 쓰기 정책은 독립 기대값으로 재검증(P21) | **이름보다 좁다**: 허용 목록은 Notion 본문 편집만 다룬다. GitHub 등 일반 외부 쓰기 허용 목록은 원본에 없다. 고정 문서 작성 시점에 배치된 정책은 비공개였고 저장소 사본과 달랐다(OPERATIONS.md:29-31, 그 시점 서술. 현재 배치 상태는 조회하지 않음) |
 
 ## 집계
 
 | 구분 | 행 |
 | --- | --- |
-| 원본 조항이 책임을 직접 뒷받침 | 1·2·3·4·5·7·8·10·11·12·15 (11행). 다만 12는 미채택 후보, 10·11은 “보완” 부분이 새 기준 |
-| 조항이 있으나 이름보다 좁음 | 6·9·17 (3행) |
+| 원본 조항이 책임을 직접 뒷받침 | 1·2·3·4·5·7·8·10·11·12 (10행). 다만 12는 미채택 후보, 10·11은 “보완” 부분이 새 기준 |
+| 조항이 있으나 이름보다 좁음 | 6·9·15·17 (4행) |
 | 공백·부분 공백 | 13·14·16 (3행) |
 
 - 공백과 좁은 행은 01-05의 결함이 아니다. 고정 원본이 말하지 않는 범위를 드러낸 것이다.

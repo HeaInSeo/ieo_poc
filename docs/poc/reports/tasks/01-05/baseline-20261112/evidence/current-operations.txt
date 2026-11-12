@@ -1,74 +1,63 @@
-# 현재 운영 읽기 전용 조회 2026-11-12T08:43:48Z · 호스트 사용자 heain · 변경 없음. 비밀·로그 본문·환경 값은 기록하지 않음
+# 현재 운영 읽기 전용 조회(재조회) 2026-11-12T09:03:56Z · 호스트 사용자 heain · 변경 없음. 비밀·로그 본문·환경 값·프롬프트는 기록하지 않음. 01-05 판단에 필요 없는 세부(포트·관리 경로·runner 이름)는 남기지 않음
 ## systemd --user timers
-NEXT                         LEFT       LAST                         PASSED             UNIT                        ACTIVATES
-Thu 2026-11-12 18:07:00 KST  23min left Thu 2026-11-12 17:07:00 KST  36min ago          claude-operator-tick.timer  claude-operator-tick.service
-Thu 2026-11-12 18:37:00 KST  53min left Thu 2026-11-12 17:37:00 KST  6min ago           claude-guardrail-tick.timer claude-guardrail-tick.service
-n/a                          n/a        Tue 2026-10-13 07:23:19 KST  4 weeks 2 days ago claude-report-bridge.timer  claude-report-bridge.service
-n/a                          n/a        Sat 2026-10-17 11:51:21 KST  3 weeks 5 days ago grub-boot-success.timer     grub-boot-success.service
+NEXT                         LEFT         LAST                         PASSED              UNIT                        ACTIVATES
+Thu 2026-11-12 18:07:00 KST  3min 3s left Thu 2026-11-12 17:07:00 KST  56min ago           claude-operator-tick.timer  claude-operator-tick.service
+Thu 2026-11-12 18:37:00 KST  33min left   Thu 2026-11-12 17:37:00 KST  26min ago           claude-guardrail-tick.timer claude-guardrail-tick.service
+n/a                          n/a          Tue 2026-10-13 07:23:19 KST  1 months 0 days ago claude-report-bridge.timer  claude-report-bridge.service
+n/a                          n/a          Sat 2026-10-17 11:51:21 KST  3 weeks 5 days ago  grub-boot-success.timer     grub-boot-success.service
 
-## running user services
-UNIT ACTIVE SUB
-at-spi-dbus-bus.service active running
-dbus.service active running
-desktop-commander-remote.service active running
-openai-dc-additional.service active running
-openclaw-gateway.service active running
-xdg-document-portal.service active running
-xdg-permission-store.service active running
-  
-LOAD Reflects whether
-ACTIVE The high-level
-SUB The low-level
-## unit definitions (Description/ExecStart/WorkingDirectory/schedule; no Environment)
+## timer unit state (systemctl --user show)
+claude-operator-tick.timer: NextElapseUSecRealtime=Thu 2026-11-12 18:07:00 KST LastTriggerUSec=Thu 2026-11-12 17:07:00 KST ActiveState=active SubState=waiting UnitFileState=enabled 
+OnCalendar=*-*-* *:07:00 Persistent=true 
+claude-guardrail-tick.timer: NextElapseUSecRealtime=Thu 2026-11-12 18:37:00 KST LastTriggerUSec=Thu 2026-11-12 17:37:00 KST ActiveState=active SubState=waiting UnitFileState=enabled 
+OnCalendar=*-*-* *:37:00 Persistent=true 
+claude-report-bridge.timer: NextElapseUSecRealtime= LastTriggerUSec=Tue 2026-10-13 07:23:19 KST ActiveState=active SubState=elapsed UnitFileState=enabled 
+OnBootSec=1min OnUnitActiveSec=5min Persistent=true 
+## unit definitions (Description/ExecStart/WorkingDirectory; no Environment)
 claude-operator-tick: Description=Claude Operator scheduled tick (OPS-CLAUDE-OPERATOR-SCHEDULE-20260918)
 claude-operator-tick: ExecStart=%h/.local/bin/claude-operator-tick.sh
-claude-operator-tick: Description=Claude Operator tick hourly at minute 07 (Asia/Seoul)
-claude-operator-tick: OnCalendar=*-*-* *:07:00
 claude-guardrail-tick: Description=Claude Guardrail scheduled tick (OPS-CLAUDE-GUARDRAIL-SCHEDULE-20260918)
 claude-guardrail-tick: ExecStart=%h/.local/bin/claude-guardrail-tick.sh
-claude-guardrail-tick: Description=Claude Guardrail tick hourly at minute 37 (Asia/Seoul)
-claude-guardrail-tick: OnCalendar=*-*-* *:37:00
 claude-report-bridge: Description=Claude Operator/Guardrail Report Bridge
 claude-report-bridge: ExecStart=%h/.local/bin/claude-report-bridge.py --scan
-claude-report-bridge: Description=Scan Claude agent reports every 5 minutes
-claude-report-bridge: OnUnitActiveSec=5min
-desktop-commander-remote: Description=Remote Desktop Commander for headless central supervision
-desktop-commander-remote: WorkingDirectory=%h/.local/share/desktop-commander-remote
-desktop-commander-remote: ExecStart=%h/.local/share/desktop-commander-remote/run-device.sh
-openai-dc-additional: Description=Additional OpenAI MCP tunnel (existing DC kept)
-openai-dc-additional: ExecStart=/usr/libexec/platform-python3.6 -I /home/heain/openai-dc-additional-manager/manage.py _serve
-openai-dc-additional: WorkingDirectory=/home/heain/openai-dc-additional-manager
-openclaw-gateway: Description=OpenClaw Gateway (v2026.3.13)
-openclaw-gateway: ExecStart=/usr/bin/node /usr/lib/node_modules/openclaw/dist/index.js gateway --port 18789
-## tick scripts (path, size, sha256-12) and declared work dir
+other running user services (names only): desktop-commander-remote.service openai-dc-additional.service openclaw-gateway.service 
+## tick scripts (size, sha256-12, WORKDIR, usage-gate policy comment)
 claude-operator-tick.sh 208 lines sha256-12=224cef2ee979
 claude-guardrail-tick.sh 251 lines sha256-12=6a19c5eb0ed9
 claude-report-bridge.py 312 lines sha256-12=d27a1855387d
 claude-usage-gate.sh 84 lines sha256-12=25272bbbe76f
 WORKDIR="/opt/go/src/github.com/HeaInSeo"
 WORKDIR="/opt/go/src/github.com/HeaInSeo"
-## last TICK_END lines (timestamps/rc only)
-operator: 2026-11-12T07:09:08Z TICK_END tier=2 rc=0
-operator: 2026-11-12T08:09:05Z TICK_END tier=2 rc=0
-guardrail: 2026-11-12T07:38:40Z TICK_END tier=2 rc=0
-guardrail: 2026-11-12T08:38:36Z TICK_END tier=2 rc=0
-## long-running agent processes (pid, comm, elapsed, cwd)
-166597 claude          25-19:37:08 /opt/go/src/github.com/HeaInSeo
-191058 claude          25-19:18:03 /opt/go/src/github.com/HeaInSeo/bori
-399065 claude          25-00:06:29 /opt/go/src/github.com/HeaInSeo
-399386 claude          25-00:06:20 /opt/dotnet/src/github.com/HeaInSeo/NodeKit
-1807178 claude             09:16:20 /opt/rust/src/github.com/HeaInSeo/ieo_poc
-1841002 codex              08:55:12 /opt/javascript/src/github.com/HeaInSeo/notion-projection-guard
-3248793 codex           11-21:14:52 /opt/javascript/src/github.com/HeaInSeo/notion-projection-guard
-4050143 codex           10-22:24:20 /home/heain/openai-dc-additional-manager
+# Policy (user-corrected 2026-09-22): weekly(all models) is the ONLY blocking
+## tick logs: last TICK_END and counts in the last 40 lines (no bodies)
+operator last: 2026-11-12T08:09:05Z TICK_END tier=2 rc=0
+operator last40: notion_mentions=1 receipt_mentions=2 pr_mentions=2
+guardrail last: 2026-11-12T08:38:36Z TICK_END tier=2 rc=0
+guardrail last40: notion_mentions=3 receipt_mentions=4 pr_mentions=5
+## long-running agent processes (pid, comm, cwd)
+166597 claude /opt/go/src/github.com/HeaInSeo
+191058 claude /opt/go/src/github.com/HeaInSeo/bori
+399065 claude /opt/go/src/github.com/HeaInSeo
+399386 claude /opt/dotnet/src/github.com/HeaInSeo/NodeKit
+1807178 claude /opt/rust/src/github.com/HeaInSeo/ieo_poc
+1841002 codex /opt/javascript/src/github.com/HeaInSeo/notion-projection-guard
+3248793 codex /opt/javascript/src/github.com/HeaInSeo/notion-projection-guard
+4050143 codex <home path>
 ## NPG working copy (read-only git)
-path /opt/javascript/src/github.com/HeaInSeo/notion-projection-guard
-HEAD 0d03bf6b0af301e85cecf882a78c806c1fbe3a5d branch fix/sori48-approved-unknown-closure-20261029 dirty_entries 0
-HEAD commit date 2026-11-01T08:10:26+09:00
+HEAD 0d03bf6b0af301e85cecf882a78c806c1fbe3a5d branch fix/sori48-approved-unknown-closure-20261029 dirty_entries 0 commit_date 2026-11-01T08:10:26+09:00
 fixed e5075aff is NOT an ancestor of HEAD
-commits in HEAD not in e5075aff: 38
-commits in e5075aff not in HEAD: 2
-## NPG remote main (GitHub API)
-main e5075affbc87ed650a755558b8491828e6783862 2026-11-02T15:11:35Z
-## GitHub Actions self-hosted runner on this host
-runner service user ghrunner, agentName rocky-baremetal-01, registered repo https://github.com/HeaInSeo/mac-k8s-multipass-terraform
+HEAD-only 38 / fixed-only 2
+## NPG remote main
+main e5075affbc87ed650a755558b8491828e6783862
+## self-hosted runner on this host: registered repo
+https://github.com/HeaInSeo/mac-k8s-multipass-terraform
+ieo_poc self-hosted runners: 0, ieo_poc_test: 0
+## podman (rootless heain)
+local-registry Created
+ieo-probe-pg Exited (0) About an hour ago
+ieo-probe-rx Exited (2) About an hour ago
+ieo-probe-forge Exited (128) About an hour ago
+ieo-probe-coord ieo-probe-forge podman 
+## actors that wrote on ieo_poc / ieo_poc_test (GitHub API, PR review comments and issue comments, login only)
+HeaInSeo/ieo_poc:      26 chatgpt-codex-connector[bot]      57 HeaInSeo 
+HeaInSeo/ieo_poc_test: 
