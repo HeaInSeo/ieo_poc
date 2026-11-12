@@ -1,21 +1,21 @@
 # PoC 진행과 최근 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0011` · 원장 SHA-256 `22e20bee8c068776684bbb74524ab6dc20352c02b094c7265aabba0d20492d0f`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0012` · 원장 SHA-256 `79656fac0785fda71b4d63761d51440094c285d46e5c0bbee9f1c2c73d72a439`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
-**현재: 01-06 검수 완료(PR #19) · 다음 02-01 · 다음 작업: 02-01**
+**현재: 02-01 검수 완료(PR #21) · 다음 02-02 · 다음 작업: 02-02**
 
 주계획과 조건부 후속은 별도 진행률이다. 실험 평가 종료·공수·제품 완성률과 구분한다. ZIP은 전달 시점 스냅샷이다.
 
 | 구간 | 검수 완료 | 단순 작업 수 진행률 |
 | --- | --- | --- |
-| 주계획 | 8/73 | 11.0% |
+| 주계획 | 9/73 | 12.3% |
 | 후속 실험 | 0/12 | 0.0% |
 
 | 구간 | 상태별 수 |
 | --- | --- |
-| 주계획 | 미착수 65 · 준비됨 0 · 진행 0 · 검수 중 0 · 검수 완료 8 · 조건 대기 0 · 종료 미충족 0 |
+| 주계획 | 미착수 64 · 준비됨 0 · 진행 0 · 검수 중 0 · 검수 완료 9 · 조건 대기 0 · 종료 미충족 0 |
 | 후속 | 미착수 12 · 준비됨 0 · 진행 0 · 검수 중 0 · 검수 완료 0 · 조건 대기 0 · 종료 미충족 0 |
 
 | 구간 | 평가 종료 |
@@ -27,10 +27,10 @@
 
 | 항목 | 기록 |
 | --- | --- |
-| 현재 작업 | 02-01 |
-| 다음 작업 | 02-01 |
-| 마지막 실제 작업 관측 | 2026-11-12T19:33:17+09:00 |
-| 화면 snapshot 작성 | 2026-11-12T19:33:17+09:00 |
+| 현재 작업 | 02-02 |
+| 다음 작업 | 02-02 |
+| 마지막 실제 작업 관측 | 2026-11-12T22:00:15+09:00 |
+| 화면 snapshot 작성 | 2026-11-12T22:00:15+09:00 |
 | 보고 owner | 개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님) |
 | 열람 상태 | GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면) |
 | 고정 사용자 링크 | https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md |
@@ -40,6 +40,7 @@
 
 | 작업 | 상태·판정 | 최근 보고 |
 | --- | --- | --- |
+| 02-01 | 검수 완료 / ieo-evidence(실행·원본 로그 가림 뒤 저장·SHA-256·판정·사용량·합산)와 기록 형식 evidence-record-v0. 종료 코드 0만으로 성공 처리 안 함, 미계측은 unmeasured(합은 null). 01-04 실제 stream 35개 재생 독립 대조 35/35(32 계측·P2c·N4b·L2 미계측) — 재개 세션 modelUsage 누적 발견 → 회차 몫 규칙(계약 rev 7 §11 항목 7). 시험 32·작업공간 110·생성기 28 PASS, 실제 실행 10건 기대대로. 모델 호출 0. PR #21 검토 2df3c35 reject(P2×4) → 97b7231 교정·273907b approve(02-01 검토 2/4·교정 1/3) → 조건부 병합 a0c59fd · main CI success(run 43222844640). F05 약 5,100초/14,400초 | [보고](../reports/tasks/02-01/collector-20261112/REPORT.md) |
 | 01-06 | 검수 완료 / 시험실 보관(sha256 a26b7290…, 자격 제외)→정리→초기화→대조, 재정리→재초기화→대조 모두 기대 일치(E 16·E1b 7, check-init 통과). 생성기 render_progress.py 일괄 교체·남은 임시 파일 탐지 보강, 시험 26건 PASS(CI 실행). STATUS 고정 경로·GitHub 익명 200, 사용자 실제 열람 미확인. PR #19 검토 b301843 approve·자동 검토 P1/P2 교정 → f873fa4 approve(01-06 검토 2/4) → 조건부 병합 c0f93d7 · main CI success | [보고](../reports/tasks/01-06/lab-20261112/REPORT.md) |
 | 01-05 | 검수 완료 / NPG 고정 e5075aff 사본 10개=고정 커밋 blob(sha256), CI 41469168311 success 재조회 일치. 정책·책임 대응표 v0 17행(직접 10·좁음 4·공백 3, 독립 기대값은 L03 연결). 현재 운영 별도 조회: timer 3 enabled·active(report bridge elapsed), NPG 작업 사본 HEAD 0d03bf6은 고정 커밋 비조상. 겹치는 외부 효과 8종 분리. PR #17 검토 efa4a5d reject(P2 report bridge 상태) → 00a7566 approve(01-05 검토 2/4) → 조건부 병합 4bcba6a · main CI success | [보고](../reports/tasks/01-05/baseline-20261112/REPORT.md) |
 | 01-04 | 검수 완료 / 첫 세 probe: P1 지원 · P2 격리 성립 확인 · P3 공유 quota 확인(분리 아님). 나머지: E 성립 확인(E1b forge 포함) · U 고정 Write(path) 미지원→사용자 결정으로 Edit(//path) 채택·지원 · G 합격 · N session-id 재개 지원(동시 재개 CLI 미차단) · L 지원 · C 4 동시 · T 세션/자식별 지원 · R 2.1.316→2.1.322 지원 · 자동 기억 비활성 2방법 확인. 모델 요청 9/30 + 27/30(B2). PR #14 검토 c20e7e3 reject → 사용자 결정 → a3d01ce approve(01-04 검토 4/4) → base 갱신 7c365d1(PR #13과 동일 차이 대조·사용자 결정) → 조건부 병합 74a1fa3 · main CI success | [보고](../reports/tasks/01-04/remaining-probes-20261112/REPORT.md) |
@@ -47,7 +48,6 @@
 | 01-08 | 검수 완료 / PASS · 보고 v0·API 계약·참조 구현(ieo-report) | [보고](../reports/tasks/01-08/report-api-contract-20261112/REPORT.md) |
 | 01-07 | 검수 완료 / PASS · 등록 검사 계약·참조 구현(ieo-spec) | [보고](../reports/tasks/01-07/spec-contract-20261112/REPORT.md) |
 | 01-02 | 검수 완료 / PASS · 설계 계약(실제 지원은 01-04 probe) | [보고](../reports/tasks/01-02/runtime-contract-20261112/REPORT.md) |
-| 01-01 | 검수 완료 / PASS · 설계 범위 | [보고](../reports/tasks/01-01/scope-20261112/REPORT.md) |
 
 현재 실행의 대기/실패 기록 없음. 계획상 선행 작업은 아직 미수행.
 
@@ -81,6 +81,8 @@
 - PR #14 자동 검토 P2 2건(auto-memory 보존, 동시 묶음 정지 시 미기록): 유효, 결과 영향 없음, 하네스 교정 bc09fe4, 답글 discussion_r4547713346·r4547713614.
 - 하네스 잔여 위험(결과 사건 없이 종료 0, 산출물 빈 출력) — 처분: 교정(probe.py·probe2.py, PR #16 cd19663)·01-04 판정 영향 없음(harness-result-check-20261112). 회귀 시험 test_result_check.py PASS.
 - PR #16 검토 P3(이월): f73ac13 P3-C projects/*/memory 빈 디렉터리 digest 처리, P3-D 정리가 subagents 기록 삭제 — 02-04 시험 (c)에서 확인(02-04 unresolved에 연결).
+- PR #21(02-01) 처리: a11f107 CI 실패(새 시험 2건의 픽스처 문제 — dash에 없는 exec -a, setsid 경쟁)로 그 head의 검토를 판정 전에 중단(검토 횟수 미산입으로 기록, 시험만 고친 273907b를 검토 2/4로 승인). base 갱신 예외는 쓰지 않음(main 불변 상태에서 병합)
+- 런타임 계약 revision 7(§11 항목 7, PR #21): 재개 세션 modelUsage·total_cost_usd는 세션 누적 — 01-04 판정 영향 없음(01-04 예산은 시도 수·시간)
 
 다음 의존 작업 착수 전·제어를 돌려받는 지점마다 원장을 갱신하고 재생성한다. 응답 없는 동안 새 관측을 추정하지 않는다. 강제 종료 뒤 실제 외부 효과를 대조한다.
 
