@@ -1,0 +1,90 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "02-01",
+  "attempt_id": "rt1",
+  "command_id": "missing-artifact",
+  "role": "other",
+  "retry_of": null,
+  "model_request": false,
+  "argv": [
+    "true"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "HOME",
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:35:15.056Z",
+  "ended_at": "2026-11-12T12:35:15.077Z",
+  "duration_ms": 20,
+  "process": {
+    "kind": "exited",
+    "exit_code": 0,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [
+    {
+      "path": "/nonexistent/out.txt",
+      "present": false,
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "markers": [],
+  "result_event": null,
+  "usage": {
+    "applicability": "not_applicable",
+    "session_mode": "unknown",
+    "resume_base": null,
+    "run": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "session": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "parent": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "children": [],
+    "attribution_check": "not_checked",
+    "attribution_detail": null,
+    "by_model": {},
+    "cost_usd_reported": null,
+    "run_cost_usd": null,
+    "partial_observations": [],
+    "internal_retries": "not_applicable"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "incomplete",
+    "reasons": [
+      "필수 산출물 없음: /nonexistent/out.txt"
+    ],
+    "counts_as_success": false
+  }
+}

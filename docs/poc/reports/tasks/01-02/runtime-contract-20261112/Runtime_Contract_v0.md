@@ -1,7 +1,7 @@
 # 01-02 · 에이전트 런타임·역할·인증·재개 계약 v0
 
 2026-11-12 KST · 계획 v1.3.3 · 이전 회차 [runtime-comparison-20261112](../runtime-comparison-20261112/REPORT.md)(후보 비교)를 이어받는 회차.
-문서 **revision 6**(2026-11-12): 01-04 실측(검수 완료, PR #12·#14)과 사용자 결정([01-04 결정](../../../../User_Decisions_2026-11-12_0104.md))을 §10 표의 6개 항목으로 반영했다. 바꾼 곳은 §2.1·§4.1·§4.2·§5·§7·§8과 새 §10이고, 다른 조항은 revision 5와 같다. revision 5(2026-11-12, [개정 v1.3.3-A1](../../../../Amendment_v1.3.3-A1.md)): 사용자 결정 D1·D2로 §3 자격 방식, §8 판정표, §9 미확정 목록만 바꿨다. 다른 조항은 revision 4(PR #2 병합 커밋 76ffd03에서 검수 완료)와 같다. revision 4: 독립 검토 7a39452(reject) F1~F9, bf854bb(reject) N1~N7, 2e5a5ef(reject) R1~R4 반영. 이 문서는 **설계 계약**이다. “근거”는 설치 버전 도움말/상태 출력에 옵션·문구가 **존재**함을 뜻하며, 동작은 01-04 probe 전까지 미확인이었다. revision 6에서 01-04 실측 결과를 반영했다(§10, 아래 각 조항의 “01-04:” 문장).
+문서 **revision 7**(2026-11-12): 02-01 계측기가 01-04 원본 stream을 재생해 확인한 사용량 집계 규칙 1건을 §11 항목 7로 반영했다. 바꾼 곳은 §4.2 자식 사건 귀속 행·§5-1·§6 기록과 새 §11이고, 다른 조항은 revision 6과 같다. revision 6(2026-11-12): 01-04 실측(검수 완료, PR #12·#14)과 사용자 결정([01-04 결정](../../../../User_Decisions_2026-11-12_0104.md))을 §10 표의 6개 항목으로 반영했다. 바꾼 곳은 §2.1·§4.1·§4.2·§5·§7·§8과 새 §10이고, 다른 조항은 revision 5와 같다. revision 5(2026-11-12, [개정 v1.3.3-A1](../../../../Amendment_v1.3.3-A1.md)): 사용자 결정 D1·D2로 §3 자격 방식, §8 판정표, §9 미확정 목록만 바꿨다. 다른 조항은 revision 4(PR #2 병합 커밋 76ffd03에서 검수 완료)와 같다. revision 4: 독립 검토 7a39452(reject) F1~F9, bf854bb(reject) N1~N7, 2e5a5ef(reject) R1~R4 반영. 이 문서는 **설계 계약**이다. “근거”는 설치 버전 도움말/상태 출력에 옵션·문구가 **존재**함을 뜻하며, 동작은 01-04 probe 전까지 미확인이었다. revision 6에서 01-04 실측 결과를 반영했다(§10, 아래 각 조항의 “01-04:” 문장).
 
 ## 1. 선택과 적용 범위
 
@@ -117,7 +117,7 @@ Guardrail cwd=/state/guardrail-cwd(빈 디렉터리), --disable-slash-commands,
 | 기록 위치 | `CLAUDE_CONFIG_DIR`(실행 파일 문자열·`auth status`의 configDirectory) | 역할 볼륨 아래에만 기록, 재생성 후 복원 |
 | 압축 | `--autocompact <auto|tokens>` | 압축 사건 감지 가능 여부 |
 | 구조화 결과 | `--output-format json|stream-json`, `--json-schema` | 결과 사건의 session_id·usage·비용 필드 실제 존재 |
-| 자식 사건 귀속 | `--forward-subagent-text`: 자식의 **텍스트·thinking**을 `parent_tool_use_id`와 함께 전달(사용량 전달은 도움말에 없음) | 01-04 T(시도 23): 자식 assistant 사건의 `usage`(`agent_id`), Agent tool_result의 `totalTokens`·`usage`로 자식별 사용량을 얻는다. 결과 `modelUsage`는 자식을 포함한다 |
+| 자식 사건 귀속 | `--forward-subagent-text`: 자식의 **텍스트·thinking**을 `parent_tool_use_id`와 함께 전달(사용량 전달은 도움말에 없음) | 01-04 T(시도 23): 자식 assistant 사건의 `usage`(`agent_id`), Agent tool_result의 `totalTokens`·`usage`로 자식별 사용량을 얻는다. 결과 `modelUsage`는 자식을 포함한다. 02-01(revision 7, §11 항목 7): 재개한 세션의 `modelUsage`·`total_cost_usd`는 **세션 누적**이고 `result.usage`는 부모의 이번 회차만이며 압축 호출을 뺀다 |
 | 예산 | `--max-budget-usd`(print 전용, 로컬 상한) | 로컬 상한일 뿐 공급자 한도 아님 |
 | 사용 안 함 | `--dangerously-skip-permissions`, `bypassPermissions`, `--bg/attach/agents`(프로세스 수명은 supervisor가 관리), `--cloud`, `--remote-control`, `--chrome` | — |
 
@@ -129,7 +129,7 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
 
 ## 5. 체크포인트·재개 절차
 
-1. supervisor는 단계 전환·인수/첫 행동·종료/한도 직전·예외 시 체크포인트를 쓴다: session_id, generation, assignment_id, 대상 SHA, **sprint_id/revision/digest, image_digest, profile ID/revision, settings_digest**, worktree HEAD·미커밋 diff 해시, 마지막 stream-json 사건 오프셋, 활성 자식 목록, 미확인 외부 요청 ID. digest·순번은 코디네이터에 보고한다(§2.1).
+1. supervisor는 단계 전환·인수/첫 행동·종료/한도 직전·예외 시 체크포인트를 쓴다: session_id, generation, assignment_id, 대상 SHA, **sprint_id/revision/digest, image_digest, profile ID/revision, settings_digest**, worktree HEAD·미커밋 diff 해시, 마지막 stream-json 사건 오프셋, 활성 자식 목록, 미확인 외부 요청 ID, 마지막 회차의 세션 누적 사용량(`modelUsage` 합·`total_cost_usd`, 다음 재개 회차 몫의 기준, §11 항목 7). digest·순번은 코디네이터에 보고한다(§2.1).
 2. 재기동 시 `reconnect`: 체크포인트의 session_id로 `--resume`, 현재 배정 세대·코디네이터 기록 digest와 대조. 세대가 낡으면 `STALE_GENERATION`, digest가 다르면 외부 대조 필요로 중단.
 3. repo 기록(승인된 명세·코드)이 세션 기억과 다르면 repo 기록이 우선이다(1.2절).
 4. 재개 실패/관측 불가는 `NOT_OBSERVED`로 보고하고 새 세션을 조용히 대체하지 않는다.
@@ -148,7 +148,7 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
 ## 6. 자식 에이전트 경계
 
 - 정의: `/etc/ieo/role/agents.json`(RO)을 `--agents`로 준다. 자식 도구는 부모 역할 허용 목록의 부분집합이다. 자식은 별도 자격을 받지 않고 부모 프로세스 안에서만 동작한다. Guardrail 자식은 개발 맥락을 받지 않는다.
-- 기록: supervisor는 stream-json에서 자식 사건(`parent_tool_use_id`)을 읽어 **자식 ID·부모 session_id·세대·부작업·외부 요청·관측 가능한 비용**을 체크포인트와 코디네이터 claim에 남긴다. 자식별 사용량을 얻지 못하면 “미계측”으로 남기고 0으로 쓰지 않는다(P35).
+- 기록: supervisor는 stream-json에서 자식 사건(`parent_tool_use_id`)을 읽어 **자식 ID·부모 session_id·세대·부작업·외부 요청·관측 가능한 비용**을 체크포인트와 코디네이터 claim에 남긴다. 자식별 사용량을 얻지 못하면 “미계측”으로 남기고 0으로 쓰지 않는다(P35). 회차 사용량은 새 세션이면 세션 누적 그대로, 재개면 세션 누적에서 **실제로 재개한 직전 회차**의 누적을 뺀 값이다. 기준 회차가 없거나 맞지 않으면 미계측으로 둔다(§11 항목 7).
 - 부모 중단: 재개 전에 체크포인트의 활성 자식 목록·미확인 외부 요청을 대조한다. 무조건 새 자식을 띄우지 않는다(§1.7).
 - 코디네이터의 인수·보고 상대는 부모뿐이다.
 
@@ -217,3 +217,10 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
 | 5 | 이름(`-n`)은 재개 키가 아니다. `--resume <이름>`이 동작해도 쓰지 않는다 | N3 시도 13 | §4.2 논리 이름 행 | 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) |
 | 6 | 개발 역할의 Bash 허용 목록은 완전한 경계가 아니다. 판정·격리 근거로 쓰지 않는다 | N4a 시도 14(`Bash(sleep:*)`만 허용했으나 `while pgrep …; echo done` 실행), U 시도 01(`ls /` 거부) | §2.1 | 03-02 정책 문서와 P07 위협 모형이 개발 Bash 규칙을 경계로 세지 않는다 |
 
+## 11. 02-01 계측 반영 (revision 7)
+
+근거: 02-01 [계측기 보고](../../02-01/collector-20261112/REPORT.md) §3. 01-04에 보존된 실제 stream 35개를 계측기로 재생하고 독립 Python 판독과 대조했다(모델 호출 0회, 01-04 판정 불변).
+
+| # | 항목 | 근거(원본) | 적용 위치 | 완료 조건 |
+| --- | --- | --- | --- | --- |
+| 7 | 재개한 세션의 `result.modelUsage`·`total_cost_usd`는 이전 회차를 포함한 **세션 누적**이다. 회차 사용량은 새 세션이면 그 값, 재개면 그 값에서 실제로 재개한 직전 회차의 누적을 뺀 값이다. `result.usage`는 부모의 이번 회차만이고 자식·압축 호출을 뺀다. 기준이 없거나 누적이 줄거나, 압축 사건 없이 회차 몫이 부모+자식과 다르면 그 회차는 **미계측**이며 0이나 누적값으로 대신하지 않는다 | 01-04 R1→R2(시도 24·25), N1→N2→N3(11~13), G3a→G3b(07·08, 09·10): 재개 회차 `modelUsage` = 이전 누적 + 그 회차 `result.usage`. L3(18, `/compact`): `result.usage` 0, 누적 증가분이 압축 사용량. N4a∥N4b(14·15)→L2(17): 동시 재개로 분기해 직전 회차를 시각 순서로 정할 수 없음 | §4.2 자식 사건 귀속 행, §5-1 체크포인트, §6 기록 | 02-01 계측기(`ieo-evidence`)가 이 규칙으로 계산한다(02-01 검수). 02-04 supervisor가 매 회차 세션 방식(새/재개)과 재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남긴다. 02-04에서 새 세션→재개→`/compact` 재개 연쇄의 회차 몫 합이 마지막 세션 누적과 같음을 시험한다 |

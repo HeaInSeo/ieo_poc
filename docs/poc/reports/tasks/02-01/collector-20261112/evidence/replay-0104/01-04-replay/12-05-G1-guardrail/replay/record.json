@@ -1,0 +1,120 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "01-04-replay",
+  "attempt_id": "12-05-G1-guardrail",
+  "command_id": "replay",
+  "role": "other",
+  "retry_of": null,
+  "model_request": true,
+  "argv": [
+    "cat",
+    "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201/docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/05-G1-guardrail/stdout.jsonl"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:35:08.179Z",
+  "ended_at": "2026-11-12T12:35:08.199Z",
+  "duration_ms": 20,
+  "process": {
+    "kind": "exited",
+    "exit_code": 0,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 20170,
+    "sha256": "97e3f6c57d95b467d6788f130dce5150d33859c47a02f5cc036bc11cf77d5791"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [],
+  "result_event": {
+    "count": 1,
+    "present": true,
+    "subtype": "success",
+    "is_error": false,
+    "session_id": "eb27a4ed-0996-41b5-919e-dc7d93858be8",
+    "num_turns": 7,
+    "stop_reason": "end_turn",
+    "runtime_version": "2.1.322",
+    "non_json_lines": 0,
+    "rate_limit_statuses": [
+      "allowed"
+    ],
+    "compact_boundaries": 0
+  },
+  "usage": {
+    "applicability": "model",
+    "session_mode": "new",
+    "resume_base": null,
+    "run": {
+      "state": "measured",
+      "tokens": {
+        "input": 4,
+        "output": 752,
+        "cache_read": 9863,
+        "cache_creation": 3195
+      },
+      "source": "새 세션: result.modelUsage"
+    },
+    "session": {
+      "state": "measured",
+      "tokens": {
+        "input": 4,
+        "output": 752,
+        "cache_read": 9863,
+        "cache_creation": 3195
+      },
+      "source": "result.modelUsage"
+    },
+    "parent": {
+      "state": "measured",
+      "tokens": {
+        "input": 4,
+        "output": 752,
+        "cache_read": 9863,
+        "cache_creation": 3195
+      },
+      "source": "result.usage"
+    },
+    "children": [],
+    "attribution_check": "consistent",
+    "attribution_detail": null,
+    "by_model": {
+      "claude-sonnet-5-5": {
+        "input": 4,
+        "output": 752,
+        "cache_read": 9863,
+        "cache_creation": 3195
+      }
+    },
+    "cost_usd_reported": 0.0212943,
+    "run_cost_usd": 0.0212943,
+    "partial_observations": [],
+    "internal_retries": "unmeasured"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "succeeded",
+    "reasons": [],
+    "counts_as_success": true
+  }
+}

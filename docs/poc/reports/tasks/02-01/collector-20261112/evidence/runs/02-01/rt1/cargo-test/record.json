@@ -1,0 +1,91 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "02-01",
+  "attempt_id": "rt1",
+  "command_id": "cargo-test",
+  "role": "other",
+  "retry_of": null,
+  "model_request": false,
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "ieo-evidence"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "HOME",
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:35:08.745Z",
+  "ended_at": "2026-11-12T12:35:11.057Z",
+  "duration_ms": 2312,
+  "process": {
+    "kind": "exited",
+    "exit_code": 0,
+    "signal": null,
+    "timeout_ms": 900000,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 2007,
+    "sha256": "24b4bac2299392736c82d163c51282311612a68c207f38d91f343f20677f9476"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 359,
+    "sha256": "f36ed5a32a0e69aa68bf2a87406380a92c6720386f71ed1ee9b74ba5646b286c"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [
+    {
+      "pattern": "test result: ok\\. 24 passed",
+      "found": true
+    }
+  ],
+  "result_event": null,
+  "usage": {
+    "applicability": "not_applicable",
+    "session_mode": "unknown",
+    "resume_base": null,
+    "run": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "session": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "parent": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "children": [],
+    "attribution_check": "not_checked",
+    "attribution_detail": null,
+    "by_model": {},
+    "cost_usd_reported": null,
+    "run_cost_usd": null,
+    "partial_observations": [],
+    "internal_retries": "not_applicable"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "succeeded",
+    "reasons": [],
+    "counts_as_success": true
+  }
+}

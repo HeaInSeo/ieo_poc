@@ -1,0 +1,136 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "01-04-replay",
+  "attempt_id": "25-18-L3-development",
+  "command_id": "replay",
+  "role": "other",
+  "retry_of": null,
+  "model_request": true,
+  "argv": [
+    "cat",
+    "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201/docs/poc/reports/tasks/01-04/remaining-probes-20261112/evidence/attempts/18-L3-development/stdout.jsonl"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:35:08.481Z",
+  "ended_at": "2026-11-12T12:35:08.502Z",
+  "duration_ms": 20,
+  "process": {
+    "kind": "exited",
+    "exit_code": 0,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 9728,
+    "sha256": "44e485e6d5b159abd1d879ea86272a4779b0cf8912060a2fd31de3e1d54d64c0"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [],
+  "result_event": {
+    "count": 1,
+    "present": true,
+    "subtype": "success",
+    "is_error": false,
+    "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+    "num_turns": 0,
+    "stop_reason": null,
+    "runtime_version": "2.1.322",
+    "non_json_lines": 0,
+    "rate_limit_statuses": [
+      "allowed"
+    ],
+    "compact_boundaries": 1
+  },
+  "usage": {
+    "applicability": "model",
+    "session_mode": "resume",
+    "resume_base": {
+      "task_id": "01-04-replay",
+      "attempt_id": "24-17-L2-development",
+      "command_id": "replay",
+      "session_id": "fb34c53a-b7e0-4b89-9ae4-bde0c4e67f54",
+      "session": {
+        "state": "measured",
+        "tokens": {
+          "input": 22,
+          "output": 513,
+          "cache_read": 23639,
+          "cache_creation": 3107
+        },
+        "source": "result.modelUsage"
+      },
+      "cost_usd_reported": 0.0199659
+    },
+    "run": {
+      "state": "measured",
+      "tokens": {
+        "input": 2020,
+        "output": 1354,
+        "cache_read": 2761,
+        "cache_creation": 1019
+      },
+      "source": "재개: result.modelUsage − 기준 회차 01-04-replay/24-17-L2-development/replay 누적"
+    },
+    "session": {
+      "state": "measured",
+      "tokens": {
+        "input": 2042,
+        "output": 1867,
+        "cache_read": 26400,
+        "cache_creation": 4126
+      },
+      "source": "result.modelUsage"
+    },
+    "parent": {
+      "state": "measured",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_creation": 0
+      },
+      "source": "result.usage"
+    },
+    "children": [],
+    "attribution_check": "mismatch",
+    "attribution_detail": "회차 사용량 Tokens { input: 2020, output: 1354, cache_read: 2761, cache_creation: 1019 } != 부모+자식 Tokens { input: 0, output: 0, cache_read: 0, cache_creation: 0 }: 부모·자식에 귀속되지 않은 모델 호출(예: 압축)",
+    "by_model": {
+      "claude-sonnet-5-5": {
+        "input": 2042,
+        "output": 1867,
+        "cache_read": 26400,
+        "cache_creation": 4126
+      }
+    },
+    "cost_usd_reported": 0.0403695,
+    "run_cost_usd": 0.0204036,
+    "partial_observations": [],
+    "internal_retries": "unmeasured"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "succeeded",
+    "reasons": [],
+    "counts_as_success": true
+  }
+}

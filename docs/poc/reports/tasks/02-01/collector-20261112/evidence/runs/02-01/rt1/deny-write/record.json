@@ -1,0 +1,91 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "02-01",
+  "attempt_id": "rt1",
+  "command_id": "deny-write",
+  "role": "other",
+  "retry_of": null,
+  "model_request": false,
+  "argv": [
+    "sh",
+    "-c",
+    "if echo x > /proc/version 2>/dev/null; then echo WRITE_OK; else echo WRITE_DENIED; exit 1; fi"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "HOME",
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:35:12.993Z",
+  "ended_at": "2026-11-12T12:35:13.014Z",
+  "duration_ms": 20,
+  "process": {
+    "kind": "exited",
+    "exit_code": 1,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 13,
+    "sha256": "d92cea3bcd25562b4b8ce750400327eeb9f5072bad70e9b23467e23ea98fc4b2"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 37,
+    "sha256": "7ccdd8b88175dbcbae223d850b632a300920fd761c50afffb1dd270eac5a867e"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [
+    {
+      "pattern": "^WRITE_DENIED$",
+      "found": true
+    }
+  ],
+  "result_event": null,
+  "usage": {
+    "applicability": "not_applicable",
+    "session_mode": "unknown",
+    "resume_base": null,
+    "run": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "session": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "parent": {
+      "state": "unmeasured",
+      "reason": "모델 요청이 없는 명령"
+    },
+    "children": [],
+    "attribution_check": "not_checked",
+    "attribution_detail": null,
+    "by_model": {},
+    "cost_usd_reported": null,
+    "run_cost_usd": null,
+    "partial_observations": [],
+    "internal_retries": "not_applicable"
+  },
+  "judgment": {
+    "expected": "nonzero_exit",
+    "status": "expected_matched",
+    "reasons": [
+      "기대 NonzeroExit: 관측 일치",
+      "종료 코드 Some(1)"
+    ],
+    "counts_as_success": true
+  }
+}

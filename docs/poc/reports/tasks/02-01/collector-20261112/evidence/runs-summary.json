@@ -1,0 +1,43 @@
+{
+  "format": "ieo-evidence-summary/v0",
+  "records": 8,
+  "task_ids": [
+    "02-01"
+  ],
+  "by_judgment": {
+    "expected_matched": 2,
+    "failed": 1,
+    "incomplete": 1,
+    "succeeded": 4
+  },
+  "by_role": {
+    "other": 8
+  },
+  "retries": 0,
+  "timed_out": 1,
+  "wall_ms_sum": 6334,
+  "usage": {
+    "completeness": "no_model_runs",
+    "model_runs": 0,
+    "measured_runs": 0,
+    "tokens_measured_sum": null,
+    "unmeasured": [],
+    "children_seen": 0,
+    "children_measured": 0,
+    "cost_usd_reported_sum": null,
+    "attribution_mismatches": []
+  },
+  "usage_by_role": {
+    "other": {
+      "completeness": "no_model_runs",
+      "model_runs": 0,
+      "measured_runs": 0,
+      "tokens_measured_sum": null,
+      "unmeasured": [],
+      "children_seen": 0,
+      "children_measured": 0,
+      "cost_usd_reported_sum": null,
+      "attribution_mismatches": []
+    }
+  }
+}

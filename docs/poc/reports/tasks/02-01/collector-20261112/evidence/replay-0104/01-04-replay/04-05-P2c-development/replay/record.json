@@ -1,0 +1,113 @@
+{
+  "format": "ieo-evidence-record/v0",
+  "task_id": "01-04-replay",
+  "attempt_id": "04-05-P2c-development",
+  "command_id": "replay",
+  "role": "other",
+  "retry_of": null,
+  "model_request": true,
+  "argv": [
+    "cat",
+    "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201/docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/05-P2c-development/stdout.jsonl"
+  ],
+  "cwd": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0201",
+  "env_names": [
+    "PATH"
+  ],
+  "started_at": "2026-11-12T12:35:08.011Z",
+  "ended_at": "2026-11-12T12:35:08.032Z",
+  "duration_ms": 20,
+  "process": {
+    "kind": "exited",
+    "exit_code": 0,
+    "signal": null,
+    "timeout_ms": null,
+    "term_sent": false,
+    "kill_sent": false,
+    "stray_group_killed": false,
+    "launch_error": null
+  },
+  "stdout": {
+    "file": "stdout",
+    "bytes": 801,
+    "sha256": "7c1f1d251e983dba87900d5e5c613342d1b0d4aada8303d335af3bc0fb3eecf7"
+  },
+  "stderr": {
+    "file": "stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "redaction": {
+    "secret_sources": 0,
+    "stdout_replacements": 0,
+    "stderr_replacements": 0,
+    "argv_replacements": 0,
+    "secret_value_seen": false
+  },
+  "artifacts": [],
+  "markers": [],
+  "result_event": {
+    "count": 1,
+    "present": true,
+    "subtype": "error_during_execution",
+    "is_error": true,
+    "session_id": "73305c11-cd0f-4d86-83e4-585fb858ab1a",
+    "num_turns": 0,
+    "stop_reason": null,
+    "runtime_version": null,
+    "non_json_lines": 0,
+    "rate_limit_statuses": [],
+    "compact_boundaries": 0
+  },
+  "usage": {
+    "applicability": "model",
+    "session_mode": "new",
+    "resume_base": null,
+    "run": {
+      "state": "measured",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_creation": 0
+      },
+      "source": "새 세션: result.usage + 자식 tool_use_result.usage (result.modelUsage 비어 있음)"
+    },
+    "session": {
+      "state": "measured",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_creation": 0
+      },
+      "source": "result.usage + 자식 tool_use_result.usage (result.modelUsage 비어 있음)"
+    },
+    "parent": {
+      "state": "measured",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_creation": 0
+      },
+      "source": "result.usage"
+    },
+    "children": [],
+    "attribution_check": "not_checked",
+    "attribution_detail": null,
+    "by_model": {},
+    "cost_usd_reported": 0.0,
+    "run_cost_usd": 0.0,
+    "partial_observations": [],
+    "internal_retries": "unmeasured"
+  },
+  "judgment": {
+    "expected": "success",
+    "status": "failed",
+    "reasons": [
+      "결과 사건 is_error=true (subtype Some(\"error_during_execution\"))"
+    ],
+    "counts_as_success": false
+  }
+}
