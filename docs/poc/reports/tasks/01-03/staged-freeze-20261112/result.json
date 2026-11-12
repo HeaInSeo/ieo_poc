@@ -1,0 +1,68 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": false,
+  "plan_version": "v1.3.3",
+  "task_id": "01-03",
+  "experiment_id": null,
+  "run_id": "staged-freeze-20261112",
+  "revision": 1,
+  "previous_run_ref": "reports/tasks/01-03/decision-proposal-20261112/REPORT.md",
+  "actor": {
+    "role": "development",
+    "name": "개발 에이전트(Claude Code 대화 세션)"
+  },
+  "execution_kind": "design_decision_freeze",
+  "execution_state": "독립 검토 대기",
+  "inputs": {
+    "spec_revision": "POC-01 rev 5 (v1.3.3-A1)",
+    "repo_sha": null,
+    "image_digest": null,
+    "profile_revision": "poc-acceptance-v1.3.3 rev 5",
+    "model_runtime_versions": [
+      "rustc 1.99.1",
+      "claude-code 2.1.322(실행 안 함)"
+    ]
+  },
+  "expected": "사용자 결정 원문 기록, stage_0 동결값과 later 항목의 담당·시점·차단 조건, 01-04 판정표의 장부·명세·런타임 계약 동일 반영, 작업 수 불변, D11 반영",
+  "observed": "freeze_register stage_0 8·later 9; 판정표 장부=명세(rev 5 프로파일)=런타임 계약 rev 5 §8=probe_gate_table.json; validate_package PASS(문서 정합만); draft 9×201, executable 9×422 UNBOUND_DRAFT; Rust 72 tests pass; PDF 공개 URL sha256 일치",
+  "verdict": "미판정",
+  "verification": {
+    "level": "claim",
+    "reviewer": null,
+    "evidence": []
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "대화 세션의 역할별 원시 사용량 수단 없음",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
+  "adoption": "미판정",
+  "reuse_assets": [
+    "crates/ieo-spec"
+  ],
+  "unresolved": [
+    "later L01~L09: 각 첫 실행 전 동결 증거 필요",
+    "L08 두 결함 교정(02-03 전)",
+    "D8 P26 후보 준비(07-01 진입 시)",
+    "D9 봉인 방식 미정"
+  ],
+  "next_action": "독립 검토 → 조건부 병합·main CI → 원장 갱신 → L08 교정 PR → 01-04(사용자 자격 발급 후 P1→P2→P3)",
+  "evidence_refs": [
+    "reports/tasks/01-03/staged-freeze-20261112/freeze_register.json",
+    "reports/tasks/01-03/staged-freeze-20261112/probe_gate_table.json",
+    "reports/tasks/01-03/staged-freeze-20261112/Probe_Budget_Rules.md",
+    "reports/tasks/01-03/staged-freeze-20261112/evidence/validate.txt",
+    "reports/tasks/01-03/staged-freeze-20261112/evidence/executable-check.txt",
+    "reports/tasks/01-03/staged-freeze-20261112/evidence/d11-link-check.txt"
+  ],
+  "started_at": null,
+  "finished_at": null,
+  "next_owner": "독립 검토 세션",
+  "resume_condition": "현재 head SHA 독립 승인 + CI 성공 → 조건부 병합",
+  "operational_report_ref": null,
+  "schedule_report_ref": null
+}

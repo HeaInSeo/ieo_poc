@@ -7,3 +7,5 @@
 # 대용량 참고 원문(PDF)은 작업공간에 두고 소스 이력에는 넣지 않는다
 /docs/poc/03_paper_repo_pairs/**/*.pdf
 __pycache__/
+# 제3자 논문 PDF는 공개 저장소에 두지 않는다(v1.3.3-A1 D11). 작업공간 사본은 패키지 무결성 대조용으로만 유지
+/docs/poc/07_supporting_research/*.pdf

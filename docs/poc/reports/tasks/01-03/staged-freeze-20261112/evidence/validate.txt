@@ -1,0 +1,145 @@
+$ python docs/poc/scripts/validate_package.py
+{
+  "plan_version": "v1.3.3",
+  "main_graph": {
+    "nodes": 73,
+    "edges": 188,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "dependency_delta": {
+    "existing_added": [
+      [
+        "07-01",
+        "04-16"
+      ]
+    ],
+    "removed": [],
+    "new_task": {
+      "04-16": [
+        "04-09",
+        "01-03"
+      ]
+    }
+  },
+  "ancestor_counts": {
+    "04-03": 14,
+    "05-05": 24,
+    "07-01": 33,
+    "07-02": 37
+  },
+  "changed_acceptance_ids": [
+    "01-02",
+    "01-03",
+    "01-04",
+    "01-07",
+    "01-08",
+    "02-01",
+    "07-01",
+    "07-04",
+    "09-02",
+    "09-03"
+  ],
+  "sprint_digests": [
+    {
+      "sprint_id": "POC-01",
+      "revision": 5,
+      "digest": "e0354a223007cd8d636bf874c49a7d37911aaf7eb7bd32eb12351c0b5c102fbc"
+    },
+    {
+      "sprint_id": "POC-02",
+      "revision": 4,
+      "digest": "4b8077e60aec7b4dd71de6a5cd475a544b9613ecd6145466410b8091243ad3bb"
+    },
+    {
+      "sprint_id": "POC-03",
+      "revision": 4,
+      "digest": "90990ca2514401682c9b8e96adc327afeb03875b74591a7800b5858d0a3901ad"
+    },
+    {
+      "sprint_id": "POC-04",
+      "revision": 4,
+      "digest": "26f0e6684246c6b535e65c8d0fa0ca141609d9826803568fccfcb57fa1b68527"
+    },
+    {
+      "sprint_id": "POC-05",
+      "revision": 4,
+      "digest": "b093a8525b390abaf40aaf280952acb73c9a3e1c0edb57baeb095289950c7864"
+    },
+    {
+      "sprint_id": "POC-06",
+      "revision": 4,
+      "digest": "282efb8b897c48f84fc802932f64d46b57382dfbc2a1227fd04a9b60ff71a974"
+    },
+    {
+      "sprint_id": "POC-07",
+      "revision": 4,
+      "digest": "267788c0452ba1ec923202096e09b32a0651ad063d285c55741ee5a01f633854"
+    },
+    {
+      "sprint_id": "POC-08",
+      "revision": 4,
+      "digest": "f032728a745adb4af93b32e9bbb45656ce25e8a1233f0a41e1d6533cf0b85038"
+    },
+    {
+      "sprint_id": "POC-09",
+      "revision": 4,
+      "digest": "08572de4a66890a2b8ef7d61bf5ebd70ee86c2928a916a7208c6dfdb4b356faa"
+    }
+  ],
+  "schema_errors": 0,
+  "ledger_spec_match": true,
+  "technical_graph": {
+    "nodes": 50,
+    "edges": 220,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "followup_graph": {
+    "nodes": 12,
+    "edges": 18,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "generated_views_match": true,
+  "runtime_probe": "NOT_RUN",
+  "human_trials": "NOT_RUN",
+  "progress": {
+    "accepted_main_tasks": 4,
+    "main_denominator": 73,
+    "followup_denominator": 12
+  },
+  "current_internal_links_checked": 173,
+  "report_contract_checks": {
+    "human_input_checks": {
+      "valid_without_estimate": true,
+      "valid_measured_estimate": true,
+      "missing_evidence_rejected": true
+    },
+    "valid_role_examples": 4,
+    "invalid_examples_rejected": 12,
+    "cases": [
+      "old actor string",
+      "missing contract revision",
+      "developer claims verified",
+      "wrong actor role",
+      "finding lacks original log",
+      "reject without findings",
+      "estimated without measurement",
+      "reversed forecast",
+      "delay without reason",
+      "undecided shown normal",
+      "decision mismatch",
+      "decision deadline is not a date"
+    ],
+    "scope": "local draft contract only; runtime/human trials NOT_RUN"
+  },
+  "package_integrity": {
+    "delivered": 120,
+    "amended": 10,
+    "gitignored_paper_pdfs_absent": 0,
+    "amendment": "v1.3.3-A1"
+  }
+}
+$ python docs/poc/scripts/render_progress.py --check
+{"ok": true, "mode": "check", "files": ["STATUS.md", "TASKS.md", "RESULTS.md", "RESUME.md", "events.jsonl"]}
