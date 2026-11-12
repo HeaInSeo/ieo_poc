@@ -1,0 +1,13 @@
+diff --git a/crates/ieo-report/src/lib.rs b/crates/ieo-report/src/lib.rs
+index 2404cbc..0286864 100644
+--- a/crates/ieo-report/src/lib.rs
++++ b/crates/ieo-report/src/lib.rs
+@@ -470,7 +470,7 @@ pub fn authorize_repro(
+     match book.lookup(req) {
+         // the runner checks out the assignment's SHA from the coordinator DB; a body naming
+         // another SHA would be new work outside the current assignment
+-        Some((a, true)) if req["target_sha"].as_str() == Some(a.target_sha.as_str()) => {
++        Some((a, true)) => {
+             Ok(ReproDisposition::Queue {
+                 target_sha: a.target_sha.clone(),
+             })

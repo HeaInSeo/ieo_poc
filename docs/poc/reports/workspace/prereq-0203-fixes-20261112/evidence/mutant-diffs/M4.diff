@@ -1,0 +1,13 @@
+diff --git a/crates/ieo-spec/src/check.rs b/crates/ieo-spec/src/check.rs
+index cc52426..0a7949f 100644
+--- a/crates/ieo-spec/src/check.rs
++++ b/crates/ieo-spec/src/check.rs
+@@ -105,7 +105,7 @@ impl Registry {
+                 self.revisions.insert(key, (digest, mode));
+             }
+         }
+-        self.tasks.retain(|_, t| t.sprint_id != sprint_id);
++        
+         for t in spec["tasks"].as_array().into_iter().flatten() {
+             let id = t["task_id"].as_str().unwrap_or_default().to_string();
+             let prerequisites = t["prerequisites"]

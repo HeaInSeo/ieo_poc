@@ -1,0 +1,13 @@
+diff --git a/crates/ieo-report/src/lib.rs b/crates/ieo-report/src/lib.rs
+index 2404cbc..4d4db0a 100644
+--- a/crates/ieo-report/src/lib.rs
++++ b/crates/ieo-report/src/lib.rs
+@@ -462,7 +462,7 @@ pub fn authorize_repro(
+     }
+     if let Some(s) = stored {
+         return if s == req {
+-            Ok(ReproDisposition::Replay)
++            Ok(ReproDisposition::Queue { target_sha: String::new() })
+         } else {
+             Err(Denied::ContentConflict)
+         };

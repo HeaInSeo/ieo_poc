@@ -329,20 +329,115 @@ fn non_integer_numbers_rejected_before_digest() {
 }
 
 #[test]
-fn lower_revision_after_higher_is_conflict() {
-    let s = sprint(0); // revision 4
+fn lower_revision_after_higher_is_superseded() {
+    let s = sprint(0);
+    let rev = s["revision"].as_u64().unwrap_or_default();
     let mut reg = registry("POC-01");
     reg.add_spec(&s);
     let mut lower = s.clone();
-    lower["revision"] = json!(3);
+    lower["revision"] = json!(rev - 1);
     lower["title"] = json!("older revision, new content");
-    let out = check_registration(&redigest(lower), &reg, CheckMode::Draft);
-    assert_eq!(out.http_status(), 409);
+    let lower = redigest(lower);
+    for mode in [CheckMode::Draft, CheckMode::Executable] {
+        let out = check_registration(&lower, &reg, mode);
+        assert_eq!(out.http_status(), 409);
+        assert!(
+            out.rejections
+                .iter()
+                .any(|r| r.code == Code::RevisionSuperseded && r.field == "revision"),
+            "{:?}",
+            out.rejections
+        );
+    }
+}
+
+// --- 02-03 prerequisite fix (01-07 N1): no new execution of an old revision ---
+
+/// The same spec content at another revision number.
+fn at_revision(base: &Value, rev: u64) -> Value {
+    let mut s = base.clone();
+    s["revision"] = json!(rev);
+    s
+}
+
+#[test]
+fn old_draft_revision_cannot_be_promoted_after_newer_exists() {
+    let base = bound_ready(sprint(0));
+    let rev = base["revision"].as_u64().unwrap_or_default();
+    let old = redigest(at_revision(&base, rev));
+    let newer = redigest(at_revision(&base, rev + 1));
+    let mut reg = registry("POC-01");
+    assert!(reg.add_spec_with_mode(&old, CheckMode::Draft));
+    // before a newer revision exists, promotion of the same content is allowed
+    assert_eq!(
+        check_registration(&old, &reg, CheckMode::Executable).http_status(),
+        201
+    );
+    assert!(reg.add_spec_with_mode(&newer, CheckMode::Draft));
+    let out = check_registration(&old, &reg, CheckMode::Executable);
+    assert_eq!(out.http_status(), 409, "{:?}", out.rejections);
+    assert_eq!(
+        out.rejections
+            .iter()
+            .map(|r| (r.code, r.field.as_str()))
+            .collect::<Vec<_>>(),
+        vec![(Code::RevisionSuperseded, "revision")]
+    );
+    // registry refuses to record it either way
+    assert!(!reg.add_spec_with_mode(&old, CheckMode::Executable));
+    assert_eq!(
+        check_registration(&old, &reg, CheckMode::Executable).http_status(),
+        409
+    );
+}
+
+#[test]
+fn historical_lookup_of_old_revision_does_not_reactivate_it() {
+    let base = bound_ready(sprint(0));
+    let rev = base["revision"].as_u64().unwrap_or_default();
+    let old = redigest(at_revision(&base, rev));
+    // the newer revision drops the last task of the sprint
+    let mut newer = at_revision(&base, rev + 1);
+    let dropped = newer["tasks"]
+        .as_array_mut()
+        .and_then(Vec::pop)
+        .unwrap_or(Value::Null);
+    let dropped_id = dropped["task_id"].as_str().unwrap_or_default().to_string();
+    let newer = redigest(newer);
+    let mut reg = registry("POC-01");
+    assert!(reg.add_spec_with_mode(&old, CheckMode::Executable));
+    assert!(reg.add_spec_with_mode(&newer, CheckMode::Executable));
+    assert_eq!(reg.latest_revision("POC-01"), Some(rev + 1));
+
+    // identical re-submission of the old revision: 200 historical result, marked superseded
+    for mode in [CheckMode::Draft, CheckMode::Executable] {
+        let out = check_registration(&old, &reg, mode);
+        assert_eq!(out.http_status(), 200);
+        assert_eq!(out.state, ieo_spec::CheckState::Superseded);
+        assert_eq!(out.superseded_by, Some(rev + 1));
+        assert!(out.rejections.is_empty());
+    }
+    // and recording it again changes nothing: still rev+1 active, dropped task stays gone
+    assert!(!reg.add_spec_with_mode(&old, CheckMode::Executable));
+    assert_eq!(reg.latest_revision("POC-01"), Some(rev + 1));
+    let mut probe = sprint(1);
+    if let Some(a) = probe["tasks"][0]["prerequisites"].as_array_mut() {
+        a.push(
+            json!({"task_id": dropped_id, "plan_version": "v1.3.3", "required_state": "accepted"}),
+        );
+    }
+    let out = check_registration(&redigest(probe), &reg, CheckMode::Draft);
     assert!(
         out.rejections
             .iter()
-            .any(|r| r.code == Code::RevisionConflict)
+            .any(|r| r.code == Code::UndefinedPrerequisite),
+        "task dropped by the active revision must not resolve: {:?}",
+        out.rejections
     );
+    // the current revision itself is still a plain idempotent 200
+    let cur = check_registration(&newer, &reg, CheckMode::Executable);
+    assert_eq!(cur.state, ieo_spec::CheckState::AlreadyRegistered);
+    assert_eq!(cur.superseded_by, None);
 }
 
 #[test]
@@ -356,5 +451,31 @@ fn ready_with_unresolved_bindings_is_format_error() {
         out.rejections
             .iter()
             .any(|r| r.code == Code::SchemaViolation && r.field == "unresolved_bindings")
+    );
+}
+
+#[test]
+fn registry_never_overwrites_a_revision_or_narrows_its_mode() {
+    let s = redigest(bound_ready(sprint(0)));
+    let mut reg = registry("POC-01");
+    assert!(reg.add_spec_with_mode(&s, CheckMode::Executable));
+    // re-recording the same content as draft keeps the executable mode
+    assert!(reg.add_spec(&s));
+    assert_eq!(
+        check_registration(&s, &reg, CheckMode::Executable).state,
+        ieo_spec::CheckState::AlreadyRegistered
+    );
+    // same revision, different content: refused, stored digest unchanged
+    let mut other = s.clone();
+    other["title"] = json!("same revision, different content");
+    let other = redigest(other);
+    assert!(!reg.add_spec_with_mode(&other, CheckMode::Executable));
+    assert_eq!(
+        check_registration(&s, &reg, CheckMode::Executable).http_status(),
+        200
+    );
+    assert_eq!(
+        check_registration(&other, &reg, CheckMode::Draft).http_status(),
+        409
     );
 }

@@ -1,0 +1,13 @@
+diff --git a/crates/ieo-report/src/lib.rs b/crates/ieo-report/src/lib.rs
+index 2404cbc..6217cf0 100644
+--- a/crates/ieo-report/src/lib.rs
++++ b/crates/ieo-report/src/lib.rs
+@@ -426,7 +426,7 @@ pub fn authorize_claim(
+         Some((a, false)) => Ok(ClaimDisposition::PreservedLate {
+             assignment_id: a.assignment_id.clone(),
+             generation: a.generation,
+-            target_sha: a.target_sha.clone(),
++            target_sha: String::from("x"),
+         }),
+         None => Err(Denied::StaleAssignment),
+     }

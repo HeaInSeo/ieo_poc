@@ -1,0 +1,13 @@
+diff --git a/crates/ieo-report/src/lib.rs b/crates/ieo-report/src/lib.rs
+index 2404cbc..92681e9 100644
+--- a/crates/ieo-report/src/lib.rs
++++ b/crates/ieo-report/src/lib.rs
+@@ -374,7 +374,7 @@ impl ClaimDisposition {
+     }
+     /// Whether this claim may be an input to the current judgment.
+     pub fn counts_for_current_judgment(&self) -> bool {
+-        matches!(self, ClaimDisposition::Current { .. })
++        !matches!(self, ClaimDisposition::Replay)
+     }
+ }
+ 

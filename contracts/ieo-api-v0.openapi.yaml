@@ -1,10 +1,12 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.4.0
+  version: 0.5.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
+    0.5.0 (L08, not backward compatible with 0.4.0 clients): RegistrationResult state SUPERSEDED + superseded_by,
+    codes REVISION_SUPERSEDED and ASSIGNMENT_SHA_MISMATCH, required ClaimReceipt disposition fields.
     - Registration acceptance is intake for semantic review, not execution intake or completion.
     - Every non-2xx response leaves server state unchanged (0 state transitions, 0 events).
     - `coordinator_to_client` data is `verified`; agent submissions are stored as `claim` only.
@@ -33,6 +35,14 @@ paths:
         → 409 `IDEMPOTENCY_KEY_CONFLICT` (a draft registration is never replayed as executable intake).
         Without an idempotent replay, a revision already stored in draft mode and now submitted with
         `mode=executable` goes through the binding check again (01-07 rule).
+        Only the latest registered revision of a sprint is active (01-07 rev 3). After a newer revision
+        exists, a new registration of an older revision (any mode) and an executable promotion of an
+        older revision stored as draft → 409 `REVISION_SUPERSEDED`. An identical re-submission of an older
+        revision in a mode it already covers → 200 `SUPERSEDED` with `superseded_by`: a historical lookup
+        of the stored result that changes no state and never reactivates the old revision. An
+        An Idempotency-Key replay returns the stored request's result re-evaluated against the current
+        registry: if a newer revision is now active, `state=SUPERSEDED` with `superseded_by` (never the
+        original ACCEPTED/ALREADY_REGISTERED), and no state changes.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - name: mode
@@ -51,7 +61,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RegistrationResult' }
         '200':
-          description: Same sprint_id/revision/digest (or same Idempotency-Key + body) already registered.
+          description: Same sprint_id/revision/digest (or same Idempotency-Key + body) already registered. `state=SUPERSEDED` when a newer revision is active (historical lookup, no state change).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RegistrationResult' }
@@ -192,9 +202,19 @@ paths:
         `actor.role` equal to the credential's role, and `report_type` allowed for that role
         (development → development_progress, guardrail → guardrail_review).
         `verified`, `coordinator_verdict` and `decision_request` from an agent credential → 403, state unchanged.
-        `assignment_id` and `generation` must equal the coordinator's current assignment for that
-        (repo, role); otherwise 409 `STALE_ASSIGNMENT`, state unchanged (§1.9 old-generation results).
-        `(event_id, event_revision)` is the idempotency key: same content → 200, different content → 409.
+        `(event_id, event_revision)`, scoped to the credential's (repo_id, role), is the idempotency key and
+        is checked first: same content → 200 with the stored receipt (a re-query; no state change even if the
+        assignment has moved on; `counts_for_current_judgment` is re-evaluated at response time and is false
+        once that assignment/generation is no longer current), different content → 409 `EVENT_CONTENT_CONFLICT`.
+        IDs of other (repo, role) scopes are never consulted, so their existence is not revealed.
+        If the body carries `body.target_sha`, it must equal the SHA the coordinator recorded for the named
+        assignment (current or earlier), else 409 `ASSIGNMENT_SHA_MISMATCH`; a claim never carries two SHAs.
+        A new claim whose `assignment_id`/`generation` is the coordinator's current assignment for that
+        (repo, role) → 202 `disposition=current`. A new claim for an assignment/generation the coordinator
+        legitimately issued earlier to the same (repo, role) → 202 `disposition=preserved_late`: stored
+        attributed to that assignment and the SHA recorded for it in the coordinator DB, excluded from the
+        current judgment, and the old assignment is not reactivated (§1.9). A claim naming an assignment
+        never issued to this (repo, role) → 409 `STALE_ASSIGNMENT`, state unchanged.
         A stored claim is never a completion verdict.
       requestBody:
         required: true
@@ -224,7 +244,10 @@ paths:
       summary: Guardrail asks the coordinator to run a reproduction on an isolated runner
       description: |
         Required scope `agent:repro` bound to (repo_id, role=guardrail). Development credentials → 403.
-        `assignment_id`/`generation` must be current, else 409 `STALE_ASSIGNMENT`.
+        `request_id` is checked first: an identical re-submission → 200 with the stored status (a re-query;
+        never re-queued, even after the assignment moved on); different content → 409 `EVENT_CONTENT_CONFLICT`.
+        A new request must name the current `assignment_id`/`generation` and that assignment's `target_sha`
+        (from the coordinator DB), else 409 `STALE_ASSIGNMENT`: a new stale request would start new work.
         The coordinator runs the bundle on a coordinator-owned, credential-less, single-use runner at
         `target_sha` (network blocked by default, time/resource caps) and returns raw logs to the
         Guardrail input location (01-02 contract §2.1). `request_id` is the idempotency key.
@@ -329,10 +352,10 @@ components:
         code:
           type: string
           enum: [MISSING_FIELD, SCHEMA_VIOLATION, DIGEST_MISMATCH, DUPLICATE_TASK_ID, UNDEFINED_PREREQUISITE,
-                 DEPENDENCY_CYCLE, UNKNOWN_PROFILE_ITEM, UNBOUND_DRAFT, REVISION_CONFLICT, TASK_ID_CONFLICT,
+                 DEPENDENCY_CYCLE, UNKNOWN_PROFILE_ITEM, UNBOUND_DRAFT, REVISION_CONFLICT, REVISION_SUPERSEDED, TASK_ID_CONFLICT,
                  UNRESOLVED_PREREQUISITE, DUPLICATE_TASK_NAME, ESTIMATE_RANGE_REVERSED,
                  IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR,
-                 STALE_ASSIGNMENT]
+                 STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }
@@ -355,7 +378,11 @@ components:
         sprint_id: { type: string }
         revision: { type: integer, minimum: 1 }
         digest: { type: string, pattern: '^[a-f0-9]{64}$' }
-        state: { type: string, enum: [ACCEPTED_FOR_SEMANTIC_REVIEW, ALREADY_REGISTERED] }
+        state: { type: string, enum: [ACCEPTED_FOR_SEMANTIC_REVIEW, ALREADY_REGISTERED, SUPERSEDED] }
+        superseded_by:
+          description: Latest registered revision when this revision is no longer active.
+          type: integer
+          minimum: 2
     ConversionResult:
       type: object
       additionalProperties: false
@@ -376,12 +403,24 @@ components:
     ClaimReceipt:
       type: object
       additionalProperties: false
-      required: [event_id, event_revision, stored_at, evidence_level]
+      required: [event_id, event_revision, stored_at, evidence_level, disposition, assignment_id, generation, attributed_target_sha, counts_for_current_judgment]
       properties:
         event_id: { type: string }
         event_revision: { type: integer, minimum: 1 }
         stored_at: { type: string, format: date-time }
         evidence_level: { const: claim }
+        disposition:
+          description: current = may feed the current judgment; preserved_late = kept for its original assignment/SHA only.
+          type: string
+          enum: [current, preserved_late]
+        assignment_id: { type: string }
+        generation: { type: integer, minimum: 0 }
+        attributed_target_sha:
+          description: SHA recorded for that assignment in the coordinator DB (never taken from the claim body).
+          type: string
+        counts_for_current_judgment:
+          description: Evaluated at response time (a replay after the assignment moved on returns false).
+          type: boolean
     ReproRequest:
       type: object
       additionalProperties: false

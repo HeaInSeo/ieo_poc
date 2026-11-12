@@ -1,0 +1,13 @@
+diff --git a/crates/ieo-spec/src/check.rs b/crates/ieo-spec/src/check.rs
+index cc52426..ff6712d 100644
+--- a/crates/ieo-spec/src/check.rs
++++ b/crates/ieo-spec/src/check.rs
+@@ -254,7 +254,7 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
+                 format!("{sprint_id} revision {revision}은(는) 다른 내용으로 이미 등록됐습니다."),
+                 "기존 revision을 바꾸지 말고 revision을 올려 새로 제출하세요.",
+             ));
+-        } else if let Some(latest) = superseded_by {
++        } else if let Some(latest) = superseded_by.filter(|_| false) {
+             // same content stored in a weaker mode: this would be a promotion of an old revision
+             rej.push(Rejection::new(
+                 Code::RevisionSuperseded,

@@ -1,0 +1,13 @@
+diff --git a/crates/ieo-spec/src/check.rs b/crates/ieo-spec/src/check.rs
+index cc52426..091be3d 100644
+--- a/crates/ieo-spec/src/check.rs
++++ b/crates/ieo-spec/src/check.rs
+@@ -237,7 +237,7 @@ pub fn check_registration(spec: &Value, registry: &Registry, mode: CheckMode) ->
+         let covers = *stored_mode == CheckMode::Executable || mode == CheckMode::Draft;
+         if *existing == digest && rej.is_empty() && covers {
+             return CheckOutcome {
+-                state: if superseded_by.is_some() {
++                state: if false {
+                     CheckState::Superseded
+                 } else {
+                     CheckState::AlreadyRegistered

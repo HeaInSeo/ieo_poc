@@ -1,0 +1,12 @@
+diff --git a/crates/ieo-report/src/lib.rs b/crates/ieo-report/src/lib.rs
+index 2404cbc..27ab698 100644
+--- a/crates/ieo-report/src/lib.rs
++++ b/crates/ieo-report/src/lib.rs
+@@ -405,6 +405,7 @@ pub fn authorize_claim(
+     }
+     // Same-ID replay is answered from storage before the assignment check, so a
+     // retry after the assignment moved on is a re-query, not a new stale claim.
++    if book.lookup(r).is_none() { return Err(Denied::StaleAssignment); }
+     if let Some(s) = stored {
+         return if s == r {
+             Ok(ClaimDisposition::Replay)
