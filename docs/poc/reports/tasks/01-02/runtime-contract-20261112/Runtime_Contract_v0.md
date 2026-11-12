@@ -1,7 +1,7 @@
 # 01-02 · 에이전트 런타임·역할·인증·재개 계약 v0
 
 2026-11-12 KST · 계획 v1.3.3 · 이전 회차 [runtime-comparison-20261112](../runtime-comparison-20261112/REPORT.md)(후보 비교)를 이어받는 회차.
-문서 revision 5(2026-11-12, [개정 v1.3.3-A1](../../../../Amendment_v1.3.3-A1.md)): 사용자 결정 D1·D2로 §3 자격 방식, §8 판정표, §9 미확정 목록만 바꿨다. 다른 조항은 revision 4(PR #2 병합 커밋 76ffd03에서 검수 완료)와 같다. revision 4: 독립 검토 7a39452(reject) F1~F9, bf854bb(reject) N1~N7, 2e5a5ef(reject) R1~R4 반영. 이 문서는 **설계 계약**이다. “근거”는 설치 버전 도움말/상태 출력에 옵션·문구가 **존재**함을 뜻하며, 동작은 01-04 probe 전까지 미확인이다.
+문서 **revision 6**(2026-11-12): 01-04 실측(검수 완료, PR #12·#14)과 사용자 결정([01-04 결정](../../../../User_Decisions_2026-11-12_0104.md))을 §10 표의 6개 항목으로 반영했다. 바꾼 곳은 §2.1·§4.1·§4.2·§5·§7·§8과 새 §10이고, 다른 조항은 revision 5와 같다. revision 5(2026-11-12, [개정 v1.3.3-A1](../../../../Amendment_v1.3.3-A1.md)): 사용자 결정 D1·D2로 §3 자격 방식, §8 판정표, §9 미확정 목록만 바꿨다. 다른 조항은 revision 4(PR #2 병합 커밋 76ffd03에서 검수 완료)와 같다. revision 4: 독립 검토 7a39452(reject) F1~F9, bf854bb(reject) N1~N7, 2e5a5ef(reject) R1~R4 반영. 이 문서는 **설계 계약**이다. “근거”는 설치 버전 도움말/상태 출력에 옵션·문구가 **존재**함을 뜻하며, 동작은 01-04 probe 전까지 미확인이다.
 
 ## 1. 선택과 적용 범위
 
@@ -35,7 +35,7 @@ U3의 “Pod당 컨테이너 하나”와 S3의 PSA Restricted(추가 capability
 
 - **Guardrail 컨테이너에서는 검토 대상(개발이 작성한) 코드·테스트·빌드 스크립트·hook을 실행하지 않는다**(검토 N1). Guardrail 컨테이너에서 실행되는 코드는 런타임·supervisor·Guardrail 모델의 도구 호출뿐이다.
 - **Guardrail의 독립 재현·재실행은 격리 실행 경로로 한다**(검토 R1, P07의 “정상 CI에 드러나지 않는 고정 반례 재현”, P20/P24의 독립 재실행, P22의 역할별 쓰기 가능한 빌드/시험 공간): Guardrail은 자기 쓰기 공간 `/state/guardrail-scratch/`에 반례 입력·시험 파일·명령을 작성하고 **재현 요청**(claim: 대상 SHA, 패치/파일 묶음 digest, 명령, 기대값)을 코디네이터에 제출한다. 코디네이터는 **자격·Secret이 없는 일회성 격리 실행기**(코디네이터 소유, 대상 SHA 체크아웃+요청 묶음, 네트워크 기본 차단, 시간/자원 상한)에서 실행하고 원본 로그·종료 코드·실행기 이미지 digest를 Guardrail 입력 위치로 돌려준다. 필수 검사 결과는 CI/코디네이터 실행기가 보호된 경로로 발행한 것을 고정 SHA 기준으로 받는다(§1.2 “완료와 필수 검사”). 이 경로의 API는 01-08 계약에 추가하고, 실행기 구현은 02-06, 실제 검증은 P07(04-07)에서 한다.
-- 개발 컨테이너는 개발 코드를 실행한다. 그 안의 자격(개발 모델 자격, 개발 claim 자격, push 자격)은 개발 코드에 노출된다고 보고 **그 범위가 개발 역할의 권한과 같도록** 둔다. 개발 컨테이너에서 Claude 권한 규칙은 보안 경계가 아니다. 경계는 컨테이너·자격 범위·코디네이터 판정이다.
+- 개발 컨테이너는 개발 코드를 실행한다. 그 안의 자격(개발 모델 자격, 개발 claim 자격, push 자격)은 개발 코드에 노출된다고 보고 **그 범위가 개발 역할의 권한과 같도록** 둔다. 개발 컨테이너에서 Claude 권한 규칙은 보안 경계가 아니다. 경계는 컨테이너·자격 범위·코디네이터 판정이다. 01-04에서 실측으로 확인했다(§10 항목 6): `Bash(sleep:*)`만 허용했는데도 읽기 전용 복합 명령(`while pgrep …; echo done`)이 거부 없이 실행됐다. 그러므로 Bash 허용 목록을 판정·격리 근거로 쓰지 않는다.
 - **push 시점 제한(§1.9, 검토 R2)**: push 자격은 코디네이터가 배정 단계가 `개발` 또는 반려 뒤 `교정`일 때만 발급하는 **단기 GitHub App 설치 토큰**(대상 repo 하나, contents/pull_requests 쓰기, 만료 ≤ 1시간)이며 `REVIEW_PENDING` 진입 시 폐기한다. 토큰은 브랜치를 한정하지 못하므로 main은 보호 설정(PR 필수·필수 체크·관리자 포함)으로 막고, 그 밖의 브랜치는 **탐지**로 다룬다: 코디네이터가 단계 밖 head 변경을 관측하면 정책 위반을 기록하고 검토 배정을 무효화·재배정하며, 병합은 승인 head SHA 서버 측 조건부 병합으로만 한다. 이 방식의 실제 거부·탐지는 05-03/P07에서 검증한다.
 - 개발과 Guardrail은 **직접 통신하지 않는다**(§1.2). 서로의 네트워크 주소·자격·볼륨을 받지 않으며 Guardrail 입력은 승인 명세·프로파일·GitHub 고정 SHA·보호된 검사 결과뿐이다.
 - **판정·체크포인트의 정본은 코디네이터 DB와 외부 상태(GitHub SHA·CI)**다. supervisor는 체크포인트 digest·순번을 코디네이터에 보고하고, 재개 시 코디네이터 기록·외부 상태와 다르면 `external_reconciliation_required=true`로 멈춘다. 개발 컨테이너의 체크포인트는 개발 코드가 바꿀 수 있으므로(검토 N5) 무결성을 보장하지 않으며, 재개 판단은 GitHub의 브랜치/SHA·CI 기록과의 대조로 한다.
@@ -71,7 +71,7 @@ U3의 “Pod당 컨테이너 하나”와 S3의 PSA Restricted(추가 capability
 
 | 역할 | repo CLAUDE.md | repo `.claude/`·hook·플러그인·`.mcp.json` | 도구 | 설정 출처 |
 | --- | --- | --- | --- | --- |
-| 개발 | 허용. 작업 브랜치의 미병합 수정도 읽히며 이는 개발 자신의 작업 메모다. 승인된 누적 지식은 main에 병합된 CLAUDE.md다(검토 N7) | 적용 금지 | 쓰기·Bash 포함(컨테이너 안). 권한 규칙은 보안 경계 아님(§2.1) | `/etc/ieo/role/` RO |
+| 개발 | 허용하지만 `--setting-sources user`에서는 **자동 로드되지 않는다**(01-04 G2, §10 항목 2). 공급 방식(예: supervisor가 main에 병합된 CLAUDE.md를 `--append-system-prompt-file`로 공급)은 02-04 전에 정한다. 승인된 누적 지식은 main에 병합된 CLAUDE.md다(검토 N7) | 적용 금지 | 쓰기·Bash 포함(컨테이너 안). 권한 규칙은 보안 경계 아님(§2.1) | `/etc/ieo/role/` RO |
 | Guardrail | **적용 금지**. 검토 대상으로 읽기만 | **적용 금지** | Read·Grep·Glob(입력 경로 한정) + Write·Edit(`/state/guardrail-scratch/**`만). Bash·네트워크 게시 없음. 검토 대상 실행 금지, 재현은 격리 실행 요청(§2.1) | `/etc/ieo/role/` RO |
 
 고정 인자 집합. 근거는 [claude-help.txt](evidence/claude-help.txt) 옵션 존재이며 각 인자가 규칙을 달성하는지는 §8 probe G로 확인한다:
@@ -84,9 +84,14 @@ U3의 “Pod당 컨테이너 하나”와 S3의 PSA Restricted(추가 capability
          --strict-mcp-config --mcp-config /etc/ieo/role/mcp.json
          --agents /etc/ieo/role/agents.json
          --allowedTools <역할 허용 목록> --disallowedTools <역할 거부 목록>
+         (경로 규칙은 `//절대경로` 형식. 파일 쓰기 허용은 `Edit(//path/**)`로 쓴다. `Write(...)` 표기는 쓰지 않는다 — §10 항목 1)
+         /etc/ieo/role/settings.json 에 {"autoMemoryEnabled": false} 포함(§10 항목 3)
 개발   cwd=/state/work/<repo>
 Guardrail cwd=/state/guardrail-cwd(빈 디렉터리), --disable-slash-commands,
          --tools "Read,Grep,Glob,Write,Edit" (--add-dir는 쓰지 않음)
+         허용 규칙: Read(//state/review/**) Read(//state/inputs/**) Read(//state/guardrail-scratch/**)
+                    Edit(//state/guardrail-scratch/**)
+         거부 규칙: Read(//run/ieo/**) Read(//etc/ieo/**) Read(//state/claude/**) Read(//state/home/**) Read(//proc/**) Bash
          읽기 허용: /state/review/<sha>/** (코드 스냅샷, RO)
                     /state/inputs/<assignment_id>/** (승인 명세·프로파일·보호된 검사 결과·재현 결과 원본, RO)
                     /state/guardrail-scratch/**
@@ -95,7 +100,7 @@ Guardrail cwd=/state/guardrail-cwd(빈 디렉터리), --disable-slash-commands,
 ```
 
 - **--add-dir를 Guardrail에 쓰지 않는다**(검토 N2): 도움말이 `--add-dir`를 CLAUDE.md 출처로 적는다. 검토 대상은 cwd 밖 읽기 전용 스냅샷으로 두고 경로 한정 Read/Grep/Glob 허용 규칙으로 읽게 한다. probe G가 그 스냅샷의 표식 CLAUDE.md가 로드되는지 확인한다. 로드되면 대안은 supervisor가 만든 검토 묶음(지시 파일 이름을 `*.reviewed`로 바꾼 사본+`review.patch`)이며, 그것도 실패하면 01-04 중단·결정 요청이다.
-- **`CLAUDE_CONFIG_DIR` 보호**(검토 N3·R3): 자격은 §3대로 `/run/ieo/cred/`에서만 오며 `CLAUDE_CONFIG_DIR`에 자격 파일을 두지 않는다(기동 전 발견 시 삭제하고 기록). supervisor는 매 기동 전에 `CLAUDE_CONFIG_DIR` 아래에서 `--resume`에 필요한 세션 기록만 **제외한 전부**(settings, CLAUDE.md, agents, skills, commands, plugins 등)를 지우고 RO 템플릿으로 다시 만든 뒤 digest를 체크포인트에 남긴다. 실행 중 변조는 Guardrail은 쓰기 도구가 없어 불가하고, 개발은 가능하지만 개발 역할 범위 안의 영향이다(§2.1). 세션 기록 경로 안의 자동 기억(auto-memory) 같은 지시성 파일은 보존 대상이 아니다: 누적 지식은 repo 파일(PR·독립 검토)로만 남긴다(§1.2, Guardrail은 repo 검토 지식만). “user 출처 = `CLAUDE_CONFIG_DIR/settings.json`”, 재개에 필요한 경로 목록, 자동 기억의 위치·비활성 방법은 도움말에 없는 **가정**이며 probe G에서 확인한다(검토 N6·R3).
+- **`CLAUDE_CONFIG_DIR` 보호**(검토 N3·R3): 자격은 §3대로 `/run/ieo/cred/`에서만 오며 `CLAUDE_CONFIG_DIR`에 자격 파일을 두지 않는다(기동 전 발견 시 삭제하고 기록). supervisor는 매 기동 전에 `CLAUDE_CONFIG_DIR` 아래에서 `--resume`에 필요한 세션 기록(`projects/<cwd>/*.jsonl`)만 **제외한 전부**(settings, CLAUDE.md, agents, skills, commands, plugins, `projects/*/memory/` 자동 기억 등)를 지우고 RO 템플릿으로 다시 만든 뒤 digest를 체크포인트에 남긴다. 실행 중 변조는 Guardrail은 쓰기 도구가 없어 불가하고, 개발은 가능하지만 개발 역할 범위 안의 영향이다(§2.1). 세션 기록 경로 안의 자동 기억(auto-memory) 같은 지시성 파일은 보존 대상이 아니다: 누적 지식은 repo 파일(PR·독립 검토)로만 남긴다(§1.2, Guardrail은 repo 검토 지식만). “user 출처 = `CLAUDE_CONFIG_DIR/settings.json`”, 재개에 필요한 경로 목록, 자동 기억의 위치·비활성 방법은 도움말에 없는 **가정**이며 probe G에서 확인한다(검토 N6·R3).
 - **경로 한정 읽기/쓰기 규칙**(`Read(<path>)`류)의 문법·효과는 도움말에 `Bash(...)` 예만 있어 **가정**이다(검토 R4). probe G에서 허용·거부 경로를 실제로 시험하고, 효과가 없으면 `--restricted`(작업 디렉터리 한정)·별도 마운트 네임스페이스 등 대안을 비교한다.
 - **비밀 유출 방지**(검토 R4): Guardrail 모델이 지시 주입으로 자기 자격을 검토문에 옮겨도 공개되지 않도록, 코디네이터는 claim을 저장·게시하기 전에 등록된 자격 지문·알려진 토큰 패턴을 검사하고 일치하면 게시를 막고 자격 교체 결정을 요청한다.
 - user 출처를 완전히 끄는 방법(빈 출처 목록, `--safe-mode`와 `--agents` 동시 사용, `--bare`+`apiKeyHelper`)은 probe G에서 비교해 가장 좁은 것을 채택한다.
@@ -107,8 +112,8 @@ Guardrail cwd=/state/guardrail-cwd(빈 디렉터리), --disable-slash-commands,
 | --- | --- | --- |
 | 무인 기동 | `-p`, `--output-format stream-json`, `--input-format stream-json`, `--permission-mode dontAsk`, `--permission-prompts none`(“anything that would prompt is denied automatically”) | 허용/거부 실제 적용, 프롬프트 대기 0건 |
 | session ID 사전 지정 | `--session-id <uuid>` | 결과 사건의 session_id가 발급 UUID와 같은지 |
-| 논리 이름 | `-n/--name`(표시 이름) | **재개 키로 쓰지 않는다**(유일성 근거 없음) |
-| 재개 | `-r/--resume <session-id>`; 복제는 `--fork-session` | 같은 ID로 이어지는지, 실행 중 세션 재개 동작 |
+| 논리 이름 | `-n/--name`(표시 이름) | **재개 키로 쓰지 않는다**(유일성 근거 없음). 01-04 N3: `--resume <이름>`은 동작했지만 계약을 바꾸지 않는다(§10 항목 5) |
+| 재개 | `-r/--resume <session-id>`; 복제는 `--fork-session` | 01-04 N2·L2·R: 지원. N4: 실행 중인 세션을 다른 프로세스가 재개해도 CLI는 막지 않고 기록이 분기된다. supervisor가 세션당 단일 실행을 보장한다(§5·§7, §10 항목 4) |
 | 기록 위치 | `CLAUDE_CONFIG_DIR`(실행 파일 문자열·`auth status`의 configDirectory) | 역할 볼륨 아래에만 기록, 재생성 후 복원 |
 | 압축 | `--autocompact <auto|tokens>` | 압축 사건 감지 가능 여부 |
 | 구조화 결과 | `--output-format json|stream-json`, `--json-schema` | 결과 사건의 session_id·usage·비용 필드 실제 존재 |
@@ -128,6 +133,8 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
 2. 재기동 시 `reconnect`: 체크포인트의 session_id로 `--resume`, 현재 배정 세대·코디네이터 기록 digest와 대조. 세대가 낡으면 `STALE_GENERATION`, digest가 다르면 외부 대조 필요로 중단.
 3. repo 기록(승인된 명세·코드)이 세션 기억과 다르면 repo 기록이 우선이다(1.2절).
 4. 재개 실패/관측 불가는 `NOT_OBSERVED`로 보고하고 새 세션을 조용히 대체하지 않는다.
+5. **세션당 단일 실행**(revision 6, §10 항목 4): supervisor는 같은 session_id로 실행 중인 프로세스가 있으면 `--resume`을 시작하지 않는다(잠금은 역할 볼륨 안 supervisor 소유 파일). 실행 중 재개 요청은 `status`로 응답한다.
+6. **변조 의심 세션**(revision 6, §10 항목 3): 기동 전 정리는 다음 기동의 설정 적용을 막지만, 이미 세션 기록에 들어간 내용은 재개하면 맥락으로 남는다(01-04 G3b). `CLAUDE_CONFIG_DIR` 변조가 탐지된 세션은 재개하지 않고 새 세션으로 시작하며, 그 사실을 체크포인트와 코디네이터에 보고한다.
 
 ## 6. 자식 에이전트 경계
 
@@ -143,7 +150,7 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
 | 동작 | supervisor 구현 |
 | --- | --- |
 | start | §4.1 고정 인자, `CLAUDE_CONFIG_DIR`/HOME=역할 볼륨, §4.3 환경. `capability_gaps`에 01-04 미확인 항목을 그대로 보고 |
-| reconnect | `--resume <session_id>`; `restored_checkpoint_ref`·`external_reconciliation_required` 반환 |
+| reconnect | `--resume <session_id>`; `restored_checkpoint_ref`·`external_reconciliation_required` 반환. 같은 session_id가 실행 중이면 재개하지 않는다(§5-5) |
 | stop (role 범위) | 체크포인트 기한 내 SIGTERM→관측→필요 시 SIGKILL. 자기 Pod 프로세스만 |
 | stop (repo 범위) | 코디네이터가 두 supervisor에 **각각** role 범위 stop을 보낸다. supervisor는 상대 역할을 멈추지 않으며, 각 역할의 안전 종료 조건(미확인 외부 효과·활성 자식·미저장 체크포인트 0)을 따로 보고한다 |
 | status | 프로세스 생존·마지막 체크포인트·session_id·`quota_group_id`·`provider_status_or_unknown`(관측 불가면 unknown)·`last_actual_action_at` |
@@ -176,10 +183,28 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
    | 3 공급자 한도 구조 | 공유 확인 → 공유 quota group의 **지원 구성으로 기록하고 진행** · 분리 확인 → 진행 · 관측 불가 → **중단** |
 
    예산 소진으로 판정하지 못한 행은 관측 불가(2는 미확인)로 기록한다. 중단이면 원본 로그·영향·대안·재개 결정을 보고하고 다음 probe/작업을 진행하지 않는다. 공유 확인을 한도 분리 성공으로 쓰지 않는다. 공유 구성에서는 한 역할의 한도 도달이 같은 group의 다른 역할·repo에 영향을 준다는 전제로 운영하며(§7, P05-Q), 그 실제 영향은 04-15에서 측정한다.
-5. 이후: **G. 설정 신뢰·실행 범위**(검토 스냅샷에 표식 CLAUDE.md·settings·hook·`.mcp.json`·skill을 두고 Guardrail 고정 인자로 실행해 적용 0건, Guardrail의 Bash·scratch 밖 쓰기·검토 대상 실행·`/run/ieo`·`/proc` 읽기 시도 거부, 재현 요청이 격리 실행기(자격 0)에서 돌고 원본 로그가 돌아오는지, 개발 쪽 repo hook/settings 적용 0건, `CLAUDE_CONFIG_DIR` 아래 settings·CLAUDE.md·agents·skills 변조가 다음 기동에 반영되지 않음, 재개에 필요한 경로 목록 확인), 무인 허용/거부, 이름↔세션 재개, 기록 위치·압축 감지, 세션/자식별 토큰, 런타임 갱신 전후 재개.
+5. 이후: **G. 설정 신뢰·실행 범위**, 무인 허용/거부, 이름↔세션 재개, 기록 위치·압축 감지, 세션/자식별 토큰, 런타임 갱신 전후 재개 — **01-04에서 실행·검수 완료**([결과](../../01-04/remaining-probes-20261112/REPORT.md)). 계약에 반영할 결과는 §10이다. 재현 요청의 격리 실행기는 02-06 구현, P07 검증 범위로 남는다.
 
 ## 9. 미확정(이 계약이 정하지 않는 것)
 
 - 역할별 자격의 실제 획득(A로 결정됨, revision 5) — 사용자가 01-04 첫 probe 전에 두 역할 토큰을 발급해 비밀 값이 기록되지 않는 경로로 넘긴다.
 - 역할별 허용/거부 도구 목록의 구체값 — 03-02 정책 문서에서 확정, 01-04 probe는 최소 목록으로 시험.
 - 역할별 상시 유지/idle 정지(P34 뒤 결정).
+
+## 10. 01-04 실측 반영 (revision 6)
+
+근거:
+- 01-04 결과 [첫 세 probe](../../01-04/first-probes-20261112/REPORT.md)·[나머지 범위](../../01-04/remaining-probes-20261112/REPORT.md) §1과 [ADDENDUM](../../01-04/remaining-probes-20261112/ADDENDUM.md)
+- 사용자 결정 [01-04](../../../../User_Decisions_2026-11-12_0104.md)
+
+이 개정은 문서 개정이다. 01-04 실험을 다시 하지 않는다. 각 항목은 해당 동작을 쓰는 구현 작업이 **착수하기 전에** 이 revision이 검수 완료여야 한다.
+
+| # | 항목 | 근거(원본) | 적용 위치 | 완료 조건 |
+| --- | --- | --- | --- | --- |
+| 1 | 파일 쓰기 경로 허용은 `Edit(//절대경로/**)`로 쓰고 `Write(...)` 표기는 쓰지 않는다. 모든 경로 규칙은 `//` 절대형이다 | U 시도 01(`Write(//…)`: 허용 대상까지 거부), U-alt 시도 02·04(`Edit(//…)`: 기대대로 2회). G1(Guardrail scratch 쓰기는 `Edit(//…)`로 성공). 사용자 결정 “Edit 형식 채택” | §4.1 고정 인자(공통·Guardrail 블록) | 이 revision 검수 완료. 03-02 정책 문서가 같은 표기를 쓴다. 02-04 supervisor의 인자 생성 시험이 `Edit(//…)`를 출력하고 `Write(`를 출력하지 않는다 |
+| 2 | 개발 역할의 repo CLAUDE.md는 `--setting-sources user`에서 **로드되지 않는다**. “허용”은 자동 적용을 뜻하지 않는다. 필요하면 supervisor가 main에 병합된 CLAUDE.md 내용을 별도 경로로 공급한다(예: `--append-system-prompt-file`). hook·MCP·skill·command·agent 같은 repo 설정은 계속 적용하지 않는다 | G2 시도 06(repo CLAUDE.md 미로드, repo 설정 적용 0) | §4.1 표의 개발 행 | 02-04 착수 전에 공급 방식을 정하거나 “공급하지 않음”을 기록한다. 공급 방식을 쓰면 02-04에서 표식 CLAUDE.md로 로드와 repo hook 미적용을 함께 시험한다 |
+| 3 | `CLAUDE_CONFIG_DIR` 기동 전 정리는 필수다. 남길 것은 `projects/<cwd>/*.jsonl` 세션 기록뿐이고 `projects/*/memory/`는 지운다. 자동 기억은 RO `settings.json`의 `{"autoMemoryEnabled": false}`로 끈다(환경 변수 `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`도 동작하지만 §4.3 허용 목록을 넓히므로 쓰지 않는다). 변조가 탐지된 세션은 재개하지 않는다 | G3a 시도 09(변조가 모두 적용됨), G3b 시도 10(정리 뒤 적용 0, 재개 성공, 이전 지시를 기록으로 인용). AM1·AM2 시도 26·27(`memory_paths` 소멸). 첫 G3 쌍 무효의 원인(SELinux 라벨) | §4.1 `CLAUDE_CONFIG_DIR` 보호·고정 인자, §5-6 | 02-04 supervisor의 정리 시험: 표식 settings·CLAUDE.md·skills·`memory/` 파일을 넣고 정리하면, 기동 init에 표식·`memory_paths`가 없고 세션 재개는 성공한다. 정리는 볼륨의 SELinux 라벨·모드를 바꾸지 않는다 |
+| 4 | CLI는 같은 세션의 동시 실행을 막지 않는다. supervisor가 세션당 단일 실행을 보장한다 | N4 시도 14·15(두 프로세스 모두 성공, 기록 파일 분기 1건) | §4.2 재개 행, §5-5, §7 reconnect | 02-04에서 실행 중 세션에 대한 두 번째 reconnect가 시작되지 않고 `status`로 응답하는 시험 |
+| 5 | 이름(`-n`)은 재개 키가 아니다. `--resume <이름>`이 동작해도 쓰지 않는다 | N3 시도 13 | §4.2 논리 이름 행 | 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) |
+| 6 | 개발 역할의 Bash 허용 목록은 완전한 경계가 아니다. 판정·격리 근거로 쓰지 않는다 | N4a 시도 14(`Bash(sleep:*)`만 허용했으나 `while pgrep …; echo done` 실행), U 시도 01(`ls /` 거부) | §2.1 | 03-02 정책 문서와 P07 위협 모형이 개발 Bash 규칙을 경계로 세지 않는다 |
+

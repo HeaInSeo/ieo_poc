@@ -1,0 +1,48 @@
+[01 SYN development] rc=0 sid=None err=None leak=[] marker=False denials=0 rl=[]
+PASS exit0_no_result_marked_unjudgeable
+PASS exit0_no_result_stops
+[02 SYN development] rc=137 sid=None err=None leak=[] marker=False denials=0 rl=[]
+PASS intended_no_result_is_judgeable
+PASS intended_no_result_does_not_stop
+[03 SYN development] rc=0 sid=s err=False leak=[] marker=False denials=0 rl=[]
+PASS result_present_judgeable
+PASS result_present_no_stop
+PASS probe_py_round_without_result_stops
+PASS probe_py_round_with_result_passes
+PASS empty_output_unobservable
+PASS unrelated_output_unobservable
+PASS recorded_2a_observed
+PASS recorded_2a-host_observed
+PASS recorded_2b-development->guardrail_observed
+PASS recorded_2p-guardrail-owner_observed
+PASS recorded_2b-guardrail->development_observed
+PASS recorded_2p-development-owner_observed
+PASS recorded_2d-control_observed
+PASS recorded_2d_observed
+PASS recorded_2e-development_observed
+PASS recorded_2e-guardrail_observed
+PASS recorded_E1-dev-push-work_observed
+PASS recorded_E1-dev-push-main_observed
+PASS recorded_E1-gd-read-snapshot_observed
+PASS recorded_E1-gd-write-snapshot_observed
+PASS recorded_E2-coord-insert_observed
+PASS recorded_E2-reader-select_observed
+PASS recorded_E2-reader-insert_observed
+PASS recorded_E2-no-password_observed
+PASS recorded_E2-development-reach_observed
+PASS recorded_E2-guardrail-reach_observed
+PASS recorded_E3-post-new_observed
+PASS recorded_E3-post-replay_observed
+PASS recorded_E3-post-conflict_observed
+PASS recorded_E3-get_observed
+PASS recorded_E3-no-token_observed
+PASS recorded_E3-other-token_observed
+PASS recorded_E1b-dev-push-work_observed
+PASS recorded_E1b-dev-push-main_observed
+PASS recorded_E1b-dev-force-main_observed
+PASS recorded_E1b-dev-delete-main_observed
+PASS recorded_E1b-dev-repo-files_observed
+PASS recorded_E1b-gd-reach_observed
+PASS recorded_E1b-main-unchanged_observed
+recorded no-model tests checked: 33
+RESULT PASS 0

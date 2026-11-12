@@ -198,6 +198,9 @@ def stop_on_signal(metas, label):
         rl = [e.get("rate_limit_info", {}).get("status") for e in x.get("rate_limit_events", [])]
         bad_rl = [s for s in rl if s and s != "allowed"]
         res = x.get("result_event") or {}
+        if not x.get("result_event"):
+            # exit 0 without a result event is not success: unobservable, start no new attempt
+            sys.exit(f"STOP after {label} ({r}): no result event (exit={x.get('exit_code')}) -> unobservable; no new attempt")
         if bad_rl or (res.get("is_error") and res.get("subtype") != "success") or x.get("exit_code") not in (0,):
             sys.exit(f"STOP after {label} ({r}): rate_limit={bad_rl} result={res.get('subtype')} exit={x.get('exit_code')} -> no new attempt; record per Probe_Budget_Rules §4")
 
@@ -229,7 +232,9 @@ def cmd_p2(ev, files_only=False):
     def t(tid, desc, argv, expect_denied=True):
         r = run(argv)
         txt = led.scrub(r.stdout + r.stderr)
-        tests.append({"id": tid, "desc": desc, "argv": json.loads(led.scrub(json.dumps(argv))), "rc": r.returncode, "output": txt[-3000:], "expect": "denied" if expect_denied else "n/a"})
+        found = sorted(set(re.findall(r"\b(?:LIST_OK|LIST_DENIED\w*|READ_OK|READ_DENIED\w*|WRITE_OK|WRITE_DENIED|WRITE_INSIDE\w*|INTRUSION_\w+|TOKEN_(?:ABSENT|PRESENT)|ENV_MATCH|FILE_MATCH)\b", txt)))
+        tests.append({"id": tid, "desc": desc, "argv": json.loads(led.scrub(json.dumps(argv))), "rc": r.returncode, "output": txt[-3000:], "expect": "denied" if expect_denied else "n/a",
+                      "markers": found, "judgement_basis": "markers" if found else "UNOBSERVABLE: no decisive marker (exit code alone is not used)"})
     dev, gd = role_dir("development"), role_dir("guardrail")
     # 2a: guardrail paths do not exist inside the development container
     g = role_dir("guardrail")

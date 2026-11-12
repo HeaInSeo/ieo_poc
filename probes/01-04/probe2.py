@@ -39,6 +39,17 @@ class Ledger2(P.Ledger):
         return P.TOKEN_RE.sub("sk-ant-[MASKED]", text), leaked
 
 
+# Decisive markers for no-model tests: a test is judged only from one of these in its output, never from the exit code
+# alone (harness check 2026-11-12, user instruction item 3). Output without any marker is recorded as unobservable.
+DECISIVE = re.compile(r"\b(LIST_OK|LIST_DENIED\w*|READ_OK|READ_DENIED\w*|WRITE_OK|WRITE_DENIED|INTRUSION_\w+|TOKEN_(?:ABSENT|PRESENT)|ENV_MATCH|FILE_MATCH|"
+                      r"PUSH_\w+|FORCE_MAIN_\w+|DELETE_MAIN_\w+|REPO_\w+|COORD_OK|READER_\w+|NOPW_\w+|REACH_\w+|VISIBLE|ABSENT)\b|^(?:201|200|401|409)$|^HTTP/1\.1 \d{3}|refs/heads/main [0-9a-f]{40}", re.M)
+
+
+def observe(output):
+    found = sorted({m.group(0) for m in DECISIVE.finditer(output)})
+    return {"markers": found, "observed": bool(found)}
+
+
 def sh(cmd, check=False, **kw):
     r = subprocess.run(cmd, capture_output=True, text=True, **kw)
     if check and r.returncode:
@@ -117,6 +128,8 @@ def record(led, n, probe, role, argv, started, ended, rc, out, err, extra=None, 
             "parent_tool_use_events": sum(1 for e in events if e.get("parent_tool_use_id")),
             "system_subtypes": sorted({e.get("subtype") for e in events if e.get("type") == "system"} - {None}),
             "rate_limit_status": [e["rate_limit_info"].get("status") for e in events if e.get("type") == "rate_limit_event"],
+            "result_missing": res is None,
+            "judgeable": res is not None or (extra or {}).get("expected_outcome") == "no_result",
             "budget_after": {"attempts_used": P.MAX_ATTEMPTS - used, "attempts_max": P.MAX_ATTEMPTS, "probe_wall_remaining_s": int(wall_left)},
             **(extra or {})}
     meta["argv"] = json.loads(meta["argv"])
@@ -137,13 +150,16 @@ def stop_signals(meta):
     rl = [s for s in meta["rate_limit_status"] if s and s != "allowed"]
     res = meta.get("result_event") or {}
     txt = str(res.get("result") or "") + " " + " ".join(meta["assistant_text"])
-    if not res and meta.get("exit_code") not in (0,):
-        sys.exit(f"STOP: attempt {meta['attempt']} ended with exit {meta.get('exit_code')} and no result event -> no new attempt (review c20e7e3 P3)")
+    if not res and meta.get("expected_outcome") != "no_result":
+        # exit 0 without a result event is NOT success: the attempt is unobservable and no new attempt starts
+        sys.exit(f"STOP: attempt {meta['attempt']} ended with exit {meta.get('exit_code')} and no result event -> unobservable, no new attempt")
     if rl or (res.get("is_error") and re.search(r"usage limit|rate.?limit|\b40[13]\b|authenticat|billing|credit balance|oauth", txt, re.I)):
         sys.exit(f"STOP SIGNAL in attempt {meta['attempt']}: rate_limit={rl}; see evidence (Probe_Budget_Rules §4)")
 
 
-def attempt(led, probe, role, prompt_key, prompt, args, label=None, background=False, **rk):
+def attempt(led, probe, role, prompt_key, prompt, args, label=None, background=False, expected_outcome="result", **rk):
+    """expected_outcome: "result" (default; a result event is required for any judgement) or "no_result" for an
+    intentional abort test, which is then judged by its own expected outcome instead of stopping the run."""
     n = led.reserve(1, label or f"{probe} {role}")[0]
     pp = prompt_file(role, prompt_key, prompt)
     binary = rk.pop("binary", "/opt/claude/claude")
@@ -157,7 +173,7 @@ def attempt(led, probe, role, prompt_key, prompt, args, label=None, background=F
         out, err = p.communicate(timeout=P.PER_ATTEMPT + 30)
     except subprocess.TimeoutExpired:
         p.kill(); out, err = p.communicate()
-    return record(led, n, probe, role, argv, started, P.now(), p.returncode, out, err)
+    return record(led, n, probe, role, argv, started, P.now(), p.returncode, out, err, {"expected_outcome": expected_outcome})
 
 
 def finish(led, probe, role, bg, extra=None):
@@ -200,8 +216,10 @@ def cmd_e(ev):
 
     def t(tid, desc, argv, expect):
         r = sh(argv)
-        tests.append({"id": tid, "desc": desc, "expect": expect, "argv": argv, "rc": r.returncode, "output": (r.stdout + r.stderr)[-3000:]})
-        print(tid, r.returncode, (r.stdout + r.stderr).strip().splitlines()[-1:] if (r.stdout + r.stderr).strip() else "")
+        o = observe(r.stdout + r.stderr)
+        tests.append({"id": tid, "desc": desc, "expect": expect, "argv": argv, "rc": r.returncode, "output": (r.stdout + r.stderr)[-3000:],
+                      **o, "judgement_basis": "markers" if o["observed"] else "UNOBSERVABLE: no decisive marker (exit code alone is not used)"})
+        print(tid, r.returncode, o["markers"] or "UNOBSERVABLE")
 
     ESECRETS.mkdir(mode=0o700, exist_ok=True)
     for k in ("pg_super", "pg_coord", "pg_reader", "rx_token", "rx_other"):
@@ -343,8 +361,10 @@ def cmd_e1b(ev):
 
     def t(tid, desc, argv, expect):
         r = sh(argv)
-        tests.append({"id": tid, "desc": desc, "expect": expect, "argv": argv, "rc": r.returncode, "output": (r.stdout + r.stderr)[-3000:]})
-        print(tid, r.returncode, (r.stdout + r.stderr).strip().splitlines()[-1:] if (r.stdout + r.stderr).strip() else "")
+        o = observe(r.stdout + r.stderr)
+        tests.append({"id": tid, "desc": desc, "expect": expect, "argv": argv, "rc": r.returncode, "output": (r.stdout + r.stderr)[-3000:],
+                      **o, "judgement_basis": "markers" if o["observed"] else "UNOBSERVABLE: no decisive marker (exit code alone is not used)"})
+        print(tid, r.returncode, o["markers"] or "UNOBSERVABLE")
     forge = ROOT / "forge"
     fnet = "ieo-probe-forge"
     unshare(f"rm -rf {forge}; mkdir -p {forge} && cp -r --no-preserve=all {TESTREPOS}/a.git {forge}/a.git && chmod 0755 {forge}/a.git/hooks/pre-receive "
