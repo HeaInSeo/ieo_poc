@@ -1,0 +1,87 @@
+{
+  "attempt": 9,
+  "probe": "P3",
+  "role": "guardrail",
+  "argv": "[\"podman\", \"run\", \"--rm\", \"--user\", \"20002:20002\", \"--network\", \"slirp4netns\", \"--security-opt\", \"no-new-privileges\", \"--cap-drop\", \"ALL\", \"-v\", \"/opt/rust/ieo_poc_probe/roles/guardrail/state:/state:z\", \"-v\", \"/opt/rust/ieo_poc_probe/roles/guardrail/cred:/run/ieo/cred:ro,z\", \"-v\", \"/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z\", \"-v\", \"/opt/rust/ieo_poc_probe/roles/guardrail/etc:/etc/ieo/role:ro,z\", \"--env\", \"HOME=/state/home\", \"--env\", \"CLAUDE_CONFIG_DIR=/state/claude\", \"--env\", \"LANG=C.UTF-8\", \"--workdir\", \"/state/work\", \"docker.io/library/golang:1.26.9-bookworm\", \"bash\", \"-c\", \"set -u; export CLAUDE_CODE_OAUTH_TOKEN=\\\"$(cat /run/ieo/cred/oauth_token)\\\"; echo \\\"#ENV_NAMES $(env | cut -d= -f1 | sort | tr '\\\\n' ' ')\\\" >&2; echo \\\"#UID $(id -u) GID $(id -g)\\\" >&2; echo \\\"#T_START $(date +%s.%N)\\\" >&2; timeout -k 10 290 /opt/claude/claude -p 'Reply with exactly: ok-guardrail' --output-format stream-json --verbose --session-id 7299c149-2659-4e21-8631-e7fa7075e075 --tools '' --strict-mcp-config --mcp-config /etc/ieo/role/mcp.json --forward-subagent-text --setting-sources user --permission-mode dontAsk ; rc=$?; echo \\\"#T_END $(date +%s.%N)\\\" >&2; exit $rc\"]",
+  "started_at": "2026-11-12T07:06:44.116+00:00",
+  "ended_at": "2026-11-12T07:06:50.184+00:00",
+  "exit_code": 0,
+  "claude_process_interval_epoch": [
+    1794467204.431946,
+    1794467207.788806
+  ],
+  "timeout": false,
+  "token_fingerprint": "da968d393412",
+  "result_event": {
+    "subtype": "success",
+    "is_error": false,
+    "session_id": "7299c149-2659-4e21-8631-e7fa7075e075",
+    "num_turns": 1,
+    "duration_ms": 1877,
+    "usage": {
+      "input_tokens": 2,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 2552,
+      "output_tokens": 9,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 9,
+          "cache_read_input_tokens": 2552,
+          "cache_creation_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "total_cost_usd": 0.00034920000000000003
+  },
+  "rate_limit_events": [
+    {
+      "type": "rate_limit_event",
+      "rate_limit_info": {
+        "status": "allowed",
+        "resetsAt": 1794479400,
+        "rateLimitType": "five_hour",
+        "overageStatus": "rejected",
+        "overageDisabledReason": "out_of_credits",
+        "isUsingOverage": false,
+        "unifiedWindows": {
+          "five_hour": {
+            "utilization": 0.12,
+            "resetsAt": 1794479400,
+            "status": "allowed"
+          },
+          "seven_day": {
+            "utilization": 0.29,
+            "resetsAt": 1794729600,
+            "status": "allowed"
+          }
+        }
+      },
+      "uuid": "718aa7fa-51ca-4c9f-92fb-82dd652f79b3",
+      "session_id": "7299c149-2659-4e21-8631-e7fa7075e075"
+    }
+  ],
+  "tool_use_events": 0,
+  "parent_tool_use_events": 0,
+  "issued_session_id": "7299c149-2659-4e21-8631-e7fa7075e075"
+}

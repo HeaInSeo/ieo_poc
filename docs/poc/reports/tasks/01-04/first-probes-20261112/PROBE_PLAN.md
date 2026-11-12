@@ -51,3 +51,11 @@
 
 - 시도별 원본은 `evidence/attempts/NN-<probe>-<role>/`에 둔다(argv, 환경 변수 이름, 시각, 종료 코드, stdout, stderr). 토큰 값은 어떤 파일에도 쓰지 않는다. 저장 전에 토큰 지문과 `sk-ant-` 접두 패턴을 검사한다.
 - 누적 시도 수와 벽시계는 `evidence/budget.log`에 둔다.
+
+## 5. 실행 후 덧붙인 측정 (기준 불변, 실행 뒤 추가)
+
+- 이 절은 P1~P3 실행(2026-11-12 07:05~07:07Z) **뒤에** 추가했다. §1~§3의 판정 기준은 바꾸지 않았다.
+- P3 계정 식별: 계획한 관측 경로 `claude auth status --json`은 토큰 인증(`authMethod=oauth_token`)에서 계정·org 필드를 내지 않았다(`fields_present`에 없음, [P3.json](evidence/P3.json)).
+- 그래서 결과를 본 뒤 식별 출처를 하나 더했다. 각 역할 CLI가 공급자에게서 받아 자기 설정 디렉터리에 저장한 policy-limits JWS의 클레임(`sub`·`ws`·`plan`)이다. 모델 요청은 쓰지 않았다. 값은 남기지 않고 형태(uuid 가림)와 SHA-256 앞 12자만 남겼다([P3-identity.json](evidence/P3-identity.json), [identity_claims.py](../../../../../../probes/01-04/identity_claims.py)).
+- 판정 기준을 바꾸지 않은 사후 식별 출처 추가라는 점을 그대로 기록하고, 독립 검토가 그 타당성을 판단한다.
+- P2 2c 대조: 재개 대상 세션 기록이 Guardrail 볼륨에만 있고 개발 볼륨에는 없음을 확인했다([P2-2c-target-control.txt](evidence/P2-2c-target-control.txt)). 재개 실패가 존재하지 않는 세션 ID 때문이 아님을 보이는 대조다.

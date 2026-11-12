@@ -1,0 +1,422 @@
+{
+  "at": "2026-11-12T07:06:12.786+00:00",
+  "tests": [
+    {
+      "id": "2a",
+      "desc": "개발 컨테이너에서 Guardrail 자격·상태 경로 목록·읽기·쓰기",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--user",
+        "20001:20001",
+        "--network",
+        "slirp4netns",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/state:/state:z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/cred:/run/ieo/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/etc:/etc/ieo/role:ro,z",
+        "--env",
+        "HOME=/state/home",
+        "--env",
+        "CLAUDE_CONFIG_DIR=/state/claude",
+        "--env",
+        "LANG=C.UTF-8",
+        "--workdir",
+        "/state/work",
+        "docker.io/library/golang:1.26.9-bookworm",
+        "bash",
+        "-c",
+        "ls -la /run/ieo/cred /state; for p in /opt/rust/ieo_poc_probe/roles/guardrail /opt/rust/ieo_poc_probe/roles/guardrail/cred /opt/rust/ieo_poc_probe/roles/guardrail/state; do printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED_OR_ABSENT; done; (cat /opt/rust/ieo_poc_probe/roles/guardrail/cred/oauth_token >/dev/null 2>&1 && echo READ_OK) || echo READ_DENIED_OR_ABSENT; (mkdir -p /opt/rust/ieo_poc_probe/roles/guardrail/state 2>/dev/null && touch /opt/rust/ieo_poc_probe/roles/guardrail/state/intrusion 2>/dev/null && echo WRITE_INSIDE_CONTAINER_FS_ONLY) || echo WRITE_DENIED; cat /run/ieo/cred/* >/dev/null && echo OWN_CRED_READABLE; grep -c guardrail /proc/self/mountinfo || true"
+      ],
+      "rc": 0,
+      "output": "/run/ieo/cred:\ntotal 4\ndrwx------. 2 20001 20001  25 Nov 12 07:05 .\ndrwxr-xr-x. 3 root  root   18 Nov 12 07:06 ..\n-r--------. 1 20001 20001 109 Nov 12 07:05 oauth_token\n\n/state:\ntotal 4\ndrwx------. 6 20001 20001   59 Nov 12 07:05 .\ndr-xr-xr-x. 1 root  root    52 Nov 12 07:06 ..\ndrwx------. 6 20001 20001 4096 Nov 12 07:05 claude\ndrwx------. 2 20001 20001    6 Nov 12 07:05 home\ndrwx------. 2 20001 20001    6 Nov 12 07:05 scratch\ndrwx------. 2 20001 20001    6 Nov 12 07:05 work\n/opt/rust/ieo_poc_probe/roles/guardrail LIST_DENIED_OR_ABSENT\n/opt/rust/ieo_poc_probe/roles/guardrail/cred LIST_DENIED_OR_ABSENT\n/opt/rust/ieo_poc_probe/roles/guardrail/state LIST_DENIED_OR_ABSENT\nREAD_DENIED_OR_ABSENT\nWRITE_DENIED\nOWN_CRED_READABLE\n0\n",
+      "expect": "denied"
+    },
+    {
+      "id": "2a-host",
+      "desc": "2a의 쓰기 시도가 호스트의 Guardrail 볼륨에 나타나지 않음",
+      "argv": [
+        "podman",
+        "unshare",
+        "bash",
+        "-c",
+        "ls -la /opt/rust/ieo_poc_probe/roles/guardrail/state; test -e /opt/rust/ieo_poc_probe/roles/guardrail/state/intrusion && echo INTRUSION_PRESENT || echo INTRUSION_ABSENT"
+      ],
+      "rc": 0,
+      "output": "total 4\ndrwx------. 6 20002 20002   59 11월 12 16:05 .\ndrwxrwxr-x. 5 root  root    42 11월 12 16:05 ..\ndrwx------. 6 20002 20002 4096 11월 12 16:05 claude\ndrwx------. 2 20002 20002    6 11월 12 16:05 home\ndrwx------. 2 20002 20002    6 11월 12 16:05 scratch\ndrwx------. 2 20002 20002    6 11월 12 16:05 work\nINTRUSION_ABSENT\n",
+      "expect": "denied"
+    },
+    {
+      "id": "2b-development->guardrail",
+      "desc": "development UID가 guardrail 소유 0700 볼륨에 접근",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--user",
+        "20001:20001",
+        "--network",
+        "slirp4netns",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/state:/state:z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/cred:/run/ieo/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/etc:/etc/ieo/role:ro,z",
+        "--env",
+        "HOME=/state/home",
+        "--env",
+        "CLAUDE_CONFIG_DIR=/state/claude",
+        "--env",
+        "LANG=C.UTF-8",
+        "--workdir",
+        "/state/work",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/cred:/x/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/state:/x/state:z",
+        "docker.io/library/golang:1.26.9-bookworm",
+        "bash",
+        "-c",
+        "for p in /x/cred /x/cred/oauth_token /x/state /x/state/claude /x/state/scratch; do printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED; printf '%s ' $p; (cat $p >/dev/null 2>&1 && echo READ_OK) || echo READ_DENIED; done; (touch /x/state/intrusion 2>/dev/null && echo WRITE_OK) || echo WRITE_DENIED"
+      ],
+      "rc": 0,
+      "output": "/x/cred LIST_DENIED\n/x/cred READ_DENIED\n/x/cred/oauth_token LIST_DENIED\n/x/cred/oauth_token READ_DENIED\n/x/state LIST_DENIED\n/x/state READ_DENIED\n/x/state/claude LIST_DENIED\n/x/state/claude READ_DENIED\n/x/state/scratch LIST_DENIED\n/x/state/scratch READ_DENIED\nWRITE_DENIED\n",
+      "expect": "denied"
+    },
+    {
+      "id": "2p-guardrail-owner",
+      "desc": "양성 대조: guardrail UID가 자기 볼륨에 접근",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--user",
+        "20002:20002",
+        "--network",
+        "slirp4netns",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/state:/state:z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/cred:/run/ieo/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/etc:/etc/ieo/role:ro,z",
+        "--env",
+        "HOME=/state/home",
+        "--env",
+        "CLAUDE_CONFIG_DIR=/state/claude",
+        "--env",
+        "LANG=C.UTF-8",
+        "--workdir",
+        "/state/work",
+        "docker.io/library/golang:1.26.9-bookworm",
+        "bash",
+        "-c",
+        "for p in /run/ieo/cred /run/ieo/cred/oauth_token /state /state/claude /state/scratch; do printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED; printf '%s ' $p; (test -d $p || cat $p >/dev/null 2>&1) && echo READ_OK || echo READ_DENIED; done; (touch /state/scratch/owner-write && rm /state/scratch/owner-write && echo WRITE_OK) || echo WRITE_DENIED"
+      ],
+      "rc": 0,
+      "output": "/run/ieo/cred LIST_OK\n/run/ieo/cred READ_OK\n/run/ieo/cred/oauth_token LIST_OK\n/run/ieo/cred/oauth_token READ_OK\n/state LIST_OK\n/state READ_OK\n/state/claude LIST_OK\n/state/claude READ_OK\n/state/scratch LIST_OK\n/state/scratch READ_OK\nWRITE_OK\n",
+      "expect": "n/a"
+    },
+    {
+      "id": "2b-guardrail->development",
+      "desc": "guardrail UID가 development 소유 0700 볼륨에 접근",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--user",
+        "20002:20002",
+        "--network",
+        "slirp4netns",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/state:/state:z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/cred:/run/ieo/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/guardrail/etc:/etc/ieo/role:ro,z",
+        "--env",
+        "HOME=/state/home",
+        "--env",
+        "CLAUDE_CONFIG_DIR=/state/claude",
+        "--env",
+        "LANG=C.UTF-8",
+        "--workdir",
+        "/state/work",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/cred:/x/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/state:/x/state:z",
+        "docker.io/library/golang:1.26.9-bookworm",
+        "bash",
+        "-c",
+        "for p in /x/cred /x/cred/oauth_token /x/state /x/state/claude /x/state/scratch; do printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED; printf '%s ' $p; (cat $p >/dev/null 2>&1 && echo READ_OK) || echo READ_DENIED; done; (touch /x/state/intrusion 2>/dev/null && echo WRITE_OK) || echo WRITE_DENIED"
+      ],
+      "rc": 0,
+      "output": "/x/cred LIST_DENIED\n/x/cred READ_DENIED\n/x/cred/oauth_token LIST_DENIED\n/x/cred/oauth_token READ_DENIED\n/x/state LIST_DENIED\n/x/state READ_DENIED\n/x/state/claude LIST_DENIED\n/x/state/claude READ_DENIED\n/x/state/scratch LIST_DENIED\n/x/state/scratch READ_DENIED\nWRITE_DENIED\n",
+      "expect": "denied"
+    },
+    {
+      "id": "2p-development-owner",
+      "desc": "양성 대조: development UID가 자기 볼륨에 접근",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--user",
+        "20001:20001",
+        "--network",
+        "slirp4netns",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/state:/state:z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/cred:/run/ieo/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/etc:/etc/ieo/role:ro,z",
+        "--env",
+        "HOME=/state/home",
+        "--env",
+        "CLAUDE_CONFIG_DIR=/state/claude",
+        "--env",
+        "LANG=C.UTF-8",
+        "--workdir",
+        "/state/work",
+        "docker.io/library/golang:1.26.9-bookworm",
+        "bash",
+        "-c",
+        "for p in /run/ieo/cred /run/ieo/cred/oauth_token /state /state/claude /state/scratch; do printf '%s ' $p; (ls $p >/dev/null 2>&1 && echo LIST_OK) || echo LIST_DENIED; printf '%s ' $p; (test -d $p || cat $p >/dev/null 2>&1) && echo READ_OK || echo READ_DENIED; done; (touch /state/scratch/owner-write && rm /state/scratch/owner-write && echo WRITE_OK) || echo WRITE_DENIED"
+      ],
+      "rc": 0,
+      "output": "/run/ieo/cred LIST_OK\n/run/ieo/cred READ_OK\n/run/ieo/cred/oauth_token LIST_OK\n/run/ieo/cred/oauth_token READ_OK\n/state LIST_OK\n/state READ_OK\n/state/claude LIST_OK\n/state/claude READ_OK\n/state/scratch LIST_OK\n/state/scratch READ_OK\nWRITE_OK\n",
+      "expect": "n/a"
+    },
+    {
+      "id": "2d-control",
+      "desc": "양성 대조: 같은 검사로 개발 자신의 토큰은 찾음",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--user",
+        "20001:20001",
+        "--network",
+        "slirp4netns",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/state:/state:z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/cred:/run/ieo/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/etc:/etc/ieo/role:ro,z",
+        "--env",
+        "HOME=/state/home",
+        "--env",
+        "CLAUDE_CONFIG_DIR=/state/claude",
+        "--env",
+        "LANG=C.UTF-8",
+        "--workdir",
+        "/state/work",
+        "docker.io/library/golang:1.26.9-bookworm",
+        "bash",
+        "-c",
+        "export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; G=2456b85e911129fda52ce955d43e83a799d24fbaba562eb9e9d397a222d438d1; hit=0; n=0; e=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -d' ' -f1); [ \"$e\" = \"$G\" ] && { echo ENV_MATCH; hit=1; }; while IFS= read -r -d '' f; do n=$((n+1)); a=$(sha256sum < \"$f\" | cut -d' ' -f1); b=$(head -c -1 \"$f\" 2>/dev/null | sha256sum | cut -d' ' -f1); if [ \"$a\" = \"$G\" ] || [ \"$b\" = \"$G\" ]; then echo FILE_MATCH $f; hit=1; fi; done < <(find /state /run/ieo /etc/ieo -type f -readable -print0 2>/dev/null); echo files_hashed=$n; [ $hit = 0 ] && echo TOKEN_ABSENT || echo TOKEN_PRESENT"
+      ],
+      "rc": 0,
+      "output": "ENV_MATCH\nFILE_MATCH /run/ieo/cred/oauth_token\nfiles_hashed=12\nTOKEN_PRESENT\n",
+      "expect": "n/a"
+    },
+    {
+      "id": "2d",
+      "desc": "개발 컨테이너의 파일·환경 어디에도 Guardrail 토큰과 같은 값이 없음",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--user",
+        "20001:20001",
+        "--network",
+        "slirp4netns",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/state:/state:z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/cred:/run/ieo/cred:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/bin/claude-2.1.322:/opt/claude/claude:ro,z",
+        "-v",
+        "/opt/rust/ieo_poc_probe/roles/development/etc:/etc/ieo/role:ro,z",
+        "--env",
+        "HOME=/state/home",
+        "--env",
+        "CLAUDE_CONFIG_DIR=/state/claude",
+        "--env",
+        "LANG=C.UTF-8",
+        "--workdir",
+        "/state/work",
+        "docker.io/library/golang:1.26.9-bookworm",
+        "bash",
+        "-c",
+        "export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; G=da968d3934126c0c1ff5c7e7bfa245903f33650fd7a375b66294927bcac5364c; hit=0; n=0; e=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -d' ' -f1); [ \"$e\" = \"$G\" ] && { echo ENV_MATCH; hit=1; }; while IFS= read -r -d '' f; do n=$((n+1)); a=$(sha256sum < \"$f\" | cut -d' ' -f1); b=$(head -c -1 \"$f\" 2>/dev/null | sha256sum | cut -d' ' -f1); if [ \"$a\" = \"$G\" ] || [ \"$b\" = \"$G\" ]; then echo FILE_MATCH $f; hit=1; fi; done < <(find /state /run/ieo /etc/ieo -type f -readable -print0 2>/dev/null); echo files_hashed=$n; [ $hit = 0 ] && echo TOKEN_ABSENT || echo TOKEN_PRESENT"
+      ],
+      "rc": 0,
+      "output": "files_hashed=12\nTOKEN_ABSENT\n",
+      "expect": "denied"
+    },
+    {
+      "id": "2e-development",
+      "desc": "호스트 비특권 사용자 heain이 development 0700 볼륨 읽기",
+      "argv": [
+        "bash",
+        "-c",
+        "ls /opt/rust/ieo_poc_probe/roles/development/cred /opt/rust/ieo_poc_probe/roles/development/state/claude 2>&1; cat /opt/rust/ieo_poc_probe/roles/development/cred/oauth_token >/dev/null 2>&1 && echo READ_OK || echo READ_DENIED"
+      ],
+      "rc": 0,
+      "output": "ls: cannot access '/opt/rust/ieo_poc_probe/roles/development/state/claude': Permission denied\nls: cannot open directory '/opt/rust/ieo_poc_probe/roles/development/cred': Permission denied\nREAD_DENIED\n",
+      "expect": "denied"
+    },
+    {
+      "id": "2e-guardrail",
+      "desc": "호스트 비특권 사용자 heain이 guardrail 0700 볼륨 읽기",
+      "argv": [
+        "bash",
+        "-c",
+        "ls /opt/rust/ieo_poc_probe/roles/guardrail/cred /opt/rust/ieo_poc_probe/roles/guardrail/state/claude 2>&1; cat /opt/rust/ieo_poc_probe/roles/guardrail/cred/oauth_token >/dev/null 2>&1 && echo READ_OK || echo READ_DENIED"
+      ],
+      "rc": 0,
+      "output": "ls: cannot access '/opt/rust/ieo_poc_probe/roles/guardrail/state/claude': Permission denied\nls: cannot open directory '/opt/rust/ieo_poc_probe/roles/guardrail/cred': Permission denied\nREAD_DENIED\n",
+      "expect": "denied"
+    },
+    {
+      "id": "2c",
+      "desc": "개발 프로세스가 Guardrail 세션 재개",
+      "attempt": 5,
+      "rc": 1,
+      "result_event": {
+        "subtype": "error_during_execution",
+        "is_error": true,
+        "session_id": "73305c11-cd0f-4d86-83e4-585fb858ab1a",
+        "num_turns": 0,
+        "duration_ms": 0,
+        "usage": {
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0,
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "total_cost_usd": 0
+      },
+      "stderr_tail": "No conversation found with session ID: 73305c11-cd0f-4d86-83e4-585fb858ab1a\n"
+    }
+  ],
+  "p1_rounds": [
+    {
+      "round": 1,
+      "both_ok_with_issued_session": true,
+      "claude_intervals_overlap": true,
+      "overlap_seconds": 3.811,
+      "claude_process_intervals_epoch": {
+        "development": [
+          1794467141.4456124,
+          1794467145.2568135
+        ],
+        "guardrail": [
+          1794467141.4004061,
+          1794467145.2884784
+        ]
+      },
+      "host_wrapper_intervals": {
+        "development": [
+          "2026-11-12T07:05:40.941+00:00",
+          "2026-11-12T07:05:45.688+00:00"
+        ],
+        "guardrail": [
+          "2026-11-12T07:05:40.942+00:00",
+          "2026-11-12T07:05:45.796+00:00"
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "both_ok_with_issued_session": true,
+      "claude_intervals_overlap": true,
+      "overlap_seconds": 3.352,
+      "claude_process_intervals_epoch": {
+        "development": [
+          1794467146.196069,
+          1794467149.9906392
+        ],
+        "guardrail": [
+          1794467146.1785045,
+          1794467149.5478516
+        ]
+      },
+      "host_wrapper_intervals": {
+        "development": [
+          "2026-11-12T07:05:45.798+00:00",
+          "2026-11-12T07:05:50.346+00:00"
+        ],
+        "guardrail": [
+          "2026-11-12T07:05:45.799+00:00",
+          "2026-11-12T07:05:50.348+00:00"
+        ]
+      }
+    }
+  ]
+}

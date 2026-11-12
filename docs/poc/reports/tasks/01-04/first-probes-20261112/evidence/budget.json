@@ -1,0 +1,107 @@
+{
+  "attempts": [
+    {
+      "n": 1,
+      "label": "P1 round 1",
+      "reserved_at": "2026-11-12T07:05:40.941+00:00",
+      "probe": "P1",
+      "role": "development",
+      "started_at": "2026-11-12T07:05:40.941+00:00",
+      "ended_at": "2026-11-12T07:05:45.688+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 2,
+      "label": "P1 round 1",
+      "reserved_at": "2026-11-12T07:05:40.941+00:00",
+      "probe": "P1",
+      "role": "guardrail",
+      "started_at": "2026-11-12T07:05:40.942+00:00",
+      "ended_at": "2026-11-12T07:05:45.796+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 3,
+      "label": "P1 round 2",
+      "reserved_at": "2026-11-12T07:05:45.798+00:00",
+      "probe": "P1",
+      "role": "development",
+      "started_at": "2026-11-12T07:05:45.798+00:00",
+      "ended_at": "2026-11-12T07:05:50.346+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 4,
+      "label": "P1 round 2",
+      "reserved_at": "2026-11-12T07:05:45.798+00:00",
+      "probe": "P1",
+      "role": "guardrail",
+      "started_at": "2026-11-12T07:05:45.799+00:00",
+      "ended_at": "2026-11-12T07:05:50.348+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 5,
+      "label": "P2 2c resume other role session",
+      "reserved_at": "2026-11-12T07:06:10.987+00:00",
+      "probe": "P2c",
+      "role": "development",
+      "started_at": "2026-11-12T07:06:10.987+00:00",
+      "ended_at": "2026-11-12T07:06:12.785+00:00",
+      "exit_code": 1
+    },
+    {
+      "n": 6,
+      "label": "P3 round 1",
+      "reserved_at": "2026-11-12T07:06:38.413+00:00",
+      "probe": "P3",
+      "role": "development",
+      "started_at": "2026-11-12T07:06:38.414+00:00",
+      "ended_at": "2026-11-12T07:06:44.112+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 7,
+      "label": "P3 round 1",
+      "reserved_at": "2026-11-12T07:06:38.413+00:00",
+      "probe": "P3",
+      "role": "guardrail",
+      "started_at": "2026-11-12T07:06:38.414+00:00",
+      "ended_at": "2026-11-12T07:06:44.113+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 8,
+      "label": "P3 round 2",
+      "reserved_at": "2026-11-12T07:06:44.115+00:00",
+      "probe": "P3",
+      "role": "development",
+      "started_at": "2026-11-12T07:06:44.115+00:00",
+      "ended_at": "2026-11-12T07:06:50.182+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 9,
+      "label": "P3 round 2",
+      "reserved_at": "2026-11-12T07:06:44.115+00:00",
+      "probe": "P3",
+      "role": "guardrail",
+      "started_at": "2026-11-12T07:06:44.116+00:00",
+      "ended_at": "2026-11-12T07:06:50.184+00:00",
+      "exit_code": 0
+    }
+  ],
+  "first_attempt_at": 1794467140.9416535,
+  "cli_runs": [
+    {
+      "label": "P3 auth status development",
+      "at": "2026-11-12T07:06:37.597+00:00",
+      "rc": 0
+    },
+    {
+      "label": "P3 auth status guardrail",
+      "at": "2026-11-12T07:06:38.412+00:00",
+      "rc": 0
+    }
+  ]
+}

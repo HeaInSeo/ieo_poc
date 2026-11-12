@@ -1,0 +1,7 @@
+# 2c 대조: 대상 세션 기록이 Guardrail 볼륨에 실제로 있고 개발 볼륨에는 없음 (2026-11-12T07:06:23Z)
+target_session_id=73305c11-cd0f-4d86-83e4-585fb858ab1a
+## guardrail
+/opt/rust/ieo_poc_probe/roles/guardrail/state/claude/projects/-state-work/73305c11-cd0f-4d86-83e4-585fb858ab1a.jsonl 31167 bytes uid=20002
+count=1
+## development
+count=0

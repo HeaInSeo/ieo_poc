@@ -1,0 +1,117 @@
+{
+  "development": {
+    "jws_alg": "ES256",
+    "jws_header_keys": [
+      "alg",
+      "kid",
+      "typ",
+      "x5c"
+    ],
+    "claims": {
+      "v": {
+        "shape": "int",
+        "fp": "6b86b273ff34"
+      },
+      "typ": {
+        "shape": "policy-limits",
+        "fp": "3ac60654f412"
+      },
+      "aud": {
+        "shape": "<uuid>",
+        "fp": "d9f8580fc621"
+      },
+      "sub": {
+        "shape": "<uuid>",
+        "fp": "006c378fb8a8"
+      },
+      "ws": {
+        "shape": "<uuid>",
+        "fp": "ad742103a1f4"
+      },
+      "plan": {
+        "shape": "consumer",
+        "fp": "100eaff0266a"
+      },
+      "iat": {
+        "shape": "int",
+        "fp": "637ce5cc11fa"
+      },
+      "exp": {
+        "shape": "int",
+        "fp": "7b38ac1464f2"
+      },
+      "sha": {
+        "shape": "str",
+        "fp": "caa87d391421"
+      }
+    },
+    "local_only": {
+      "claude.json userID fp": "91c50115b496",
+      "stamp.identity fp": "561dda757b5e",
+      "stamp.kind": "token"
+    }
+  },
+  "guardrail": {
+    "jws_alg": "ES256",
+    "jws_header_keys": [
+      "alg",
+      "kid",
+      "typ",
+      "x5c"
+    ],
+    "claims": {
+      "v": {
+        "shape": "int",
+        "fp": "6b86b273ff34"
+      },
+      "typ": {
+        "shape": "policy-limits",
+        "fp": "3ac60654f412"
+      },
+      "aud": {
+        "shape": "<uuid>",
+        "fp": "d9f8580fc621"
+      },
+      "sub": {
+        "shape": "<uuid>",
+        "fp": "006c378fb8a8"
+      },
+      "ws": {
+        "shape": "<uuid>",
+        "fp": "ad742103a1f4"
+      },
+      "plan": {
+        "shape": "consumer",
+        "fp": "100eaff0266a"
+      },
+      "iat": {
+        "shape": "int",
+        "fp": "637ce5cc11fa"
+      },
+      "exp": {
+        "shape": "int",
+        "fp": "7b38ac1464f2"
+      },
+      "sha": {
+        "shape": "str",
+        "fp": "caa87d391421"
+      }
+    },
+    "local_only": {
+      "claude.json userID fp": "a3a1fe1e60df",
+      "stamp.identity fp": "8c1a8b095323",
+      "stamp.kind": "token"
+    }
+  },
+  "comparison": {
+    "aud": "same",
+    "exp": "same",
+    "iat": "same",
+    "plan": "same",
+    "sha": "same",
+    "sub": "same",
+    "typ": "same",
+    "v": "same",
+    "ws": "same"
+  }
+}
