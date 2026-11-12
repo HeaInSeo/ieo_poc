@@ -257,7 +257,7 @@
         "docker.io/library/golang:1.26.9-bookworm",
         "bash",
         "-c",
-        "export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; G=2456b85e911129fda52ce955d43e83a799d24fbaba562eb9e9d397a222d438d1; hit=0; n=0; e=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -d' ' -f1); [ \"$e\" = \"$G\" ] && { echo ENV_MATCH; hit=1; }; while IFS= read -r -d '' f; do n=$((n+1)); a=$(sha256sum < \"$f\" | cut -d' ' -f1); b=$(head -c -1 \"$f\" 2>/dev/null | sha256sum | cut -d' ' -f1); if [ \"$a\" = \"$G\" ] || [ \"$b\" = \"$G\" ]; then echo FILE_MATCH $f; hit=1; fi; done < <(find /state /run/ieo /etc/ieo -type f -readable -print0 2>/dev/null); echo files_hashed=$n; [ $hit = 0 ] && echo TOKEN_ABSENT || echo TOKEN_PRESENT"
+        "export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; G=2456b85e9111[sha256-truncated]; hit=0; n=0; e=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -d' ' -f1); [ \"$e\" = \"$G\" ] && { echo ENV_MATCH; hit=1; }; while IFS= read -r -d '' f; do n=$((n+1)); a=$(sha256sum < \"$f\" | cut -d' ' -f1); b=$(head -c -1 \"$f\" 2>/dev/null | sha256sum | cut -d' ' -f1); if [ \"$a\" = \"$G\" ] || [ \"$b\" = \"$G\" ]; then echo FILE_MATCH $f; hit=1; fi; done < <(find /state /run/ieo /etc/ieo -type f -readable -print0 2>/dev/null); echo files_hashed=$n; [ $hit = 0 ] && echo TOKEN_ABSENT || echo TOKEN_PRESENT"
       ],
       "rc": 0,
       "output": "ENV_MATCH\nFILE_MATCH /run/ieo/cred/oauth_token\nfiles_hashed=12\nTOKEN_PRESENT\n",
@@ -297,7 +297,7 @@
         "docker.io/library/golang:1.26.9-bookworm",
         "bash",
         "-c",
-        "export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; G=da968d3934126c0c1ff5c7e7bfa245903f33650fd7a375b66294927bcac5364c; hit=0; n=0; e=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -d' ' -f1); [ \"$e\" = \"$G\" ] && { echo ENV_MATCH; hit=1; }; while IFS= read -r -d '' f; do n=$((n+1)); a=$(sha256sum < \"$f\" | cut -d' ' -f1); b=$(head -c -1 \"$f\" 2>/dev/null | sha256sum | cut -d' ' -f1); if [ \"$a\" = \"$G\" ] || [ \"$b\" = \"$G\" ]; then echo FILE_MATCH $f; hit=1; fi; done < <(find /state /run/ieo /etc/ieo -type f -readable -print0 2>/dev/null); echo files_hashed=$n; [ $hit = 0 ] && echo TOKEN_ABSENT || echo TOKEN_PRESENT"
+        "export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat /run/ieo/cred/oauth_token)\"; G=da968d393412[sha256-truncated]; hit=0; n=0; e=$(printf %s \"$CLAUDE_CODE_OAUTH_TOKEN\" | sha256sum | cut -d' ' -f1); [ \"$e\" = \"$G\" ] && { echo ENV_MATCH; hit=1; }; while IFS= read -r -d '' f; do n=$((n+1)); a=$(sha256sum < \"$f\" | cut -d' ' -f1); b=$(head -c -1 \"$f\" 2>/dev/null | sha256sum | cut -d' ' -f1); if [ \"$a\" = \"$G\" ] || [ \"$b\" = \"$G\" ]; then echo FILE_MATCH $f; hit=1; fi; done < <(find /state /run/ieo /etc/ieo -type f -readable -print0 2>/dev/null); echo files_hashed=$n; [ $hit = 0 ] && echo TOKEN_ABSENT || echo TOKEN_PRESENT"
       ],
       "rc": 0,
       "output": "files_hashed=12\nTOKEN_ABSENT\n",

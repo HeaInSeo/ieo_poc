@@ -68,6 +68,10 @@ class Ledger:
         for r, t in self.tokens.items():
             if t and t.decode(errors="ignore") in text:
                 raise SystemExit(f"SECRET GUARD: {r} token value found in output; nothing written")
+        # full SHA-256 of a token is not recorded either (PROBE_PLAN §0: 12-char prefix only; review of PR #12 P2-1)
+        for t in self.tokens.values():
+            h = hashlib.sha256(t).hexdigest()
+            text = text.replace(h, h[:12] + "[sha256-truncated]")
         return TOKEN_RE.sub("sk-ant-[MASKED]", text)
 
 
@@ -213,7 +217,7 @@ def cmd_p2(ev, files_only=False):
     def t(tid, desc, argv, expect_denied=True):
         r = run(argv)
         txt = led.scrub(r.stdout + r.stderr)
-        tests.append({"id": tid, "desc": desc, "argv": argv, "rc": r.returncode, "output": txt[-3000:], "expect": "denied" if expect_denied else "n/a"})
+        tests.append({"id": tid, "desc": desc, "argv": json.loads(led.scrub(json.dumps(argv))), "rc": r.returncode, "output": txt[-3000:], "expect": "denied" if expect_denied else "n/a"})
     dev, gd = role_dir("development"), role_dir("guardrail")
     # 2a: guardrail paths do not exist inside the development container
     g = role_dir("guardrail")

@@ -1,6 +1,6 @@
 # 01-04 첫 세 probe 결과 (P1·P2·P3, 판정표 A1-GATE-01-04)
 
-2026-11-12 KST · 계획 v1.3.3-A1 · run `first-probes-20261112` · 계획 [PROBE_PLAN.md](PROBE_PLAN.md)(실행 전 고정 a321cd2, 측정 보강 93a44ad, 실행 후 §5) · 판정표 [probe_gate_table.json](../../01-03/staged-freeze-20261112/probe_gate_table.json) · 예산 [Probe_Budget_Rules.md](../../01-03/staged-freeze-20261112/Probe_Budget_Rules.md)
+2026-11-12 KST · 계획 v1.3.3-A1 · run `first-probes-20261112` · 계획 [PROBE_PLAN.md](PROBE_PLAN.md)(실행 전 고정 a321cd2, 측정 보강 93a44ad) · 실행 후 추가·교정 [ADDENDUM.md](ADDENDUM.md) · 판정표 [probe_gate_table.json](../../01-03/staged-freeze-20261112/probe_gate_table.json) · 예산 [Probe_Budget_Rules.md](../../01-03/staged-freeze-20261112/Probe_Budget_Rules.md)
 
 **01-04 전체의 결과가 아니다.** 판정표가 다른 probe보다 먼저 하라고 정한 세 probe의 결과다. 01-04의 나머지 범위(§6)는 아직 하지 않았으므로 01-04는 검수 완료가 아니고 작업 수도 늘지 않는다.
 
@@ -10,7 +10,7 @@
 | --- | --- | --- | --- | --- |
 | ① | P1 같은 계정 두 역할 동시 세션 | **지원** | 진행 | 두 회차 모두 두 프로세스 실행 구간이 겹치고(3.811초, 3.352초) 두 역할 모두 오류 없는 결과 사건과 발급한 session_id를 냄 |
 | ② | P2 역할별 자격·세션·저장소 접근 격리 | **성립 확인** | 진행 | 2a~2e 교차 시도 전부 거부. 같은 종류 컨테이너의 양성 대조(소유 UID 접근, 자기 토큰 탐지)는 성공 |
-| ③ | P3 공급자 한도 구조 | **공유 확인** | 공유 quota group의 지원 구성으로 기록하고 진행 | 두 토큰의 공급자 발급 식별 클레임(`sub`·`ws`·`plan`)이 같고, 같은 창(`five_hour`·`seven_day`)의 `resetsAt`가 6쌍 관측 모두 같음 |
+| ③ | P3 공급자 한도 구조 | **공유 확인** | 공유 quota group의 지원 구성으로 기록하고 진행 | 두 토큰의 공급자 서명 문서 클레임 `sub`(계정)·`aud`(org)가 같고, 같은 창(`five_hour`·`seven_day`)의 `resetsAt`가 4쌍(8건) 관측 모두 같음 |
 
 - 사용자 결정 D1에 따라 ③ 공유 확인은 **지원 구성**이다. 이것을 개발/Guardrail **한도 분리 성공으로 쓰지 않는다.**
 - 01-04 수용 항목 “개발/Guardrail 한도 분리”의 결과는 **분리되지 않음(같은 quota group 공유)**이다.
@@ -63,7 +63,7 @@
 
 [P3.json](evidence/P3.json) · 시도 06~09 · [P3-identity.json](evidence/P3-identity.json)
 
-**한도 창 관측.** stream-json의 `rate_limit_event`를 6쌍(P1 2회차 + P3 2회차, 각 회차 두 역할이 동시에) 관측했다.
+**한도 창 관측.** stream-json의 `rate_limit_event`를 4쌍 8건(P1 2회차 + P3 2회차, 각 회차 두 역할이 동시에) 관측했다.
 
 | 관측 | `status` | `five_hour` utilization / resetsAt | `seven_day` utilization / resetsAt |
 | --- | --- | --- | --- |
@@ -75,7 +75,7 @@
 
 **계정 식별.**
 - `claude auth status --json`은 토큰 인증에서 `authMethod=oauth_token`, `apiProvider=firstParty`만 내고 계정·org 필드는 없었다(CLI 기동 2회, 모델 요청 아님).
-- 그래서 각 역할 CLI가 공급자에게서 받아 저장한 policy-limits JWS(ES256)의 클레임으로 식별했다. `sub`(uuid), `ws`(uuid), `plan`(`consumer`)이 두 역할에서 같다.
+- 그래서 각 역할 CLI가 공급자에게서 받아 저장한 policy-limits JWS(ES256)의 클레임으로 식별했다([ADDENDUM §1](ADDENDUM.md)). `sub`(계정 uuid)와 `aud`(org uuid)가 두 역할에서 같다. 두 클레임의 의미는 호스트 로그인의 accountUuid·organizationUuid와 같은지 대조해 확인했다(같음 여부만 기록). `ws`는 둘 다 아니어서 근거에서 뺐다.
 - 로컬에서만 생기는 값(`.claude.json`의 `userID`, 토큰별 stamp)은 다르다. 두 설정 디렉터리가 같은 파일을 공유한 결과가 아니라, 각자 받은 문서라는 뜻이다.
 
 **판정.**
@@ -83,9 +83,9 @@
 - 두 번째 조건(한 역할의 사용 뒤 다른 역할의 utilization이 함께 움직임)은 근거로 쓰지 않았다. 0.11→0.12 변화는 두 역할 모두 사용한 구간에서 일어났고, 같은 구독의 다른 사용과도 구별할 수 없다.
 
 **검토가 판단할 한계.**
-- 식별 출처(JWS 클레임)는 계획한 `auth status`에 계정 필드가 없다는 것을 본 **뒤에** 더했다(계획 §5). 판정 기준은 바꾸지 않았다.
-- JWS 서명은 검증하지 않았다(venv에 암호 라이브러리가 없다). 클레임은 CLI가 TLS로 받은 그대로 읽었다.
-- `sub`·`ws`의 의미(계정·작업공간)는 클레임 이름과 문서 종류에서 추론한 것이다. 공급자 문서로 확인한 것이 아니다.
+- 식별 출처(JWS 클레임)는 계획한 `auth status`에 계정 필드가 없다는 것을 본 **뒤에** 더했다([ADDENDUM §1](ADDENDUM.md)). 판정 기준은 바꾸지 않았다.
+- JWS 서명은 두 문서 모두 `x5c` 리프 인증서로 검증된다(openssl, Verified OK). 두 문서의 서명·리프·`kid`는 서로 다르므로 역할별로 따로 받은 문서다. 상위 발급자(Anthropic의 Claude Code Signed Cache Issuing CA)는 시스템 CA 저장소에 없다. 그래서 공급자 키까지 이어지는 신뢰 사슬은 확인하지 못했다.
+- 클레임 의미는 공급자 문서로 확인한 것이 아니다. 호스트 로그인 값과 같다는 대조에 근거한다.
 - 계정이 같다는 사실만으로 판정하지 않았다. 계획 §3에 따라 같은 창의 resetsAt를 함께 썼다.
 
 **영향.**
@@ -97,7 +97,7 @@
 
 - 모델 요청 시도 **9/30**: P1 4회, P2 1회, P3 4회. 수동 재시도 0회.
 - 벽시계: 첫 시도 07:05:40.941Z부터 마지막 종료 07:06:50.184Z까지 69초. 7,200초 중 일부다.
-- 모델 없는 CLI 기동: `auth status` 2회. 모델 없는 컨테이너 실행: P2 파일·프로세스 시험 10건과 setup. 원본은 각 증거에 있다.
+- 모델 없는 CLI 기동: `auth status` 2회. P2 파일·프로세스 시험: 컨테이너 7건, 호스트 실행 3건. 그 밖에 setup. 원본은 각 증거에 있다.
 - 가짜 토큰 사전 점검([dry-run-dummy-tokens/](evidence/dry-run-dummy-tokens/README.md))은 하네스 점검이다. 판정 증거가 아니다.
 
 판정표 처분이 셋 다 “진행”이므로 01-04의 나머지 범위로 넘어갈 수 있다. 남은 수용 항목은 다음과 같다.
@@ -112,11 +112,17 @@
 
 이 범위는 실행 전에 별도 계획으로 고정한다. 01-04 전체 상한은 14,400초(F05)다.
 
-## 7. 재현
+## 7. 검토 교정
+
+- 독립 검토 0303f3e는 reject였다([review](reviews/review-pr12-0303f3e.md)). 막는 지적은 P2-1 하나다. 두 역할 토큰의 SHA-256 전체값이 공개 증거에 기록돼 있었다.
+- 교정은 [ADDENDUM §2·§3](ADDENDUM.md)에 있다. 판정 세 개는 검토자가 원본으로 다시 계산해 유지됐다.
+- 다시 실행한 probe는 없다. 시도 수는 9/30 그대로다.
+
+## 8. 재현
 
 ```
 .venv-poc/bin/python -I probes/01-04/probe.py setup|p1|p2|p3|status
-podman unshare .venv-poc/bin/python -I probes/01-04/identity_claims.py /opt/rust/ieo_poc_probe/roles/{development,guardrail}/state/claude
+podman unshare .venv-poc/bin/python -I probes/01-04/identity_claims.py --host-login ~/.claude.json /opt/rust/ieo_poc_probe/roles/{development,guardrail}/state/claude
 ```
 
 다시 실행하면 새 시도로 센다(예산 규칙 §2). 이 결과를 재시험으로 늘려 세지 않는다.
