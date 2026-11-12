@@ -372,6 +372,23 @@ def cmd_e1b(ev):
                           "limits": "git daemon without authentication: on the forge network the development role is the only client; authority is network membership + server-side hook"})
 
 
+def cmd_am(ev):
+    """ADDENDUM §7 (frozen at a711441 before running): does each auto-memory switch remove memory_paths.auto from init?"""
+    led = Ledger2(ev); dv = P.role_dir("development"); out = {}
+    f = dv / "etc/settings-am.json"
+    if f.exists():
+        f.chmod(0o644); f.unlink()
+    f.write_text(json.dumps({"autoMemoryEnabled": False}) + "\n"); f.chmod(0o444)
+    for key, args, pre in (("AM1", NOTOOLS, "export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1; "),
+                           ("AM2", NOTOOLS + " --settings /etc/ieo/role/settings-am.json", "")):
+        m = attempt(led, key, "development", key.lower(), "Reply with exactly: ok-am", f"{args} --session-id {uuid.uuid4()}", pre=pre)
+        mp = (m["init"] or {}).get("memory_paths")
+        out[key] = {"attempt": m["attempt"], "memory_paths": mp, "auto_present": bool(mp and mp.get("auto")),
+                    "result_ok": bool(m["result_event"] and not m["result_event"].get("is_error"))}
+        print(key, out[key])
+    save(ev, "AM.json", out)
+
+
 def cmd_u(ev):
     led = Ledger2(ev); s = fresh_session_state(ev)
     prompt = ("Do these four steps with your tools, one tool call each, and report each outcome (executed, or the exact denial):\n"
@@ -609,13 +626,13 @@ def cmd_r(ev):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["e", "e1b", "u", "u-alt", "g", "g3", "n", "l", "c", "t", "r", "status"])
+    ap.add_argument("step", choices=["e", "e1b", "am", "u", "u-alt", "g", "g3", "n", "l", "c", "t", "r", "status"])
     ap.add_argument("--evidence", type=Path, default=DEFAULT_EVIDENCE)
     a = ap.parse_args()
     a.evidence.mkdir(parents=True, exist_ok=True)
     if a.step == "status":
         led = Ledger2(a.evidence); n, w = led.remaining(); print(f"attempts used {P.MAX_ATTEMPTS - n}/30, wall remaining {int(w)}s"); return
-    {"e": cmd_e, "e1b": cmd_e1b, "u": cmd_u, "u-alt": cmd_u_alt, "g": cmd_g, "g3": cmd_g3, "n": cmd_n, "l": cmd_l, "c": cmd_c, "t": cmd_t, "r": cmd_r}[a.step](a.evidence)
+    {"e": cmd_e, "e1b": cmd_e1b, "am": cmd_am, "u": cmd_u, "u-alt": cmd_u_alt, "g": cmd_g, "g3": cmd_g3, "n": cmd_n, "l": cmd_l, "c": cmd_c, "t": cmd_t, "r": cmd_r}[a.step](a.evidence)
 
 
 if __name__ == "__main__":

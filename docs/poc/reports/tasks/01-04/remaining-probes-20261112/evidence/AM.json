@@ -1,0 +1,14 @@
+{
+  "AM1": {
+    "attempt": 26,
+    "memory_paths": null,
+    "auto_present": false,
+    "result_ok": true
+  },
+  "AM2": {
+    "attempt": 27,
+    "memory_paths": null,
+    "auto_present": false,
+    "result_ok": true
+  }
+}

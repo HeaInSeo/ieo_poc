@@ -248,6 +248,26 @@
       "started_at": "2026-11-12T07:38:13.563+00:00",
       "ended_at": "2026-11-12T07:38:17.499+00:00",
       "exit_code": 0
+    },
+    {
+      "n": 26,
+      "label": "AM1 development",
+      "reserved_at": "2026-11-12T08:05:44.949+00:00",
+      "probe": "AM1",
+      "role": "development",
+      "started_at": "2026-11-12T08:05:44.950+00:00",
+      "ended_at": "2026-11-12T08:05:49.117+00:00",
+      "exit_code": 0
+    },
+    {
+      "n": 27,
+      "label": "AM2 development",
+      "reserved_at": "2026-11-12T08:05:49.119+00:00",
+      "probe": "AM2",
+      "role": "development",
+      "started_at": "2026-11-12T08:05:49.121+00:00",
+      "ended_at": "2026-11-12T08:05:53.021+00:00",
+      "exit_code": 0
     }
   ],
   "first_attempt_at": 1794468680.024365,

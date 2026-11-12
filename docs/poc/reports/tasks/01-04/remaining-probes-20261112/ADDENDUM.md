@@ -96,3 +96,15 @@
 - 판정: 해당 방법이 init에서 `auto`를 없애면 **비활성 확인**이다. 그대로 있으면 **그 방법으로는 미비활성**이다. 결과 사건이 없으면 관측 불가다.
 - 대조군은 이미 있다. 같은 인자에 이 설정이 없으면 모든 시도에서 `auto`가 있었다.
 - 시도는 각 1회, 합계 2회이고 B2 안이다(누적 25 → 27). 재시도는 하지 않는다.
+
+### 결과 (시도 26·27)
+
+| # | init `memory_paths` | 결과 | 판정 |
+| --- | --- | --- | --- |
+| AM1 `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` | 키 자체가 없음(원본 stdout에 `"memory_paths"` 0건). 환경 변수 이름 목록에 `CLAUDE_CODE_DISABLE_AUTO_MEMORY` 있음 | `ok-am`, 오류 없음 | **비활성 확인** |
+| AM2 `--settings {"autoMemoryEnabled": false}` | 키 자체가 없음(0건) | `ok-am`, 오류 없음 | **비활성 확인** |
+| 대조(R2 등 이 설정이 없는 시도) | `{"auto": "/state/claude/projects/-state-work/memory/"}` | — | — |
+
+- 두 방법 모두 자동 기억을 끈다. 계약에는 설정 방식(AM2)을 권한다. supervisor가 RO로 주는 `/etc/ieo/role/settings.json`에 넣으면 환경 허용 목록(§4.3)을 넓히지 않아도 된다.
+- 판정 근거는 init 사건의 표시다. 실제로 기억 파일이 쓰이지 않는지까지 행동으로 시험하지는 않았다. 정리 대상에 `projects/*/memory/`를 함께 넣는 계약 반영 사항 3은 그대로 둔다(이중 방어).
+- 시도 누적은 27/30(B2)이다.
