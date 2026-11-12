@@ -1,0 +1,19 @@
+# 교정 후: --write → 재검산 → --write → 재검산 (2026-11-12T05:21:58Z)
+$ python scripts/validate_package.py --write >/dev/null; echo rc=$?
+rc=0
+$ sha256sum validation/v1.3.3-A1_current_validation.json v1_3_3_validation.json
+d584fd4595e8ca5fbb2822bc865b5ffd79f46079f13afc249ae6837d651ed587  validation/v1.3.3-A1_current_validation.json
+10cac4471876fe0a4152873e2662009985069d151a8e895e264fd71e688b1023  v1_3_3_validation.json
+$ python scripts/validate_package.py >/dev/null; echo rc=$?
+rc=0
+$ python scripts/validate_package.py --write >/dev/null; echo rc=$?
+rc=0
+$ sha256sum validation/v1.3.3-A1_current_validation.json v1_3_3_validation.json
+d584fd4595e8ca5fbb2822bc865b5ffd79f46079f13afc249ae6837d651ed587  validation/v1.3.3-A1_current_validation.json
+10cac4471876fe0a4152873e2662009985069d151a8e895e264fd71e688b1023  v1_3_3_validation.json
+$ python scripts/validate_package.py >/dev/null; echo rc=$?
+rc=0
+$ grep v1_3_3_validation.json SHA256SUMS.txt
+10cac4471876fe0a4152873e2662009985069d151a8e895e264fd71e688b1023  v1_3_3_validation.json
+$ python scripts/render_progress.py --check
+{"ok": true, "mode": "check", "files": ["STATUS.md", "TASKS.md", "RESULTS.md", "RESUME.md", "events.jsonl"]}

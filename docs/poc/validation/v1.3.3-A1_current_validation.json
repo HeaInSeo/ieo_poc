@@ -1,0 +1,142 @@
+{
+  "plan_version": "v1.3.3",
+  "main_graph": {
+    "nodes": 73,
+    "edges": 188,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "dependency_delta": {
+    "existing_added": [
+      [
+        "07-01",
+        "04-16"
+      ]
+    ],
+    "removed": [],
+    "new_task": {
+      "04-16": [
+        "04-09",
+        "01-03"
+      ]
+    }
+  },
+  "ancestor_counts": {
+    "04-03": 14,
+    "05-05": 24,
+    "07-01": 33,
+    "07-02": 37
+  },
+  "changed_acceptance_ids": [
+    "01-02",
+    "01-03",
+    "01-04",
+    "01-07",
+    "01-08",
+    "02-01",
+    "07-01",
+    "07-04",
+    "09-02",
+    "09-03"
+  ],
+  "sprint_digests": [
+    {
+      "sprint_id": "POC-01",
+      "revision": 5,
+      "digest": "058bfd3ee48c18a2cae8c83f197619bd727babeeb1ce7243c16881535291fb60"
+    },
+    {
+      "sprint_id": "POC-02",
+      "revision": 5,
+      "digest": "8d1c5923dd48ffedb57e69597c83f5fdfaf59ba057c915a64ea056aa8113648b"
+    },
+    {
+      "sprint_id": "POC-03",
+      "revision": 5,
+      "digest": "b6a7780cb7d995703f858644a1c0cc46ad8b6489cdab2174f39a64e2f401dfb0"
+    },
+    {
+      "sprint_id": "POC-04",
+      "revision": 5,
+      "digest": "0ce3a4807ff3704e1d7dc9af8065082183c166794c71ce7385763afc539e70d5"
+    },
+    {
+      "sprint_id": "POC-05",
+      "revision": 5,
+      "digest": "c204dc2f793c993e01578a8139dcac944c8bd27e1c6a1d29ab7f149102f0aea6"
+    },
+    {
+      "sprint_id": "POC-06",
+      "revision": 5,
+      "digest": "64b0c1e4ebca21922f95e9c5b1c6fe4b21a1863980631d1796b7f8f523267ce4"
+    },
+    {
+      "sprint_id": "POC-07",
+      "revision": 5,
+      "digest": "8a3a976df627a930ef65966c0b5eddee9ca203f8bb26a6bbf603abaa8c7d1545"
+    },
+    {
+      "sprint_id": "POC-08",
+      "revision": 5,
+      "digest": "23d5caf13893439100609170fca0c040ae68302f62fdf16b3de980c0a007ba87"
+    },
+    {
+      "sprint_id": "POC-09",
+      "revision": 5,
+      "digest": "3834756cde1bad03322c6c2e7f021717892d5f8863de9c8a647bd9ed97710ae5"
+    }
+  ],
+  "schema_errors": 0,
+  "ledger_spec_match": true,
+  "technical_graph": {
+    "nodes": 50,
+    "edges": 220,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "followup_graph": {
+    "nodes": 12,
+    "edges": 18,
+    "cycles": 0,
+    "undefined_prerequisites": 0
+  },
+  "generated_views_match": true,
+  "runtime_probe": "NOT_RUN",
+  "human_trials": "NOT_RUN",
+  "progress": {
+    "accepted_main_tasks": 5,
+    "main_denominator": 73,
+    "followup_denominator": 12
+  },
+  "current_internal_links_checked": 184,
+  "report_contract_checks": {
+    "human_input_checks": {
+      "valid_without_estimate": true,
+      "valid_measured_estimate": true,
+      "missing_evidence_rejected": true
+    },
+    "valid_role_examples": 4,
+    "invalid_examples_rejected": 12,
+    "cases": [
+      "old actor string",
+      "missing contract revision",
+      "developer claims verified",
+      "wrong actor role",
+      "finding lacks original log",
+      "reject without findings",
+      "estimated without measurement",
+      "reversed forecast",
+      "delay without reason",
+      "undecided shown normal",
+      "decision mismatch",
+      "decision deadline is not a date"
+    ],
+    "scope": "local draft contract only; runtime/human trials NOT_RUN"
+  },
+  "package_integrity": {
+    "delivered": 120,
+    "amended": 11,
+    "gitignored_paper_pdfs_absent": 4,
+    "amendment": "v1.3.3-A1"
+  }
+}

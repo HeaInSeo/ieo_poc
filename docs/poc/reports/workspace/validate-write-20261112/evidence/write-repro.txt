@@ -1,0 +1,7 @@
+# 재현: main 4bd4eaf에서 --write 후 재검산 (2026-11-12T05:21:34Z)
+$ python scripts/validate_package.py --write >/dev/null; echo rc=$?
+rc=0
+$ python scripts/validate_package.py >/dev/null; echo rc=$?
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: v1_3_3_validation.json
+rc=1
