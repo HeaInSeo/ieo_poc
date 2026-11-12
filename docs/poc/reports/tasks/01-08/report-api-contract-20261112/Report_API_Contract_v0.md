@@ -32,7 +32,9 @@
 | `GET /v0/sprints/{id}/state` | `sprints:read` | verified 현재 상태, claim 별도, 마지막 관측 시각, 전달 상태 | 401/403/404 |
 | `GET /v0/sprints/{id}/events?cursor=&limit=` | `sprints:read` | 서버 커밋 순서, 같은 cursor는 같은 페이지 | 400 `INVALID_CURSOR`, 401/403/404 |
 | `POST /v0/agent/reports` | `agent:report`(repo, role 고정) | 202 저장, 200 동일 재전송 | 400/409/422, 403(위 §1) |
+| `POST /v0/agent/repro-requests`, `GET …/{request_id}` | `agent:repro`(repo, **guardrail만**) | 202 대기열, 200 동일 재요청; 상태·실행기 이미지 digest·종료 코드·원본 로그 참조 | 400/409, 403(개발 자격·다른 repo) |
 
+- 재현 요청은 01-02 계약 §2.1의 Guardrail 독립 재현 경로다. 코디네이터 소유·자격 없는 일회성 격리 실행기에서 대상 SHA로 실행하고 원본 로그를 Guardrail 입력 위치로 돌려준다. 실행 결과는 Guardrail claim의 증거이며 판정이 아니다. 실행기 구현 02-06, 검증 P07.
 - 거부 본문은 01-07의 `{code, field, message, correction, retryable_after_edit}` 목록이다. 01-08에서 `IDEMPOTENCY_KEY_CONFLICT`, `EVENT_CONTENT_CONFLICT`, `REPORT_SEMANTIC_VIOLATION`, `INVALID_CURSOR`를 추가했다.
 - **조회는 사건·알림·상태 전환을 만들지 않는다.** 재조회로 완료 수가 늘지 않는다.
 - 등록 접수(201)는 실행 인수나 완료가 아니다.

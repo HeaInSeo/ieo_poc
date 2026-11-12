@@ -171,6 +171,57 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
+  /v0/agent/repro-requests:
+    post:
+      tags: [agent]
+      operationId: submitReproRequest
+      summary: Guardrail asks the coordinator to run a reproduction on an isolated runner
+      description: |
+        Required scope `agent:repro` bound to (repo_id, role=guardrail). Development credentials → 403.
+        The coordinator runs the bundle on a coordinator-owned, credential-less, single-use runner at
+        `target_sha` (network blocked by default, time/resource caps) and returns raw logs to the
+        Guardrail input location (01-02 contract §2.1). `request_id` is the idempotency key.
+        A finished run is evidence for the Guardrail's claim, not a verdict.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReproRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReproStatus' }
+        '200':
+          description: Same request_id and content already queued or finished
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReproStatus' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+  /v0/agent/repro-requests/{request_id}:
+    get:
+      tags: [agent]
+      operationId: getReproRequest
+      summary: Status and raw-log references of a reproduction run
+      description: Same credential scope as the submitter.
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 128 }
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReproStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 components:
   securitySchemes:
     bearer:
@@ -263,6 +314,35 @@ components:
         event_revision: { type: integer, minimum: 1 }
         stored_at: { type: string, format: date-time }
         evidence_level: { const: claim }
+    ReproRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, repo_id, assignment_id, generation, target_sha, bundle_digest, command, expected]
+      properties:
+        request_id: { type: string, minLength: 8, maxLength: 128 }
+        repo_id: { type: string, minLength: 1 }
+        assignment_id: { type: string, minLength: 1 }
+        generation: { type: integer, minimum: 0 }
+        target_sha: { type: string, pattern: '^[a-f0-9]{40,64}$' }
+        bundle_digest:
+          description: SHA-256 of the files/patch the Guardrail wrote in its scratch area (uploaded by the supervisor).
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        command: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+        expected: { type: string, minLength: 1 }
+        timeout_seconds: { type: integer, minimum: 1, maximum: 3600 }
+    ReproStatus:
+      type: object
+      additionalProperties: false
+      required: [request_id, state, target_sha]
+      properties:
+        request_id: { type: string }
+        state: { type: string, enum: [queued, running, finished, runner_failed, rejected_stale_generation] }
+        target_sha: { type: string }
+        runner_image_digest: { type: [string, 'null'] }
+        exit_code: { type: [integer, 'null'] }
+        raw_log_refs: { type: array, items: { type: string } }
+        finished_at: { type: [string, 'null'], format: date-time }
     SprintState:
       type: object
       additionalProperties: false
