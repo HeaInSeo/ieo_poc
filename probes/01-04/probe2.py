@@ -131,8 +131,9 @@ def record(led, n, probe, role, argv, started, ended, rc, out, err, extra=None):
 
 def stop_signals(meta):
     rl = [s for s in meta["rate_limit_status"] if s and s != "allowed"]
-    txt = json.dumps(meta.get("result_event") or {}) + " ".join(meta["assistant_text"])
-    if rl or re.search(r"usage limit|rate.?limit|401|403|authentication|billing|credit", txt, re.I) and (meta.get("result_event") or {}).get("is_error"):
+    res = meta.get("result_event") or {}
+    txt = str(res.get("result") or "") + " " + " ".join(meta["assistant_text"])
+    if rl or (res.get("is_error") and re.search(r"usage limit|rate.?limit|\b40[13]\b|authenticat|billing|credit balance|oauth", txt, re.I)):
         sys.exit(f"STOP SIGNAL in attempt {meta['attempt']}: rate_limit={rl}; see evidence (Probe_Budget_Rules §4)")
 
 

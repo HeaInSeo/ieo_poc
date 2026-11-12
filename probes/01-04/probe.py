@@ -191,6 +191,17 @@ def attempt_pair(led, probe, label, extra_by_role=None, sessions=None):
     return metas
 
 
+def stop_on_signal(metas, label):
+    """Probe_Budget_Rules §4: after any attempt with a non-allowed rate-limit status or an auth/billing/limit error,
+    start no new attempt (PR #12 automated review 4547423210). Evidence of the round is already recorded."""
+    for r, x in metas.items():
+        rl = [e.get("rate_limit_info", {}).get("status") for e in x.get("rate_limit_events", [])]
+        bad_rl = [s for s in rl if s and s != "allowed"]
+        res = x.get("result_event") or {}
+        if bad_rl or (res.get("is_error") and res.get("subtype") != "success") or x.get("exit_code") not in (0,):
+            sys.exit(f"STOP after {label} ({r}): rate_limit={bad_rl} result={res.get('subtype')} exit={x.get('exit_code')} -> no new attempt; record per Probe_Budget_Rules §4")
+
+
 def cmd_p1(ev):
     led = Ledger(ev)
     rounds = []
@@ -207,6 +218,7 @@ def cmd_p1(ev):
                        "host_wrapper_intervals": {r: [x["started_at"], x["ended_at"]] for r, x in m.items()}})
         if not ok:
             break
+        stop_on_signal(m, f"P1 round {i}")
     (ev / "P1.json").write_text(json.dumps({"rounds": rounds}, indent=2) + "\n")
     print(json.dumps(rounds, indent=2))
 
@@ -305,6 +317,9 @@ def cmd_p3(ev):
     for i in (1, 2):
         m = attempt_pair(led, "P3", f"P3 round {i}")
         out["rounds"].append({r: {"rate_limit_events": x["rate_limit_events"], "result_ok": bool(x["result_event"] and not x["result_event"].get("is_error"))} for r, x in m.items()})
+        if i == 1:
+            (ev / "P3.json").write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
+            stop_on_signal(m, "P3 round 1")
     (ev / "P3.json").write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(out, ensure_ascii=False, indent=2)[:6000])
 
