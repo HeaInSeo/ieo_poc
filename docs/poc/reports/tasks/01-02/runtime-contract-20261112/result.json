@@ -5,29 +5,59 @@
   "task_id": "01-02",
   "experiment_id": null,
   "run_id": "runtime-contract-20261112",
-  "revision": 1,
+  "revision": 2,
   "previous_run_ref": "reports/tasks/01-02/runtime-comparison-20261112/REPORT.md",
-  "actor": {"role": "development", "name": "개발 에이전트(Claude Code 대화 세션)"},
+  "actor": {
+    "role": "development",
+    "name": "개발 에이전트(Claude Code 대화 세션)"
+  },
   "execution_kind": "design_contract_with_static_install_check",
-  "execution_state": "작성 완료·독립 검토 대기",
+  "execution_state": "교정 완료·재검토 대기",
   "inputs": {
     "spec_revision": "POC-01 rev 4",
     "repo_sha": null,
     "image_digest": null,
     "profile_revision": "poc-acceptance-v1.3.3 rev 4",
-    "model_runtime_versions": ["Claude Code 2.1.322", "codex-cli 0.166.0 (대안, 미사용)"]
+    "model_runtime_versions": [
+      "Claude Code 2.1.322",
+      "codex-cli 0.166.0 (대안, 미사용)"
+    ]
   },
   "expected": "01-02.accept 요소 전부를 계약에 고정, 실제 지원은 01-04 probe로 위임",
-  "observed": "계약 §1~§9 작성, 설치 버전 옵션 존재 확인, 인증 1개(구독) 관측",
+  "observed": "계약 rev2(검토 F1~F9 반영): 역할별 설정 신뢰·고정 인자, 같은 UID 한계와 코디네이터 정본, 인증 방식 표·공유 판정 01-04 위임, 체크포인트 버전 필드, repo 범위 stop, 자식 기록, 오류 대응, 환경 정리, probe G 추가",
   "verdict": "미판정",
-  "verification": {"level": "claim", "reviewer": null, "evidence": []},
-  "cost": {"elapsed_seconds": null, "parent_child_tokens": null, "unmeasured_reason": "대화 세션의 역할별 원시 사용량 수단 없음"},
+  "verification": {
+    "level": "claim",
+    "reviewer": null,
+    "evidence": []
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "대화 세션의 역할별 원시 사용량 수단 없음",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
   "adoption": "미판정",
-  "unresolved": ["역할별 자격 방식 A/B/C 선택(사람 정책 소유자)", "01-04 probe 전 실제 지원 미확인"],
+  "unresolved": [
+    "역할별 자격 방식 A/B/C 선택(사람 정책 소유자, 01-04 첫 probe 전)",
+    "설정 신뢰 수단(probe G) 미확인",
+    "01-04 probe 전 실제 지원 미확인"
+  ],
   "next_action": "독립 검토 → PR 병합 → 원장 갱신",
   "evidence_refs": [
     "reports/tasks/01-02/runtime-contract-20261112/Runtime_Contract_v0.md",
     "reports/tasks/01-02/runtime-contract-20261112/evidence/claude-help.txt",
-    "reports/tasks/01-02/runtime-contract-20261112/evidence/claude-auth-status.redacted.txt"
-  ]
+    "reports/tasks/01-02/runtime-contract-20261112/evidence/claude-auth-status.redacted.txt",
+    "reports/tasks/01-02/runtime-contract-20261112/evidence/commands.txt"
+  ],
+  "started_at": "2026-11-12T08:43:32+09:00",
+  "finished_at": null,
+  "reuse_assets": [],
+  "next_owner": "독립 검토 세션",
+  "resume_condition": "현재 head SHA 독립 승인 + CI 성공 → 조건부 병합",
+  "operational_report_ref": null,
+  "schedule_report_ref": null
 }
