@@ -1,0 +1,33 @@
+# 고정 원본 대조 2026-11-12T08:44:02Z · NPG e5075affbc87ed650a755558b8491828e6783862 · gh api raw(읽기 전용)
+## commit
+sha e5075affbc87ed650a755558b8491828e6783862
+committer_date 2026-11-02T15:11:35Z
+subject fix: validate migrated central execution without changing incident ownership (#25)
+## 패키지 사본 vs 고정 커밋 blob (sha256 전체)
+AGENTS.md local=520a26595d8d200864a7b2925086dce0546a363cbf8e53826dd6a598f1b9f647 remote=520a26595d8d200864a7b2925086dce0546a363cbf8e53826dd6a598f1b9f647 SAME
+AUTOMATIC_FOLLOWTHROUGH.md local=299841daf91e6783606369a2b55b6e7d6a76e31d1c3a0faa1dac8af54766ab63 remote=299841daf91e6783606369a2b55b6e7d6a76e31d1c3a0faa1dac8af54766ab63 SAME
+CENTRAL_SCHEDULER_MIGRATION.md local=8e30ff126a01e2c899917695eee581518815ccc72cd50ee042776cd748183ea5 remote=8e30ff126a01e2c899917695eee581518815ccc72cd50ee042776cd748183ea5 SAME
+OPERATIONS.md local=309f1bc299c0c4748ec29e4b661528b1fa6a33e91029b724fe99fbd16982043f remote=309f1bc299c0c4748ec29e4b661528b1fa6a33e91029b724fe99fbd16982043f SAME
+README.md local=60d88dfbc5cd8633dea15890604168735751a050a94e75a2001d163d951777fb remote=60d88dfbc5cd8633dea15890604168735751a050a94e75a2001d163d951777fb SAME
+REVIEW_TIMEOUT_VERIFICATION.md local=4f74d7523b88cb156ef16f66bcb2bd5f6c8e80ac8615a7df7375ac40ca05d755 remote=4f74d7523b88cb156ef16f66bcb2bd5f6c8e80ac8615a7df7375ac40ca05d755 SAME
+SOURCE_REVIEW_BOOTSTRAP.md local=6cd56399f2910720063e6c4556b1c875412014b8128d0bab455ae09320859dc4 remote=6cd56399f2910720063e6c4556b1c875412014b8128d0bab455ae09320859dc4 SAME
+VERIFICATION_20261012.md local=12b12abc32ba342a6f82924c2b61adbc7dc9c027d59a19d2ac132242b939bb75 remote=12b12abc32ba342a6f82924c2b61adbc7dc9c027d59a19d2ac132242b939bb75 SAME
+VERIFICATION_20261020_OPERATIONS.md local=f882ea84eabdbcaa426d57dc49abe11e31308b562a2cae9ef12a4f1626b3954f remote=f882ea84eabdbcaa426d57dc49abe11e31308b562a2cae9ef12a4f1626b3954f SAME
+.github/workflows/ci.yml local(05_npg_evidence/ci.yml)=4895d8afb58db8249104e92e66bee526239510549cd13c3ed1b5b78efd2a2932 remote=4895d8afb58db8249104e92e66bee526239510549cd13c3ed1b5b78efd2a2932 SAME
+## 고정 커밋 파일 수
+blobs 143 truncated false
+## 기존 CI 실행 (패키지 CI_Run.json·CI_Jobs.json에서)
+{'id': 41469168311, 'name': 'Notion projection guard CI', 'head_sha': 'e5075affbc87ed650a755558b8491828e6783862', 'head_branch': 'main', 'event': 'push', 'status': 'completed', 'conclusion': 'success', 'created_at': '2026-11-02T15:11:40Z', 'run_attempt': 1}
+Node 22 tests and source provenance success None
+Node 24 tests and source provenance success None
+## GitHub API 재조회: run 41469168311
+{"conclusion":"success","created_at":"2026-11-02T15:11:40Z","head_sha":"e5075affbc87ed650a755558b8491828e6783862","id":41469168311,"name":"Notion projection guard CI","run_attempt":1}
+## 기타 패키지 원본 sha256
+79ebb86e3ae6a8d1c51003bb6d342f5381938efe1a4a2215b93f05d4a87edba5  05_npg_evidence/CI_Run.json
+ab867777c3c89739e26cfb7b12dee6b02841645478b0aa9dd4e626c9b6847fa7  05_npg_evidence/CI_Jobs.json
+ead9c8e0800d28a626fadae268bd3e59ebdbcbcf868f246a48c9d193ef2ca4b8  05_npg_evidence/Node22_Job.log
+5c8c4482bc1e710606d467a0c2f0d70e31f197ce21ee566297938fb49c012cab  05_npg_evidence/Node24_Job.log
+e7a1dba44aa2b90826d14be02046d31a5af66a08c9a9f709ada951cce73e8a4c  05_npg_evidence/NPG_Design_Operations_Guide.docx
+6996b87781431b2b9b998346d4b24c6fb328364e0ef63649303013914e90d5d6  05_npg_evidence/CI_Evidence_Scope.md
+0719b992ccc10d752df6744d4c7df25becb7b4c5a5f153d4fa082122a91d10ae  02_design_sources/Console_Automation_Design_Log.md
+c8c2caa949fd0397a65dd055309f8d937342a71cdba2ebb6b55cdd78be6cd66b  02_design_sources/Console_Coordinator_Architecture.png
