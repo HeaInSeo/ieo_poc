@@ -1,4 +1,4 @@
-<!-- 보관본: PR #12 독립 검토(Guardrail) 0303f3e 원문 -->
+<!-- 보관본: PR #12 독립 검토(Guardrail) 0303f3e 원문과 게시 댓글 끝줄(교정 커밋 안내). 게시 댓글의 머리말 1줄(검토 주체·SHA·판정)은 생략 · 게시 댓글 https://github.com/HeaInSeo/ieo_poc/pull/12#issuecomment-6817381159 -->
 # PR #12 독립 검토 (Guardrail) · 01-04 첫 세 probe
 
 - 검토 SHA: `0303f3e32dfcd6112eb8438a07c08b004da2a2b8` (branch `task/01-04-probes`)
@@ -122,3 +122,6 @@ PROBE_PLAN §1의 조건은 실행 구간 겹침, 두 역할 모두 오류 없�
 
 ## 5. 승인 조건
 P2-1의 (a)·(b)·(c)를 반영한 새 head에서 P2.json의 해시 가림, probe.py 수정, 처분 기록을 확인하면 승인한다. P3-1·P3-2는 같은 수정에서 함께 고치기를 권하지만 차단 사유는 아니다. 나머지 P3은 01-04 나머지 probe 계획을 고정할 때 반영해도 된다.
+
+---
+교정 커밋: `4ada612` (ADDENDUM.md §2·§3). 재검토 예정.
