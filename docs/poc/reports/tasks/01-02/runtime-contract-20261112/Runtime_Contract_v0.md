@@ -1,7 +1,7 @@
 # 01-02 · 에이전트 런타임·역할·인증·재개 계약 v0
 
 2026-11-12 KST · 계획 v1.3.3 · 이전 회차 [runtime-comparison-20261112](../runtime-comparison-20261112/REPORT.md)(후보 비교)를 이어받는 회차.
-문서 revision 2: 독립 검토(7a39452, reject) F1~F9 반영. 이 문서는 **설계 계약**이다. “근거”는 설치 버전 도움말/상태 출력에 옵션·문구가 **존재**함을 뜻하며, 동작은 01-04 probe 전까지 미확인이다.
+문서 revision 3: 독립 검토 7a39452(reject) F1~F9, bf854bb(reject) N1~N7 반영. 이 문서는 **설계 계약**이다. “근거”는 설치 버전 도움말/상태 출력에 옵션·문구가 **존재**함을 뜻하며, 동작은 01-04 probe 전까지 미확인이다.
 
 ## 1. 선택과 적용 범위
 
@@ -31,16 +31,18 @@
 
 ### 2.1 같은 컨테이너 안의 supervisor와 에이전트(알려진 한계)
 
-U3의 “Pod당 컨테이너 하나”와 S3의 PSA Restricted(추가 capability 금지)에서는 PID 1 supervisor와 에이전트 프로세스를 **다른 UID로 나눌 수 없다**. 따라서 같은 UID의 에이전트가 supervisor의 파일·환경을 읽거나 로컬 파일을 바꿀 수 있다고 가정하고 아래로 경계를 둔다.
+U3의 “Pod당 컨테이너 하나”와 S3의 PSA Restricted(추가 capability 금지)에서는 PID 1 supervisor와 에이전트 프로세스를 **다른 UID로 나눌 수 없다**. 같은 UID의 프로세스는 supervisor의 파일·환경(모델 자격, 코디네이터 claim 자격)을 읽을 수 있다고 가정한다. 따라서 경계는 “그 컨테이너 안에서 **누구의 코드가 실행되는가**”로 둔다.
 
-- **판정·체크포인트의 정본은 코디네이터 DB**다. supervisor는 체크포인트 본문을 볼륨에 쓰되 그 digest·순번을 코디네이터에 보고하고, 재개 시 코디네이터 기록과 digest가 다르면 `external_reconciliation_required=true`로 멈춘다(로컬 파일을 신뢰하지 않음).
-- supervisor가 쓰는 코디네이터 자격은 **그 (repo, role)의 claim 제출·어댑터 응답**만 가능한 범위다. 에이전트가 읽어도 그 역할이 원래 할 수 있는 claim 이상은 못 한다. verified 발행·판정·다른 repo/역할 권한은 없다(01-08 API의 403 규칙).
-- 코디네이터→supervisor 어댑터 호출은 코디네이터 전용 자격으로 인증하며 supervisor는 그 검증 키(공개 키/토큰 해시)만 가진다. 에이전트가 어댑터 응답을 위조해도 세대·`request_id`·코디네이터 측 관측 대조로 판정에 쓰이지 않는다.
-- 이 한계로 인한 독립성 위반 가능성은 P07(04-07)에서 실제 시도로 검증한다. Pod 분리 선언만으로 독립성 PASS를 주지 않는다.
+- **Guardrail 컨테이너에서는 검토 대상(개발이 작성한) 코드·테스트·빌드 스크립트·hook을 절대 실행하지 않는다**(검토 N1). Guardrail은 코드를 **읽기만** 하고, 실행 결과(필수 검사·테스트)는 CI 또는 코디네이터 소유 실행기가 보호된 경로로 발행한 결과를 고정 SHA 기준으로 받는다(§1.2 “완료와 필수 검사”, 03-07/P08). 그러므로 Guardrail 컨테이너에서 실행되는 코드는 런타임·supervisor·Guardrail 모델의 도구 호출(읽기 전용)뿐이며, Guardrail 자격을 읽을 수 있는 것은 Guardrail 역할 자신뿐이다.
+- 개발 컨테이너는 개발 코드를 실행한다. 그 안의 자격(개발 모델 자격, 개발 claim 자격, 작업 브랜치 push 자격)은 개발 코드에 노출된다고 보고 **그 범위가 개발 역할의 권한과 같도록** 둔다. 개발 컨테이너에서 Claude 권한 규칙은 보안 경계가 아니다(개발은 Bash로 무엇이든 할 수 있음). 경계는 컨테이너·자격 범위·코디네이터 판정이다.
+- 개발과 Guardrail은 **직접 통신하지 않는다**(§1.2). 서로의 네트워크 주소·자격·볼륨을 받지 않으며 Guardrail 입력은 승인 명세·프로파일·GitHub 고정 SHA·보호된 검사 결과뿐이다.
+- **판정·체크포인트의 정본은 코디네이터 DB와 외부 상태(GitHub SHA·CI)**다. supervisor는 체크포인트 digest·순번을 코디네이터에 보고하고, 재개 시 코디네이터 기록·외부 상태와 다르면 `external_reconciliation_required=true`로 멈춘다. 개발 컨테이너의 체크포인트는 개발 코드가 바꿀 수 있으므로(검토 N5) 무결성을 보장하지 않으며, 재개 판단은 GitHub의 브랜치/SHA·CI 기록과의 대조로 한다.
+- 코디네이터→supervisor 어댑터 호출은 코디네이터 전용 자격으로 인증하며 supervisor는 그 검증 키(공개 키/토큰 해시)만 가진다.
+- 이 경계의 실제 위반 시도(개발 코드가 Guardrail 자격 획득·Guardrail 명의 발행 시도, 0건이어야 함)는 P07(04-07)에서 검증한다. Pod 분리 선언만으로 독립성 PASS를 주지 않는다.
 
 ## 3. 인증 계약
 
-설치 관측([claude-auth-status.redacted.txt](evidence/claude-auth-status.redacted.txt)): 현 사용자에 **claude.ai 로그인 1개**(authMethod `claude.ai`, subscriptionType `max`, configDirectory `~/.claude`)만 있다. API key·별도 계정은 관측되지 않았다. `CLAUDE_CONFIG_DIR`을 빈 디렉터리로 지정하면 이 로그인이 보이지 않는다(검토 세션 확인, 01-04에서 원본 로그로 재확인).
+설치 관측([claude-auth-status.redacted.txt](evidence/claude-auth-status.redacted.txt)): 현 사용자에 **claude.ai 로그인 1개**(authMethod `claude.ai`, subscriptionType `max`, configDirectory `~/.claude`)만 있다. API key·별도 계정은 관측되지 않았다. `CLAUDE_CONFIG_DIR`을 빈 디렉터리로 지정하면 이 로그인이 보이지 않는다는 관측은 검토 세션의 미커밋 기록뿐이므로 01-04에서 원본 로그로 확인한다.
 
 계약(방식과 무관하게 고정):
 
@@ -59,16 +61,16 @@ U3의 “Pod당 컨테이너 하나”와 S3의 PSA Restricted(추가 capability
 
 ## 4. 기동·설정 신뢰·재개 계약
 
-### 4.1 역할별 설정 신뢰(검토 F1)
+### 4.1 역할별 설정 신뢰·실행 범위
 
-**규칙**: 역할 프로세스는 **supervisor가 읽기 전용으로 제공한 설정만** 적용한다. 에이전트가 쓸 수 있는 위치(repo worktree의 `.claude/`·`.mcp.json`·플러그인, `CLAUDE_CONFIG_DIR` 안의 settings)에서 온 권한 규칙·hook·MCP·플러그인은 적용하지 않는다.
+**규칙**: 역할 프로세스는 **supervisor가 읽기 전용으로 제공한 설정만** 적용한다. repo worktree나 `CLAUDE_CONFIG_DIR` 아래 에이전트가 쓸 수 있는 위치에서 온 권한 규칙·hook·MCP·플러그인·skill·명령·자식 정의·사용자 CLAUDE.md는 적용하지 않는다.
 
-| 역할 | repo CLAUDE.md | repo `.claude/settings*.json`·hook·플러그인·`.mcp.json` | 설정 출처 |
-| --- | --- | --- | --- |
-| 개발 | 허용(repo 기록이 누적 지식의 정본, §1.2) | 적용 금지(권한·hook이 정책 밖으로 넓어지는 것 방지) | `/etc/ieo/role/settings.json`(RO) |
-| Guardrail | **적용 금지**(검토 대상 SHA의 개발 작성 내용이 Guardrail 지시·자격으로 실행되면 안 됨). 검토 대상으로 읽는 것만 허용 | **적용 금지** | `/etc/ieo/role/settings.json`(RO) |
+| 역할 | repo CLAUDE.md | repo `.claude/`·hook·플러그인·`.mcp.json` | 도구 | 설정 출처 |
+| --- | --- | --- | --- | --- |
+| 개발 | 허용. 작업 브랜치의 미병합 수정도 읽히며 이는 개발 자신의 작업 메모다. 승인된 누적 지식은 main에 병합된 CLAUDE.md다(검토 N7) | 적용 금지 | 쓰기·Bash 포함(컨테이너 안). 권한 규칙은 보안 경계 아님(§2.1) | `/etc/ieo/role/` RO |
+| Guardrail | **적용 금지**. 검토 대상으로 읽기만 | **적용 금지** | **읽기 전용**(Read·Grep·Glob 경로 한정). Bash·Write·Edit·네트워크 게시 없음. 검토 대상 실행 금지(§2.1) | `/etc/ieo/role/` RO |
 
-고정 인자 집합(역할 공통 + 역할별). 근거는 [claude-help.txt](evidence/claude-help.txt) 옵션 존재이며, 각 인자가 실제로 위 규칙을 달성하는지는 §8 probe G로 확인한다:
+고정 인자 집합. 근거는 [claude-help.txt](evidence/claude-help.txt) 옵션 존재이며 각 인자가 규칙을 달성하는지는 §8 probe G로 확인한다:
 
 ```text
 공통   claude -p --input-format stream-json --output-format stream-json --verbose
@@ -79,12 +81,15 @@ U3의 “Pod당 컨테이너 하나”와 S3의 PSA Restricted(추가 capability
          --agents /etc/ieo/role/agents.json
          --allowedTools <역할 허용 목록> --disallowedTools <역할 거부 목록>
 개발   cwd=/state/work/<repo>
-Guardrail cwd=/state/guardrail-cwd(빈 디렉터리), 검토 대상 SHA 체크아웃은 --add-dir /state/work/<repo>@<sha>,
-         --disable-slash-commands, 허용 도구는 읽기·검사 실행만(쓰기·push·네트워크 게시 없음)
+Guardrail cwd=/state/guardrail-cwd(빈 디렉터리), --disable-slash-commands,
+         --tools "Read,Grep,Glob" (검토 대상은 /state/review/<sha>/ 읽기 전용 스냅샷,
+         경로 한정 허용 규칙으로만 접근; --add-dir는 쓰지 않음)
 ```
 
-- `--setting-sources user`의 user 출처는 `CLAUDE_CONFIG_DIR/settings.json`이며 이 위치는 에이전트가 쓸 수 있다. 따라서 supervisor는 매 기동 전에 그 파일을 RO 설정 사본으로 덮어쓰고 digest를 체크아웃 기록에 남긴다. 덮어쓰기 외에 user 출처를 완전히 끄는 방법(예: 빈 출처 목록, `--safe-mode`와 `--agents` 동시 사용 가능 여부, `--bare`+`apiKeyHelper`)은 probe G에서 비교해 가장 좁은 것을 채택한다.
-- **probe G에서 Guardrail이 검토 대상 트리의 CLAUDE.md·settings·hook·MCP·플러그인을 하나라도 적용하면** 그 방식은 불합격이며, 대안이 없으면 Guardrail 독립성(P07)이 성립하지 않으므로 01-04 결과로 중단·결정 요청 대상이다.
+- **--add-dir를 Guardrail에 쓰지 않는다**(검토 N2): 도움말이 `--add-dir`를 CLAUDE.md 출처로 적는다. 검토 대상은 cwd 밖 읽기 전용 스냅샷으로 두고 경로 한정 Read/Grep/Glob 허용 규칙으로 읽게 한다. probe G가 그 스냅샷의 표식 CLAUDE.md가 로드되는지 확인한다. 로드되면 대안은 supervisor가 만든 검토 묶음(지시 파일 이름을 `*.reviewed`로 바꾼 사본+`review.patch`)이며, 그것도 실패하면 01-04 중단·결정 요청이다.
+- **`CLAUDE_CONFIG_DIR` 보호**(검토 N3): supervisor는 매 기동 전에 `CLAUDE_CONFIG_DIR` 아래에서 세션 기록(`projects/` 등 재개에 필요한 경로)과 자격 파일을 **제외한 전부**(settings, CLAUDE.md, agents, skills, commands, plugins 등)를 지우고 RO 템플릿으로 다시 만든 뒤 digest를 체크포인트에 남긴다. 실행 중 변조는 Guardrail은 쓰기 도구가 없어 불가하고, 개발은 가능하지만 개발 역할 범위 안의 영향이다(§2.1). “user 출처 = `CLAUDE_CONFIG_DIR/settings.json`”과 재개에 필요한 경로 목록은 도움말에 없는 **가정**이며 probe G에서 확인한다(검토 N6).
+- user 출처를 완전히 끄는 방법(빈 출처 목록, `--safe-mode`와 `--agents` 동시 사용, `--bare`+`apiKeyHelper`)은 probe G에서 비교해 가장 좁은 것을 채택한다.
+- **probe G에서 Guardrail이 검토 대상의 CLAUDE.md·settings·hook·MCP·플러그인을 하나라도 적용하거나, 읽기 전용 도구 밖의 실행이 일어나면** 그 방식은 불합격이다. 대안이 없으면 Guardrail 독립성(P07)이 성립하지 않으므로 01-04 결과로 중단·결정 요청 대상이다.
 
 ### 4.2 식별·재개
 
@@ -133,16 +138,19 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
 | stop (repo 범위) | 코디네이터가 두 supervisor에 **각각** role 범위 stop을 보낸다. supervisor는 상대 역할을 멈추지 않으며, 각 역할의 안전 종료 조건(미확인 외부 효과·활성 자식·미저장 체크포인트 0)을 따로 보고한다 |
 | status | 프로세스 생존·마지막 체크포인트·session_id·`quota_group_id`·`provider_status_or_unknown`(관측 불가면 unknown)·`last_actual_action_at` |
 
-오류 대응(런타임 관측 → 어댑터 오류 코드; 실제 런타임 오류 문자열은 01-04 원본 로그로 채운다):
+오류 대응. 어댑터 오류 코드(§1.2, 6종)는 **호출 자체의 실패**에만 쓴다. 공급자 한도·인증/과금은 재시도 가능한 일시 오류가 아니므로 `status`의 분류와 운영 상태로 보고한다(검토 N4, §1.2 “한도 종류와 공유”). 실제 런타임 오류 문자열은 01-04 원본 로그로 채운다.
 
-| 관측 | 코드 |
-| --- | --- |
-| 호출자 자격 불일치·범위 밖 요청 | `UNAUTHORIZED` |
-| 배정 세대가 현재보다 낡음 | `STALE_GENERATION` |
-| 같은 `request_id`·다른 내용 | `ID_CONTENT_CONFLICT` |
-| 필요한 옵션/동작이 런타임에 없음(probe 미지원) | `UNSUPPORTED_CAPABILITY` |
-| 프로세스/세션 상태를 관측할 수 없음, 재개 결과 확인 불가 | `NOT_OBSERVED` |
-| 일시적 네트워크·공급자 오류(재시도 가능), 한도/rate limit 신호 | `TRANSIENT_FAILURE` + `quota_group_id`·원 오류 분류(컨텍스트/사용량 한도/rate limit/인증·과금, §1.2). 한도 신호의 실제 형태는 probe 대상 |
+| 관측 | 어댑터 응답 | 재시도 |
+| --- | --- | --- |
+| 호출자 자격 불일치·범위 밖 요청 | `UNAUTHORIZED` | 없음 |
+| 배정 세대가 현재보다 낡음 | `STALE_GENERATION` | 없음 |
+| 같은 `request_id`·다른 내용 | `ID_CONTENT_CONFLICT` | 없음 |
+| 필요한 옵션/동작이 런타임에 없음 | `UNSUPPORTED_CAPABILITY` | 없음 |
+| 프로세스/세션 상태·재개 결과를 관측할 수 없음 | `NOT_OBSERVED` | 외부 대조 후 판단 |
+| 일시적 네트워크 오류·공급자 5xx·rate limit(짧은 대기) | `TRANSIENT_FAILURE` | 상한 있는 backoff |
+| **공급자 사용량 한도** | 정상 응답 + `status.provider_status_or_unknown=usage_limit`, `quota_group_id`, 최초 오류 원문 참조 | 즉시 재시도 금지. 운영 상태 `작업을 보유한 대기`/`QUOTA_WAIT`, `next_check_at`에 01-03에서 정한 간격·상한의 재개 probe |
+| **인증/과금 오류** | 정상 응답 + `provider_status_or_unknown=auth_or_billing` | 재시도 금지. `사람 결정 대기`로 결정 요청(자격 교체는 사람 정책 소유자) |
+| 컨텍스트 한계·압축 | 오류 아님. 체크포인트 + 압축 사건 기록 | — |
 
 ## 8. 01-04 probe 순서(이 계약의 확인 계획)
 
@@ -150,7 +158,7 @@ supervisor와 01-04 probe는 역할 프로세스를 **빈 환경에서 허용 �
 2. **역할별 자격 격리**: 역할 A가 역할 B의 설정 디렉터리·세션 기록·Secret을 읽거나 B 명의로 동작할 수 있는지. 판정: 지원/미지원/관측 불가.
 3. **공급자 한도 공유·분리**: 두 역할의 quota group이 같은지. 판정을 **공유 확인 / 분리 확인 / 관측 불가**로 나눈다. 로컬 예산·별도 컨테이너는 근거로 쓰지 않는다.
 4. 위 1~3 중 불가 또는 관측 불가가 있으면 원본 로그·영향·대안·재개 결정을 보고하고 다음 probe/작업을 진행하지 않는다(현행 중단 조건, 임의 변경 금지).
-5. 이후: **G. 설정 신뢰**(검토 대상 트리에 표식 CLAUDE.md·settings·hook·`.mcp.json`을 두고 Guardrail 고정 인자로 실행해 적용 0건 확인, 개발 쪽 hook/settings 적용 0건 확인, `CLAUDE_CONFIG_DIR` settings 변조가 다음 기동에 반영되지 않는지), 무인 허용/거부, 이름↔세션 재개, 기록 위치·압축 감지, 세션/자식별 토큰, 런타임 갱신 전후 재개.
+5. 이후: **G. 설정 신뢰·실행 범위**(검토 스냅샷에 표식 CLAUDE.md·settings·hook·`.mcp.json`·skill을 두고 Guardrail 고정 인자로 실행해 적용 0건, Guardrail의 Bash/쓰기/검토 대상 실행 시도 거부, 개발 쪽 repo hook/settings 적용 0건, `CLAUDE_CONFIG_DIR` 아래 settings·CLAUDE.md·agents·skills 변조가 다음 기동에 반영되지 않음, 재개에 필요한 경로 목록 확인), 무인 허용/거부, 이름↔세션 재개, 기록 위치·압축 감지, 세션/자식별 토큰, 런타임 갱신 전후 재개.
 
 ## 9. 미확정(이 계약이 정하지 않는 것)
 

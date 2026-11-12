@@ -5,14 +5,14 @@
   "task_id": "01-02",
   "experiment_id": null,
   "run_id": "runtime-contract-20261112",
-  "revision": 2,
+  "revision": 3,
   "previous_run_ref": "reports/tasks/01-02/runtime-comparison-20261112/REPORT.md",
   "actor": {
     "role": "development",
     "name": "개발 에이전트(Claude Code 대화 세션)"
   },
   "execution_kind": "design_contract_with_static_install_check",
-  "execution_state": "교정 완료·재검토 대기",
+  "execution_state": "교정 rev3·재검토 대기",
   "inputs": {
     "spec_revision": "POC-01 rev 4",
     "repo_sha": null,
@@ -24,7 +24,7 @@
     ]
   },
   "expected": "01-02.accept 요소 전부를 계약에 고정, 실제 지원은 01-04 probe로 위임",
-  "observed": "계약 rev2(검토 F1~F9 반영): 역할별 설정 신뢰·고정 인자, 같은 UID 한계와 코디네이터 정본, 인증 방식 표·공유 판정 01-04 위임, 체크포인트 버전 필드, repo 범위 stop, 자식 기록, 오류 대응, 환경 정리, probe G 추가",
+  "observed": "계약 rev2(검토 F1~F9 반영): 역할별 설정 신뢰·고정 인자, 같은 UID 한계와 코디네이터 정본, 인증 방식 표·공유 판정 01-04 위임, 체크포인트 버전 필드, repo 범위 stop, 자식 기록, 오류 대응, 환경 정리, probe G 추가 / rev3: Guardrail 검토 대상 미실행·읽기 전용 도구, --add-dir 미사용, CLAUDE_CONFIG_DIR 전체 재구성, 한도·인증 오류 비재시도 분리, 역할 간 직접 통신 금지",
   "verdict": "미판정",
   "verification": {
     "level": "claim",
