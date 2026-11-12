@@ -1,0 +1,17 @@
+[package]
+name = "ieo-report"
+version = "0.1.0"
+description = "Progress report v0: validation, claim authorization, 5-part rendering, re-notification (01-08 reference)"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ieo-spec = { path = "../ieo-spec" }
+jsonschema = { version = "0.61.1", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.154"
+
+[lints]
+workspace = true

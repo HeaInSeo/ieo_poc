@@ -1,0 +1,16 @@
+수동 변이 확인(2026-11-12, 로컬, crates/ieo-report). 각 변이 후 `cargo test -q -p ieo-report`, 확인 뒤 원본 복원.
+M1 decision/body 일치 검사 비활성        → FAILED 20 passed; 1 failed (decision_mismatch)
+M2 재알림 조건에서 새 증거 제거          → FAILED 20 passed; 1 failed (input4_reobservation_is_suppressed)
+M3 기한 전 late 검사 비활성              → FAILED 20 passed; 1 failed (late_before_deadline_rejected)
+복원 후: ok 1 / 21 passed
+
+rev 2 (검토 8637403 뒤, 같은 방식):
+M4 decision.options 불일치 검사 비활성        → FAILED (options_mismatch_alone_is_rejected)
+M5 재알림의 결정 시한 경로 무효화             → FAILED (material_changes_notify_and_reorders_do_not)
+M6 재알림의 phase 경로 무효화                 → FAILED (같은 시험)
+M7 재알림의 operational_state 경로 무효화     → FAILED (같은 시험)
+M8 next_check_at 시각 검사 제외               → FAILED (bad_next_check_at_is_rejected)
+M9 예상 범위 순서 검사 비활성                 → FAILED 2건 (reversed_forecast, fractional_seconds_are_ordered)
+M10 현재 배정 대조 비활성                     → FAILED (stale_assignment_or_generation_is_409)
+(M5~M7 첫 시도는 배열 길이 변경으로 컴파일 실패 → 유효 변이로 다시 실행해 위 결과)
+복원 후: ok 1 / 30 passed

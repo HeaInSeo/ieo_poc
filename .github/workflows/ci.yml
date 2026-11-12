@@ -21,6 +21,9 @@ jobs:
       - name: render_progress.py --check
         working-directory: docs/poc
         run: python scripts/render_progress.py --check
+      - name: OpenAPI contract (external $ref resolved)
+        working-directory: contracts
+        run: openapi-spec-validator ieo-api-v0.openapi.yaml
   rust-toolchain:
     name: rust toolchain pin resolves
     runs-on: ubuntu-latest
