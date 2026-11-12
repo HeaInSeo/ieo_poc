@@ -1,0 +1,153 @@
+{
+  "all_ok": true,
+  "checks": [
+    {
+      "id": "E2 schema init rc",
+      "ok": true,
+      "got": 0
+    },
+    {
+      "id": "E1-dev-push-work",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1-dev-push-main",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1-gd-read-snapshot",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1-gd-write-snapshot",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E2-coord-insert",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E2-reader-select",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E2-reader-insert",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E2-no-password",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E2-development-reach",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E2-guardrail-reach",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E3-post-new",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E3-post-replay",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E3-post-conflict",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E3-get",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E3-no-token",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E3-other-token",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1b-dev-push-work",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1b-dev-push-main",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1b-dev-force-main",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1b-dev-delete-main",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1b-dev-repo-files",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1b-gd-reach",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "E1b-main-unchanged",
+      "ok": true,
+      "missing": [],
+      "forbidden_seen": []
+    },
+    {
+      "id": "no unexpected tests",
+      "ok": true,
+      "got": []
+    }
+  ]
+}

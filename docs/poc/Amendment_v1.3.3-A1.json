@@ -148,6 +148,13 @@
       "sha256": "31c637ab4fe6667c3b595b5f76de4ee4a93dc456d43f56d362b86b0bc562d5e6",
       "change": "amended",
       "reason": "A1 revision·패키지 무결성 대조; --write는 전달본 v1_3_3_validation.json을 보존하고 validation/v1.3.3-A1_current_validation.json에 저장(자동 검토 P2 교정)"
+    },
+    {
+      "path": "scripts/render_progress.py",
+      "original_sha256": "7e1a152c3bd05c9d03d18c3e41b47cb5cf4c4db17731ee44e5d8dacec88ccda0",
+      "sha256": "6f2ac232d5480b1750c1ceb5caf0593f887cdf8683df12c1e2ac1fa54e162a5a",
+      "change": "amended",
+      "reason": "01-06 산출물(진행 화면 생성기) 보강: 모든 화면을 임시 파일로 먼저 쓴 뒤 일괄 교체, 이전 중단의 *.tmp 제거, --check가 남은 임시 파일을 보고. 판정·검증 규칙은 바뀌지 않음(reports/tasks/01-06/lab-20261112/REPORT.md §2)"
     }
   ]
 }

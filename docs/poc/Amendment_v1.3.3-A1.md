@@ -27,3 +27,9 @@
 
 - 자동 검토 P2(PR #7, 814a5fb): `validate_package.py --write`가 전달본 `v1_3_3_validation.json`을 덮어써 다음 무결성 검사가 실패했다(재현함). 이제 전달본은 그대로 두고 현재 결과는 [validation/v1.3.3-A1_current_validation.json](validation/v1.3.3-A1_current_validation.json)에 쓴다. 이 파일은 그 시점의 결과 사본이며, 정합 여부는 검증기를 다시 실행해 확인한다. 전달 패키지 파일을 쓰려 하면 거부한다. [사용자 후속 지시](User_Decisions_2026-11-12_followup.md) 1에 따른 것이다.
 - P26 부족분 기록(후속 지시 4·5): 동결 대장 L04 `shortfall_record`. 기준 6+6을 유지하며, 01-04의 차단 조건이 아니다.
+
+## 5. 01-06 생성기 보강(2026-11-12)
+
+- 01-06의 산출물인 [scripts/render_progress.py](scripts/render_progress.py)의 쓰기 방식을 보강했다. 모든 화면을 임시 파일로 먼저 쓴 뒤 한꺼번에 교체하고, 이전 중단이 남긴 `*.tmp`를 지운다. `--check`는 남은 임시 파일도 보고한다.
+- 화면 내용과 검증 규칙은 바뀌지 않았다. 전달본 대비 sha256 변경은 [Amendment_v1.3.3-A1.json](Amendment_v1.3.3-A1.json) `files`에 있다.
+- 근거와 시험: [01-06 보고](reports/tasks/01-06/lab-20261112/REPORT.md) §2, `scripts/test_render_progress.py`.

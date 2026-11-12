@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-12T09:13:34+00:00",
+  "archive": "/opt/rust/ieo_poc_archive/lab-20261112T091332Z/lab-state.tar.gz",
+  "sha256": "a26b7290ee0d873f9e69c50143bbf83db02c8fae71a4349c434b15177d818c9a",
+  "bytes": 5228400,
+  "dirs": [
+    "roles",
+    "roles-recreated",
+    "testrepos",
+    "snapshots",
+    "snapshots-g",
+    "forge",
+    "rx-data",
+    "g2-src",
+    "g3-cfg"
+  ],
+  "entries": 564,
+  "names_digest": "b14b5511dacc3ac3",
+  "excluded": [
+    "*/cred",
+    "*/cred/*",
+    "e-secrets",
+    "e-secrets/*"
+  ]
+}

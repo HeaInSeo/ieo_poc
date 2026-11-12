@@ -173,12 +173,22 @@ def main():
     try:
         outputs=render(args.root)
         stale=[]
-        for name,text in outputs.items():
-            p=args.root/'progress'/name
-            if args.check:
+        progress=args.root/'progress'
+        if args.check:
+            for name,text in outputs.items():
+                p=progress/name
                 if not p.exists() or p.read_bytes()!=text.encode():stale.append(name)
-            else:
-                temporary=p.with_name(p.name+'.tmp');temporary.write_text(text,encoding='utf-8');temporary.replace(p)
+            leftovers=sorted(x.name for x in progress.glob('*.tmp'))
+            if leftovers:stale.append('남은 임시 파일 '+', '.join(leftovers))
+        else:
+            # 01-06: an interrupted earlier run may leave *.tmp files and a mix of old/new views.
+            # Remove stale temporaries, write every view to a temporary first, then swap them in;
+            # a rerun from state.json always reproduces the complete set (verified by test_render_progress.py).
+            for x in progress.glob('*.tmp'):x.unlink()
+            temporaries=[]
+            for name,text in outputs.items():
+                temporary=progress/(name+'.tmp');temporary.write_text(text,encoding='utf-8');temporaries.append((temporary,progress/name))
+            for temporary,target in temporaries:temporary.replace(target)
         if stale:raise ValueError('재생성 필요: '+', '.join(stale))
         print(json.dumps({'ok':True,'mode':'check' if args.check else 'render','files':list(outputs)},ensure_ascii=False))
     except (ValueError,KeyError,OSError,TypeError) as e:

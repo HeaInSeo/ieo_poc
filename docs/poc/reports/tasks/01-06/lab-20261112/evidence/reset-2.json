@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-12T09:14:43+00:00",
+  "removed": {
+    "containers": [
+      "ieo-probe-pg",
+      "ieo-probe-rx",
+      "ieo-probe-forge"
+    ],
+    "networks": [
+      "ieo-probe-coord",
+      "ieo-probe-forge"
+    ],
+    "dirs": [
+      "roles",
+      "testrepos",
+      "snapshots",
+      "forge",
+      "rx-data"
+    ]
+  },
+  "kept": [
+    "bin",
+    "e-secrets"
+  ]
+}

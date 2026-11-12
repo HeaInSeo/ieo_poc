@@ -1,0 +1,70 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": false,
+  "plan_version": "v1.3.3",
+  "task_id": "01-06",
+  "experiment_id": null,
+  "run_id": "lab-20261112",
+  "revision": 1,
+  "previous_run_ref": null,
+  "actor": {
+    "role": "development",
+    "name": "개발 에이전트(Claude Code 대화 세션)"
+  },
+  "execution_kind": "lab_reset_and_progress_renderer",
+  "execution_state": "독립 검토 대기",
+  "inputs": {
+    "spec_revision": "POC-01 rev 5 (v1.3.3-A1)",
+    "repo_sha": null,
+    "image_digest": "postgres:17-bookworm 018dbecf6a31 · golang:1.26.9-bookworm 6880d90c0623",
+    "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+    "model_runtime_versions": [
+      "모델 요청 0회"
+    ]
+  },
+  "expected": "사례별 초기 상태·기록 위치·정리 절차 재현, 필요한 환경만 준비, STATUS 고정 경로·결과 인덱스 제공, 생성기 산출물 포함·손편집/타이머 불요, 정상/실패·링크·중단 뒤 재생성 확인, 열람 미확인 공개",
+  "observed": "보관→정리→초기화→대조 2회 모두 기대 일치(E 16·E1b 7 허용/거부 기대대로), 두 초기화 구조 동일; 생성기 시험 26건 PASS(이전 생성기는 남은 임시 파일 탐지 1건 FAIL); GitHub 4 URL 익명 200·호스트 경로 존재; 사용자 실제 열람 미확인",
+  "verdict": "미판정",
+  "verification": {
+    "level": "claim",
+    "reviewer": null,
+    "evidence": []
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "대화 세션의 역할별 원시 사용량 수단 없음",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
+  "adoption": "미판정",
+  "reuse_assets": [
+    "probes/lab/lab.py",
+    "docs/poc/scripts/render_progress.py",
+    "docs/poc/scripts/test_render_progress.py"
+  ],
+  "unresolved": [
+    "보관본은 호스트 로컬(호스트 장애 미보존)",
+    "초기화마다 seed SHA가 달라짐 — 고정 SHA가 필요한 실험은 별도 seed 절차",
+    "사용자 실제 열람 미확인",
+    "공유 작업공간은 병합마다 main으로 되돌림(절차)"
+  ],
+  "next_action": "독립 검토 → 조건부 병합·main CI → 원장 갱신 → 02-01",
+  "evidence_refs": [
+    "reports/tasks/01-06/lab-20261112/Lab_Procedure.md",
+    "reports/tasks/01-06/lab-20261112/evidence/test_render_progress.txt",
+    "reports/tasks/01-06/lab-20261112/evidence/test_render_progress_old_renderer.txt",
+    "reports/tasks/01-06/lab-20261112/evidence/verify-1.json",
+    "reports/tasks/01-06/lab-20261112/evidence/verify-2.json",
+    "reports/tasks/01-06/lab-20261112/evidence/archive-manifest.json",
+    "reports/tasks/01-06/lab-20261112/evidence/viewing-paths.txt"
+  ],
+  "started_at": null,
+  "finished_at": null,
+  "next_owner": "독립 검토 세션",
+  "resume_condition": "현재 head SHA 독립 승인 + CI 성공 → 조건부 병합",
+  "operational_report_ref": null,
+  "schedule_report_ref": null
+}

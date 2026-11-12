@@ -1,0 +1,25 @@
+# lab.py 교정 검사 2026-11-12T09:25:50Z (모델 요청 없음)
+## check-init init-1
+{"all_ok": true, "failed": []}
+rc=0
+## check-init init-2
+{"all_ok": true, "failed": []}
+rc=0
+## 음성 대조: DB 스키마 rc=3
+{"all_ok": false, "failed": ["E2 schema init rc"]}
+rc=1
+## 음성 대조: main push 성공 표식
+{"all_ok": false, "failed": ["E1b-dev-push-main"]}
+rc=1
+## 상속된 IEO_PROBE_BASE 거부
+SCOPE GUARD: inherited IEO_PROBE_BASE differs from the lab ('/tmp/x'); unset it
+rc=1
+## 저장소 안 보관 거부
+archive destination must be outside the repository (it holds role session records)
+rc=1
+## 보관 없는 reset 거부
+reset needs --archived <MANIFEST.json> (or --no-archive-needed when the state is regenerable)
+rc=1
+## 상대 경로 보관(다른 cwd에서)
+archive <scratchpad>/reltest/lab-state.tar.gz entries 287 sha_ok True
+rc=0
