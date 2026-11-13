@@ -3479,8 +3479,8 @@ fn h2_every_reader_takes_the_same_latest_import() {
         .map(|r| r.get(0))
         .collect();
     assert_eq!(order, vec![1, 2, 3]);
-    // an inverted state (as two racing imports could leave before the stamp moved behind the
-    // lock): revision 3 stamped before revision 2. Every reader must then agree on revision 2.
+    // a clock that went backwards: revision 3 stamped before revision 2. Every reader must still
+    // take revision 3 (review f0c4e87 J2: revision first, never an older release).
     db.batch_execute(
         "ALTER TABLE notion_imports DISABLE TRIGGER notion_imports_append_only;
          UPDATE notion_imports SET imported_at = (SELECT imported_at FROM notion_imports
@@ -3489,7 +3489,7 @@ fn h2_every_reader_takes_the_same_latest_import() {
          ALTER TABLE notion_imports ENABLE TRIGGER notion_imports_append_only;",
     )
     .expect("invert");
-    // a spec derived from revision 3 is not the latest import's derivation
+    // revision 3 is gated: its derivation is refused
     let from3 = ready_from(&e, "POCX-T01", 3, 4);
     let (st, b) = e.post_k(
         "alice",
@@ -3498,7 +3498,21 @@ fn h2_every_reader_takes_the_same_latest_import() {
         &from3,
     );
     assert_ne!(st, 201, "{b}");
-    // the exception binds the same import the gate reads (revision 2's content)
+    // a spec derived from the older release (revision 2) is no longer the latest derivation:
+    // refused as stale before the gate (revision 3 is the latest import, whatever the clock says)
+    let from2 = ready_from(&e, "POCX-T01", 2, 4);
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "h2-from2-key",
+        &from2,
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    // the exception binds the same import the gate reads (revision 3's content)
     let (st, x) = e.post(
         "uma",
         "/v0/coordinator/exceptions",
@@ -3506,7 +3520,7 @@ fn h2_every_reader_takes_the_same_latest_import() {
     );
     assert_eq!(
         (st, x["approved_content_digest"].clone()),
-        (201, json!("b".repeat(64))),
+        (201, json!("c".repeat(64))),
         "{x}"
     );
 }
@@ -3578,11 +3592,11 @@ fn i1_only_the_named_pages_latest_content_hides_the_cited_digest() {
     assert_eq!(e.counts(), before);
 }
 
-/// Imports P as POCX-T01: revision 1 gated (content a), revision 2 released (content b); then
-/// stamps revision 1 after revision 2, so "latest" by import time is the gated revision 1 while
-/// the highest revision is the released one.
+/// Imports P as POCX-T01: revision 1 released (content b), revision 2 gated (content a); then
+/// stamps revision 2 before revision 1 (a clock that went backwards), so by import time the
+/// released revision 1 looks newer. Readers must take revision 2 (review f0c4e87 J2).
 fn inverted_latest(e: &Env) {
-    for (digest, gates) in [('a', queue_gates()), ('b', json!([]))] {
+    for (digest, gates) in [('b', json!([])), ('a', queue_gates())] {
         assert_eq!(
             e.post(
                 "importer",
@@ -3597,8 +3611,8 @@ fn inverted_latest(e: &Env) {
         .batch_execute(
             "ALTER TABLE notion_imports DISABLE TRIGGER notion_imports_append_only;
              UPDATE notion_imports SET imported_at = (SELECT imported_at FROM notion_imports
-               WHERE test_id = 'POCX-T01' AND sprint_revision = 2) + interval '1 millisecond'
-             WHERE test_id = 'POCX-T01' AND sprint_revision = 1;
+               WHERE test_id = 'POCX-T01' AND sprint_revision = 1) - interval '1 millisecond'
+             WHERE test_id = 'POCX-T01' AND sprint_revision = 2;
              ALTER TABLE notion_imports ENABLE TRIGGER notion_imports_append_only;",
         )
         .expect("invert");
@@ -3649,8 +3663,25 @@ fn i2_an_import_is_stamped_after_the_registry_lock() {
             )
             .0
         });
-        // the import's transaction has started and waits on the lock
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        // wait until the import's transaction is actually queued on the lock (review f0c4e87 J3)
+        let mut watcher = e.db();
+        let t0 = std::time::Instant::now();
+        while watcher
+            .query_one(
+                "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted
+                   AND database = (SELECT oid FROM pg_database WHERE datname = current_database())",
+                &[],
+            )
+            .expect("pg_locks")
+            .get::<_, i64>(0)
+            == 0
+        {
+            assert!(
+                t0.elapsed().as_secs() < 10,
+                "the import never waited on the lock"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
         let released_at: std::time::SystemTime = tx
             .query_one("SELECT clock_timestamp()", &[])
             .expect("clock")

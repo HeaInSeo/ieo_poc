@@ -819,7 +819,7 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
     if let Some(row) = tx.query_opt(
         "SELECT test_id, response FROM notion_imports WHERE page_id = $1 AND content_digest = $2
            AND (test_id, sprint_revision) = (SELECT test_id, sprint_revision FROM notion_imports
-                 WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1)",
+                 WHERE page_id = $1 ORDER BY sprint_revision DESC, imported_at DESC LIMIT 1)",
         &[&page_id, &digest],
     )? {
         if row.get::<_, &str>(0) != test_id {
@@ -1005,7 +1005,7 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Re
     let Some(row) = tx.query_opt(
         "SELECT n.content_digest, s.repo_id, s.spec FROM notion_imports n
            JOIN sprint_revisions s ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
-         WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1",
+         WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC, n.imported_at DESC LIMIT 1",
         &[&sid],
     )?
     else {
@@ -1072,8 +1072,10 @@ fn page_ids_in(v: &Value, out: &mut Vec<String>) {
 /// no longer cite the gated page's id nor its imported content digest — both dropped, or both
 /// rewritten (including to another imported page's id and digest) — is not recognised; it rests
 /// on the registrar and the semantic review. "Latest
-/// import" is ordered the same way everywhere: `imported_at` (stamped with `clock_timestamp()`
-/// after the registry lock), then revision (review e908a8c H2). For each page the **latest**
+/// import" is ordered the same way everywhere: revision first (assigned under the registry lock,
+/// so a clock that jumps backwards cannot make an older release look newer than a later
+/// re-gating import — review f0c4e87 J2), then `imported_at` (stamped with `clock_timestamp()`
+/// after the lock; it only orders pages imported under two test ids before that was refused). For each page the **latest**
 /// import decides: missing facts always block (`IMPORT_INCOMPLETE`); queue gates block
 /// (`IMPORT_GATED`) unless a user-approved exception exists for exactly this test sprint, repo,
 /// page and that import's content digest. A later trusted import without gates is the release
@@ -1113,7 +1115,7 @@ fn notion_gate(
             && tx
                 .query_one(
                     "SELECT EXISTS (SELECT 1 FROM (SELECT DISTINCT ON (page_id) content_digest FROM notion_imports
-                       WHERE page_id = ANY($1) ORDER BY page_id, imported_at DESC, sprint_revision DESC) l
+                       WHERE page_id = ANY($1) ORDER BY page_id, sprint_revision DESC, imported_at DESC) l
                      WHERE l.content_digest = $2)",
                     &[&named, &digest],
                 )?
@@ -1135,7 +1137,7 @@ fn notion_gate(
     for page in pages {
         let row = tx.query_one(
             "SELECT gates, missing, response, test_id, content_digest FROM notion_imports
-             WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1",
+             WHERE page_id = $1 ORDER BY sprint_revision DESC, imported_at DESC LIMIT 1",
             &[&page],
         )?;
         let (gates, missing): (Value, Value) = match (
@@ -1298,7 +1300,7 @@ fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
         .query_opt(
             "SELECT s.repo_id, n.content_digest, n.page_id FROM notion_imports n JOIN sprint_revisions s
                ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
-             WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1",
+             WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC, n.imported_at DESC LIMIT 1",
             &[&test_id],
         )?
         .map(|r| (r.get(0), r.get(1), r.get(2)));

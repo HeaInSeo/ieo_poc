@@ -213,8 +213,9 @@ CREATE TABLE IF NOT EXISTS notion_imports (
     -- one row per import, i.e. per test-sprint revision it created: content that returns to an
     -- earlier digest is a new row (review 9a421b7 F2). Keyed by the sprint revision, which never
     -- conflicts on earlier data where a page was imported under two test ids (review 7afd4d1 G4);
-    -- "latest import" (of a page or of a test id) is ordered by imported_at, then sprint_revision;
-    -- new rows stamp imported_at with clock_timestamp() after the registry lock (review e908a8c H2).
+    -- "latest import" (of a page or of a test id) is ordered by sprint_revision, assigned under the
+    -- registry lock (review f0c4e87 J2: clock independent), then imported_at, which new rows stamp
+    -- with clock_timestamp() after the lock (review e908a8c H2).
     PRIMARY KEY (test_id, sprint_revision),
     FOREIGN KEY (test_id, sprint_revision) REFERENCES sprint_revisions (sprint_id, revision)
 );
