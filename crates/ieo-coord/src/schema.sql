@@ -210,13 +210,22 @@ CREATE TABLE IF NOT EXISTS notion_imports (
     gates            jsonb,
     missing          jsonb,
     imported_at      timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (page_id, content_digest),
+    -- one row per (page, test-sprint revision): content that returns to an earlier digest is a new
+    -- row (review 9a421b7 F2)
+    PRIMARY KEY (page_id, sprint_revision),
     FOREIGN KEY (test_id, sprint_revision) REFERENCES sprint_revisions (sprint_id, revision)
 );
 
 -- C2 migration for databases created before C2 (columns stay NULL on earlier rows)
 ALTER TABLE notion_imports ADD COLUMN IF NOT EXISTS gates jsonb;
 ALTER TABLE notion_imports ADD COLUMN IF NOT EXISTS missing jsonb;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+             WHERE c.conname = 'notion_imports_pkey' AND a.attname = 'content_digest') THEN
+    ALTER TABLE notion_imports DROP CONSTRAINT notion_imports_pkey;
+    ALTER TABLE notion_imports ADD PRIMARY KEY (page_id, sprint_revision);
+  END IF;
+END $$;
 
 -- X-01 C2: user-approved execution exceptions for an imported test sprint. They lift the
 -- recorded queue gates only, for exactly one (test_id, repo); never missing facts or other checks.
@@ -229,8 +238,12 @@ CREATE TABLE IF NOT EXISTS exec_exceptions (
     decision_ref text        NOT NULL,
     request      jsonb       NOT NULL,
     approved_by  text        NOT NULL,
+    -- content digest of the import the exception was approved against (review 9a421b7 F4);
+    -- a later, different gated import needs a new approval. NULL (earlier rows) never matches.
+    content_digest text,
     approved_at  timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE exec_exceptions ADD COLUMN IF NOT EXISTS content_digest text;
 
 -- Append-only history: UPDATE/DELETE on these tables is refused by the database itself.
 CREATE OR REPLACE FUNCTION forbid_change() RETURNS trigger LANGUAGE plpgsql AS

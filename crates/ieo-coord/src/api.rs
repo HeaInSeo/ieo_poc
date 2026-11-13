@@ -590,6 +590,24 @@ fn register(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         return ok(200, result);
     }
     guard_import_owned(tx, &body, mode)?;
+    // C2 (review 9a421b7 F1): the gate follows the Notion sources a spec cites, whatever its
+    // sprint_id, so a copy of a gated task under another sprint id is gated too. Format errors
+    // keep their 400 (checked by register_spec).
+    if mode == CheckMode::Executable
+        && ieo_spec::schema::format_rejections(ieo_spec::schema::sprint_spec_validator(), &body)
+            .is_empty()
+    {
+        let repo = body["target"]["repo_id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        notion_gate(
+            tx,
+            &body,
+            body["sprint_id"].as_str().unwrap_or_default(),
+            &repo,
+        )?;
+    }
     let (status, result) = register_spec(tx, ctx, who, &body, mode)?;
     idempotent_store(
         tx,
@@ -796,8 +814,11 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         }
     };
     lock(tx, "registry")?;
+    // review 9a421b7 F2: a replay is only the page's *latest* import; content that returns to an
+    // earlier state (A→B→A) becomes a new revision so its gates apply again
     if let Some(row) = tx.query_opt(
-        "SELECT test_id, response FROM notion_imports WHERE page_id = $1 AND content_digest = $2",
+        "SELECT test_id, response FROM notion_imports WHERE page_id = $1 AND content_digest = $2
+           AND sprint_revision = (SELECT max(sprint_revision) FROM notion_imports WHERE page_id = $1)",
         &[&page_id, &digest],
     )? {
         if row.get::<_, &str>(0) != test_id {
@@ -829,6 +850,19 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         stored["registration"] = reevaluate(tx, stored["registration"].take())?;
         stored["replay"] = json!(true);
         return ok(200, stored);
+    }
+    if let Some(row) = tx.query_opt(
+        "SELECT test_id FROM notion_imports WHERE page_id = $1 AND test_id <> $2 LIMIT 1",
+        &[&page_id, &test_id],
+    )? {
+        let _ = row;
+        return Err(one(
+            409,
+            "EVENT_CONTENT_CONFLICT",
+            "test_id",
+            "this Notion page was imported under another test_id",
+            "use the test_id of the earlier import",
+        ));
     }
     if let Some(row) = tx.query_opt(
         "SELECT page_id FROM notion_imports WHERE test_id = $1 LIMIT 1",
@@ -991,10 +1025,7 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Re
         .flatten()
         .any(|x| x["kind"] == "notion_page" && x["digest"].as_str() == Some(digest.as_str()));
     if same_source && spec["tasks"] == imported["tasks"] {
-        // C2: execution of an imported task needs the server's own records to allow it
-        if mode == CheckMode::Executable {
-            import_gate(tx, sid, &owner)?;
-        }
+        let _ = mode;
         return Ok(());
     }
     Err(one(
@@ -1007,63 +1038,93 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Re
     ))
 }
 
-/// X-01 C2: the execution gate of an imported test sprint, from server records only — never from
-/// spec text a registrar can edit. Missing facts recorded by the latest import always block
-/// (`IMPORT_INCOMPLETE`). Queue gates recorded by the latest import block (`IMPORT_GATED`) unless a
-/// user-approved exception exists for exactly this (test_id, repo). A later trusted import whose
-/// gates are empty is the release record. Not an imported sprint → no gate.
-fn import_gate(tx: &mut Transaction, sprint_id: &str, repo: &str) -> Result<(), Resp> {
-    let Some(row) = tx.query_opt(
-        "SELECT gates, missing, response FROM notion_imports WHERE test_id = $1
-         ORDER BY sprint_revision DESC LIMIT 1",
-        &[&sprint_id],
-    )?
-    else {
-        return Ok(());
-    };
-    let (gates, missing): (Value, Value) = match (
-        row.get::<_, Option<Value>>(0),
-        row.get::<_, Option<Value>>(1),
-    ) {
-        (Some(g), Some(m)) => (g, m),
-        _ => {
-            // imported before C2: derive from the import service's stored response
-            let response: Value = row.get(2);
-            let reasons: Vec<String> = response["conversion"]["unresolved_bindings"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|x| x.as_str().map(str::to_string))
-                .collect();
-            let (g, m) = legacy_split(&reasons);
-            (json!(g), json!(m))
-        }
-    };
-    if missing.as_array().is_some_and(|m| !m.is_empty()) {
-        return Err(one(
-            409,
-            "IMPORT_INCOMPLETE",
-            "sprint_id",
-            &format!("the latest import lacks required facts: {missing}"),
-            "re-import once the Notion task states them; an exception does not lift this",
-        ));
-    }
-    if gates.as_array().is_some_and(|g| !g.is_empty()) {
-        let excepted: bool = tx
-            .query_one(
-                "SELECT EXISTS (SELECT 1 FROM exec_exceptions WHERE test_id = $1 AND repo_id = $2
-                   AND lifts = 'queue_gates')",
-                &[&sprint_id, &repo],
-            )?
-            .get(0);
-        if !excepted {
+/// X-01 C2: the execution gate, from server records only — never from spec text a registrar can
+/// edit. The Notion pages concerned are those imported for this sprint and those whose imported
+/// content a `notion_page` source of the spec cites (a copy under another sprint id is caught;
+/// a copy that drops the source cannot be recognised and rests on the registrar and the semantic
+/// review). For each page the **latest** import decides: missing facts always block
+/// (`IMPORT_INCOMPLETE`); queue gates block (`IMPORT_GATED`) unless a user-approved exception
+/// exists for exactly this test sprint, repo and that import's content digest. A later trusted
+/// import without gates is the release record.
+fn notion_gate(
+    tx: &mut Transaction,
+    spec: &Value,
+    sprint_id: &str,
+    repo: &str,
+) -> Result<(), Resp> {
+    let digests: Vec<String> = spec["sources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|x| x["kind"] == "notion_page")
+        .filter_map(|x| x["digest"].as_str().map(str::to_string))
+        .collect();
+    let pages: Vec<String> = tx
+        .query(
+            "SELECT DISTINCT page_id FROM notion_imports WHERE test_id = $1 OR content_digest = ANY($2)",
+            &[&sprint_id, &digests],
+        )?
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    for page in pages {
+        let row = tx.query_one(
+            "SELECT gates, missing, response, test_id, content_digest FROM notion_imports
+             WHERE page_id = $1 ORDER BY sprint_revision DESC LIMIT 1",
+            &[&page],
+        )?;
+        let (gates, missing): (Value, Value) = match (
+            row.get::<_, Option<Value>>(0),
+            row.get::<_, Option<Value>>(1),
+        ) {
+            (Some(g), Some(m)) => (g, m),
+            _ => {
+                // imported before C2: derive from the import service's stored response
+                let response: Value = row.get(2);
+                let reasons: Vec<String> = response["conversion"]["unresolved_bindings"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|x| x.as_str().map(str::to_string))
+                    .collect();
+                let (g, m) = legacy_split(&reasons);
+                (json!(g), json!(m))
+            }
+        };
+        let test_id: String = row.get(3);
+        let latest_digest: String = row.get(4);
+        if missing.as_array().is_some_and(|m| !m.is_empty()) {
             return Err(one(
                 409,
-                "IMPORT_GATED",
+                "IMPORT_INCOMPLETE",
                 "sprint_id",
-                &format!("the latest import records unreleased queue gates: {gates}"),
-                "wait for a trusted import that records the release, or a user-approved exception for this test",
+                &format!(
+                    "the latest import of a cited Notion page lacks required facts: {missing}"
+                ),
+                "re-import once the Notion task states them; an exception does not lift this",
             ));
+        }
+        if gates.as_array().is_some_and(|g| !g.is_empty()) {
+            // review 9a421b7 F4: the exception is bound to the import content it approved
+            let excepted: bool = test_id == sprint_id
+                && tx
+                    .query_one(
+                        "SELECT EXISTS (SELECT 1 FROM exec_exceptions WHERE test_id = $1 AND repo_id = $2
+                           AND lifts = 'queue_gates' AND content_digest = $3)",
+                        &[&sprint_id, &repo, &latest_digest],
+                    )?
+                    .get(0);
+            if !excepted {
+                return Err(one(
+                    409,
+                    "IMPORT_GATED",
+                    "sprint_id",
+                    &format!(
+                        "the latest import of a cited Notion page records unreleased queue gates: {gates}"
+                    ),
+                    "wait for a trusted import that records the release, or a user-approved exception for this test and content",
+                ));
+            }
         }
     }
     Ok(())
@@ -1167,15 +1228,15 @@ fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
             ))
         };
     }
-    let owner: Option<String> = tx
+    let latest: Option<(String, String)> = tx
         .query_opt(
-            "SELECT s.repo_id FROM notion_imports n JOIN sprint_revisions s
+            "SELECT s.repo_id, n.content_digest FROM notion_imports n JOIN sprint_revisions s
                ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
-             WHERE n.test_id = $1 LIMIT 1",
+             WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1",
             &[&test_id],
         )?
-        .map(|r| r.get(0));
-    if owner.as_deref() != Some(repo.as_str()) {
+        .map(|r| (r.get(0), r.get(1)));
+    let Some((owner, approved_digest)) = latest.filter(|(o, _)| *o == repo) else {
         return Err(one(
             422,
             "UNKNOWN_TASK",
@@ -1183,11 +1244,13 @@ fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
             "no imported test sprint with this id in this repo",
             "name an imported test sprint",
         ));
-    }
+    };
+    let _ = owner;
     tx.execute(
-        "INSERT INTO exec_exceptions (exception_id, test_id, repo_id, lifts, scope, decision_ref, request, approved_by)
-         VALUES ($1,$2,$3,'queue_gates',$4,$5,$6,$7)",
-        &[&id, &test_id, &repo, &body["scope"], &decision_ref, &body, &who.name],
+        "INSERT INTO exec_exceptions (exception_id, test_id, repo_id, lifts, scope, decision_ref, request,
+            approved_by, content_digest)
+         VALUES ($1,$2,$3,'queue_gates',$4,$5,$6,$7,$8)",
+        &[&id, &test_id, &repo, &body["scope"], &decision_ref, &body, &who.name, &approved_digest],
     )?;
     history(
         tx,
@@ -1983,8 +2046,6 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             ))
         };
     }
-    // C2: an imported test sprint is assignable only when the server's records allow execution
-    import_gate(tx, &sprint_id, &repo)?;
     // the sprint revision must be active, executable and semantically reviewed
     let Some(rev_row) = tx.query_opt(
         "SELECT repo_id, mode, review_state, spec FROM sprint_revisions WHERE sprint_id = $1 AND revision = $2",
@@ -2061,6 +2122,8 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         ));
     }
     let spec: Value = rev_row.get(3);
+    // C2: execution is allowed only when the server's Notion records allow it (review 9a421b7 F1)
+    notion_gate(tx, &spec, &sprint_id, &repo)?;
     let Some(task) = find_task(&spec, &task_id) else {
         return Err(one(
             422,

@@ -1552,6 +1552,20 @@ fn credentials_refuse_inconsistent_principals() {
         json!({"name": "a", "token_sha256": d, "kind": "user", "scopes": ["agent:report"], "repo_ids": ["r1"]}),
         json!({"name": "a", "token_sha256": "ABC", "kind": "user", "scopes": [], "repo_ids": []}),
     ];
+    // C2: the import scope is service-only, the exception scope user-only (review 9a421b7 F6)
+    let bad: Vec<Value> = bad.into_iter().chain([
+        json!({"name": "a", "token_sha256": d, "kind": "user", "scopes": ["notion:import"], "repo_ids": ["r1"]}),
+        json!({"name": "a", "token_sha256": d, "kind": "service", "scopes": ["exceptions:approve"], "repo_ids": ["r1"]}),
+    ]).collect();
+    for p in [
+        json!({"name": "a", "token_sha256": d, "kind": "service", "scopes": ["notion:import"], "repo_ids": ["r1"]}),
+        json!({"name": "a", "token_sha256": d, "kind": "user", "scopes": ["exceptions:approve"], "repo_ids": ["r1"]}),
+    ] {
+        assert!(
+            Credentials::from_json(&json!({"principals": [p]})).is_ok(),
+            "{p}"
+        );
+    }
     for p in bad {
         assert!(
             Credentials::from_json(&json!({"principals": [p]})).is_err(),
@@ -2118,18 +2132,20 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
         e.get("alice", "/v0/sprints/POCX-T01/revisions/1").1["digest"],
         rev1["digest"]
     );
-    // replay of the first content now reports it as superseded
-    let (_, r) = e.post(
+    // content that returns to the first state is a new revision (review 9a421b7 F2), not a replay
+    let (st, r) = e.post(
         "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'a', gate.clone()),
     );
     assert_eq!(
         (
-            r["registration"]["state"].clone(),
-            r["registration"]["superseded_by"].clone()
+            st,
+            r["registration"]["revision"].clone(),
+            r["replay"].clone()
         ),
-        (json!("SUPERSEDED"), json!(2))
+        (201, json!(3), json!(false)),
+        "{r}"
     );
     // the same content under another test id, or another page under this test id → 409
     assert_eq!(
@@ -2187,12 +2203,12 @@ fn an_imported_draft_with_unresolved_reasons_cannot_execute() {
     );
     assert_eq!(st, 201, "{r}");
     let spec = e.get("alice", "/v0/sprints/POCX-T01/revisions/1").1["spec"].clone();
-    // assigning the draft is refused: the import gate (C2) answers first, then UNBOUND_DRAFT
+    // assigning the draft is refused (draft revisions are checked before the import gate)
     let (st, b) = e.post("assigner", "/v0/coordinator/assignments",
         &json!({"repo_id": "repo-a", "role": "development", "assignment_id": "N1", "generation": 0,
                 "sprint_id": "POCX-T01", "sprint_revision": 1, "task_id": "11-01", "target_sha": SHA1,
                 "expected_current": null}));
-    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
     // promoting the stored draft as executable is refused by the import gate recorded by the
     // import service (C2), before the binding check
     let (st, b) = e.post_k(
@@ -2955,5 +2971,156 @@ fn c2_a_trusted_release_and_review_allow_execution() {
     d["unresolved_bindings"] = json!([]);
     d["digest"] = json!(ieo_spec::spec_digest(&d));
     let (st1, b1, st2, st3) = promote_review_assign(&e, &d, "c2-f-01-key");
+    assert_eq!((st1, st2, st3), (201, 201, 201), "{b1}");
+}
+
+// --- review 9a421b7 corrections ---
+
+fn ready_from(e: &Env, sprint_id: &str, from_rev: i64, new_rev: i64) -> Value {
+    let rev = e
+        .get(
+            "alice",
+            &format!("/v0/sprints/{sprint_id}/revisions/{from_rev}"),
+        )
+        .1;
+    let mut d = rev["spec"].clone();
+    d["revision"] = json!(new_rev);
+    d["registration_state"] = json!("ready");
+    d["target"]["repository_url"] = json!("https://example.invalid/repo-a");
+    d["limits"] = json!({"elapsed_seconds": 3600, "total_tokens": 100000, "correction_attempts": 1,
+                         "unresolved_reason": null});
+    d["unresolved_bindings"] = json!([]);
+    d["digest"] = json!(ieo_spec::spec_digest(&d));
+    d
+}
+
+#[test]
+fn c2_a_copy_under_another_sprint_id_is_still_gated() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    // F1: same tasks and the gated notion source, under another sprint id and task id
+    let mut copy = derived_executable(&e, "POCX-T01");
+    copy["sprint_id"] = json!("POCX-Z02");
+    copy["revision"] = json!(1);
+    copy["tasks"][0]["task_id"] = json!("13-01");
+    copy["digest"] = json!(ieo_spec::spec_digest(&copy));
+    let before = e.counts();
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "f1-copy-key", &copy);
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    assert_eq!(e.counts(), before);
+    // an exception for the import's own test sprint does not cover the copy
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-T01", "POCX-T01", "repo-a")
+        )
+        .0,
+        201
+    );
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "f1-copy-key2",
+        &copy,
+    );
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+}
+
+#[test]
+fn c2_content_returning_to_a_gated_state_gates_again() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'b', json!([]), json!([]))
+        )
+        .0,
+        201
+    );
+    // F2: back to the gated content A → new revision 3, gated again
+    let (st, r) = e.post(
+        "importer",
+        "/v0/imports/notion",
+        &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([])),
+    );
+    assert_eq!(
+        (st, r["registration"]["revision"].clone()),
+        (201, json!(3)),
+        "{r}"
+    );
+    let d = ready_from(&e, "POCX-T01", 3, 4);
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "f2-regate-key", &d);
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+}
+
+#[test]
+fn c2_an_exception_covers_only_the_content_it_approved() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-A", "POCX-T01", "repo-a")
+        )
+        .0,
+        201
+    );
+    // F4: a later import with different, still-gated content needs a new approval
+    let gated_b2 = json!(["Notion 차단 대상 미해제: 새 선행 B2"]);
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'c', gated_b2, json!([]))
+        )
+        .0,
+        201
+    );
+    let d = ready_from(&e, "POCX-T01", 2, 3);
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "f4-new-gate-key",
+        &d,
+    );
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-C", "POCX-T01", "repo-a")
+        )
+        .0,
+        201
+    );
+    let (st1, b1, st2, st3) = promote_review_assign(&e, &d, "f4-after-key");
     assert_eq!((st1, st2, st3), (201, 201, 201), "{b1}");
 }

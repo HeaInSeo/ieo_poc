@@ -29,7 +29,7 @@ def pairs(transcript, page_id):
                 continue
             for b in content:
                 if b.get('type') == 'tool_use' and b.get('name') == 'mcp__notion__notion-fetch' \
-                        and page_id in json.dumps(b.get('input', {})):
+                        and page_id in json.dumps(b.get('input', {})).replace('-', '').lower():
                     uses[b['id']] = n
                 if b.get('type') == 'tool_result' and b.get('tool_use_id') in uses:
                     results[b['tool_use_id']] = (n, b.get('content'), o.get('timestamp'))
@@ -39,7 +39,12 @@ def pairs(transcript, page_id):
 def main():
     if len(sys.argv) < 4:
         sys.exit(__doc__)
-    transcript, page_id, out_dir = sys.argv[1:4]
+    transcript, page_arg, out_dir = sys.argv[1:4]
+    # accept a dashed UUID or a URL as well as the 32-hex form
+    hexes = ''.join(c for c in page_arg.split('?')[0].split('#')[0] if c in '0123456789abcdefABCDEF')
+    page_id = hexes[-32:].lower()
+    if len(page_id) != 32:
+        sys.exit('PAGE_ID must contain a 32-hex Notion page id')
     found = pairs(transcript, page_id)
     if not found:
         sys.exit('no notion-fetch result for this page in the transcript')

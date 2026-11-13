@@ -50,6 +50,9 @@ paths:
         `notion_page` source digest); other content → 409 `EVENT_CONTENT_CONFLICT`. With `mode=executable` the
         server's import records decide (C2): missing facts → 409 `IMPORT_INCOMPLETE`; unreleased queue gates without a
         user-approved exception → 409 `IMPORT_GATED`. Text in the spec (e.g. removed reasons) does not decide.
+        The gate applies to every executable spec that cites a `notion_page` source whose content was imported (a copy
+        under another sprint_id is gated; the exception covers only the import's own test sprint). A copy that drops
+        the source cannot be recognised by the server and rests on the registrar and the semantic review.
         Only the latest registered revision of a sprint is active (01-07 rev 3). After a newer revision
         exists, a new registration of an older revision (any mode) and an executable promotion of an
         older revision stored as draft → 409 `REVISION_SUPERSEDED`. An identical re-submission of an older
@@ -140,7 +143,8 @@ paths:
         existing `test_id` → 409 `EVENT_CONTENT_CONFLICT`. A replay is answered only for the repo of the earlier
         import (another repo → 409 without stored content). A `test_id` that names an existing sprint not created
         by a Notion import → 409 `EVENT_CONTENT_CONFLICT`; a `test_id` equal to the Notion task ID → 400.
-        Content that returns to an earlier digest (A→B→A) is a replay of that earlier import, not a new revision.
+        A replay is only the page's latest import: content that returns to an earlier digest (A→B→A) is a new
+        revision, so the gates it records apply again. A page belongs to one test_id.
         A `test_id` may not be a binding's `sprint_id` (reserved for human input conversion, so `convertHumanInput`
         never writes an imported sprint). `registerSprint` for an imported sprint accepts only a spec derived from its
         latest import (same tasks and the same `notion_page` source digest) — the way to bind limits and make it
@@ -201,7 +205,9 @@ paths:
       summary: A person approves a PoC execution exception for one imported test sprint (X-01 C2)
       description: |
         Required scope `exceptions:approve`, held by user principals only, for `repo_id`. The exception lifts the queue
-        gates recorded by the import service for exactly this (test_id, repo) and nothing else: missing facts
+        gates recorded by the import service for exactly this (test_id, repo) and the content digest of that test
+        sprint's latest import at approval time (a later, different gated import needs a new approval), and nothing
+        else; its `scope` (branch, base SHA, no merge/deploy) is stored as a record, not enforced by the server. Missing facts
         (`IMPORT_INCOMPLETE`), binding, semantic review, limits and every other check still apply. It is a separate
         record; the imported gates stay stored. `exception_id` is the idempotency key. Unknown imported test sprint in
         this repo → 422 `UNKNOWN_TASK`.
@@ -498,7 +504,10 @@ paths:
         latest (409 `REVISION_SUPERSEDED`) — except that a running assignment's next generation may stay on the
         revision its previous generation used (X-01 pin; user decision 2026-11-13); that continuation is
         bounded by the `limits.correction_attempts` of the newest revision that is executable and semantically
-        reviewed (a newer draft changes nothing for the running execution), else by its own revision's — be registered executable (422 `UNBOUND_DRAFT`) and have passed the
+        reviewed (a newer draft changes nothing for the running execution), else by its own revision's —
+        and the Notion execution gate of the revision's spec (X-01 C2): 409 `IMPORT_INCOMPLETE` when the latest import
+        of a cited page lacks facts, 409 `IMPORT_GATED` when it records queue gates without a matching exception (this
+        also stops pinned continuations after a re-gating import) — be registered executable (422 `UNBOUND_DRAFT`) and have passed the
         semantic review (422 `SEMANTIC_REVIEW_NOT_PASSED`); the task must be in it (422 `UNKNOWN_TASK`).
         `expected_current` must equal the current head of (repo, role) (null when none), else 409
         `OWNERSHIP_CONFLICT`. Generation 0 needs an unused assignment_id; generation n>0 must follow the head
