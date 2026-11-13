@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS task_attempts (
     role          text    NOT NULL,
     issued        bigint  NOT NULL DEFAULT 0,
     limit_reached boolean NOT NULL DEFAULT false,
+    -- ceiling at which the one decision request was recorded (a raised ceiling asks again)
+    reached_ceiling bigint,
     PRIMARY KEY (sprint_id, task_id, role)
 );
 

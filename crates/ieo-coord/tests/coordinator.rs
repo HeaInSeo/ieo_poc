@@ -56,7 +56,14 @@ type PrincipalRow = (
     Option<&'static str>,
 );
 
-const PRINCIPALS: [PrincipalRow; 11] = [
+const PRINCIPALS: [PrincipalRow; 12] = [
+    (
+        "erin",
+        "user",
+        &["sprints:register", "review:semantic", "sprints:read"],
+        &["repo-a"],
+        None,
+    ),
     (
         "alice",
         "user",
@@ -1603,4 +1610,194 @@ fn development_and_guardrail_claims_race_into_one_ordered_stream() {
         .map(|r| r.get(0))
         .collect();
     assert_eq!(seqs, (1..=24).collect::<Vec<i64>>());
+}
+
+// --- review 1e98f17 corrections ---
+
+#[test]
+fn a_sprint_cannot_be_moved_to_another_repo() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    // F1: carol (repo-b) registers a newer revision of repo-a's sprint under repo-b
+    let hijack = spec("repo-b", 6, 3);
+    let before = e.counts();
+    let (st, b) = e.post_k(
+        "carol",
+        "/v0/sprints?mode=executable",
+        "hijack-key-01",
+        &hijack,
+    );
+    assert_eq!((st, code(&b)), (409, "SPRINT_REPO_CONFLICT".into()), "{b}");
+    assert_eq!(e.counts(), before);
+    assert_eq!(e.get("alice", "/v0/sprints/POC-01/state").0, 200);
+    assert_eq!(e.get("carol", "/v0/sprints/POC-01/events").0, 404);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+}
+
+#[test]
+fn github_reviews_count_only_at_the_head_and_comments_do_not_clear_changes_requested() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    full_evidence(&e, SHA1, "h");
+    let rv = |id: &str, sha: &str, reviewer: &str, state: &str| {
+        evidence(
+            &e,
+            id,
+            "review",
+            json!({"sha": sha, "reviewer": reviewer, "author": "dev",
+            "state": state, "source_ref": format!("pull/1#{id}")}),
+        )
+    };
+    assert_eq!(rv("r1-ok", SHA1, "r1", "approved").0, 201);
+    assert_eq!(rv("r2-cr", SHA1, "r2", "changes_requested").0, 201);
+    assert_eq!(judge(&e, "g1", "01-01").1["outcome"], "not_accepted");
+    // F2 repro 1: a later COMMENTED review by r2 does not clear its changes_requested
+    assert_eq!(rv("r2-cm", SHA1, "r2", "commented").0, 201);
+    assert_eq!(judge(&e, "g2", "01-01").1["outcome"], "not_accepted");
+    // F2 repro 2: r2 approving another PR's SHA does not clear it either
+    assert_eq!(rv("r2-other", SHA3, "r2", "approved").0, 201);
+    let (_, v) = judge(&e, "g3", "01-01");
+    assert_eq!(v["outcome"], "not_accepted", "{v}");
+    // a dismissed changes_requested no longer blocks
+    assert_eq!(rv("r2-dis", SHA1, "r2", "dismissed").0, 201);
+    assert_eq!(judge(&e, "g4", "01-01").1["outcome"], "accepted");
+    // F9: when a reject blocks, an approval of the task's earlier SHA is still named as not used
+    assert_eq!(
+        assign(
+            &e,
+            "development",
+            "A1",
+            1,
+            "01-01",
+            SHA2,
+            json!({"assignment_id": "A1", "generation": 0})
+        )
+        .0,
+        201
+    );
+    full_evidence(&e, SHA2, "h2");
+    assert_eq!(rv("r3-cr", SHA2, "r3", "changes_requested").0, 201);
+    let (_, v) = judge(&e, "g5", "01-01");
+    let summary = v["summary"].as_str().unwrap_or_default();
+    assert!(
+        v["outcome"] == "not_accepted"
+            && summary.contains("이전 SHA 승인 1111111은 현재 판정에 쓰지 않음"),
+        "{v}"
+    );
+}
+
+#[test]
+fn a_raised_ceiling_reached_again_asks_again() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 1);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    assert_eq!(
+        assign(
+            &e,
+            "development",
+            "A1",
+            1,
+            "01-01",
+            SHA2,
+            json!({"assignment_id": "A1", "generation": 0})
+        )
+        .0,
+        201
+    );
+    let (_, b) = assign(
+        &e,
+        "development",
+        "A1",
+        2,
+        "01-01",
+        SHA3,
+        json!({"assignment_id": "A1", "generation": 1}),
+    );
+    assert_eq!(b["outcome"], "limit_reached");
+    // the user raises the ceiling with a newer revision (ceiling 2)
+    let s6 = spec("repo-a", 6, 2);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-r6", &s6)
+            .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/6/semantic-review",
+            &json!({"decision": "passed", "reason": "ok", "digest": s6["digest"]})
+        )
+        .0,
+        201
+    );
+    let body = |g: u64, sha: &str| {
+        json!({"repo_id": "repo-a", "role": "development", "assignment_id": "A1",
+        "generation": g, "sprint_id": "POC-01", "sprint_revision": 6, "task_id": "01-01", "target_sha": sha,
+        "expected_current": {"assignment_id": "A1", "generation": g - 1}})
+    };
+    assert_eq!(
+        e.post("assigner", "/v0/coordinator/assignments", &body(2, SHA3))
+            .0,
+        201
+    );
+    let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &body(3, MERGE));
+    assert_eq!(
+        (st, b["outcome"].clone()),
+        (202, json!("limit_reached")),
+        "{b}"
+    );
+    assert_eq!(
+        code(
+            &e.post("assigner", "/v0/coordinator/assignments", &body(3, MERGE))
+                .1
+        ),
+        "LIMIT_REACHED"
+    );
+    let mut db = e.db();
+    let n: i64 = db
+        .query_one(
+            "SELECT count(*) FROM events WHERE report_type = 'decision_request'",
+            &[],
+        )
+        .expect("q")
+        .get(0);
+    assert_eq!(n, 2);
+}
+
+#[test]
+fn whoever_registered_or_promoted_a_revision_cannot_review_it() {
+    let Some(e) = start() else { return };
+    let s = spec("repo-a", 5, 1);
+    assert_eq!(e.post_k("alice", "/v0/sprints", "reg-key-p01", &s).0, 201);
+    assert_eq!(
+        e.post_k("erin", "/v0/sprints?mode=executable", "reg-key-p02", &s)
+            .0,
+        201
+    );
+    let review = json!({"decision": "passed", "reason": "ok", "digest": s["digest"]});
+    let (st, b) = e.post(
+        "erin",
+        "/v0/sprints/POC-01/revisions/5/semantic-review",
+        &review,
+    );
+    assert_eq!((st, code(&b)), (403, "SELF_REVIEW_DENIED".into()));
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/5/semantic-review",
+            &review
+        )
+        .0,
+        201
+    );
 }

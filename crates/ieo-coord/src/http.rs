@@ -71,13 +71,23 @@ pub fn serve(
 ) -> Result<(), String> {
     let mut handles = Vec::new();
     for _ in 0..workers.max(1) {
-        let mut db = db.connect(NoTls).map_err(|e| format!("db connect: {e}"))?;
+        let cfg = db.clone();
+        let mut db = cfg.connect(NoTls).map_err(|e| format!("db connect: {e}"))?;
         let server = Arc::clone(&server);
         let app = Arc::clone(&app);
         handles.push(std::thread::spawn(move || {
             while let Ok(req) = server.recv() {
+                // a dropped DB connection is re-opened; until then requests get 500, never silence
                 if db.is_closed() {
-                    break;
+                    match cfg.connect(NoTls) {
+                        Ok(c) => db = c,
+                        Err(e) => {
+                            eprintln!("ieo-coord: database reconnect failed: {e}");
+                            let b = serde_json::json!({"code": "INTERNAL", "message": "database unavailable"});
+                            respond(req, 500, &b);
+                            continue;
+                        }
+                    }
                 }
                 serve_one(&mut db, &app, req);
             }

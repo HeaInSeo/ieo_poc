@@ -38,6 +38,8 @@ paths:
         → 409 `IDEMPOTENCY_KEY_CONFLICT` (a draft registration is never replayed as executable intake).
         Without an idempotent replay, a revision already stored in draft mode and now submitted with
         `mode=executable` goes through the binding check again (01-07 rule).
+        A sprint_id belongs to the repo of its first registered revision: a revision whose `target.repo_id`
+        differs → 409 `SPRINT_REPO_CONFLICT` (policy RG2).
         Only the latest registered revision of a sprint is active (01-07 rev 3). After a newer revision
         exists, a new registration of an older revision (any mode) and an executable promotion of an
         older revision stored as draft → 409 `REVISION_SUPERSEDED`. An identical re-submission of an older
@@ -70,6 +72,7 @@ paths:
               schema: { $ref: '#/components/schemas/RegistrationResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
@@ -103,6 +106,7 @@ paths:
               schema: { $ref: '#/components/schemas/ConversionResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
@@ -134,6 +138,7 @@ paths:
                   review_state: { type: string, enum: [pending_semantic_review, semantic_review_passed, semantic_review_rejected] }
                   registered_at: { type: string, format: date-time }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /v0/sprints/{sprint_id}/state:
@@ -151,6 +156,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SprintState' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /v0/sprints/{sprint_id}/events:
@@ -192,6 +198,7 @@ paths:
                   has_more: { type: boolean }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /v0/agent/reports:
@@ -237,6 +244,7 @@ paths:
               schema: { $ref: '#/components/schemas/ClaimReceipt' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
@@ -273,6 +281,7 @@ paths:
               schema: { $ref: '#/components/schemas/ReproStatus' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
@@ -294,6 +303,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ReproStatus' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /v0/health:
@@ -324,7 +334,8 @@ paths:
       description: |
         Required scope `review:semantic` for the sprint's repo (otherwise 404, the sprint is not revealed).
         Separate from the format/reference check that registration runs. The registrant cannot review its own
-        registration (403 `SELF_REVIEW_DENIED`, policy G3). The body names the exact digest it covers (policy RG2);
+        registration — neither the registrant nor a principal that registered/promoted this revision
+        (403 `SELF_REVIEW_DENIED`, policy G3). The body names the exact digest it covers (policy RG2);
         another digest → 409 `DIGEST_MISMATCH`. One decision per revision: the same decision again → 200, a different
         one → 409 `EVENT_CONTENT_CONFLICT`. A superseded revision → 409 `REVISION_SUPERSEDED`. Only a revision that is
         registered executable and has `semantic_review_passed` can be assigned.
@@ -351,6 +362,7 @@ paths:
         '200': { $ref: '#/components/responses/SemanticReview' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Rejected' }
@@ -373,7 +385,8 @@ paths:
         Attempts are cumulative per (sprint, task, role) across assignments and generations (policy G4); the
         ceiling is the spec's `limits.correction_attempts`. The first request past the ceiling records one
         verified `decision_request` with its outbox entry and answers 202 `limit_reached` (the head is
-        unchanged); later ones → 409 `LIMIT_REACHED` with no state change (policy G5).
+        unchanged); later ones at the same ceiling → 409 `LIMIT_REACHED` with no state change; a ceiling raised
+        by a newer revision and reached again records a new decision_request (policy G5).
       requestBody:
         required: true
         content:
@@ -406,6 +419,7 @@ paths:
         '200': { $ref: '#/components/responses/CoordinatorResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
@@ -437,6 +451,7 @@ paths:
         '200': { $ref: '#/components/responses/CoordinatorResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
   /v0/coordinator/judgments:
@@ -449,7 +464,10 @@ paths:
         coordinator recorded for the current development assignment of that task (409 `NO_CURRENT_ASSIGNMENT`
         otherwise, policy G2). Inputs: CI/run evidence at the head; review inputs = the latest guardrail_review
         claim of the guardrail's *current* (assignment, generation) at judgment time for that task, plus GitHub
-        reviews whose reviewer differs from the author; a current reject/needs_confirmation at the head blocks;
+        reviews **at the head SHA** whose reviewer differs from the author (per reviewer the latest approved,
+        changes_requested or dismissed review; a later commented review does not clear changes_requested);
+        a current reject/needs_confirmation at the head blocks; the task and outputs are those of the
+        revision the development assignment was issued from;
         merge evidence whose head_sha is the head; main CI at its merged SHA; required outputs only (optional
         outputs are listed as not judged, policy G7); accepted follow-ups at the merged SHA. The verdict is a
         verified `coordinator_verdict` whose `evidence_comparison` is the per-scope completion wording.
@@ -472,6 +490,7 @@ paths:
         '200': { $ref: '#/components/responses/CoordinatorResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
@@ -490,6 +509,7 @@ paths:
         '200': { $ref: '#/components/responses/CoordinatorResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /v0/coordinator/outbox/{outbox_id}/delivery:
     post:
@@ -518,6 +538,7 @@ paths:
         '200': { $ref: '#/components/responses/CoordinatorResult' }
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Rejected' }
@@ -607,7 +628,7 @@ components:
                  IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR,
                  STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH, OWNERSHIP_CONFLICT, PREREQUISITE_UNMET, LIMIT_REACHED,
                  SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
-                 NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT]
+                 NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

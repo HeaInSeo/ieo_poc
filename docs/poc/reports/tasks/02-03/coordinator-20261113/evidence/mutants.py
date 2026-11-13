@@ -23,6 +23,12 @@ M=[
  ("M18 append-only triggers removed", "crates/ieo-coord/src/schema.sql", "$$ BEGIN RAISE EXCEPTION 'append-only table %', TG_TABLE_NAME; END $$;", "$$ BEGIN RETURN NEW; END $$;"),
  ("M19 registry trusts digest string (PR10 N2)", "crates/ieo-spec/src/check.rs", "if spec_digest(spec) != digest {", "if false {"),
  ("M20 completion summary prefix only (01-08 N2)", "crates/ieo-report/src/lib.rs", "        .filter(|(_, ok)| *ok)\n", "        .take_while(|(_, ok)| *ok)\n"),
+ ("M21 sprint may move to another repo (review F1)", API, "&& Some(r.get::<_, &str>(0)) != spec[\"target\"][\"repo_id\"].as_str()", "&& false"),
+ ("M22 GitHub reviews of any SHA (review F2)", API, "WHERE repo_id = $1 AND kind = 'review' AND sha = $2 AND body->>'reviewer' <> body->>'author'", "WHERE repo_id = $1 AND kind = 'review' AND (sha = $2 OR true) AND body->>'reviewer' <> body->>'author'"),
+ ("M23 commented review clears changes_requested (review F2)", API, "AND body->>'state' IN ('approved', 'changes_requested', 'dismissed')", "AND body->>'state' IN ('approved', 'changes_requested', 'dismissed', 'commented')"),
+ ("M24 decision request once per task, not per ceiling (review F6)", API, "if reached == Some(ceiling) {", "if reached.is_some() {"),
+ ("M25 promoter may review (review F10)", API, "if registrant == who.name || registered_it {", "if registrant == who.name {"),
+ ("M26 stale note dropped when blocked (review F9)", API, "        stale.dedup();\n", "        stale.clear();\n"),
 ]
 env=dict(os.environ)
 out=[]

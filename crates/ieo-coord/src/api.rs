@@ -411,6 +411,23 @@ fn register_spec(
     spec: &Value,
     mode: CheckMode,
 ) -> Result<(u16, Value), Resp> {
+    // review 1e98f17 F1: a sprint_id belongs to one repo for life (RG2); a revision that
+    // names another repo would hand the sprint to that repo
+    if let Some(sid) = spec["sprint_id"].as_str()
+        && let Some(r) = tx.query_opt(
+            "SELECT repo_id FROM sprint_revisions WHERE sprint_id = $1 LIMIT 1",
+            &[&sid],
+        )?
+        && Some(r.get::<_, &str>(0)) != spec["target"]["repo_id"].as_str()
+    {
+        return Err(one(
+            409,
+            "SPRINT_REPO_CONFLICT",
+            "target.repo_id",
+            "this sprint_id is registered for another repo",
+            "use a new sprint_id for this repo",
+        ));
+    }
     let reg = load_registry(tx, ctx)?;
     let out = check_registration(spec, &reg, mode);
     let status = out.http_status();
@@ -744,7 +761,15 @@ fn semantic_review(tx: &mut Transaction, who: &Caller, id: &str, rev: &str, req:
     };
     let digest: String = row.get(0);
     let registrant: String = row.get(1);
-    if registrant == who.name {
+    // whoever registered or promoted this revision cannot review it (review 1e98f17 F10)
+    let registered_it: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM history WHERE action = 'sprint.registered' AND actor = $1
+               AND subject->>'sprint_id' = $2 AND (subject->>'revision')::bigint = $3)",
+            &[&who.name, &id, &rev],
+        )?
+        .get(0);
+    if registrant == who.name || registered_it {
         return Err(problem(
             403,
             "SELF_REVIEW_DENIED",
@@ -1323,6 +1348,10 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         }
     };
     lock(tx, &format!("scope:{repo}:{role}"))?;
+    // an assignment_id is global across roles (F6); the registry lock keeps the revision
+    // checks below stable until commit (review 1e98f17 F5). Order: scope → id → registry.
+    lock(tx, &format!("assignment-id:{aid}"))?;
+    lock(tx, "registry")?;
     // same (assignment, generation) again: historical re-query, never a re-activation
     if let Some(row) = tx.query_opt(
         "SELECT request FROM assignments WHERE assignment_id = $1 AND generation = $2",
@@ -1481,11 +1510,12 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     }
     // G4/G5: cumulative attempts per (sprint, task, role)
     let attempts = tx.query_opt(
-        "SELECT issued, limit_reached FROM task_attempts WHERE sprint_id = $1 AND task_id = $2 AND role = $3",
+        "SELECT issued, reached_ceiling FROM task_attempts WHERE sprint_id = $1 AND task_id = $2 AND role = $3",
         &[&sprint_id, &task_id, &role],
     )?;
-    let (issued, reached) =
-        attempts.map_or((0, false), |r| (r.get::<_, i64>(0), r.get::<_, bool>(1)));
+    let (issued, reached) = attempts.map_or((0, None), |r| {
+        (r.get::<_, i64>(0), r.get::<_, Option<i64>>(1))
+    });
     let Some(ceiling) = spec["limits"]["correction_attempts"].as_i64() else {
         return Err(one(
             422,
@@ -1496,7 +1526,9 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         ));
     };
     if issued > ceiling {
-        if reached {
+        // one decision request per (task, role, ceiling): a ceiling raised by a newer
+        // revision and reached again asks again (review 1e98f17 F6)
+        if reached == Some(ceiling) {
             return Err(one(
                 409,
                 "LIMIT_REACHED",
@@ -1526,8 +1558,9 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             &[&sprint_id, &seq],
         )?;
         tx.execute(
-            "UPDATE task_attempts SET limit_reached = true WHERE sprint_id = $1 AND task_id = $2 AND role = $3",
-            &[&sprint_id, &task_id, &role],
+            "UPDATE task_attempts SET limit_reached = true, reached_ceiling = $4
+             WHERE sprint_id = $1 AND task_id = $2 AND role = $3",
+            &[&sprint_id, &task_id, &role, &ceiling],
         )?;
         history(
             tx,
@@ -1636,7 +1669,7 @@ fn limit_decision_request(
             "사용자가 새 상한을 승인해 새 명세 revision으로 등록하면 재개한다.",
         ),
     ];
-    r["event_id"] = json!(format!("limit-{sprint_id}-{task_id}-{role}"));
+    r["event_id"] = json!(format!("limit-{sprint_id}-{task_id}-{role}-c{ceiling}"));
     r["phase"] = json!("교정");
     r["operational_state"] = json!("사람 결정 대기");
     r["affected_tasks"] = json!([task_id]);
@@ -1946,8 +1979,8 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "fix repo_id",
         ));
     }
-    let spec: Value = rev_row.get(1);
-    let Some(task) = find_task(&spec, &task_id).cloned() else {
+    let latest_spec: Value = rev_row.get(1);
+    if find_task(&latest_spec, &task_id).is_none() {
         return Err(one(
             422,
             "UNKNOWN_TASK",
@@ -1955,12 +1988,12 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "the task is not in the active revision",
             "fix task_id",
         ));
-    };
+    }
     // G2: the head SHA is the coordinator's record for the current development assignment
     let dev = load_book(tx, &repo, "development")?;
     let head = match &dev.current {
         Some((a, g)) => tx.query_opt(
-            "SELECT target_sha, assignment_id, generation FROM assignments
+            "SELECT target_sha, assignment_id, generation, sprint_revision FROM assignments
              WHERE assignment_id = $1 AND generation = $2 AND sprint_id = $3 AND task_id = $4",
             &[a, &i64_of(*g), &sprint_id, &task_id],
         )?,
@@ -1978,6 +2011,23 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     let head_sha: String = head.get(0);
     let dev_aid: String = head.get(1);
     let dev_gen = u64::try_from(head.get::<_, i64>(2)).unwrap_or_default();
+    // the verdict judges the revision the assignment was issued from (RG2; review 1e98f17 F3)
+    let rev: i64 = head.get(3);
+    let spec: Value = tx
+        .query_one(
+            "SELECT spec FROM sprint_revisions WHERE sprint_id = $1 AND revision = $2",
+            &[&sprint_id, &rev],
+        )?
+        .get(0);
+    let Some(task) = find_task(&spec, &task_id).cloned() else {
+        return Err(one(
+            422,
+            "UNKNOWN_TASK",
+            "task_id",
+            "the task is not in the assigned revision",
+            "fix task_id",
+        ));
+    };
     let mut used = Vec::new();
     let ci = ci_ok(tx, &repo, &["ci_run", "run_record"], &head_sha, &mut used)?;
     // G3 review inputs (N4): the guardrail claim must be the *current* guardrail
@@ -1998,27 +2048,50 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         reviews.push((r.get(0), r.get(1)));
         used.push(format!("claim:{}", r.get::<_, String>(2)));
     }
+    // GitHub reviews (review 1e98f17 F2): per independent reviewer, the latest
+    // state-changing review *at the head SHA*. A later COMMENTED review does not clear a
+    // changes_requested; DISMISSED does. Reviews of other SHAs or PRs never count.
     for r in tx.query(
-        "SELECT DISTINCT ON (body->>'reviewer') evidence_id, sha, body->>'state' FROM evidence
-         WHERE repo_id = $1 AND kind = 'review' AND body->>'reviewer' <> body->>'author'
+        "SELECT DISTINCT ON (body->>'reviewer') evidence_id, body->>'state' FROM evidence
+         WHERE repo_id = $1 AND kind = 'review' AND sha = $2 AND body->>'reviewer' <> body->>'author'
+           AND body->>'state' IN ('approved', 'changes_requested', 'dismissed')
          ORDER BY body->>'reviewer', seq DESC",
-        &[&repo],
+        &[&repo, &head_sha],
     )? {
-        let state: String = r.get(2);
+        let state: String = r.get(1);
         let verdict = match state.as_str() {
             "approved" => "approve",
             "changes_requested" => "reject",
             _ => continue,
         };
-        reviews.push((r.get(1), verdict.to_string()));
+        reviews.push((head_sha.clone(), verdict.to_string()));
         used.push(format!("evidence:{}", r.get::<_, String>(0)));
+    }
+    // independent approvals of this task's earlier SHAs: shown as "not used", never counted
+    for r in tx.query(
+        "SELECT DISTINCT sha FROM evidence
+         WHERE repo_id = $1 AND kind = 'review' AND sha <> $2 AND body->>'state' = 'approved'
+           AND body->>'reviewer' <> body->>'author'
+           AND sha IN (SELECT target_sha FROM assignments WHERE repo_id = $1 AND role = 'development'
+                       AND sprint_id = $3 AND task_id = $4)
+         ORDER BY sha",
+        &[&repo, &head_sha, &sprint_id, &task_id],
+    )? {
+        reviews.push((r.get(0), "approve".to_string()));
     }
     let blocked = reviews
         .iter()
         .any(|(s, v)| *s == head_sha && (v == "reject" || v == "needs_confirmation"));
     let review = if blocked {
+        // keep the note about earlier-SHA approvals (review 1e98f17 F9)
+        let mut stale: Vec<String> = reviews
+            .iter()
+            .filter(|(s, v)| *s != head_sha && v == "approve")
+            .map(|(s, _)| s.clone())
+            .collect();
+        stale.dedup();
         ReviewCurrency::ReviewNeededOnCurrentSha {
-            stale_approvals: vec![],
+            stale_approvals: stale,
         }
     } else {
         review_currency(&head_sha, &reviews)
