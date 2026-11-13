@@ -1,0 +1,16 @@
+# X-01 C2 live check · commit 85f689c · 2026-11-13T13:27:07Z · persistent DB (pre-C2 rows kept; backup taken before the migration)
+## before
+2 revisions, 2 imports, 0 exceptions, 4 history, 0 assignments
+## 1. derived executable spec of POCX-SORI-OC08-T01 (reasons removed, limits bound), no exception → refused
+['IMPORT_GATED'] -> HTTP 409
+2 revisions, 2 imports, 0 exceptions, 4 history, 0 assignments
+## 2. exception recorded by the user-approver credential (decision ③; separate record, Notion task unchanged)
+{"exception_id":"EX-POCX-SORI-OC08-T01-20261113","lifts":"queue_gates","replay":false,"repo_id":"HeaInSeo/sori","test_id":"POCX-SORI-OC08-T01"} -> HTTP 201
+2 revisions, 2 imports, 1 exceptions, 5 history, 0 assignments
+## 3. the import service credential cannot approve exceptions; the approver cannot import
+importer → exceptions: HTTP 403
+approver → imports: HTTP 403
+2 revisions, 2 imports, 1 exceptions, 5 history, 0 assignments
+## 4. stored gate record of the latest import is unchanged (pre-C2 row: NULL → derived fail-closed at check time)
+1|t|t
+2|t|t
