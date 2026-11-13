@@ -819,8 +819,8 @@ pub struct CompletionFacts {
     pub followups_accepted: bool,
 }
 
-/// Completion wording: lists what is done and the first scope that is not.
-/// Never says "완료" for the whole task unless every scope holds.
+/// Completion wording: lists every confirmed scope and every scope that is not
+/// confirmed. Never says "완료" for the whole task unless every scope holds.
 pub fn completion_summary(f: &CompletionFacts) -> String {
     let short = |s: &str| s.chars().take(7).collect::<String>();
     let review_ok = matches!(f.review, Some(ReviewCurrency::ApprovedAtCurrentSha));
@@ -847,35 +847,40 @@ pub fn completion_summary(f: &CompletionFacts) -> String {
         ("필수 산출물 확인".to_string(), f.required_outputs_present),
         ("후속 작업 인수".to_string(), f.followups_accepted),
     ];
+    // Every scope is judged on its own (01-08 N2): a confirmed later scope (e.g. a merge)
+    // is shown even when an earlier one (e.g. current-SHA approval) is missing.
     let done: Vec<&str> = scopes
         .iter()
-        .take_while(|(_, ok)| *ok)
+        .filter(|(_, ok)| *ok)
         .map(|(t, _)| t.as_str())
         .collect();
-    match scopes.iter().find(|(_, ok)| !*ok) {
-        None => format!("작업 완료: {}", done.join(" · ")),
-        Some((first_missing, _)) => {
-            let mut s = if done.is_empty() {
-                "확인된 완료 범위 없음".to_string()
-            } else {
-                format!("{}까지만 확인", done.join(" · "))
-            };
-            s += &format!(". 미완료: {first_missing}");
-            if let Some(ReviewCurrency::ReviewNeededOnCurrentSha { stale_approvals }) = &f.review
-                && !stale_approvals.is_empty()
-            {
-                s += &format!(
-                    " (이전 SHA 승인 {}은 현재 판정에 쓰지 않음)",
-                    stale_approvals
-                        .iter()
-                        .map(|x| short(x))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-            }
-            s
-        }
+    let missing: Vec<&str> = scopes
+        .iter()
+        .filter(|(_, ok)| !*ok)
+        .map(|(t, _)| t.as_str())
+        .collect();
+    if missing.is_empty() {
+        return format!("작업 완료: {}", done.join(" · "));
     }
+    let mut s = if done.is_empty() {
+        "확인된 완료 범위 없음".to_string()
+    } else {
+        format!("{}만 확인", done.join(" · "))
+    };
+    s += &format!(". 미완료: {}", missing.join(" · "));
+    if let Some(ReviewCurrency::ReviewNeededOnCurrentSha { stale_approvals }) = &f.review
+        && !stale_approvals.is_empty()
+    {
+        s += &format!(
+            " (이전 SHA 승인 {}은 현재 판정에 쓰지 않음)",
+            stale_approvals
+                .iter()
+                .map(|x| short(x))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    s
 }
 
 #[cfg(test)]

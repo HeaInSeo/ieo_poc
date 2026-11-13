@@ -51,10 +51,11 @@ fn registry_for(items: &[&str]) -> Registry {
     let mut r = Registry::new();
     r.add_profile("nk-profile", 1, items.iter().map(|s| s.to_string()));
     // Make 01-07 resolvable as a registered task of another sprint.
-    r.add_spec(
-        &json!({"sprint_id": "POC-01", "plan_version": "v1.3.3", "revision": 4, "digest": "x",
-                       "tasks": [{"task_id": "01-07", "prerequisites": []}]}),
-    );
+    // The registry recomputes digests (PR #10 review N2), so the fixture carries a real one.
+    let mut prior = json!({"sprint_id": "POC-01", "plan_version": "v1.3.3", "revision": 4,
+                           "tasks": [{"task_id": "01-07", "prerequisites": []}]});
+    prior["digest"] = json!(ieo_spec::spec_digest(&prior));
+    assert!(r.add_spec(&prior));
     r
 }
 

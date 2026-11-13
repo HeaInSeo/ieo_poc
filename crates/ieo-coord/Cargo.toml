@@ -1,0 +1,20 @@
+[package]
+name = "ieo-coord"
+version = "0.1.0"
+description = "Coordinator DB schema, authenticated HTTP/JSON API, assignments, events, outbox and read model (02-03)"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ieo-spec = { path = "../ieo-spec" }
+ieo-report = { path = "../ieo-report" }
+hex = "0.4.3"
+postgres = { version = "0.19", features = ["with-serde_json-1"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tiny_http = "0.12"
+
+[lints]
+workspace = true

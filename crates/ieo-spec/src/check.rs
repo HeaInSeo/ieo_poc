@@ -84,6 +84,8 @@ impl Registry {
     /// revision is never (re)activated) or when the same revision is stored with a
     /// different digest. A stored executable mode is never narrowed back to draft.
     /// A newer revision replaces the sprint's task set (tasks it dropped disappear).
+    /// A spec without a `digest`, or whose content does not hash to its `digest`, is
+    /// never recorded (`false`).
     pub fn add_spec_with_mode(&mut self, spec: &Value, mode: CheckMode) -> bool {
         let sprint_id = spec["sprint_id"].as_str().unwrap_or_default().to_string();
         let plan_version = spec["plan_version"]
@@ -94,7 +96,14 @@ impl Registry {
         if self.latest_revision(&sprint_id).is_some_and(|l| l > rev) {
             return false;
         }
-        let digest = spec["digest"].as_str().unwrap_or_default().to_string();
+        // The registry trusts no caller-supplied digest (PR #10 review N2): a spec
+        // without a digest, or whose content does not hash to it, is never recorded.
+        let Some(digest) = spec["digest"].as_str().map(str::to_string) else {
+            return false;
+        };
+        if spec_digest(spec) != digest {
+            return false;
+        }
         let key = (sprint_id.clone(), rev);
         match self.revisions.get(&key) {
             // a stored revision is immutable: different content is never recorded over it

@@ -1,10 +1,12 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.5.0
+  version: 0.6.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
+    0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
+    their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
     0.5.0 (L08, not backward compatible with 0.4.0 clients): RegistrationResult state SUPERSEDED + superseded_by,
     codes REVISION_SUPERSEDED and ASSIGNMENT_SHA_MISMATCH, required ClaimReceipt disposition fields.
     - Registration acceptance is intake for semantic review, not execution intake or completion.
@@ -21,6 +23,7 @@ security:
 tags:
   - name: sprints
   - name: agent
+  - name: coordinator
 paths:
   /v0/sprints:
     post:
@@ -39,7 +42,7 @@ paths:
         exists, a new registration of an older revision (any mode) and an executable promotion of an
         older revision stored as draft → 409 `REVISION_SUPERSEDED`. An identical re-submission of an older
         revision in a mode it already covers → 200 `SUPERSEDED` with `superseded_by`: a historical lookup
-        of the stored result that changes no state and never reactivates the old revision. An
+        of the stored result that changes no state and never reactivates the old revision.
         An Idempotency-Key replay returns the stored request's result re-evaluated against the current
         registry: if a newer revision is now active, `state=SUPERSEDED` with `superseded_by` (never the
         original ACCEPTED/ALREADY_REGISTERED), and no state changes.
@@ -293,6 +296,231 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v0/health:
+    get:
+      tags: [coordinator]
+      operationId: getHealth
+      summary: Liveness (process answers, DB reachable); not a P04 result
+      security: []
+      responses:
+        '200':
+          description: Up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, schema_version, policy_digest, scope]
+                properties:
+                  status: { const: up }
+                  schema_version: { type: string }
+                  policy_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+                  scope: { type: string }
+        '500': { $ref: '#/components/responses/Internal' }
+  /v0/sprints/{sprint_id}/revisions/{revision}/semantic-review:
+    post:
+      tags: [sprints]
+      operationId: recordSemanticReview
+      summary: Independent semantic review (P01) of one registered revision
+      description: |
+        Required scope `review:semantic` for the sprint's repo (otherwise 404, the sprint is not revealed).
+        Separate from the format/reference check that registration runs. The registrant cannot review its own
+        registration (403 `SELF_REVIEW_DENIED`, policy G3). The body names the exact digest it covers (policy RG2);
+        another digest → 409 `DIGEST_MISMATCH`. One decision per revision: the same decision again → 200, a different
+        one → 409 `EVENT_CONTENT_CONFLICT`. A superseded revision → 409 `REVISION_SUPERSEDED`. Only a revision that is
+        registered executable and has `semantic_review_passed` can be assigned.
+      parameters:
+        - $ref: '#/components/parameters/SprintId'
+        - name: revision
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, reason, digest]
+              properties:
+                decision: { type: string, enum: [passed, rejected] }
+                reason: { type: string, minLength: 1 }
+                digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+      responses:
+        '201': { $ref: '#/components/responses/SemanticReview' }
+        '200': { $ref: '#/components/responses/SemanticReview' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/assignments:
+    post:
+      tags: [coordinator]
+      operationId: issueAssignment
+      summary: Issue an (assignment, generation) to a (repo, role); compare-and-swap on the ownership head
+      description: |
+        Required scope `coordinator:assign` for `repo_id` (service/user, never an agent).
+        Same (assignment_id, generation) and same body → 200 `already_issued` with `is_current` (historical
+        re-query, never a re-activation); different body → 409 `EVENT_CONTENT_CONFLICT`.
+        The revision must exist (422 `UNKNOWN_SPRINT_REVISION`), target this repo (422 `REPO_MISMATCH`), be the
+        latest (409 `REVISION_SUPERSEDED`), be registered executable (422 `UNBOUND_DRAFT`) and have passed the
+        semantic review (422 `SEMANTIC_REVIEW_NOT_PASSED`); the task must be in it (422 `UNKNOWN_TASK`).
+        `expected_current` must equal the current head of (repo, role) (null when none), else 409
+        `OWNERSHIP_CONFLICT`. Generation 0 needs an unused assignment_id; generation n>0 must follow the head
+        (same assignment_id, n-1, same sprint and task) — else 409 `OWNERSHIP_CONFLICT` / 422.
+        Prerequisites need verified verdicts under the pinned policy (409 `PREREQUISITE_UNMET`, policy G1).
+        Attempts are cumulative per (sprint, task, role) across assignments and generations (policy G4); the
+        ceiling is the spec's `limits.correction_attempts`. The first request past the ceiling records one
+        verified `decision_request` with its outbox entry and answers 202 `limit_reached` (the head is
+        unchanged); later ones → 409 `LIMIT_REACHED` with no state change (policy G5).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [repo_id, role, assignment_id, generation, sprint_id, sprint_revision, task_id, target_sha, expected_current]
+              properties:
+                repo_id: { type: string, minLength: 1 }
+                role: { type: string, enum: [development, guardrail] }
+                assignment_id: { type: string, minLength: 1, maxLength: 128 }
+                generation: { type: integer, minimum: 0 }
+                sprint_id: { type: string, minLength: 1 }
+                sprint_revision: { type: integer, minimum: 1 }
+                task_id: { type: string, minLength: 1 }
+                target_sha: { type: string, pattern: '^[a-f0-9]{40,64}$' }
+                expected_current:
+                  oneOf:
+                    - type: 'null'
+                    - type: object
+                      additionalProperties: false
+                      required: [assignment_id, generation]
+                      properties:
+                        assignment_id: { type: string, minLength: 1 }
+                        generation: { type: integer, minimum: 0 }
+      responses:
+        '201': { $ref: '#/components/responses/CoordinatorResult' }
+        '202': { $ref: '#/components/responses/CoordinatorResult' }
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/evidence:
+    post:
+      tags: [coordinator]
+      operationId: ingestEvidence
+      summary: Store GitHub or execution evidence (input to verdicts, never a verdict)
+      description: |
+        Required scope `evidence:ingest` for `repo_id`. Kinds: `ci_run`/`main_ci` {sha, conclusion, source_ref},
+        `run_record` {sha, source_ref, record = ieo-evidence record; passes only when
+        `record.judgment.counts_as_success` is true, never on exit status alone}, `review` {sha, reviewer, author,
+        state, source_ref}, `merge` {head_sha, merged_sha, source_ref}, `output` {sha, task_id, artifact_id, ref},
+        `followups` {sha, task_id, accepted, ref}. `(repo_id, evidence_id)` is the idempotency key: same body → 200,
+        different → 409 `EVENT_CONTENT_CONFLICT`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [evidence_id, repo_id, kind]
+              properties:
+                evidence_id: { type: string, minLength: 1 }
+                repo_id: { type: string, minLength: 1 }
+                kind: { type: string, enum: [ci_run, run_record, review, merge, main_ci, output, followups] }
+      responses:
+        '201': { $ref: '#/components/responses/CoordinatorResult' }
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/judgments:
+    post:
+      tags: [coordinator]
+      operationId: recordVerdict
+      summary: Judge one task from evidence and current claims; verdict, outbox entry and judgment row commit together
+      description: |
+        Required scope `judge:verify` held by a service principal (policy G3). The head SHA is the target_sha the
+        coordinator recorded for the current development assignment of that task (409 `NO_CURRENT_ASSIGNMENT`
+        otherwise, policy G2). Inputs: CI/run evidence at the head; review inputs = the latest guardrail_review
+        claim of the guardrail's *current* (assignment, generation) at judgment time for that task, plus GitHub
+        reviews whose reviewer differs from the author; a current reject/needs_confirmation at the head blocks;
+        merge evidence whose head_sha is the head; main CI at its merged SHA; required outputs only (optional
+        outputs are listed as not judged, policy G7); accepted follow-ups at the merged SHA. The verdict is a
+        verified `coordinator_verdict` whose `evidence_comparison` is the per-scope completion wording.
+        `(repo_id, judgment_id)` is the idempotency key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [judgment_id, repo_id, sprint_id, task_id]
+              properties:
+                judgment_id: { type: string, minLength: 1 }
+                repo_id: { type: string, minLength: 1 }
+                sprint_id: { type: string, minLength: 1 }
+                task_id: { type: string, minLength: 1 }
+      responses:
+        '201': { $ref: '#/components/responses/CoordinatorResult' }
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/outbox:
+    get:
+      tags: [coordinator]
+      operationId: listOutbox
+      summary: Outbox entries of verified reports in the caller's repos
+      description: Required scope `outbox:deliver`. Reading changes nothing.
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema: { type: string, enum: [pending, sent, unknown], default: pending }
+      responses:
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v0/coordinator/outbox/{outbox_id}/delivery:
+    post:
+      tags: [coordinator]
+      operationId: recordDelivery
+      summary: Record the external delivery state of one outbox entry
+      description: |
+        Required scope `outbox:deliver`. pending → sent | unknown; unknown → sent; the same state again → 200
+        unchanged; sent → unknown → 409 `OUTBOX_STATE_CONFLICT`. Delivery state is independent of task verdicts.
+      parameters:
+        - name: outbox_id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [state]
+              properties:
+                state: { type: string, enum: [sent, unknown] }
+      responses:
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Rejected' }
 components:
   securitySchemes:
     bearer:
@@ -328,6 +556,28 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Problem' }
+    SemanticReview:
+      description: Recorded (201) or the same decision already recorded (200)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [sprint_id, revision, digest, decision]
+            properties:
+              sprint_id: { type: string }
+              revision: { type: integer }
+              digest: { type: string }
+              decision: { type: string, enum: [passed, rejected] }
+    CoordinatorResult:
+      description: Coordinator endpoint result (outcome fields per operation description)
+      content:
+        application/json:
+          schema: { type: object }
+    Internal:
+      description: Unexpected server or database failure; the transaction was rolled back.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
     NotFound:
       description: Unknown sprint/revision, or not visible to this principal.
       content:
@@ -342,7 +592,7 @@ components:
         code:
           type: string
           enum: [UNAUTHENTICATED, SCOPE_DENIED, REPO_SCOPE_DENIED, ROLE_MISMATCH, VERIFIED_FROM_AGENT_DENIED,
-                 AGENT_READ_DENIED, NOT_FOUND]
+                 AGENT_READ_DENIED, NOT_FOUND, SELF_REVIEW_DENIED, INTERNAL]
         message: { type: string, minLength: 1 }
     Rejection:
       type: object
@@ -355,7 +605,9 @@ components:
                  DEPENDENCY_CYCLE, UNKNOWN_PROFILE_ITEM, UNBOUND_DRAFT, REVISION_CONFLICT, REVISION_SUPERSEDED, TASK_ID_CONFLICT,
                  UNRESOLVED_PREREQUISITE, DUPLICATE_TASK_NAME, ESTIMATE_RANGE_REVERSED,
                  IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR,
-                 STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH]
+                 STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH, OWNERSHIP_CONFLICT, PREREQUISITE_UNMET, LIMIT_REACHED,
+                 SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
+                 NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

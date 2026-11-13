@@ -42,6 +42,20 @@ jobs:
   rust-check:
     name: rust fmt clippy test
     runs-on: ubuntu-latest
+    services:
+      # 02-03 coordinator DB tests: throwaway PostgreSQL 17 (same image digest as the local runs)
+      postgres:
+        image: docker.io/library/postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+        env:
+          POSTGRES_USER: ieo
+          POSTGRES_DB: ieo
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ieo" --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      IEO_TEST_DB_URL: host=127.0.0.1 port=5432 user=ieo dbname=ieo
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: install toolchain from rust-toolchain.toml

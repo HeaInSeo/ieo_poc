@@ -479,3 +479,33 @@ fn registry_never_overwrites_a_revision_or_narrows_its_mode() {
         409
     );
 }
+
+#[test]
+fn registry_recomputes_the_digest_and_refuses_missing_or_forged_ones() {
+    // PR #10 review N2: the registry does not trust the caller's digest string.
+    let s = redigest(bound_ready(sprint(0)));
+    let mut reg = registry("POC-01");
+    assert!(reg.add_spec_with_mode(&s, CheckMode::Executable));
+    // probe 1: same stored digest pasted onto different content (tasks emptied) → refused
+    let mut forged = s.clone();
+    forged["tasks"] = json!([]);
+    assert!(!reg.add_spec_with_mode(&forged, CheckMode::Executable));
+    assert_eq!(
+        check_registration(&s, &reg, CheckMode::Executable).state,
+        ieo_spec::CheckState::AlreadyRegistered,
+        "stored revision and its task set unchanged"
+    );
+    // probe 2: no digest → refused, and a later correct submission is not blocked
+    let mut fresh = registry("POC-01");
+    let mut no_digest = s.clone();
+    no_digest.as_object_mut().map(|m| m.remove("digest"));
+    assert!(!fresh.add_spec(&no_digest));
+    assert_eq!(
+        fresh.latest_revision(s["sprint_id"].as_str().unwrap_or_default()),
+        None
+    );
+    assert_eq!(
+        check_registration(&s, &fresh, CheckMode::Draft).http_status(),
+        201
+    );
+}
