@@ -12,6 +12,16 @@ use std::path::{Path, PathBuf};
 
 const SID: &str = "6f1d2c3b-0000-4000-8000-000000000001";
 
+/// Serialises child-process spawns against the lock test (review 119ab95 P1): between fork and
+/// exec a child shares every descriptor of this process, including a session lock's O_CLOEXEC
+/// one, so a spawn on another test thread can make a just-released lock look held. Every test
+/// that starts a process holds this while spawning; the lock test holds it throughout.
+static SPAWN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn spawn_guard() -> std::sync::MutexGuard<'static, ()> {
+    SPAWN.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 /// A temporary directory removed on drop (restoring permissions first).
 struct Tmp(PathBuf);
 
@@ -135,7 +145,10 @@ fn environment_is_cleared_to_the_allow_list() {
     // the child sees exactly the allow-list, not this process's environment
     let mut cmd = std::process::Command::new("/usr/bin/env");
     env::apply(&mut cmd, &e).expect("apply");
-    let out = cmd.output().expect("run env");
+    let out = {
+        let _g = spawn_guard();
+        cmd.output().expect("run env")
+    };
     let mut seen: Vec<String> = String::from_utf8_lossy(&out.stdout)
         .lines()
         .filter_map(|l| l.split('=').next().map(str::to_string))
@@ -436,6 +449,7 @@ fn reconnect_decisions() {
 
 #[test]
 fn one_running_process_per_session() {
+    let _spawns = spawn_guard();
     let d = Tmp::new("lock");
     let me = std::process::id();
     let held = SessionLock::acquire(d.p(), SID, me).expect("first");
@@ -755,6 +769,7 @@ fn special_files_are_never_opened() {
     let fifo = |rel: &str| {
         let p = d.p().join(rel);
         std::fs::create_dir_all(p.parent().expect("parent")).expect("mk");
+        let _g = spawn_guard();
         let ok = std::process::Command::new("mkfifo")
             .arg(&p)
             .status()
@@ -861,11 +876,14 @@ fn a_non_regular_claude_json_is_never_opened() {
     // a FIFO: observed() must not block on it, and it is tamper
     let d = Tmp::new("cfg-r3-fifo");
     let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
-    let ok = std::process::Command::new("mkfifo")
-        .arg(d.p().join(".claude.json"))
-        .status()
-        .expect("mkfifo")
-        .success();
+    let ok = {
+        let _g = spawn_guard();
+        std::process::Command::new("mkfifo")
+            .arg(d.p().join(".claude.json"))
+            .status()
+            .expect("mkfifo")
+            .success()
+    };
     assert!(ok);
     let dir = d.p().to_path_buf();
     let (tx, rx) = std::sync::mpsc::channel();
