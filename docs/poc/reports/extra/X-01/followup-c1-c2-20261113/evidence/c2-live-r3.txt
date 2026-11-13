@@ -1,0 +1,27 @@
+# X-01 C2 live re-application after PR #30 merge · main c5a3d3a · 2026-11-13T14:47:07Z
+backup: ieo-20261113T144707Z-pre-c2r3.dump 39123 bytes
+## before
+3 revisions, 3 imports, 3 exceptions, 9 history, 0 assignments
+health: {"policy_digest":"e19a54ad636efea9df1534e7b28446853fa1d05cedff4ba40d1b4e2ff96e8e41","schema_version":"ieo-coord-v0","sco
+## schema after migration
+notion_imports pkey: PRIMARY KEY (test_id, sprint_revision)
+EX-POCX-SORI-OC08-T01-20261113|NULL|NULL
+EX-POCX-SORI-OC08-T01-20261113-r2|20181522c3dd|NULL
+EX-POCX-SORI-OC08-T01-20261113-r3|3f8a300fcae5|NULL
+3 revisions, 3 imports, 3 exceptions, 9 history, 0 assignments
+## 1. derived executable spec; existing exceptions carry no page (fail closed) → refused
+['EVENT_CONTENT_CONFLICT'] -> HTTP 409
+3 revisions, 3 imports, 3 exceptions, 9 history, 0 assignments
+## 2. decision ③ re-recorded, bound to the latest import's page and content
+{"approved_content_digest": "3f8a300fcae5\u2026", "approved_page_id": "3fd86e6dd1d1\u2026", "exception_id": "EX-POCX-SORI-OC08-T01-20261113-r4", "lifts": "queue_gates", "replay": false, "repo_id": "HeaInSeo/sori", "test_id": "POCX-SORI-OC08-T01"} -> HTTP 201
+EX-POCX-SORI-OC08-T01-20261113|NULL|NULL
+EX-POCX-SORI-OC08-T01-20261113-r2|20181522c3dd|NULL
+EX-POCX-SORI-OC08-T01-20261113-r3|3f8a300fcae5|NULL
+EX-POCX-SORI-OC08-T01-20261113-r4|3f8a300fcae5|3fd86e6d
+## 3. latest import (unchanged; Notion task not modified)
+3|3f8a300fcae5|3|0
+3 revisions, 3 imports, 4 exceptions, 10 history, 0 assignments
+## 4. scope separation: importer cannot approve, approver cannot import
+importer → exceptions: HTTP 403
+approver → imports: HTTP 403
+3 revisions, 3 imports, 4 exceptions, 10 history, 0 assignments
