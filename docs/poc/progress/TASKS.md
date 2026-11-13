@@ -1,6 +1,6 @@
 # 주계획·후속 작업 상태
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0014` · 원장 SHA-256 `fbe5209118a0e4c815c67f40e79c887dca4edd4c729817070a65b9cb55962dd3`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0015` · 원장 SHA-256 `fb892678275003d0099630668651eb22f90a2768461faad4ff659ed29c65a388`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -103,7 +103,7 @@
 
 | 작업 | 종류 | 상태 | 결과·근거 수준 | 관측 시각 | 최근 보고 | 다음 행동 |
 | --- | --- | --- | --- | --- | --- | --- |
-| X-01 · Notion 작업 가져오기·초안 등록 | 구현 | 진행 | 구현·검증 중(PR 대기) / unverified | 미확인 | 없음 · 미실행 | 독립 검토 → 조건부 병합 → 원장 갱신 |
+| X-01 · Notion 작업 가져오기·초안 등록 | 구현 | 검수 완료 | crates/ieo-notion(읽기 전용: 연결 스냅샷·REST API) + 코디네이터 POST /v0/imports/notion(OpenAPI 0.7.0). 실제 Notion 작업 OP-OCI-RAC-OC08-20261018을 대화 연결로 읽은 비공개 스냅샷(서버에 Notion 자격 없음)으로 영속 DB에 시험 ID POCX-SORI-OC08-T01 draft 등록(201), 같은 입력 재조회(200·행 불변), 모의 변경으로 revision 2·revision 1 보존, 초안 배정·executable 승격 거부(422), Notion 읽기 실패 시 DB 불변. 실행 중 배정의 revision 고정(상한은 더 새로운 executable·검토 통과 revision 기준). 시험 165건·변이 17/17. 대상 repo HeaInSeo/sori poc/POCX-SORI-OC08-T01 = 기준 2fa7f5e(추가 커밋 0, PR 없음). DB 등록은 개발 완료가 아님. PR #27 b8b619a reject(P2 R1~R3) → 38b671b reject(P2 S1·S2) → 7a48a4f reject(P2 T1) → 74bd796 approve(X-01 검토 4/4·교정 3/3) → 병합 74b00fd · main CI success(run 43425920936). 모델 호출 0 / verified | 2026-11-13T21:34:10+09:00 | [보고](../reports/extra/X-01/notion-import-20261113/REPORT.md) | X-02 착수 조건 충족 시(02-04 수용·모델 예산 승인·큐 선행 처분) |
 | X-02 · Notion 시험 작업의 실제 개발 세션 연결 | 검증 | 조건 대기 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 선행 X-01·02-04 수용, 모델 예산 승인, 원 작업 큐 선행 해제 또는 사용자 결정 뒤 착수 |
 
 [현황](STATUS.md) · [실험 결과](RESULTS.md)
