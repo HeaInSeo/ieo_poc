@@ -3536,3 +3536,138 @@ fn h3_an_exception_recorded_without_a_page_never_matches() {
     let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "h3-legacy-key", &d);
     assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
 }
+
+// --- review aa38041 I1–I2 ---
+
+#[test]
+fn i1_only_the_named_pages_latest_content_hides_the_cited_digest() {
+    let Some(e) = start() else { return };
+    const Q: &str = "fedcba9876543210fedcba9876543210";
+    // P (T01) gated with content a; Q (T02) once had the same content a, then was released as c
+    for (body, why) in [
+        (
+            notion_import_gated("POCX-T01", 'a', queue_gates(), json!([])),
+            "P",
+        ),
+        (
+            on_page(
+                notion_import_gated("POCX-T02", 'a', queue_gates(), json!([])),
+                Q,
+            ),
+            "Q gated a",
+        ),
+        (
+            on_page(
+                notion_import_gated("POCX-T02", 'c', json!([]), json!([])),
+                Q,
+            ),
+            "Q released c",
+        ),
+    ] {
+        assert_eq!(
+            e.post("importer", "/v0/imports/notion", &body).0,
+            201,
+            "{why}"
+        );
+    }
+    let q_url = format!("https://app.notion.com/p/Synthetic-Task-{Q}");
+    let copy = copy_of_t01(&e, "POCX-Z12", |s| s["ref"] = json!(q_url));
+    let before = e.counts();
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "i1-copy-key", &copy);
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    assert_eq!(e.counts(), before);
+}
+
+/// Imports P as POCX-T01: revision 1 gated (content a), revision 2 released (content b); then
+/// stamps revision 1 after revision 2, so "latest" by import time is the gated revision 1 while
+/// the highest revision is the released one.
+fn inverted_latest(e: &Env) {
+    for (digest, gates) in [('a', queue_gates()), ('b', json!([]))] {
+        assert_eq!(
+            e.post(
+                "importer",
+                "/v0/imports/notion",
+                &notion_import_gated("POCX-T01", digest, gates, json!([]))
+            )
+            .0,
+            201
+        );
+    }
+    e.db()
+        .batch_execute(
+            "ALTER TABLE notion_imports DISABLE TRIGGER notion_imports_append_only;
+             UPDATE notion_imports SET imported_at = (SELECT imported_at FROM notion_imports
+               WHERE test_id = 'POCX-T01' AND sprint_revision = 2) + interval '1 millisecond'
+             WHERE test_id = 'POCX-T01' AND sprint_revision = 1;
+             ALTER TABLE notion_imports ENABLE TRIGGER notion_imports_append_only;",
+        )
+        .expect("invert");
+}
+
+#[test]
+fn i2_the_gate_reads_the_latest_import_by_import_time() {
+    let Some(e) = start() else { return };
+    inverted_latest(&e);
+    // a copy citing P's page: the gate must read revision 1 (gated), not revision 2 (released)
+    let mut copy = ready_from(&e, "POCX-T01", 2, 1);
+    copy["sprint_id"] = json!("POCX-Z13");
+    copy["tasks"][0]["task_id"] = json!("13-01");
+    copy["digest"] = json!(ieo_spec::spec_digest(&copy));
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "i2-gate-key", &copy);
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+}
+
+#[test]
+fn i2_a_replay_matches_the_latest_import_by_import_time() {
+    let Some(e) = start() else { return };
+    inverted_latest(&e);
+    // content a is the latest import by import time: a replay, not a new revision
+    let (st, r) = e.post(
+        "importer",
+        "/v0/imports/notion",
+        &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([])),
+    );
+    assert_eq!((st, r["replay"].clone()), (200, json!(true)), "{r}");
+}
+
+#[test]
+fn i2_an_import_is_stamped_after_the_registry_lock() {
+    let Some(e) = start() else { return };
+    let mut holder = e.db();
+    let mut tx = holder.transaction().expect("tx");
+    tx.execute(
+        "SELECT pg_advisory_xact_lock(hashtextextended('registry', 0))",
+        &[],
+    )
+    .expect("hold registry lock");
+    std::thread::scope(|sc| {
+        let req = sc.spawn(|| {
+            e.post(
+                "importer",
+                "/v0/imports/notion",
+                &notion_import("POCX-T01", 'a', json!([])),
+            )
+            .0
+        });
+        // the import's transaction has started and waits on the lock
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let released_at: std::time::SystemTime = tx
+            .query_one("SELECT clock_timestamp()", &[])
+            .expect("clock")
+            .get(0);
+        tx.commit().expect("release");
+        assert_eq!(req.join().expect("join"), 201);
+        let stamped: std::time::SystemTime = e
+            .db()
+            .query_one(
+                "SELECT imported_at FROM notion_imports WHERE test_id = 'POCX-T01'",
+                &[],
+            )
+            .expect("row")
+            .get(0);
+        assert!(
+            stamped >= released_at,
+            "imported_at precedes the lock release: stamped at transaction start"
+        );
+    });
+}

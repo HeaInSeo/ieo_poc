@@ -19,10 +19,14 @@ M = [
  ("C10 replay of an earlier content state (review F2)", API, "           AND (test_id, sprint_revision) = (SELECT test_id, sprint_revision FROM notion_imports\n                 WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1)\",", "\","),
  ("C11 exception not bound to the approved content (review F4)", API, "AND page_id = $3 AND content_digest = $4", "AND page_id = $3 AND (content_digest = $4 OR true)"),
  ("C12 a page may be imported under a second test id (review 7afd4d1 G3)", API, "WHERE page_id = $1 AND test_id <> $2 LIMIT 1\",", "WHERE page_id = $1 AND test_id <> $2 AND false LIMIT 1\","),
- ("C13 a named page hides the cited content whatever its digest (review e908a8c H1)", API, "WHERE page_id = ANY($1) AND content_digest = $2)\",", "WHERE page_id = ANY($1) AND (content_digest = $2 OR true))\","),
- ("C13b the cited digest always pulls in every page with that content (G2 over-blocking)", API, "WHERE page_id = ANY($1) AND content_digest = $2)\",", "WHERE page_id = ANY($1) AND content_digest = $2 AND false)\","),
+ ("C13 a named page hides the cited content whatever its digest (review e908a8c H1)", API, "WHERE l.content_digest = $2)\",", "WHERE l.content_digest = $2 OR true)\","),
+ ("C13b the cited digest always pulls in every page with that content (G2 over-blocking)", API, "WHERE l.content_digest = $2)\",", "WHERE l.content_digest = $2 AND false)\","),
  ("C14 registration reads the latest import by revision only (review e908a8c H2)", API, "           JOIN sprint_revisions s ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision\n         WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1\",", "           JOIN sprint_revisions s ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision\n         WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1\","),
  ("C14b exception approval reads the latest import by revision only (review e908a8c H2)", API, "               ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision\n             WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1\",", "               ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision\n             WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1\","),
+ ("C15 carried compares with any past import of the named page (review aa38041 I1)", API, "WHERE page_id = ANY($1) ORDER BY page_id, imported_at DESC, sprint_revision DESC) l", "WHERE page_id = ANY($1)) l"),
+ ("C16 the gate reads the latest import by revision only (review aa38041 I2 X1)", API, "             WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1\",\n            &[&page],", "             WHERE page_id = $1 ORDER BY sprint_revision DESC LIMIT 1\",\n            &[&page],"),
+ ("C17 replay reads the latest import by revision only (review aa38041 I2 X2)", API, "                 WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1)\",", "                 WHERE page_id = $1 ORDER BY sprint_revision DESC LIMIT 1)\","),
+ ("C18 imports stamped at transaction start, before the registry lock (review aa38041 I2 X3)", API, "$9,$10,$11, clock_timestamp())", "$9,$10,$11, now())"),
 ]
 for name, f, a, b in M:
     if ONLY and not any(name.startswith(o) for o in ONLY):
