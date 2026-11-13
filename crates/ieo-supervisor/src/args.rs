@@ -13,6 +13,24 @@ pub enum Role {
 
 pub const ROLE_DIR: &str = "/etc/ieo/role";
 
+/// Guardrail allow rules (§4.1): file writes as `Edit(//…)`, never `Write(` (§10 item 1).
+pub const GUARDRAIL_ALLOWED: [&str; 4] = [
+    "Read(//state/review/**)",
+    "Read(//state/inputs/**)",
+    "Read(//state/guardrail-scratch/**)",
+    "Edit(//state/guardrail-scratch/**)",
+];
+
+/// Guardrail deny rules (§4.1).
+pub const GUARDRAIL_DISALLOWED: [&str; 6] = [
+    "Read(//run/ieo/**)",
+    "Read(//etc/ieo/**)",
+    "Read(//state/claude/**)",
+    "Read(//state/home/**)",
+    "Read(//proc/**)",
+    "Bash",
+];
+
 /// `claude -p …` argv (without the program name). `resume` = the checkpoint's session id;
 /// otherwise a new session with the coordinator-issued `session_id`.
 pub fn build(role: &Role, repo: &str, session_id: &str, resume: bool) -> Vec<String> {
@@ -52,6 +70,9 @@ pub fn build(role: &Role, repo: &str, session_id: &str, resume: bool) -> Vec<Str
         Role::Development {
             append_system_prompt_file,
         } => {
+            // Not here yet: the development role's --allowedTools/--disallowedTools lists. §4.1
+            // names them, but their content is open (§9) and is set with 03-02; until then the
+            // development role relies on the read-only settings and permission mode.
             if let Some(f) = append_system_prompt_file {
                 a.extend(["--append-system-prompt-file".into(), f.clone()]);
             }
@@ -59,14 +80,12 @@ pub fn build(role: &Role, repo: &str, session_id: &str, resume: bool) -> Vec<Str
         Role::Guardrail => {
             a.push("--disable-slash-commands".into());
             a.extend(["--tools".into(), "Read,Grep,Glob,Write,Edit".into()]);
-            a.extend([
-                "--allowedTools".into(),
-                "Read(//state/review/**) Read(//state/inputs/**) Read(//state/guardrail-scratch/**) Edit(//state/guardrail-scratch/**)".into(),
-            ]);
-            a.extend([
-                "--disallowedTools".into(),
-                "Read(//run/ieo/**) Read(//etc/ieo/**) Read(//state/claude/**) Read(//state/home/**) Read(//proc/**) Bash".into(),
-            ]);
+            // one argv entry per rule (the options are variadic); 01-04 never passed these
+            // two options, so their acceptance is checked in the 02-04 real-session tests
+            a.push("--allowedTools".into());
+            a.extend(GUARDRAIL_ALLOWED.iter().map(|s| s.to_string()));
+            a.push("--disallowedTools".into());
+            a.extend(GUARDRAIL_DISALLOWED.iter().map(|s| s.to_string()));
         }
     }
     a

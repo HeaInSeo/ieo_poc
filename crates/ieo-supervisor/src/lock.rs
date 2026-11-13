@@ -1,63 +1,60 @@
 //! One running process per session (runtime contract §5-5, rev 6 §10 item 4).
 //!
-//! The lock is a supervisor-owned file in the role volume holding the owner pid. A second
-//! `reconnect` for a session whose lock holder is alive does not start `--resume`; it answers
-//! with the holder (`status`). A lock whose holder no longer exists is stale and is replaced.
+//! The lock is an advisory OS file lock (`flock`, via `File::try_lock`) on a supervisor-owned
+//! file in the role volume. The kernel releases it when the holder's file descriptor closes,
+//! including when the process dies, so there is no stale-lock takeover, no pid-reuse question
+//! and no window between creating the file and writing the pid. The pid in the file is only
+//! information for the `status` answer; it is written after the lock is held and may be empty
+//! while the holder is starting. The file is never removed (removing it would let a second
+//! taker lock a new inode while the first still holds the old one).
+//!
+//! Limit (§5-5, §2.1): development code in the same container can delete the lock file; the
+//! effect stays inside the development role's own sessions.
 
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::fs::{File, OpenOptions, TryLockError};
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct SessionLock {
-    path: PathBuf,
+    _file: File,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LockError {
-    /// The session is already running in `pid`.
+    /// The session is already running; `pid` as written by the holder (None while it starts).
     Running {
-        pid: u32,
+        pid: Option<u32>,
     },
     Io(String),
 }
 
-fn alive(pid: u32) -> bool {
-    Path::new(&format!("/proc/{pid}")).exists()
-}
-
 impl SessionLock {
     pub fn acquire(dir: &Path, session_id: &str, pid: u32) -> Result<SessionLock, LockError> {
+        let io = |e: std::io::Error| LockError::Io(e.to_string());
         let path = dir.join(format!("{session_id}.lock"));
-        for _ in 0..2 {
-            match OpenOptions::new().write(true).create_new(true).open(&path) {
-                Ok(mut f) => {
-                    f.write_all(pid.to_string().as_bytes())
-                        .map_err(|e| LockError::Io(e.to_string()))?;
-                    return Ok(SessionLock { path });
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let holder = std::fs::read_to_string(&path)
-                        .ok()
-                        .and_then(|s| s.trim().parse::<u32>().ok());
-                    match holder {
-                        Some(p) if alive(p) => return Err(LockError::Running { pid: p }),
-                        // stale (holder gone) or unreadable: replace once
-                        _ => {
-                            std::fs::remove_file(&path)
-                                .map_err(|e| LockError::Io(e.to_string()))?;
-                        }
-                    }
-                }
-                Err(e) => return Err(LockError::Io(e.to_string())),
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(io)?;
+        match f.try_lock() {
+            Ok(()) => {}
+            Err(TryLockError::WouldBlock) => {
+                let mut s = String::new();
+                let _ = f.read_to_string(&mut s);
+                return Err(LockError::Running {
+                    pid: s.trim().parse().ok(),
+                });
             }
+            Err(TryLockError::Error(e)) => return Err(io(e)),
         }
-        Err(LockError::Io("lock could not be taken".into()))
-    }
-}
-
-impl Drop for SessionLock {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        f.set_len(0).map_err(io)?;
+        f.seek(SeekFrom::Start(0)).map_err(io)?;
+        f.write_all(pid.to_string().as_bytes()).map_err(io)?;
+        f.flush().map_err(io)?;
+        Ok(SessionLock { _file: f })
     }
 }

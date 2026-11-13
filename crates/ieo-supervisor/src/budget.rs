@@ -4,13 +4,27 @@
 //! children, development and review, failed, incomplete and correction runs alike — with its
 //! `usage.run` share (resumed sessions: cumulative minus the resumed base, rev 7 §11 item 7).
 //! Billable tokens = input + output + cache_creation; cache_read has its own cap.
-//! An unmeasured run is never zero: it stops further calls. No automatic retry.
+//! An unmeasured run is never zero: it stops further calls. A record whose duration, run
+//! state or token fields are missing or not numbers counts as unmeasured, and a record that
+//! does not say whether it was a model run stops the budget too. No automatic retry.
 //!
-//! Extra billing: only subscription usage is allowed (additional charge USD 0). The CLI's
-//! `total_cost_usd` is a conversion estimate, not a bill, and is never capped at 0. A run may
-//! start only when the latest observed `rate_limit_event` shows that extra usage is not in use
-//! and cannot start (`isUsingOverage:false`, `overageStatus` not `allowed`); otherwise that call
-//! is held with the reason.
+//! **When caps are checked.** Run count and seconds are hard: a run starts only while one is
+//! left, and its timeout is the per-run limit capped by the seconds left. Tokens cannot be
+//! stopped mid-run by this guard, so a run starts only when the spent amount plus a *reserve*
+//! (the largest run so far) does not exceed the cap. This is a projection, not a guarantee:
+//! the first run has no history and is bounded only by its timeout, and any run can exceed
+//! the reserve; [`Spent`] then shows the overrun, which is reported, and the next call stops.
+//! The adapter's in-stream stop on a cap crossing is a later 02-04 step.
+//!
+//! **Extra billing.** Only subscription usage is allowed (additional charge USD 0). The CLI's
+//! `total_cost_usd` is a conversion estimate, not a bill, and is never capped at 0. The CLI
+//! (2.1.322) types `overageStatus` as `allowed | allowed_warning | rejected`, where the first
+//! two mean paid extra usage covers the overflow. A run may start only when **every**
+//! `rate_limit_event` of the latest observed stream shows `overageStatus: "rejected"`,
+//! `isUsingOverage: false` and `status: "allowed"`, and that observation is not older than
+//! [`OBSERVATION_MAX_AGE_SECONDS`]. Otherwise that call is held with the reason. During a
+//! run, [`stream_stop`] tells the adapter to stop the process on the first event that breaks
+//! the condition.
 
 use serde_json::Value;
 
@@ -44,15 +58,23 @@ pub const BUDGET_X02: Budget = Budget {
     cache_read_tokens: 30_000_000,
 };
 
+/// Oldest no-overage observation a run may start on (7 days). The account setting it reflects
+/// (extra usage off) changes only by a user action; the in-stream stop covers a change
+/// during the run.
+pub const OBSERVATION_MAX_AGE_SECONDS: u64 = 7 * 24 * 3600;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Spent {
     pub runs: u64,
     pub seconds: u64,
     pub billable_tokens: u64,
     pub cache_read_tokens: u64,
-    /// Largest billable share of a single run so far (used to refuse a run that would cross the cap).
     pub largest_run_billable: u64,
+    pub largest_run_cache_read: u64,
+    /// Runs whose usage or duration is not measured (never counted as zero).
     pub unmeasured_runs: Vec<String>,
+    /// Records that do not say whether they were model runs.
+    pub unclassified_records: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,76 +87,144 @@ pub enum Decision {
     Hold { reason: String },
 }
 
+/// A no-overage observation: the stream text of the newest run (or, for the first run of a
+/// budget, the newest stored stream of the same account) and its age.
+#[derive(Debug, Clone, Copy)]
+pub struct Observation<'a> {
+    pub stream: &'a str,
+    pub age_seconds: u64,
+}
+
+fn id(r: &Value) -> String {
+    format!(
+        "{}/{}",
+        r["attempt_id"].as_str().unwrap_or("?"),
+        r["command_id"].as_str().unwrap_or("?")
+    )
+}
+
 /// Sum the model runs of `records` (ieo-evidence records as JSON).
 pub fn spent(records: &[Value]) -> Spent {
     let mut s = Spent::default();
-    for r in records.iter().filter(|r| r["model_request"] == true) {
+    for r in records {
+        match r["model_request"].as_bool() {
+            Some(false) => continue,
+            None => {
+                s.unclassified_records.push(id(r));
+                continue;
+            }
+            Some(true) => {}
+        }
         s.runs += 1;
-        s.seconds += r["duration_ms"].as_u64().unwrap_or(0).div_ceil(1000);
+        let duration = r["duration_ms"].as_u64();
         let run = &r["usage"]["run"];
-        if run["state"] == "measured" {
-            let t = &run["tokens"];
-            let n = |k: &str| t[k].as_u64().unwrap_or(0);
-            let billable = n("input") + n("output") + n("cache_creation");
-            s.billable_tokens += billable;
-            s.cache_read_tokens += n("cache_read");
-            s.largest_run_billable = s.largest_run_billable.max(billable);
-        } else {
-            s.unmeasured_runs.push(format!(
-                "{}/{}",
-                r["attempt_id"].as_str().unwrap_or("?"),
-                r["command_id"].as_str().unwrap_or("?")
-            ));
+        let t = &run["tokens"];
+        let n = |k: &str| t[k].as_u64();
+        let tokens = (run["state"] == "measured")
+            .then(|| {
+                Some((
+                    n("input")?,
+                    n("output")?,
+                    n("cache_creation")?,
+                    n("cache_read")?,
+                ))
+            })
+            .flatten();
+        if let Some(ms) = duration {
+            s.seconds += ms.div_ceil(1000);
+        }
+        match (duration, tokens) {
+            (Some(_), Some((i, o, cc, cr))) => {
+                let billable = i + o + cc;
+                s.billable_tokens += billable;
+                s.cache_read_tokens += cr;
+                s.largest_run_billable = s.largest_run_billable.max(billable);
+                s.largest_run_cache_read = s.largest_run_cache_read.max(cr);
+            }
+            _ => s.unmeasured_runs.push(id(r)),
         }
     }
     s
 }
 
-/// The latest `rate_limit_event` in a stream-json text, if any.
-pub fn last_rate_limit(stream: &str) -> Option<Value> {
+/// All `rate_limit_event`s of a stream-json text, in order.
+pub fn rate_limit_events(stream: &str) -> Vec<Value> {
     stream
         .lines()
-        .rev()
         .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .find(|v| v["type"] == "rate_limit_event")
+        .filter(|v| v["type"] == "rate_limit_event")
+        .collect()
 }
 
-/// No-extra-billing condition from an observed `rate_limit_info`.
-pub fn overage_check(event: Option<&Value>) -> Result<(), String> {
-    let Some(e) = event else {
-        return Err(
-            "no rate_limit_event observed: the no-extra-billing condition is unconfirmed".into(),
-        );
-    };
-    let info = &e["rate_limit_info"];
+/// No-extra-billing condition for one event.
+pub fn overage_check(event: &Value) -> Result<(), String> {
+    let info = &event["rate_limit_info"];
+    if info["overageStatus"] != "rejected" {
+        return Err(format!(
+            "overageStatus {} (only \"rejected\" excludes paid extra usage)",
+            info["overageStatus"]
+        ));
+    }
     if info["isUsingOverage"] != false {
         return Err(format!(
-            "isUsingOverage is {} (extra usage in use or unknown)",
+            "isUsingOverage {} (extra usage in use or unknown)",
             info["isUsingOverage"]
         ));
     }
-    match info["overageStatus"].as_str() {
-        Some("allowed") | None => Err(format!(
-            "overageStatus {} — extra usage could be billed",
-            info["overageStatus"]
-        )),
-        Some(_) => {
-            if info["status"] == "allowed" {
-                Ok(())
-            } else {
-                Err(format!(
-                    "rate limit status {} (not allowed)",
-                    info["status"]
-                ))
-            }
-        }
+    if info["status"] != "allowed" {
+        return Err(format!(
+            "rate limit status {} (not allowed)",
+            info["status"]
+        ));
     }
+    Ok(())
 }
 
-/// May the next run of `budget` start? `latest_rate_limit`: the newest observed event (the last
-/// run's stream, or for the first run the newest stored observation of the same account).
-pub fn next(budget: &Budget, records: &[Value], latest_rate_limit: Option<&Value>) -> Decision {
+/// The no-extra-billing condition from an observation: at least one event, every event passes,
+/// and the observation is fresh enough.
+pub fn observation_check(obs: Option<Observation<'_>>) -> Result<(), String> {
+    let Some(obs) = obs else {
+        return Err("no observation: the no-extra-billing condition is unconfirmed".into());
+    };
+    if obs.age_seconds > OBSERVATION_MAX_AGE_SECONDS {
+        return Err(format!(
+            "observation is {} s old (max {OBSERVATION_MAX_AGE_SECONDS})",
+            obs.age_seconds
+        ));
+    }
+    let events = rate_limit_events(obs.stream);
+    if events.is_empty() {
+        return Err(
+            "no rate_limit_event in the observation: the no-extra-billing condition is unconfirmed"
+                .into(),
+        );
+    }
+    for (i, e) in events.iter().enumerate() {
+        overage_check(e).map_err(|why| format!("event {}: {why}", i + 1))?;
+    }
+    Ok(())
+}
+
+/// During a run: `Some(reason)` when this stream line is a `rate_limit_event` that breaks the
+/// no-extra-billing condition; the adapter then stops the process and reports.
+pub fn stream_stop(line: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    (v["type"] == "rate_limit_event")
+        .then(|| overage_check(&v).err())
+        .flatten()
+}
+
+/// May the next run of `budget` start?
+pub fn next(budget: &Budget, records: &[Value], observation: Option<Observation<'_>>) -> Decision {
     let s = spent(records);
+    if !s.unclassified_records.is_empty() {
+        return Decision::Stop {
+            reason: format!(
+                "record(s) {:?} do not say whether they were model runs",
+                s.unclassified_records
+            ),
+        };
+    }
     if !s.unmeasured_runs.is_empty() {
         return Decision::Stop {
             reason: format!(
@@ -153,23 +243,25 @@ pub fn next(budget: &Budget, records: &[Value], latest_rate_limit: Option<&Value
             reason: format!("{} s used of {}", s.seconds, budget.total_seconds),
         };
     }
-    if s.billable_tokens + s.largest_run_billable >= budget.billable_tokens {
+    let reserve = s.largest_run_billable;
+    if s.billable_tokens + reserve > budget.billable_tokens {
         return Decision::Stop {
             reason: format!(
-                "billable tokens {} (+ largest run {}) reach the cap {}",
-                s.billable_tokens, s.largest_run_billable, budget.billable_tokens
+                "billable tokens {} + reserve {} exceed the cap {}",
+                s.billable_tokens, reserve, budget.billable_tokens
             ),
         };
     }
-    if s.cache_read_tokens >= budget.cache_read_tokens {
+    let reserve_cr = s.largest_run_cache_read;
+    if s.cache_read_tokens + reserve_cr > budget.cache_read_tokens {
         return Decision::Stop {
             reason: format!(
-                "cache_read {} reaches the cap {}",
-                s.cache_read_tokens, budget.cache_read_tokens
+                "cache_read {} + reserve {} exceed the cap {}",
+                s.cache_read_tokens, reserve_cr, budget.cache_read_tokens
             ),
         };
     }
-    if let Err(why) = overage_check(latest_rate_limit) {
+    if let Err(why) = observation_check(observation) {
         return Decision::Hold { reason: why };
     }
     Decision::Start {

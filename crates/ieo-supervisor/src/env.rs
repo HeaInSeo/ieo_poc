@@ -1,5 +1,7 @@
 //! Role process environment: empty, then only the allow-list (runtime contract §4.3).
 
+use std::process::Command;
+
 /// Variable that carries the role credential (subscription OAuth token). Its value is read
 /// from the credential file by the supervisor and never logged.
 pub const CREDENTIAL_VAR: &str = "CLAUDE_CODE_OAUTH_TOKEN";
@@ -19,6 +21,17 @@ pub fn build(home: &str, config_dir: &str, credential: &str) -> Vec<(String, Str
         ("CLAUDE_CONFIG_DIR".into(), config_dir.into()),
         (CREDENTIAL_VAR.into(), credential.into()),
     ]
+}
+
+/// Apply to a command: clear the inherited environment, then set exactly `env`. Names outside
+/// [`ALLOWED`] are refused.
+pub fn apply(cmd: &mut Command, env: &[(String, String)]) -> Result<(), String> {
+    if let Some((k, _)) = env.iter().find(|(k, _)| !ALLOWED.contains(&k.as_str())) {
+        return Err(format!("{k} is not in the environment allow-list"));
+    }
+    cmd.env_clear();
+    cmd.envs(env.iter().map(|(k, v)| (k, v)));
+    Ok(())
 }
 
 /// Names only, for evidence records.
