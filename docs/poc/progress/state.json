@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0014",
-  "snapshot_created_at": "2026-11-13T17:43:37+09:00",
-  "last_actual_work_observed_at": "2026-11-13T17:43:37+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0015",
+  "snapshot_created_at": "2026-11-13T21:34:10+09:00",
+  "last_actual_work_observed_at": "2026-11-13T21:34:10+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료(PR #25) · 다음 02-04",
+  "phase": "02-03 검수 완료 · 추가 작업 X-01 검수 완료(PR #27, 73·12 미산입) · 다음 02-04",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -277,7 +277,7 @@
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/43395168058"
       ],
       "next_action": "02-04 착수(선행 02-03 충족)",
-      "unresolved": "후속(P3)과 담당·시점: F3 잔여(개발 머리가 다른 작업으로 넘어간 뒤 앞 작업 판정) → 02-07 착수 시 판정 머리 규칙 결정(02-04에 이어짐); F4(GitHub 검토 author 신원)·N5(이전 SHA changes_requested와 PR 상태 차이) → 02-05 착수 전 실제 수집기 규칙 결정(수집기 구현 02-04); N2(sprint_id 선점·존재 노출) → 02-05 착수 시 repo별 sprint 바인딩; S1(G1이 outputs 배열 전체 비교 — 선택 산출물 설명·순서 변경도 무효, 엄격 방향) → 02-05 착수 전 정책 다음 버전에서 필수 산출물 artifact_id만 비교할지 결정(문서 revision 변경을 처음 다루는 작업); S2(mutants.txt 재지정 M27 표기) → 이 보고 PR에서 정정 완료(evidence/mutants.txt 끝 줄); S3(acceptance·exit_condition·requirement_ids 개별 제거, judgments 외래 키 제거 변이 미검출) → 02-07 수용 전 판정 시험 보강(필드별), 외래 키는 04-04 원자성 시험; F5(등록·배정 경쟁 자동 시험 없음)·registry 전역 잠금 직렬화 성능 미측정 → 04-04 착수 시. 범위 밖: 판정·outbox 원자 기록 검증·보고 대기 → 02-07, 재현 실행기 → 02-06, P04 판정 → 04-03·04-04"
+      "unresolved": "후속(P3)과 담당·시점: F3 잔여(개발 머리가 다른 작업으로 넘어간 뒤 앞 작업 판정) → 02-07 착수 시 판정 머리 규칙 결정; F4(GitHub 검토 author 신원)·N5(이전 SHA changes_requested와 PR 상태 차이) → 02-05 착수 전 실제 수집기 규칙 결정(수집기 구현 02-04); N2(sprint_id 선점·존재 노출) → 02-05 착수 시 repo별 sprint 바인딩; S1(G1이 outputs 배열 전체 비교 — 선택 산출물 설명·순서 변경도 무효, 엄격 방향) → 02-05 착수 전 정책 다음 버전에서 필수 산출물 artifact_id만 비교할지 결정(문서 revision 변경을 처음 다루는 작업); S2(mutants.txt 재지정 M27 표기) → 이 보고 PR에서 정정 완료(evidence/mutants.txt 끝 줄); S3(acceptance·exit_condition·requirement_ids 개별 제거, judgments 외래 키 제거 변이 미검출) → 02-07 수용 전 판정 시험 보강(필드별), 외래 키는 04-04 원자성 시험; F5(등록·배정 경쟁 자동 시험 없음)·registry 전역 잠금 직렬화 성능 미측정 → 04-04 착수 시. 범위 밖: 판정·outbox 원자 기록 검증·보고 대기 → 02-07, 재현 실행기 → 02-06, P04 판정 → 04-03·04-04 · PR #26 승인 검토 84a123a P3(보관: reports/tasks/02-03/coordinator-20261113/reviews/review-pr26-84a123a.md): D1 mutants.py의 M27 정의가 넓은 형태로 남음(표기·검출 영향 없음, 다음 계측 수정 때 좁은 형태로) · D2 F3 문구 정정(이번 갱신에서 '(02-04에 이어짐)' 제거)"
     },
     {
       "task_id": "02-04",
@@ -292,7 +292,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달 · 02-01→02-02 이월 판정 규칙(담당 02-04, 시점: 02-04가 계측기 판정을 supervisor 판정 입력으로 연결하기 전): 2df3c35 P3-2 결과 subtype≠success이고 is_error가 false/없음(현재 succeeded — 02-02 validation V-33 관측), P3-3 nonzero_exit/no_result 기대가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 일치 불가, P3-6 마감 직전 자연 종료 경쟁. 규칙을 정한 뒤 새 평가 세트 버전으로 시험(02-02 validation은 사용 완료) · 02-03 이월(02-04 수용 전): supervisor가 elapsed_seconds·total_tokens 집행(02-01 계측기 연결), 실제 GitHub 증거 수집기를 ieo-coord 증거 입력에 연결(PR 작성자 신원 직접 확인 F4·PR 수준 검토 상태 N5의 규칙은 02-05 착수 전 결정)"
+      "unresolved": "착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달 · 02-01→02-02 이월 판정 규칙(담당 02-04, 시점: 02-04가 계측기 판정을 supervisor 판정 입력으로 연결하기 전): 2df3c35 P3-2 결과 subtype≠success이고 is_error가 false/없음(현재 succeeded — 02-02 validation V-33 관측), P3-3 nonzero_exit/no_result 기대가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 일치 불가, P3-6 마감 직전 자연 종료 경쟁. 규칙을 정한 뒤 새 평가 세트 버전으로 시험(02-02 validation은 사용 완료) · 02-03 이월(02-04 수용 전): supervisor가 elapsed_seconds·total_tokens 집행(02-01 계측기 연결), 실제 GitHub 증거 수집기를 ieo-coord 증거 입력에 연결(PR 작성자 신원 직접 확인 F4·PR 수준 검토 상태 N5의 규칙은 02-05 착수 전 결정) · X-01 이월(02-04 기동 검사): 바인딩 sprint_id와 기존 Notion 가져오기 시험 ID 충돌 확인(X-01 최종 검토 U3)"
     },
     {
       "task_id": "02-05",
@@ -307,7 +307,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": null,
-      "unresolved": "런타임 계약 rev 6 §10 항목 5: 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) — PR #18 검토 P3-1 · 02-03 이월: sprint_id를 repo별 승인 바인딩으로 미리 묶음(ieo-coord는 첫 등록 repo가 소유, 재검토 0fa839d N2) · 02-03 이월(02-05 착수 전): GitHub 검토 author 신원 확인 규칙(F4), 이전 SHA changes_requested와 GitHub PR 상태 차이 처리(N5), G1 판정 관련 필드 중 outputs를 필수 산출물 artifact_id만으로 좁힐지 정책 다음 버전 결정(S1)"
+      "unresolved": "런타임 계약 rev 6 §10 항목 5: 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) — PR #18 검토 P3-1 · 02-03 이월: sprint_id를 repo별 승인 바인딩으로 미리 묶음(ieo-coord는 첫 등록 repo가 소유, 재검토 0fa839d N2) · 02-03 이월(02-05 착수 전): GitHub 검토 author 신원 확인 규칙(F4), 이전 SHA changes_requested와 GitHub PR 상태 차이 처리(N5), G1 판정 관련 필드 중 outputs를 필수 산출물 artifact_id만으로 좁힐지 정책 다음 버전 결정(S1) · X-01 이월(02-05 착수 전): 가져온 스프린트 소유 검사와 01-07 revision 검사의 순서를 계약에 명시(X-01 최종 검토 U2)"
     },
     {
       "task_id": "02-06",
@@ -1917,7 +1917,8 @@
     "PR #21(02-01) 처리: a11f107 CI 실패(새 시험 2건의 픽스처 문제 — dash에 없는 exec -a, setsid 경쟁)로 그 head의 검토를 판정 전에 중단(검토 횟수 미산입으로 기록, 시험만 고친 273907b를 검토 2/4로 승인). base 갱신 예외는 쓰지 않음(main 불변 상태에서 병합)",
     "런타임 계약 revision 7(§11 항목 7, PR #21): 재개 세션 modelUsage·total_cost_usd는 세션 누적 — 01-04 판정 영향 없음(01-04 예산은 시도 수·시간)",
     "개정 v1.3.3-A2(PR #23, 사용자 결정 2026-11-12 02-02): 02-02 수용 기준 rev 6 — 비공개 평가 강한 봉인·개발 계정 정답 접근 차단 실증을 04-07(P07) 착수 전 조건으로 이월(04-07 unresolved 연결). 제품 런타임 역할·자격 격리 불변. 봉인 구축안 이번 단계 보류. 01-03 'sudo는 없고' 정정(heain wheel, (ALL) ALL 비밀번호, kind NOPASSWD). 계획 변경·환경 준비는 완료 수 미산입",
-    "판정 정책 L07(D12) 고정(PR #25): contracts/judgment-policy-v0.json 0.4.0, 버전·digest 고정 기계 판독 정책 참조 방식(명세 스키마 r4·9개 digest 불변). G1 선행 증거·G2 SHA 귀속·G3 독립 판정·G4 누적 시도(재시도·교정 한 상한으로 셈 — 별도 재시도 상한 값 미결정이라 새 숫자 없이 엄격 해석)·G5 한도 도달·RG2(대상 승인 범위 — 01-08 RG2 결정 답변 범위의 필드화는 다음 contract revision 후보)·G7 제외 범위. 계획 변경 아님, 완료 수 미산입"
+    "판정 정책 L07(D12) 고정(PR #25): contracts/judgment-policy-v0.json 0.4.0, 버전·digest 고정 기계 판독 정책 참조 방식(명세 스키마 r4·9개 digest 불변). G1 선행 증거·G2 SHA 귀속·G3 독립 판정·G4 누적 시도(재시도·교정 한 상한으로 셈 — 별도 재시도 상한 값 미결정이라 새 숫자 없이 엄격 해석)·G5 한도 도달·RG2(대상 승인 범위 — 01-08 RG2 결정 답변 범위의 필드화는 다음 contract revision 후보)·G7 제외 범위. 계획 변경 아님, 완료 수 미산입",
+    "추가 작업 X-01 검수 완료(PR #27, 개정 A3): Notion 작업 가져오기·초안 등록. 73·12 완료 수 미산입. 서버에 Notion 자격 없음(대화 연결 스냅샷으로 시험) — 서버 직접 조회는 통합 토큰 발급 결정 뒤. X-02(실제 개발 세션)는 02-04 수용·모델 예산·큐 선행 처분 대기"
   ],
   "notes": [
     "등록 전 분모는 73/12이며 현재 실행 진척은 이 원장에 기록한다.",
@@ -2202,14 +2203,26 @@
         "reports/tasks/02-03/coordinator-20261113/reviews/review-pr25-66958e2.md",
         "https://github.com/HeaInSeo/ieo_poc/pull/25"
       ]
+    },
+    {
+      "event_id": "X-01-ACCEPTED-20261113",
+      "event_revision": 1,
+      "task_id": "X-01",
+      "observed_at": "2026-11-13T21:34:10+09:00",
+      "state": "추가 작업 X-01 검수 완료(73·12 미산입). PR #27: b8b619a reject(P2 R1~R3) → 38b671b reject(P2 S1·S2) → 7a48a4f reject(P2 T1) → 74bd796 approve(P3 U1~U5, 검토 4/4·교정 3/3) → 조건부 병합 74b00fd · main CI success(run 43425920936). 영속 DB에 실제 Notion 작업 1건 draft 등록·재조회·revision 보존·실행 차단 확인. 모델 호출 0",
+      "evidence": [
+        "reports/extra/X-01/notion-import-20261113/REPORT.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-74bd796.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/27"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-03 검수 완료(PR #25 병합 de1dd4d, main CI success). 11/73 · 0/12",
+    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), 추가 작업 X-01 검수 완료(PR #27 병합 74b00fd, main CI success)",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main de1dd4d20e03966b5212cf121788fbcd3bef9c16 (이 보고 PR 병합 전)",
-    "plan_and_spec": "v1.3.3-A1·A2 · 명세 8개 rev 5·POC-02 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR(report/02-03-accepted). 런타임 세션 없음. 시험 DB 컨테이너 ieo-poc-0203-pg(tmpfs, 일회성)",
+    "branch_sha": "main 74b00fd3356c9ebd8775e92442087b82253a5c3e (이 보고 PR 병합 전)",
+    "plan_and_spec": "v1.3.3-A1·A2·A3 · 명세 8개 rev 5·POC-02 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
+    "running": "보고 PR(report/x01-accepted). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2227,10 +2240,11 @@
       "reports/tasks/01-06/lab-20261112/REPORT.md",
       "reports/tasks/02-01/collector-20261112/REPORT.md",
       "reports/tasks/02-02/eval-20261112/REPORT.md",
-      "reports/tasks/02-03/coordinator-20261113/REPORT.md"
+      "reports/tasks/02-03/coordinator-20261113/REPORT.md",
+      "reports/extra/X-01/notion-import-20261113/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "02-04 PID 1·역할별 기동·체크포인트·재개 착수 준비(선행 02-03 충족). 착수 전 02-04 unresolved(런타임 계약 rev 6 §10 항목 1~5, rev 7 §11 항목 7, 02-01·02-02·02-03 이월) 확인",
+    "next_action": "02-04 착수(모델 없는 부분부터). 실제 세션 시험과 X-02는 모델 예산·역할 자격·OC08 큐 선행 처분에 대한 사용자 결정 뒤",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
@@ -2256,13 +2270,28 @@
       "prerequisites": [
         "02-03"
       ],
-      "status": "진행",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "구현·검증 중(PR 대기)",
-      "verification_level": "unverified",
-      "evidence": [],
-      "next_action": "독립 검토 → 조건부 병합 → 원장 갱신"
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-13T21:34:10+09:00",
+      "latest_report": "reports/extra/X-01/notion-import-20261113/REPORT.md",
+      "result_state": "crates/ieo-notion(읽기 전용: 연결 스냅샷·REST API) + 코디네이터 POST /v0/imports/notion(OpenAPI 0.7.0). 실제 Notion 작업 OP-OCI-RAC-OC08-20261018을 대화 연결로 읽은 비공개 스냅샷(서버에 Notion 자격 없음)으로 영속 DB에 시험 ID POCX-SORI-OC08-T01 draft 등록(201), 같은 입력 재조회(200·행 불변), 모의 변경으로 revision 2·revision 1 보존, 초안 배정·executable 승격 거부(422), Notion 읽기 실패 시 DB 불변. 실행 중 배정의 revision 고정(상한은 더 새로운 executable·검토 통과 revision 기준). 시험 165건·변이 17/17. 대상 repo HeaInSeo/sori poc/POCX-SORI-OC08-T01 = 기준 2fa7f5e(추가 커밋 0, PR 없음). DB 등록은 개발 완료가 아님. PR #27 b8b619a reject(P2 R1~R3) → 38b671b reject(P2 S1·S2) → 7a48a4f reject(P2 T1) → 74bd796 approve(X-01 검토 4/4·교정 3/3) → 병합 74b00fd · main CI success(run 43425920936). 모델 호출 0",
+      "verification_level": "verified",
+      "evidence": [
+        "reports/extra/X-01/notion-import-20261113/REPORT.md",
+        "reports/extra/X-01/notion-import-20261113/evidence/cargo-test.log",
+        "reports/extra/X-01/notion-import-20261113/evidence/mutants.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/live-check.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/live-recheck3.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/db-backup-restore.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/target-branch.txt",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-b8b619a.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-38b671b.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-7a48a4f.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-74bd796.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/27",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/43425920936"
+      ],
+      "next_action": "X-02 착수 조건 충족 시(02-04 수용·모델 예산 승인·큐 선행 처분)",
+      "unresolved": "최종 검토 74bd796 P3(담당·시점): U1 가져온 스프린트의 executable 등록은 작업·Notion 출처만 고정하고 제목·목표·위임·출처 메타·미해결 사유는 등록자가 바꿀 수 있음(큐 선행 미해제 상태의 실행 등록 차단이 서버가 아니라 등록자와 독립 의미 검토에 달림) → X-02 착수 전 조건으로 고정(executable 승격 전 큐 선행 해제 증거 또는 사용자 결정 필수, 필요하면 가드 확장); U2 소유 검사가 01-07 revision 검사보다 앞서 수정 재제출이 REVISION_* 대신 409 → 계약 검사 순서 명시는 02-05(문서 버전·배정 연결) 착수 전; U3 바인딩 sprint_id를 운영 중 기존 가져오기 시험 ID로 바꾸면 /v0/sprint-inputs가 그 스프린트에 쓸 수 있음(기동 검사 없음) → 02-04 기동 검사에 바인딩·가져오기 충돌 확인 추가; U4 T2·T5 경로 시험 미고정(변이 Z1·Z2·Z5 생존, 동작은 정상) → X-02 착수 전 시험 보강; U5 보관본 각주 렌더링 → 이 보고 PR에서 교정. 서버 직접 Notion 조회(통합 토큰)와 경로별 digest 차이는 토큰 발급 뒤 재시험"
     },
     {
       "task_id": "X-02",
@@ -2280,7 +2309,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": "선행 X-01·02-04 수용, 모델 예산 승인, 원 작업 큐 선행 해제 또는 사용자 결정 뒤 착수",
-      "unresolved": "모델 예산 미승인(01-04 예산 전용 금지) · 선정 작업 OP-OCI-RAC-OC08-20261018의 큐 선행(OC01·OC02 수용·merged, Sori 단일 슬롯) 미해제"
+      "unresolved": "모델 예산 미승인(01-04 예산 전용 금지; 예산안은 X-01 보고 §5) · 역할 자격 확인 필요 · 선정 작업 OP-OCI-RAC-OC08-20261018의 큐 선행(OC01·OC02 수용·merged, Sori 단일 슬롯) 미해제 → 해제 대기 또는 PoC 시험 실행 사용자 결정 · Sori 시험 PR 개설 여부 사용자 결정 · X-01 최종 검토 U1·U4를 착수 전 조건으로 처리"
     }
   ]
 }
