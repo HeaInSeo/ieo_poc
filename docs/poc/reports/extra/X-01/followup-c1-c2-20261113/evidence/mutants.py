@@ -1,5 +1,6 @@
 """X-01 C2 mutation check (run from repo root at a clean commit with IEO_TEST_DB_URL set)."""
-import subprocess, pathlib
+import subprocess, pathlib, sys
+ONLY = sys.argv[1:]  # optional name prefixes, e.g. "C9 "
 API = 'crates/ieo-coord/src/api.rs'
 LIB = 'crates/ieo-notion/src/lib.rs'
 M = [
@@ -13,13 +14,15 @@ M = [
  ("C6 legacy rows: unknown reasons not fail-closed", API, "        } else if !BINDING.contains(&r.as_str()) {", "        } else if false {"),
  ("C7 importer files a gate as a missing fact", LIB, "        gates.push(format!(\"Notion 차단 대상 미해제: {}\", truncate(&b, 400)));", "        unresolved.push(format!(\"Notion 차단 대상 미해제: {}\", truncate(&b, 400)));"),
  ("C8 gates stored empty (release forged)", API, "            &json!(gates),\n", "            &json!([]),\n"),
- ("C9 page ids in sources not recognised (review 7afd4d1 G1)", API, "        page_ids_in(source, &mut ids);\n", ""),
+ ("C9 page ids in sources not recognised (review 7afd4d1 G1)", API, "WHERE page_id = ANY($1)\",", "WHERE page_id = ANY($1) AND false\","),
  ("C9b no digest fallback for a source without a page reference", API, "WHERE content_digest = $1\",", "WHERE content_digest = $1 AND false\","),
  ("C10 replay of an earlier content state (review F2)", API, "           AND (test_id, sprint_revision) = (SELECT test_id, sprint_revision FROM notion_imports\n                 WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1)\",", "\","),
  ("C11 exception not bound to the approved content (review F4)", API, "AND page_id = $3 AND content_digest = $4", "AND page_id = $3 AND (content_digest = $4 OR true)"),
  ("C12 a page may be imported under a second test id (review 7afd4d1 G3)", API, "WHERE page_id = $1 AND test_id <> $2 LIMIT 1\",", "WHERE page_id = $1 AND test_id <> $2 AND false LIMIT 1\","),
 ]
 for name, f, a, b in M:
+    if ONLY and not any(name.startswith(o) for o in ONLY):
+        continue
     p = pathlib.Path(f); s = p.read_text()
     if s.count(a) != 1:
         print(f"{name}: PATTERN COUNT {s.count(a)}", flush=True); continue
