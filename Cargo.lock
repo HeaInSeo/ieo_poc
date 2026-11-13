@@ -582,6 +582,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ieo-supervisor"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
