@@ -1256,11 +1256,11 @@ fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
         tx,
         &who.name,
         "exception.approved",
-        &json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "decision_ref": decision_ref}),
+        &json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "decision_ref": decision_ref, "approved_content_digest": approved_digest}),
     )?;
     ok(
         201,
-        json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "lifts": "queue_gates", "replay": false}),
+        json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "lifts": "queue_gates", "approved_content_digest": approved_digest, "replay": false}),
     )
 }
 
