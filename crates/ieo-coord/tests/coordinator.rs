@@ -2318,3 +2318,106 @@ fn converting_a_sprint_again_is_a_new_revision_not_a_task_conflict() {
         "{r}"
     );
 }
+
+// --- review b8b619a corrections ---
+
+#[test]
+fn a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id() {
+    let Some(e) = start() else { return };
+    let input = json!({"title": "예시", "repo": "repo-a", "goal": "목표",
+        "deadline": {"state": "none", "at": null, "reason": "기한 없음"},
+        "tasks": [{"name": "검사 준비", "output": "시험 입력", "done_when": "입력 확정", "how_to_check": "목록 대조"}]});
+    assert_eq!(
+        e.post_k("alice", "/v0/sprint-inputs", "conv-r1-01", &input)
+            .0,
+        201
+    );
+    let before = e.counts();
+    // R1: an existing sprint not created by a Notion import
+    let (st, b) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("HUM-01", 'a', json!([])),
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    // the test id must differ from the Notion task id
+    let (st, b) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("OP-SYNTH-0001", 'a', json!([])),
+    );
+    assert_eq!((st, code(&b)), (400, "SCHEMA_VIOLATION".into()), "{b}");
+    assert_eq!(e.counts(), before);
+}
+
+#[test]
+fn an_import_replay_answers_only_within_its_repo() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "alice",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    // R2: carol (repo-b) sends the same page, digest and test id under her repo
+    let mut theirs = notion_import("POCX-T01", 'a', json!([]));
+    theirs["input"]["repo"] = json!("repo-b");
+    let (st, b) = e.post("carol", "/v0/imports/notion", &theirs);
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    assert!(
+        b.get("conversion").is_none() && b.get("registration").is_none(),
+        "no stored content: {b}"
+    );
+}
+
+#[test]
+fn a_pinned_continuation_obeys_the_latest_attempt_ceiling() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // R3: the newer revision lowers the ceiling to 0
+    let s6 = spec("repo-a", 6, 0);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-r3", &s6)
+            .0,
+        201
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(
+        (st, b["outcome"].clone()),
+        (202, json!("limit_reached")),
+        "{b}"
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!((st, code(&b)), (409, "LIMIT_REACHED".into()), "{b}");
+}

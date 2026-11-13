@@ -741,6 +741,15 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         ));
     }
     let source_task_id = str_field(src, "source_task_id", 256)?.to_string();
+    if test_id == source_task_id {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "test_id",
+            "the test id must differ from the Notion task id",
+            "choose a separate test id",
+        ));
+    }
     str_field(src, "fetched_via", 128)?;
     let unresolved: Vec<String> = match &body["unresolved"] {
         Value::Null => vec![],
@@ -772,6 +781,22 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
                 "use the test_id of the earlier import",
             ));
         }
+        // a replay answers only within the repo the import belongs to (review b8b619a R2)
+        let stored_repo: Option<String> = tx
+            .query_opt(
+                "SELECT repo_id FROM sprint_revisions WHERE sprint_id = $1 LIMIT 1",
+                &[&test_id],
+            )?
+            .map(|r| r.get(0));
+        if stored_repo.as_deref() != Some(repo) {
+            return Err(one(
+                409,
+                "EVENT_CONTENT_CONFLICT",
+                "input.repo",
+                "this Notion page content was imported for another repo",
+                "import under the repo of the earlier import",
+            ));
+        }
         let mut stored: Value = row.get(1);
         stored["registration"] = reevaluate(tx, stored["registration"].take())?;
         stored["replay"] = json!(true);
@@ -787,6 +812,22 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
             "EVENT_CONTENT_CONFLICT",
             "test_id",
             "this test_id belongs to another Notion page",
+            "use a new test_id",
+        ));
+    }
+    // a test id is never an existing sprint that no Notion import created (review b8b619a R1)
+    let imported_before: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE test_id = $1)",
+            &[&test_id],
+        )?
+        .get(0);
+    if !imported_before && latest_revision(tx, &test_id)?.is_some() {
+        return Err(one(
+            409,
+            "EVENT_CONTENT_CONFLICT",
+            "test_id",
+            "test_id names an existing sprint that was not created by a Notion import",
             "use a new test_id",
         ));
     }
@@ -1675,7 +1716,11 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "assign within the revision's repo",
         ));
     }
-    if latest_revision(tx, &sprint_id)?.is_some_and(|l| l > sprint_rev) {
+    // a pinned continuation is bounded by the latest revision's attempt ceiling (review b8b619a R3)
+    let mut ceiling_from_latest: Option<Value> = None;
+    if let Some(latest) = latest_revision(tx, &sprint_id)?
+        && latest > sprint_rev
+    {
         // X-01: a running assignment stays on the revision it started from. A later revision
         // (e.g. a re-imported Notion task) never changes it; only its own next generation may
         // continue on that pinned revision. New assignments need the latest revision.
@@ -1696,6 +1741,13 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
                 "assign from the latest revision",
             ));
         }
+        let l: Value = tx
+            .query_one(
+                "SELECT spec FROM sprint_revisions WHERE sprint_id = $1 AND revision = $2",
+                &[&sprint_id, &latest],
+            )?
+            .get(0);
+        ceiling_from_latest = Some(l["limits"]["correction_attempts"].clone());
     }
     if rev_row.get::<_, &str>(1) != "executable" {
         return Err(one(
@@ -1821,7 +1873,10 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         &[&sprint_id, &task_id, &role],
     )?;
     let issued = attempts.map_or(0, |r| r.get::<_, i64>(0));
-    let Some(ceiling) = spec["limits"]["correction_attempts"].as_i64() else {
+    let ceiling_value = ceiling_from_latest
+        .clone()
+        .unwrap_or_else(|| spec["limits"]["correction_attempts"].clone());
+    let Some(ceiling) = ceiling_value.as_i64() else {
         return Err(one(
             422,
             "UNBOUND_DRAFT",

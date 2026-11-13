@@ -6,7 +6,7 @@
 | 수용 기준 | 장부 §7 X-01 행 |
 | 산출물 | crate [`crates/ieo-notion`](../../../../../../crates/ieo-notion)(라이브러리 + CLI `ieo-notion snapshot|import`) · 코디네이터 `POST /v0/imports/notion`(OpenAPI 0.7.0) · `notion_imports` 표 · 진행 화면의 추가 작업 표시 |
 | 모델 호출 | 0회 |
-| 상태 | rev 1. 독립 검토 대기 |
+| 상태 | rev 2. 독립 검토 [b8b619a reject](reviews/review-pr27-b8b619a.md)(P2 R1~R3) → 교정(§6). X-01 검토 1/4·교정 1/3. 재검토 대기 |
 
 ## 1. 사용한 Notion 원본과 선정
 
@@ -20,13 +20,9 @@
 | `OP-NODEKIT-CLI-USABILITY-20261021`(`40086e6dd1d1811db360fe7c2619b4cc`) | 속성과 차단·재개 지시 |
 
 **판단.**
-- **OC08을 선정했다. 초안 등록만 하고 실행 가능으로 보지 않는다.** 원본은 큐 구획이 `조건 대기`, 작업 상태가 `결정대기`이고 `KEEP_GATED / NOT ACTIVE`다.
-  - 직접 선행 OC01·OC02(`DA-OCI-RAC-OC01/02-20261018`)는 둘 다 `검증대기`로, 수용과 merged 인계가 없다.
-  - Sori 단일 수정 슬롯은 PR #48(W02.1b-I)이 쥐고 있다.
-  - 코드 범위는 겹치지 않는다. PR #48은 `internal/admininit`·`jobledger`를 바꾸고, OC08은 `chunked/validate.go`의 `ValidateIndex`를 확장한다.
-  - 작은 순수 부품이고 수용 기준 OC08-01~03이 표로 고정돼 있어 변환 시험에 적합하다.
-- **NodeKit CLI 후속은 제외했다.** `NEXT_NODEKIT_CHILD_ROW_UNRESOLVED`로 다음 하위 행이 없고, Operator CLAIM이 0이다. 기존 서버 작업공간도 다른 브랜치에서 수정 중이다(변경 5건). 실행 중인 운영 흐름과 겹칠 위험이 크다.
-- **더 작은 후보는 없었다.** 큐의 `현재` 구획 26행을 확인했다. 기존 담당이 진행 중인 행(Sori W02 사슬, AH PR38 등), 설계·검토 전용 행, HOLD 행뿐이었다. 비어 있는 작은 코드 작업은 없었다.
+- **OC08을 선정했다. 초안 등록만 하고 실행 가능으로 보지 않는다.** 원본의 큐 구획·작업 상태·차단 대상이 실행 대기 상태가 아니다. 직접 선행 OC01·OC02는 수용·merged 인계 전이고, Sori 단일 수정 슬롯은 PR #48이 쓰고 있다. 코드 범위는 겹치지 않는다(PR #48은 `internal/admininit`·`jobledger`, OC08은 `chunked/validate.go`). 작은 순수 부품이고 수용 기준 OC08-01~03이 표로 고정돼 있어 변환 시험에 적합하다.
+- **NodeKit CLI 후속은 제외했다.** 다음 하위 행이 정해지지 않았고 Operator 인수도 없다. 기존 서버 작업공간도 다른 브랜치에서 수정 중이다. 실행 중인 운영 흐름과 겹칠 위험이 크다.
+- **더 작은 후보는 없었다.** 큐의 `현재` 구획 행은 기존 담당이 진행 중인 행, 설계·검토 전용 행, 보류 행뿐이었다.
 - Notion에는 아무것도 쓰지 않았다. 원 작업의 담당·상태·claim은 그대로다.
 
 ## 2. 구현
@@ -95,3 +91,15 @@
 **후속(담당).**
 - Notion 원본 상태 자동 갱신: 별도 후속이며 이번 범위 밖이다.
 - 02-04의 모델 없는 부분(supervisor 골격, 체크포인트 형식, 계측기 연결, 이월 판정 규칙 정리): 02-04에서 다음에 진행한다. 이번 회차에는 진행하지 않았다.
+
+## 6. 독립 검토 반영(rev 2)
+
+| 지적 | 처분 | 시험·변이 |
+| --- | --- | --- |
+| R1 P2 Notion 가져오기가 만든 적 없는 기존 스프린트 ID를 test_id로 써 덮어쓸 수 있음, test_id = Notion 작업 ID 허용 | 교정. 앞의 경우 409, 뒤의 경우 400 | `a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id`, X9 |
+| R2 P2 replay가 다른 repo 호출자에게 저장 spec 전체를 돌려줌 | 교정. replay는 이전 가져오기의 repo에서만 응답하고, 다른 repo는 저장 내용 없이 409 | `an_import_replay_answers_only_within_its_repo`, X10 |
+| R3 P2 pin 예외가 최신 revision의 시도 상한을 무시함, 문서 미갱신 | 교정. pin된 이어 쓰기도 최신 revision의 `correction_attempts`를 따른다. OpenAPI issueAssignment와 판정 정책 0.5.0(RG2 예외 문장, 근거 사용자 지시 2026-11-13)에 적었다 | `a_pinned_continuation_obeys_the_latest_attempt_ceiling`, X11 |
+| R4 P3 A→B→A 되돌림은 새 revision이 아니라 replay | 유지하고 OpenAPI에 명시. 되돌림을 새 revision으로 만들려면 가져오기 순번을 digest에 넣어야 하는데, 같은 내용 중복 방지 요구와 충돌한다 | — |
+| R5 P3 REST 경로와 연결 경로의 digest 차이, 미지원 블록 생략 | 주석을 사실대로 고쳤다(경로를 바꾸면 새 revision). 서버 직접 조회가 열리면 한 경로로 통일한다 | — |
+| R6 P3 `unresolved`는 클라이언트 값, 번호 풀과 바인딩 번호 중복 가능 | 유지. 가져오기 도구가 원본에서 만든 사유를 보내며, 서버는 사유를 더 붙일 수만 있고 실행 가능으로 바꿀 수는 없다. 번호가 겹쳐도 나중 변환이 거부돼 오염은 없다 | — |
+| R7 P3 보고서의 큐 상태 원문 표기 | 교정. §1을 요약 표현으로 바꿨다 | — |

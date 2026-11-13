@@ -12,6 +12,9 @@ M = [
  ("X6 importer's unresolved reasons dropped", API, "for u in &imp.extra_unresolved {", "for u in imp.extra_unresolved.iter().take(0) {"),
  ("X7 snapshot tampering not detected", LIB, "if v[\"content_digest\"].as_str() != Some(content_digest(&p).as_str()) {", "if false {"),
  ("X8 Notion source not recorded on the spec", API, "src.extend(imp.extra_sources.iter().cloned());", "let _ = &imp.extra_sources;"),
+ ("X9 existing non-import sprint may be taken over (review R1)", API, "if !imported_before && latest_revision(tx, &test_id)?.is_some() {", "if false {"),
+ ("X10 replay answers another repo (review R2)", API, "if stored_repo.as_deref() != Some(repo) {", "if false {"),
+ ("X11 pinned continuation ignores latest ceiling (review R3)", API, "ceiling_from_latest = Some(l[\"limits\"][\"correction_attempts\"].clone());", "let _ = &l;"),
 ]
 out = []
 for name, f, a, b in M:

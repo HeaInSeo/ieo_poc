@@ -127,7 +127,10 @@ paths:
         Same (page, content digest) → 200 replay with `replay=true` and no state change (re-evaluated:
         `SUPERSEDED` once a newer revision exists). Changed content → the next revision of the test sprint;
         earlier revisions stay stored. The same content under another `test_id`, or another page under an
-        existing `test_id` → 409 `EVENT_CONTENT_CONFLICT`. A new test sprint takes the first number of the
+        existing `test_id` → 409 `EVENT_CONTENT_CONFLICT`. A replay is answered only for the repo of the earlier
+        import (another repo → 409 without stored content). A `test_id` that names an existing sprint not created
+        by a Notion import → 409 `EVENT_CONTENT_CONFLICT`; a `test_id` equal to the Notion task ID → 400.
+        Content that returns to an earlier digest (A→B→A) is a replay of that earlier import, not a new revision. A new test sprint takes the first number of the
         binding's `import_sprint_numbers` that no registered task uses; none free → 422 `UNBOUND_DRAFT`.
         Nothing is written to Notion. An assignment already running keeps its revision; only its own next
         generation may continue on that revision after a newer one is registered.
@@ -431,7 +434,9 @@ paths:
         Same (assignment_id, generation) and same body → 200 `already_issued` with `is_current` (historical
         re-query, never a re-activation); different body → 409 `EVENT_CONTENT_CONFLICT`.
         The revision must exist (422 `UNKNOWN_SPRINT_REVISION`), target this repo (422 `REPO_MISMATCH`), be the
-        latest (409 `REVISION_SUPERSEDED`), be registered executable (422 `UNBOUND_DRAFT`) and have passed the
+        latest (409 `REVISION_SUPERSEDED`) — except that a running assignment's next generation may stay on the
+        revision its previous generation used (X-01 pin; user decision 2026-11-13); that continuation is still
+        bounded by the latest revision's `limits.correction_attempts` — be registered executable (422 `UNBOUND_DRAFT`) and have passed the
         semantic review (422 `SEMANTIC_REVIEW_NOT_PASSED`); the task must be in it (422 `UNKNOWN_TASK`).
         `expected_current` must equal the current head of (repo, role) (null when none), else 409
         `OWNERSHIP_CONFLICT`. Generation 0 needs an unused assignment_id; generation n>0 must follow the head

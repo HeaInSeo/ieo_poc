@@ -113,7 +113,10 @@ pub fn from_connector_fetch(v: &Value) -> Result<NotionPage, String> {
 }
 
 /// SHA-256 over the page's properties and body (canonical JSON, sorted keys). Any edit in
-/// Notion changes it; the read path and time do not.
+/// Notion changes it, and repeated reads through the *same* path give the same value. The
+/// connector and REST paths render the body differently (the REST reader keeps headings,
+/// paragraphs, list items, code and tables only, and skips nested or other blocks), so the
+/// two paths give different digests for one page; a switch of path is a new revision.
 pub fn content_digest(p: &NotionPage) -> String {
     let canon = json!({"properties": p.properties, "content": p.content}).to_string();
     hex::encode(Sha256::digest(canon.as_bytes()))
