@@ -1772,6 +1772,30 @@ fn a_raised_ceiling_reached_again_asks_again() {
         .expect("q")
         .get(0);
     assert_eq!(n, 2);
+    // review 0fa839d N1: back to an already-asked ceiling (1) → 409, never 500, nothing new
+    let s7 = spec("repo-a", 7, 1);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-r7", &s7)
+            .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/7/semantic-review",
+            &json!({"decision": "passed", "reason": "ok", "digest": s7["digest"]})
+        )
+        .0,
+        201
+    );
+    let mut b7 = body(3, MERGE);
+    b7["sprint_revision"] = json!(7);
+    let before = e.counts();
+    for _ in 0..2 {
+        let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &b7);
+        assert_eq!((st, code(&b)), (409, "LIMIT_REACHED".into()), "{b}");
+    }
+    assert_eq!(e.counts(), before);
 }
 
 #[test]
@@ -1800,4 +1824,92 @@ fn whoever_registered_or_promoted_a_revision_cannot_review_it() {
         .0,
         201
     );
+}
+
+// --- review 0fa839d corrections ---
+
+#[test]
+fn verdicts_judge_the_assigned_revision_and_a_changed_task_needs_a_new_verdict() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    assert_eq!(
+        assign(&e, "guardrail", "G1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "gr-a",
+            "/v0/agent/reports",
+            &report("guardrail", "gr-1", "G1", 0, "01-01", SHA1)
+        )
+        .0,
+        202
+    );
+    full_evidence(&e, SHA1, "v");
+    // revision 6 adds a required output to 01-01
+    let mut s6 = spec("repo-a", 6, 3);
+    if let Some(o) = s6["tasks"][0]["outputs"].as_array_mut() {
+        o.push(
+            json!({"artifact_id": "01-01-extra", "description": "added in r6", "required": true}),
+        );
+    }
+    s6["digest"] = json!(ieo_spec::spec_digest(&s6));
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-v6", &s6)
+            .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/6/semantic-review",
+            &json!({"decision": "passed", "reason": "ok", "digest": s6["digest"]})
+        )
+        .0,
+        201
+    );
+    // F3: the assignment came from revision 5, so its outputs are judged
+    let (_, v) = judge(&e, "jv", "01-01");
+    assert_eq!(v["outcome"], "accepted", "{v}");
+    // N3: but 01-01 changed in revision 6, so that verdict no longer satisfies 01-02's prerequisite
+    let a2 = json!({"repo_id": "repo-a", "role": "development", "assignment_id": "A2", "generation": 0,
+                    "sprint_id": "POC-01", "sprint_revision": 6, "task_id": "01-02", "target_sha": SHA2,
+                    "expected_current": {"assignment_id": "A1", "generation": 0}});
+    let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &a2);
+    assert_eq!((st, code(&b)), (409, "PREREQUISITE_UNMET".into()), "{b}");
+}
+
+#[test]
+fn one_assignment_id_raced_by_two_roles_never_errors() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 50); // ceiling high enough that 10 rounds never reach it
+    let e = Arc::new(e);
+    for round in 0..10 {
+        let aid = format!("RACE-{round}");
+        let (dev_exp, gr_exp) = if round == 0 {
+            (Value::Null, Value::Null)
+        } else {
+            let mut db = e.db();
+            let mut head = |role: &str| -> Value {
+                db.query_opt("SELECT assignment_id, generation FROM assignment_heads WHERE role = $1", &[&role])
+                    .expect("q")
+                    .map_or(Value::Null, |r| json!({"assignment_id": r.get::<_, String>(0), "generation": r.get::<_, i64>(1)}))
+            };
+            (head("development"), head("guardrail"))
+        };
+        let hs: Vec<_> = [("development", dev_exp), ("guardrail", gr_exp)]
+            .into_iter()
+            .map(|(role, exp)| {
+                let (e, aid) = (Arc::clone(&e), aid.clone());
+                std::thread::spawn(move || assign(&e, role, &aid, 0, "01-01", SHA1, exp).0)
+            })
+            .collect();
+        let mut st: Vec<u16> = hs.into_iter().map(|h| h.join().unwrap_or(0)).collect();
+        st.sort_unstable();
+        assert_eq!(st, vec![201, 409], "round {round}");
+    }
 }

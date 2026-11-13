@@ -1,6 +1,6 @@
 {
   "policy_id": "ieo-judgment-policy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "freeze_item": "L07",
   "source_decision": "docs/poc/User_Decisions_2026-11-12_0103.md D12",
   "gap_sources": [
@@ -13,7 +13,7 @@
     {
       "rule_id": "G1.prerequisite_evidence",
       "gap": "G1",
-      "rule": "A prerequisite is met only by a verified coordinator_verdict stored by the coordinator for that task_id. required_state=accepted needs outcome=accepted. required_state=result_recorded accepts any verified verdict. Agent claims, status labels in a spec and verdicts made under a different policy digest never satisfy a prerequisite.",
+      "rule": "A prerequisite is met only by a verified coordinator_verdict stored by the coordinator for that task_id, judged against a revision whose definition of that task equals its definition in the sprint's latest revision (a changed task needs a new verdict). required_state=accepted needs outcome=accepted. required_state=result_recorded accepts any verified verdict. Agent claims, status labels in a spec and verdicts made under a different policy digest never satisfy a prerequisite.",
       "effect_when_unmet": "New assignment refused: 409 PREREQUISITE_UNMET, state unchanged."
     },
     {
@@ -38,7 +38,7 @@
       "rule_id": "G5.limit_reached",
       "gap": "G5",
       "rule": "When the next generation would exceed the ceiling, the coordinator issues no new generation. In the same transaction it records one decision_request (verified) and its outbox entry, and marks the task limit_reached. The current owner keeps the assignment. Nothing continues automatically until a user decision is recorded outside this policy.",
-      "effect_when_unmet": "409 LIMIT_REACHED for the refused generation. The decision_request is recorded once per (task, role, ceiling): when a newer revision raises the ceiling and it is reached again, a new decision_request is recorded."
+      "effect_when_unmet": "409 LIMIT_REACHED for the refused generation. The decision_request is recorded once per (task, role, ceiling value), whenever that value was asked before: when a newer revision changes the ceiling to a value not yet asked and it is reached, a new decision_request is recorded; a value already asked answers 409 LIMIT_REACHED."
     },
     {
       "rule_id": "RG2.approval_scope",

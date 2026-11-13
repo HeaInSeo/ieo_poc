@@ -29,6 +29,10 @@ M=[
  ("M24 decision request once per task, not per ceiling (review F6)", API, "if reached == Some(ceiling) {", "if reached.is_some() {"),
  ("M25 promoter may review (review F10)", API, "if registrant == who.name || registered_it {", "if registrant == who.name {"),
  ("M26 stale note dropped when blocked (review F9)", API, "        stale.dedup();\n", "        stale.clear();\n"),
+ ("M27 prerequisite verdict of a changed task counts (review N3)", API, "                     AND (SELECT t FROM jsonb_array_elements(jr.spec->'tasks') t WHERE t->>'task_id' = $1)\n                       = (SELECT t FROM jsonb_array_elements(lr.spec->'tasks') t WHERE t->>'task_id' = $1))", "                     AND true)"),
+ ("M28 asked ceiling not recognised (review N1)", API, "        if asked {", "        if asked && false {"),
+ ("M29 assignment-id lock removed (review F6/N4)", API, "    lock(tx, &format!(\"assignment-id:{aid}\"))?;\n", ""),
+ ("M30 verdict judges the latest revision (review F3/N3)", API, "    let rev: i64 = head.get(3);", "    let rev: i64 = latest_revision(tx, &sprint_id)?.unwrap_or_default();"),
 ]
 env=dict(os.environ)
 out=[]

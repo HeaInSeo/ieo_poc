@@ -1489,10 +1489,18 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     for p in task["prerequisites"].as_array().into_iter().flatten() {
         let pid = p["task_id"].as_str().unwrap_or_default();
         let need_accepted = p["required_state"] == "accepted";
+        // the verdict must have judged the prerequisite as it is defined *now*: the task in the
+        // verdict's revision must equal the task in its sprint's latest revision (review 0fa839d N3)
         let met: bool = tx
             .query_one(
-                "SELECT EXISTS (SELECT 1 FROM judgments WHERE task_id = $1 AND policy_digest = $2
-                   AND ($3 = false OR outcome = 'accepted'))",
+                "SELECT EXISTS (
+                   SELECT 1 FROM judgments j
+                   JOIN sprint_revisions jr ON jr.sprint_id = j.sprint_id AND jr.revision = j.sprint_revision
+                   JOIN LATERAL (SELECT spec FROM sprint_revisions l WHERE l.sprint_id = j.sprint_id
+                                 ORDER BY l.revision DESC LIMIT 1) lr ON true
+                   WHERE j.task_id = $1 AND j.policy_digest = $2 AND ($3 = false OR j.outcome = 'accepted')
+                     AND (SELECT t FROM jsonb_array_elements(jr.spec->'tasks') t WHERE t->>'task_id' = $1)
+                       = (SELECT t FROM jsonb_array_elements(lr.spec->'tasks') t WHERE t->>'task_id' = $1))",
                 &[&pid, &ctx.policy.digest, &need_accepted],
             )?
             .get(0);
@@ -1510,12 +1518,10 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     }
     // G4/G5: cumulative attempts per (sprint, task, role)
     let attempts = tx.query_opt(
-        "SELECT issued, reached_ceiling FROM task_attempts WHERE sprint_id = $1 AND task_id = $2 AND role = $3",
+        "SELECT issued FROM task_attempts WHERE sprint_id = $1 AND task_id = $2 AND role = $3",
         &[&sprint_id, &task_id, &role],
     )?;
-    let (issued, reached) = attempts.map_or((0, None), |r| {
-        (r.get::<_, i64>(0), r.get::<_, Option<i64>>(1))
-    });
+    let issued = attempts.map_or(0, |r| r.get::<_, i64>(0));
     let Some(ceiling) = spec["limits"]["correction_attempts"].as_i64() else {
         return Err(one(
             422,
@@ -1528,7 +1534,15 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     if issued > ceiling {
         // one decision request per (task, role, ceiling): a ceiling raised by a newer
         // revision and reached again asks again (review 1e98f17 F6)
-        if reached == Some(ceiling) {
+        // asked already at this ceiling (any earlier time, not only the last one: review 0fa839d N1)
+        let asked: bool = tx
+            .query_one(
+                "SELECT EXISTS (SELECT 1 FROM events WHERE scope_repo = $1 AND scope_role = 'coordinator'
+                   AND event_id = $2)",
+                &[&repo, &format!("limit-{sprint_id}-{task_id}-{role}-c{ceiling}")],
+            )?
+            .get(0);
+        if asked {
             return Err(one(
                 409,
                 "LIMIT_REACHED",
@@ -2218,10 +2232,10 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         &[&sprint_id, &seq],
     )?;
     tx.execute(
-        "INSERT INTO judgments (repo_id, judgment_id, request, sprint_id, task_id, outcome, head_sha,
-            merged_sha, facts, policy_digest, event_sprint, event_seq, judged_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
-        &[&repo, &jid, &body, &sprint_id, &task_id, &outcome, &head_sha, &merged, &facts_json,
+        "INSERT INTO judgments (repo_id, judgment_id, request, sprint_id, sprint_revision, task_id, outcome,
+            head_sha, merged_sha, facts, policy_digest, event_sprint, event_seq, judged_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
+        &[&repo, &jid, &body, &sprint_id, &rev, &task_id, &outcome, &head_sha, &merged, &facts_json,
           &ctx.policy.digest, &sprint_id, &seq, &who.name],
     )?;
     history(

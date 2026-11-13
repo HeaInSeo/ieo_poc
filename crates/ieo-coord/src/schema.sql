@@ -153,6 +153,8 @@ CREATE TABLE IF NOT EXISTS judgments (
     judgment_id   text        NOT NULL,
     request       jsonb       NOT NULL,
     sprint_id     text        NOT NULL,
+    -- revision whose task definition was judged (a prerequisite counts only while unchanged)
+    sprint_revision bigint    NOT NULL,
     task_id       text        NOT NULL,
     outcome       text        NOT NULL CHECK (outcome IN ('accepted', 'not_accepted')),
     head_sha      text        NOT NULL,
