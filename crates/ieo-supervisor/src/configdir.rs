@@ -7,10 +7,13 @@
 //! only `mcpServers`, `projects.*.mcpServers`, `projects.*.allowedTools`,
 //! `projects.*.enabledMcpjsonServers`. Items the CLI writes on every normal run are outside it.
 //!
-//! Symbolic links are never followed. A link inside the directive scope is digested by its
-//! target text (so planting one is tamper), and cleanup removes the link itself. A directory
+//! Symbolic links are never followed. Cleanup removes every link, so **any** link found later,
+//! at any path (including `projects/<x>` and `.claude.json`, which the CLI would follow), is
+//! digested by its path and target text and is therefore tamper. Only regular files in the
+//! directive scope are read; any other file type there (FIFO, socket, device) is digested by its
+//! path and kind without being opened, and non-directive entries are never opened. A directory
 //! or file that cannot be read makes [`directive_digest`] fail; [`observed`] turns that into a
-//! value that never equals a digest, so the reconnect decision reports tamper (fail closed).
+//! value that is not a digest, which the reconnect decision reports as tamper (fail closed).
 //!
 //! Cleanup keeps only regular files `projects/<cwd>/*.jsonl` (session records needed by
 //! `--resume`), removes everything else (restoring owner permissions on directories the role
@@ -37,6 +40,8 @@ const DIRECTIVE_DIRS: [&str; 7] = [
 enum Entry {
     File(PathBuf),
     Link(PathBuf),
+    /// FIFO, socket, device: never opened.
+    Other(PathBuf),
 }
 
 /// Read-only walk: never follows links, propagates every error.
@@ -51,8 +56,10 @@ fn walk(dir: &Path, out: &mut Vec<Entry>) -> io::Result<()> {
             out.push(Entry::Link(p));
         } else if ft.is_dir() {
             walk(&p, out)?;
-        } else {
+        } else if ft.is_file() {
             out.push(Entry::File(p));
+        } else {
+            out.push(Entry::Other(p));
         }
     }
     Ok(())
@@ -78,7 +85,12 @@ fn is_directive(rel: &str) -> bool {
 fn claude_json_directives(dir: &Path) -> io::Result<Value> {
     // a missing file and a file without directive keys digest the same (normal CLI writes);
     // an unreadable or non-JSON file is an error
-    let v: Value = match std::fs::read(dir.join(".claude.json")) {
+    // a link here is digested as a link (tamper) by the walk and never read
+    let path = dir.join(".claude.json");
+    if std::fs::symlink_metadata(&path).is_ok_and(|m| !m.file_type().is_file()) {
+        return Ok(Value::Null);
+    }
+    let v: Value = match std::fs::read(&path) {
         Ok(raw) => serde_json::from_slice(&raw).map_err(|e| {
             io::Error::new(io::ErrorKind::InvalidData, format!(".claude.json: {e}"))
         })?,
@@ -112,18 +124,21 @@ pub fn directive_digest(dir: &Path) -> io::Result<String> {
     walk(dir, &mut entries)?;
     let mut h = Sha256::new();
     for e in entries {
-        let (p, kind, content) = match &e {
-            Entry::File(p) => (p, b'f', std::fs::read(p)?),
-            Entry::Link(p) => (
-                p,
-                b'l',
-                std::fs::read_link(p)?.to_string_lossy().as_bytes().to_vec(),
-            ),
+        let (p, kind) = match &e {
+            Entry::File(p) => (p, b'f'),
+            Entry::Link(p) => (p, b'l'),
+            Entry::Other(p) => (p, b'o'),
         };
         let r = rel(dir, p);
-        if (r == ".claude.json" && kind == b'f') || !is_directive(&r) {
+        // links count everywhere; files only in the directive scope (`.claude.json` by its keys)
+        if kind != b'l' && (r == ".claude.json" || !is_directive(&r)) {
             continue;
         }
+        let content = match kind {
+            b'f' => std::fs::read(p)?,
+            b'l' => std::fs::read_link(p)?.to_string_lossy().as_bytes().to_vec(),
+            _ => Vec::new(),
+        };
         h.update(r.as_bytes());
         h.update([0, kind]);
         h.update(Sha256::digest(&content));
@@ -155,9 +170,12 @@ fn is_credential(rel: &str) -> bool {
 }
 
 /// Remove everything under `d` except regular files `projects/<x>/*.jsonl`; restores owner
-/// rwx on directories first so a role cannot hide items by removing permissions.
+/// rwx on directories below the root first so a role cannot hide items by removing
+/// permissions. The root's own mode is left as provisioned.
 fn clean_dir(root: &Path, d: &Path, report: &mut CleanReport) -> io::Result<()> {
-    std::fs::set_permissions(d, std::fs::Permissions::from_mode(0o700))?;
+    if d != root {
+        std::fs::set_permissions(d, std::fs::Permissions::from_mode(0o700))?;
+    }
     let entries = std::fs::read_dir(d)?
         .map(|e| e.map(|e| e.path()))
         .collect::<io::Result<Vec<_>>>()?;
@@ -208,7 +226,7 @@ pub fn clean(dir: &Path, template: &Path) -> io::Result<CleanReport> {
         let Entry::File(f) = e else {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "template contains a symbolic link",
+                "template contains something other than regular files",
             ));
         };
         let to = dir.join(rel(template, &f));

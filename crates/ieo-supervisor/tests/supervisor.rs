@@ -186,6 +186,9 @@ fn coord(generation: u64) -> CoordinatorRecord<'static> {
         sprint_id: "POCX",
         sprint_revision: 3,
         spec_digest: "dg",
+        image_digest: "sha256:img",
+        profile_id: "dev",
+        profile_revision: 1,
     }
 }
 
@@ -378,27 +381,29 @@ fn checkpoint_record_has_the_5_1_fields() {
 
 #[test]
 fn reconnect_decisions() {
-    let cp = cp_value("d0", 2);
+    let d0 = "d".repeat(64);
+    let d0 = d0.as_str();
+    let cp = cp_value(d0, 2);
     let c = coord(2);
     let resume = Reconnect::Resume {
         session_id: SID.into(),
     };
-    assert_eq!(checkpoint::decide(Some(&cp), &c, "d0", None), resume);
+    assert_eq!(checkpoint::decide(Some(&cp), &c, d0, None), resume);
     assert_eq!(
-        checkpoint::decide(None, &c, "d0", None),
+        checkpoint::decide(None, &c, d0, None),
         Reconnect::NewSession
     );
     assert_eq!(
-        checkpoint::decide(Some(&cp), &c, "d0", Some(Some(42))),
+        checkpoint::decide(Some(&cp), &c, d0, Some(Some(42))),
         Reconnect::AlreadyRunning { pid: Some(42) }
     );
     assert_eq!(
-        checkpoint::decide(Some(&cp), &coord(3), "d0", None),
+        checkpoint::decide(Some(&cp), &coord(3), d0, None),
         Reconnect::StaleGeneration
     );
     let reconcile = |v: &Value, c: &CoordinatorRecord<'_>| {
         matches!(
-            checkpoint::decide(Some(v), c, "d0", None),
+            checkpoint::decide(Some(v), c, d0, None),
             Reconnect::ExternalReconciliation { .. }
         )
     };
@@ -408,6 +413,13 @@ fn reconnect_decisions() {
         ("sprint_id", json!("OTHER")),
         ("sprint_revision", json!(4)),
         ("assignment_id", json!("A2")),
+        ("image_digest", json!("sha256:other")),
+        ("profile_id", json!("other")),
+        ("profile_revision", json!(2)),
+        (
+            "settings_digest",
+            json!("unreadable: Permission denied (os error 13)"),
+        ),
         ("session_id", json!("")),
         ("session_id", Value::Null),
         ("generation", Value::Null),
@@ -446,18 +458,27 @@ fn one_running_process_per_session() {
         Some(LockError::Running { pid: None })
     );
     drop(held);
-    // a holder in another process blocks; its death releases the lock. The holder is one
-    // process (sh execs into sleep with the locked descriptor), so killing it closes the fd.
+    // a holder in another process blocks; its death releases the lock. sh takes the lock on its
+    // own descriptor through flock(1), waits for it, then execs into sleep: once the process is
+    // `sleep`, it is the only holder, so killing it closes the last descriptor.
     let mut child = std::process::Command::new("sh")
         .args(["-c", "exec 9<>\"$0\" && flock 9 && exec sleep 30"])
         .arg(&path)
         .spawn()
         .expect("holder");
+    let comm = format!("/proc/{}/comm", child.id());
     let t0 = std::time::Instant::now();
-    while SessionLock::acquire(d.p(), SID, me).is_ok() {
-        assert!(t0.elapsed().as_secs() < 10, "child never took the lock");
+    while std::fs::read_to_string(&comm)
+        .map(|c| c.trim() != "sleep")
+        .unwrap_or(true)
+    {
+        assert!(t0.elapsed().as_secs() < 10, "holder never reached sleep");
         std::thread::yield_now();
     }
+    assert!(matches!(
+        SessionLock::acquire(d.p(), SID, me),
+        Err(LockError::Running { .. })
+    ));
     child.kill().expect("kill");
     child.wait().expect("wait");
     assert!(SessionLock::acquire(d.p(), SID, me).is_ok());
@@ -677,6 +698,146 @@ fn extra_usage_must_be_off_before_and_during_a_call() {
     let stream = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"),
         "/../../docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/01-P1-development/stdout.jsonl"))
         .expect("stored 01-04 stream");
-    assert!(!budget::rate_limit_events(&stream).is_empty());
+    assert!(
+        !budget::rate_limit_events(&stream)
+            .expect("events")
+            .is_empty()
+    );
     assert!(budget::observation_check(fresh(&stream)).is_ok());
+}
+
+// ---- review 260089f N1–N8 ----
+
+#[test]
+fn any_link_is_tamper_and_is_never_followed() {
+    let t = template();
+    let outside = Tmp::new("outside-n1");
+    put(outside.p(), "memory/m.md", "MARKER");
+    for at in [
+        "projects",
+        "projects/-state-work-sori",
+        ".claude.json",
+        "agents/a.md",
+        "backups",
+    ] {
+        let d = Tmp::new("cfg-n1");
+        let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+        let link = d.p().join(at);
+        std::fs::create_dir_all(link.parent().expect("parent")).expect("mk");
+        std::os::unix::fs::symlink(outside.p(), &link).expect("link");
+        let observed = configdir::observed(d.p());
+        assert_ne!(observed, digest, "{at}");
+        assert!(
+            matches!(
+                checkpoint::decide(Some(&cp_value(&digest, 0)), &coord(0), &observed, None),
+                Reconnect::TamperDetected { .. }
+            ),
+            "{at}"
+        );
+        // not followed: changing what the link points at does not change the digest
+        put(outside.p(), "memory/m.md", &format!("MARKER {at}"));
+        assert_eq!(configdir::observed(d.p()), observed, "{at}");
+    }
+    // a file holding a path and a link to that path are different items
+    let a = Tmp::new("cfg-kind-a");
+    let b = Tmp::new("cfg-kind-b");
+    put(a.p(), "skills/x", "/elsewhere");
+    std::fs::create_dir_all(b.p().join("skills")).expect("mk");
+    std::os::unix::fs::symlink("/elsewhere", b.p().join("skills/x")).expect("link");
+    assert_ne!(configdir::observed(a.p()), configdir::observed(b.p()));
+}
+
+#[test]
+fn special_files_are_never_opened() {
+    let t = template();
+    let d = Tmp::new("cfg-n2");
+    let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+    let fifo = |rel: &str| {
+        let p = d.p().join(rel);
+        std::fs::create_dir_all(p.parent().expect("parent")).expect("mk");
+        let ok = std::process::Command::new("mkfifo")
+            .arg(&p)
+            .status()
+            .expect("mkfifo")
+            .success();
+        assert!(ok);
+    };
+    let observe = |dir: PathBuf| {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(configdir::observed(&dir));
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(10))
+            .expect("observed() blocked on a special file")
+    };
+    // outside the directive scope: ignored, not opened
+    fifo("sessions/f");
+    assert_eq!(observe(d.p().to_path_buf()), digest);
+    // inside it: tamper, still not opened
+    fifo("skills/f");
+    assert_ne!(observe(d.p().to_path_buf()), digest);
+    let report = configdir::clean(d.p(), t.p()).expect("clean");
+    assert_eq!(report.digest, digest);
+}
+
+#[test]
+fn claude_json_directive_keys_are_all_digested() {
+    let t = template();
+    for key in ["mcpServers", "allowedTools", "enabledMcpjsonServers"] {
+        let d = Tmp::new("cfg-json");
+        let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+        put(
+            d.p(),
+            ".claude.json",
+            &json!({"projects": {"/state/work/sori": {key: ["x"]}}}).to_string(),
+        );
+        assert_ne!(configdir::observed(d.p()), digest, "projects.*.{key}");
+    }
+    // only the CLI's own builtin record in plugins/store is excluded
+    for rel in [
+        "plugins/store/other.json",
+        "plugins/store/builtin.json",
+        "plugins/store/x_builtin-1.txt",
+        "plugins/x/a_builtin-1.json",
+    ] {
+        let d = Tmp::new("cfg-plugins");
+        let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+        put(d.p(), rel, "{}");
+        assert_ne!(configdir::observed(d.p()), digest, "{rel}");
+    }
+}
+
+#[test]
+fn cleanup_leaves_the_root_mode_alone() {
+    let d = Tmp::new("cfg-n7");
+    std::fs::set_permissions(d.p(), std::fs::Permissions::from_mode(0o750)).expect("chmod");
+    configdir::clean(d.p(), template().p()).expect("clean");
+    let mode = std::fs::metadata(d.p()).expect("meta").permissions().mode() & 0o7777;
+    assert_eq!(mode, 0o750);
+}
+
+#[test]
+fn overflowing_or_truncated_measurements_are_not_trusted() {
+    let s = ok_stream();
+    let huge = [
+        rec(measured(u64::MAX, 2, 0, 0), 1000),
+        rec(measured(1, 0, 0, 0), 1000),
+    ];
+    assert!(matches!(
+        budget::next(&BUDGET_X02, &huge, fresh(&s)),
+        Decision::Stop { .. }
+    ));
+    assert!(!budget::spent(&huge).unmeasured_runs.is_empty());
+    let two = [
+        rec(measured(u64::MAX - 1, 0, 0, 0), 1000),
+        rec(measured(5, 0, 0, 0), 1000),
+    ];
+    assert!(!budget::spent(&two).unmeasured_runs.is_empty());
+    // a truncated event is not skipped, before or during a run
+    let truncated =
+        r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","overageStatus":"allo"#;
+    let mixed = format!("{truncated}\n{s}\n");
+    assert!(budget::observation_check(fresh(&mixed)).is_err());
+    assert!(budget::stream_stop(truncated).is_some());
+    assert!(budget::stream_stop("not json at all").is_none());
 }

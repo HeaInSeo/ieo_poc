@@ -39,7 +39,8 @@ pub fn record(c: &Checkpoint<'_>) -> Value {
            "session_cumulative": c.session_cumulative})
 }
 
-/// What the coordinator holds for the current assignment (§5-2).
+/// What the coordinator holds for the current assignment (§5-2): every recorded digest and
+/// identity of the checkpoint must match it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoordinatorRecord<'a> {
     pub generation: u64,
@@ -47,6 +48,9 @@ pub struct CoordinatorRecord<'a> {
     pub sprint_id: &'a str,
     pub sprint_revision: u64,
     pub spec_digest: &'a str,
+    pub image_digest: &'a str,
+    pub profile_id: &'a str,
+    pub profile_revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,6 +112,9 @@ pub fn decide(
         ("sprint_id", json!(coordinator.sprint_id)),
         ("sprint_revision", json!(coordinator.sprint_revision)),
         ("spec_digest", json!(coordinator.spec_digest)),
+        ("image_digest", json!(coordinator.image_digest)),
+        ("profile_id", json!(coordinator.profile_id)),
+        ("profile_revision", json!(coordinator.profile_revision)),
     ] {
         if cp[key] != want {
             return reconcile(format!(
@@ -120,8 +127,12 @@ pub fn decide(
         Some(s) if !s.is_empty() => s.to_string(),
         _ => return reconcile("checkpoint has no session_id"),
     };
-    let Some(checkpoint_digest) = cp["settings_digest"].as_str().filter(|s| !s.is_empty()) else {
-        return reconcile("checkpoint has no settings_digest");
+    // only a digest written by cleanup (64 hex) can be compared; never an "unreadable" value
+    let Some(checkpoint_digest) = cp["settings_digest"]
+        .as_str()
+        .filter(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+    else {
+        return reconcile("checkpoint has no valid settings_digest");
     };
     if checkpoint_digest != observed_digest {
         return Reconnect::TamperDetected {

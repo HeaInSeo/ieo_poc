@@ -131,13 +131,22 @@ pub fn spent(records: &[Value]) -> Spent {
             })
             .flatten();
         if let Some(ms) = duration {
-            s.seconds += ms.div_ceil(1000);
+            s.seconds = s.seconds.saturating_add(ms.div_ceil(1000));
         }
-        match (duration, tokens) {
-            (Some(_), Some((i, o, cc, cr))) => {
-                let billable = i + o + cc;
-                s.billable_tokens += billable;
-                s.cache_read_tokens += cr;
+        // an overflowing value is not a measurement
+        let sums = tokens.and_then(|(i, o, cc, cr)| {
+            let billable = i.checked_add(o)?.checked_add(cc)?;
+            Some((
+                billable,
+                cr,
+                s.billable_tokens.checked_add(billable)?,
+                s.cache_read_tokens.checked_add(cr)?,
+            ))
+        });
+        match (duration, sums) {
+            (Some(_), Some((billable, cr, total_b, total_cr))) => {
+                s.billable_tokens = total_b;
+                s.cache_read_tokens = total_cr;
                 s.largest_run_billable = s.largest_run_billable.max(billable);
                 s.largest_run_cache_read = s.largest_run_cache_read.max(cr);
             }
@@ -147,13 +156,22 @@ pub fn spent(records: &[Value]) -> Spent {
     s
 }
 
-/// All `rate_limit_event`s of a stream-json text, in order.
-pub fn rate_limit_events(stream: &str) -> Vec<Value> {
-    stream
-        .lines()
-        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .filter(|v| v["type"] == "rate_limit_event")
-        .collect()
+/// All `rate_limit_event`s of a stream-json text, in order. A line that mentions
+/// `rate_limit_event` but is not a complete JSON object (e.g. truncated) is an error: it may
+/// have carried a breaking value.
+pub fn rate_limit_events(stream: &str) -> Result<Vec<Value>, String> {
+    let mut out = Vec::new();
+    for (n, l) in stream.lines().enumerate() {
+        match serde_json::from_str::<Value>(l) {
+            Ok(v) if v["type"] == "rate_limit_event" => out.push(v),
+            Ok(_) => {}
+            Err(_) if l.contains("rate_limit_event") => {
+                return Err(format!("line {}: unreadable rate_limit_event", n + 1));
+            }
+            Err(_) => {}
+        }
+    }
+    Ok(out)
 }
 
 /// No-extra-billing condition for one event.
@@ -192,7 +210,7 @@ pub fn observation_check(obs: Option<Observation<'_>>) -> Result<(), String> {
             obs.age_seconds
         ));
     }
-    let events = rate_limit_events(obs.stream);
+    let events = rate_limit_events(obs.stream)?;
     if events.is_empty() {
         return Err(
             "no rate_limit_event in the observation: the no-extra-billing condition is unconfirmed"
@@ -208,10 +226,15 @@ pub fn observation_check(obs: Option<Observation<'_>>) -> Result<(), String> {
 /// During a run: `Some(reason)` when this stream line is a `rate_limit_event` that breaks the
 /// no-extra-billing condition; the adapter then stops the process and reports.
 pub fn stream_stop(line: &str) -> Option<String> {
-    let v: Value = serde_json::from_str(line).ok()?;
-    (v["type"] == "rate_limit_event")
-        .then(|| overage_check(&v).err())
-        .flatten()
+    match serde_json::from_str::<Value>(line) {
+        Ok(v) => (v["type"] == "rate_limit_event")
+            .then(|| overage_check(&v).err())
+            .flatten(),
+        Err(_) if line.contains("rate_limit_event") => {
+            Some("unreadable rate_limit_event line".into())
+        }
+        Err(_) => None,
+    }
 }
 
 /// May the next run of `budget` start?
