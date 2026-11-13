@@ -1,0 +1,11 @@
+# commit 3e242863261ffd682ac3cf3e9947f34929239007 (+ this report directory, uncommitted at run time)
+$ python scripts/validate_package.py
+      "v1.3.3-A1",
+      "v1.3.3-A2"
+    ]
+  }
+}
+EXIT=0
+$ python scripts/render_progress.py --check
+{"ok": true, "mode": "check", "files": ["STATUS.md", "TASKS.md", "RESULTS.md", "RESUME.md", "events.jsonl"]}
+EXIT=0

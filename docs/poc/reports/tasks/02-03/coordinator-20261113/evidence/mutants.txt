@@ -1,0 +1,23 @@
+# mutants at commit 3e242863261ffd682ac3cf3e9947f34929239007 · 2026-11-13T07:47:54Z · each mutant = one replace in one file, full 'cargo test --locked --all-targets', file restored by git checkout
+M01 ownership CAS removed: killed ['ownership_head_is_compare_and_swap']
+M02 generation need not follow head: killed ['ownership_head_is_compare_and_swap']
+M03 prerequisites ignored (G1): killed ['prerequisites_need_a_verified_accepted_verdict']
+M04 attempt ceiling off by one (G4): killed ['attempt_ceiling_is_cumulative_and_records_one_decision_request']
+M05 CI evidence from any SHA (G2): killed ['verdict_uses_github_and_run_evidence_for_the_recorded_sha_only']
+M06 replay counts not re-evaluated (N3): killed ['claims_late_duplicate_stale_and_mismatched']
+M07 old guardrail generation counted (N4): killed ['review_inputs_are_current_independent_and_for_the_head']
+M08 GitHub self-review counted (G3): killed ['review_inputs_are_current_independent_and_for_the_head']
+M09 registrant may self-review (G3): killed ['self_review_is_refused']
+M10 semantic review gate removed: killed ['registration_is_format_intake_and_semantic_review_is_separate']
+M11 run record passes on any judgment: killed ['verdict_uses_github_and_run_evidence_for_the_recorded_sha_only']
+M12 current reject does not block: killed ['review_inputs_are_current_independent_and_for_the_head']
+M13 refused request commits: SURVIVED []
+M14 per-sprint event lock removed: killed ['development_and_guardrail_claims_race_into_one_ordered_stream']
+M15 claim task/sprint consistency removed: killed ['claims_late_duplicate_stale_and_mismatched']
+M16 optional outputs judged (G7): killed ['review_inputs_are_current_independent_and_for_the_head', 'verdict_uses_github_and_run_evidence_for_the_recorded_sha_only', 'prerequisites_need_a_verified_accepted_verdict']
+M17 decision request not once (G5): killed ['attempt_ceiling_is_cumulative_and_records_one_decision_request']
+M18 append-only triggers removed: killed ['event_pages_are_append_only_and_reads_change_nothing']
+M19 registry trusts digest string (PR10 N2): killed ['registry_recomputes_the_digest_and_refuses_missing_or_forged_ones']
+M20 completion summary prefix only (01-08 N2): killed ['review_inputs_are_current_independent_and_for_the_head']
+dirty after run: none
+# M13 is an equivalent mutant: PostgreSQL turns COMMIT of a failed transaction into ROLLBACK, and no handler refuses after a successful write. The property itself (a failure after the first write leaves no row) is fixed by a_failure_after_the_first_write_rolls_back_the_whole_request (fault injection).

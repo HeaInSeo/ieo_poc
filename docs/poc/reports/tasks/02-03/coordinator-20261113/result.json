@@ -1,0 +1,64 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": false,
+  "plan_version": "v1.3.3",
+  "task_id": "02-03",
+  "experiment_id": null,
+  "run_id": "coordinator-20261113",
+  "revision": 1,
+  "previous_run_ref": null,
+  "actor": {
+    "role": "development",
+    "name": "개발 에이전트(Claude Code 대화 세션)"
+  },
+  "execution_kind": "coordinator_db_api_implementation",
+  "execution_state": "독립 검토 대기",
+  "inputs": {
+    "spec_revision": "POC-02 rev 6 (v1.3.3-A2; 02-03 행은 rev 4 기준 그대로)",
+    "repo_sha": "3e242863261ffd682ac3cf3e9947f34929239007",
+    "image_digest": "docker.io/library/postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994 (시험 DB)",
+    "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+    "model_runtime_versions": [
+      "모델 요청 0회"
+    ]
+  },
+  "expected": "명세 v0·보고 v0·인증된 HTTP/JSON API를 따르는 배정·권한 세대·사건 ID·이력·outbox·조회 모델, 형식 검사와 의미 검토 분리, GitHub/실행 증거가 완료 판정 입력, 기동 확인과 P04 구분; 선행 L07·L08·01-08 N2·PR #10 잔여 지적 처분",
+  "observed": "ieo-coord(PostgreSQL 17·HTTP) 시험 21건 포함 작업공간 135건 PASS; 변이 20개 중 19 검출·1 동등(M13); 소유권 CAS·중복·늦은 결과·옛 세대 승인 제외·거부 무상태·결함 주입 롤백·동시 기록 순서 확인; L07 정책 고정(digest f616d526…), 01-08 N2·PR #10 N1~N5 반영; 기동 확인은 liveness만(P04 아님)",
+  "verdict": "미판정",
+  "verification": {
+    "level": "claim",
+    "reviewer": null,
+    "evidence": []
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "대화 세션의 역할별 원시 사용량 수단 없음. 경과는 측정 시작 07:25:10Z~시험 보강 커밋 07:47:36Z 약 1,350초이나 시작 전 선행 읽기 몇 분이 빠져 있어 elapsed_seconds에 넣지 않음",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
+  "adoption": "미판정",
+  "reuse_assets": [
+    "crates/ieo-coord",
+    "contracts/judgment-policy-v0.json",
+    "contracts/ieo-api-v0.openapi.yaml (0.6.0)"
+  ],
+  "unresolved": [
+    "P04 판정은 해당 검증 작업(04-03·04-04 등) — 이번 기동 확인은 liveness만",
+    "실제 GitHub 증거 수집기·실제 에이전트 연결은 02-04·02-05·EARLY-01, 실제 GitHub는 GH1~GH5 충족 뒤",
+    "재현 실행기 02-06(이번은 접수·조회만)",
+    "판정·outbox 원자 기록 검증과 보고 대기 02-07",
+    "G5 뒤 사용자 결정 기록 경로·RG1/RG2 필드화는 다음 contract revision 후보",
+    "elapsed_seconds·total_tokens 집행은 02-04 supervisor, 토큰 총량 정의는 L01/L02"
+  ],
+  "next_action": "독립 검토 → 조건부 병합·main CI → 원장 갱신 → 02-04",
+  "evidence_refs": [
+    "reports/tasks/02-03/coordinator-20261113/evidence/cargo-test.log",
+    "reports/tasks/02-03/coordinator-20261113/evidence/mutants.txt",
+    "reports/tasks/02-03/coordinator-20261113/evidence/openapi-validate.log",
+    "reports/tasks/02-03/coordinator-20261113/evidence/validate.log",
+    "reports/tasks/02-03/coordinator-20261113/evidence/startup-smoke.txt"
+  ]
+}
