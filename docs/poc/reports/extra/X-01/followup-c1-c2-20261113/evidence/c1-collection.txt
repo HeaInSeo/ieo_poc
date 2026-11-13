@@ -1,0 +1,15 @@
+# X-01 C1 · Notion collection without retyping · 2026-11-13
+path: this terminal's Claude Code MCP server `notion` (https://mcp.notion.com/mcp, HTTP, OAuth held by Claude Code; `claude mcp list` → Connected). No API token in the environment; none was extracted or created.
+method: call mcp__notion__notion-fetch in the session → tools/notion_from_transcript.py copies the recorded tool_result text verbatim from the session transcript (JSONL) to a private file (0600) with metadata.
+page: 3fd86e6dd1d181a3a9cace91920adac0 (OP-OCI-RAC-OC08-20261018) · page_last_edited_at 2026-10-18T14:08:08.303Z
+fetch 1 (X-01 run):  transcript line 9704,  recorded 2026-11-13T09:28:35Z, 17,203 bytes, sha256 0c2c7e822c6cbcb828cdba948e184c3a2c30bb16650054d1b09d16f773fd5eba
+fetch 2 (this run):  transcript line 10919, recorded 2026-11-13T13:16:56Z, 17,203 bytes, sha256 0c2c7e822c6cbcb828cdba948e184c3a2c30bb16650054d1b09d16f773fd5eba
+completeness markers (both): truncated=absent, unknown_block_count=absent, </content> and </page> present
+normalised (ieo-notion snapshot, properties+content): content digest
+  raw fetch 1: 3f8a300fcae5d319ec4f952c3ce2c51912f4fe2593447c008e3c93b46ed7292b
+  raw fetch 2: 3f8a300fcae5d319ec4f952c3ce2c51912f4fe2593447c008e3c93b46ed7292b
+  X-01 snapshot (hand-transcribed, kept unchanged as the evidence of that run): 3f8a300fcae5d319ec4f952c3ce2c51912f4fe2593447c008e3c93b46ed7292b
+derived fields (goal, tasks/acceptance criteria, repo, title, gates/unresolved, source task id): identical across all three
+properties (43) and content (5,034 chars): identical across all three
+conclusion: the X-01 run's snapshot matched the connector response; no conversion/registration/judgment result is affected and none was re-run.
+limits: the connector's own rendering is the collected form (not the REST API's block JSON); REST-path collection still needs an integration token (not requested).

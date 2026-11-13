@@ -290,6 +290,9 @@ pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Re
         ("POST", ["v0", "sprints"]) => run(db, &|tx| register(tx, ctx, who, req)),
         ("POST", ["v0", "sprint-inputs"]) => run(db, &|tx| convert(tx, ctx, who, req)),
         ("POST", ["v0", "imports", "notion"]) => run(db, &|tx| import_notion(tx, ctx, who, req)),
+        ("POST", ["v0", "coordinator", "exceptions"]) => {
+            run(db, &|tx| record_exception(tx, who, req))
+        }
         ("GET", ["v0", "sprints", id, "revisions", rev]) => {
             run(db, &|tx| get_revision(tx, who, id, rev))
         }
@@ -586,7 +589,25 @@ fn register(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         let result = reevaluate(tx, stored)?;
         return ok(200, result);
     }
-    guard_import_owned(tx, &body)?;
+    guard_import_owned(tx, &body, mode)?;
+    // C2 (review 9a421b7 F1): the gate follows the Notion sources a spec cites, whatever its
+    // sprint_id, so a copy of a gated task under another sprint id is gated too. Format errors
+    // keep their 400 (checked by register_spec).
+    if mode == CheckMode::Executable
+        && ieo_spec::schema::format_rejections(ieo_spec::schema::sprint_spec_validator(), &body)
+            .is_empty()
+    {
+        let repo = body["target"]["repo_id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        notion_gate(
+            tx,
+            &body,
+            body["sprint_id"].as_str().unwrap_or_default(),
+            &repo,
+        )?;
+    }
     let (status, result) = register_spec(tx, ctx, who, &body, mode)?;
     idempotent_store(
         tx,
@@ -673,7 +694,8 @@ fn is_hex64(s: &str) -> bool {
 /// Nothing here can make a spec executable: that still needs `mode=executable` registration,
 /// bound limits, no unresolved reasons and an independent semantic review.
 fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
-    need_client_scope(who, "sprints:register", true)?;
+    // X-01 C2: only the import service writes trusted collection records
+    need_client_scope(who, "notion:import", true)?;
     let body = parse_body(req.body)?;
     let input = &body["input"];
     let Some(repo) = input["repo"].as_str() else {
@@ -692,7 +714,10 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
             "repo not in this credential's scope",
         ));
     }
-    only_keys(&body, &["test_id", "source", "input", "unresolved"])?;
+    only_keys(
+        &body,
+        &["test_id", "source", "input", "unresolved", "gates"],
+    )?;
     let test_id = str_field(&body, "test_id", 64)?.to_string();
     if !test_id
         .bytes()
@@ -753,6 +778,25 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         ));
     }
     str_field(src, "fetched_via", 128)?;
+    let list = |k: &str| -> Result<Vec<String>, Resp> {
+        match &body[k] {
+            Value::Null => Ok(vec![]),
+            Value::Array(a) if a.iter().all(|x| x.as_str().is_some_and(|s| !s.is_empty())) => Ok(a
+                .iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()),
+            _ => Err(one(
+                400,
+                "SCHEMA_VIOLATION",
+                k,
+                "must be a list of non-empty strings",
+                "fix the list",
+            )),
+        }
+    };
+    // C2: queue gates and missing facts are recorded separately by the import service
+    let gates = list("gates")?;
+    let missing = list("unresolved")?;
     let unresolved: Vec<String> = match &body["unresolved"] {
         Value::Null => vec![],
         Value::Array(a) if a.iter().all(|x| x.as_str().is_some_and(|s| !s.is_empty())) => a
@@ -770,8 +814,12 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         }
     };
     lock(tx, "registry")?;
+    // review 9a421b7 F2: a replay is only the page's *latest* import; content that returns to an
+    // earlier state (A→B→A) becomes a new revision so its gates apply again
     if let Some(row) = tx.query_opt(
-        "SELECT test_id, response FROM notion_imports WHERE page_id = $1 AND content_digest = $2",
+        "SELECT test_id, response FROM notion_imports WHERE page_id = $1 AND content_digest = $2
+           AND (test_id, sprint_revision) = (SELECT test_id, sprint_revision FROM notion_imports
+                 WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1)",
         &[&page_id, &digest],
     )? {
         if row.get::<_, &str>(0) != test_id {
@@ -803,6 +851,19 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         stored["registration"] = reevaluate(tx, stored["registration"].take())?;
         stored["replay"] = json!(true);
         return ok(200, stored);
+    }
+    if let Some(row) = tx.query_opt(
+        "SELECT test_id FROM notion_imports WHERE page_id = $1 AND test_id <> $2 LIMIT 1",
+        &[&page_id, &test_id],
+    )? {
+        let _ = row;
+        return Err(one(
+            409,
+            "EVENT_CONTENT_CONFLICT",
+            "test_id",
+            "this Notion page was imported under another test_id",
+            "use the test_id of the earlier import",
+        ));
     }
     if let Some(row) = tx.query_opt(
         "SELECT page_id FROM notion_imports WHERE test_id = $1 LIMIT 1",
@@ -898,7 +959,7 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
             sprint_id: test_id.clone(),
             sprint_number: Some(number),
             extra_sources: vec![notion_source],
-            extra_unresolved: unresolved,
+            extra_unresolved: gates.iter().chain(unresolved.iter()).cloned().collect(),
             input_ref: format!("notion:{page_id}@{digest}"),
         },
     )?;
@@ -909,10 +970,20 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
     let rev = registration["revision"].as_i64().unwrap_or_default();
     tx.execute(
         "INSERT INTO notion_imports (page_id, content_digest, test_id, url, last_edited_time,
-            source, sprint_revision, response, imported_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+            source, sprint_revision, response, imported_by, gates, missing, imported_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, clock_timestamp())",
         &[
-            &page_id, &digest, &test_id, &url, &edited, src, &rev, &result, &who.name,
+            &page_id,
+            &digest,
+            &test_id,
+            &url,
+            &edited,
+            src,
+            &rev,
+            &result,
+            &who.name,
+            &json!(gates),
+            &json!(missing),
         ],
     )?;
     history(
@@ -929,12 +1000,12 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
 /// That is how an imported draft becomes executable once its limits are bound and its reasons are
 /// resolved (review 7a48a4f T1); any other content → 409 (review 38b671b S2). Malformed bodies
 /// and other repos fall through to the normal checks (400 / `SPRINT_REPO_CONFLICT`, T2/T5).
-fn guard_import_owned(tx: &mut Transaction, spec: &Value) -> Result<(), Resp> {
+fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Result<(), Resp> {
     let sid = spec["sprint_id"].as_str().unwrap_or_default();
     let Some(row) = tx.query_opt(
         "SELECT n.content_digest, s.repo_id, s.spec FROM notion_imports n
            JOIN sprint_revisions s ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
-         WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1",
+         WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1",
         &[&sid],
     )?
     else {
@@ -955,6 +1026,7 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value) -> Result<(), Resp> {
         .flatten()
         .any(|x| x["kind"] == "notion_page" && x["digest"].as_str() == Some(digest.as_str()));
     if same_source && spec["tasks"] == imported["tasks"] {
+        let _ = mode;
         return Ok(());
     }
     Err(one(
@@ -965,6 +1037,294 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value) -> Result<(), Resp> {
          (same tasks and notion_page source) may be registered here",
         "re-import the Notion task, or keep its tasks and source and bind only limits/readiness",
     ))
+}
+
+/// Candidate Notion page ids (32 lowercase hex) in any string of a source, dashed or not: every
+/// 32-character window of each hex run, so a page id inside a URL slug is found. Over-inclusion
+/// is harmless (only ids of imported pages match).
+fn page_ids_in(v: &Value, out: &mut Vec<String>) {
+    match v {
+        Value::String(t) => {
+            let flat: String = t
+                .chars()
+                .filter(|c| *c != '-')
+                .collect::<String>()
+                .to_lowercase();
+            for run in flat.split(|c: char| !c.is_ascii_hexdigit()) {
+                for i in 0..=run.len().saturating_sub(32) {
+                    if run.len() >= 32 {
+                        out.push(run[i..i + 32].to_string());
+                    }
+                }
+            }
+        }
+        Value::Array(a) => a.iter().for_each(|x| page_ids_in(x, out)),
+        Value::Object(m) => m.values().for_each(|x| page_ids_in(x, out)),
+        _ => {}
+    }
+}
+
+/// X-01 C2: the execution gate, from server records only — never from spec text a registrar can
+/// edit. The Notion pages concerned are (1) those imported for this sprint, (2) every imported page
+/// whose id appears in any field of any source, whatever its `kind` or digest (review 7afd4d1
+/// G1), and (3) every imported page whose content digest a source cites, unless a page that
+/// source names was itself imported with that digest (review e908a8c H1). A copy whose sources
+/// no longer cite the gated page's id nor its imported content digest — both dropped, or both
+/// rewritten (including to another imported page's id and digest) — is not recognised; it rests
+/// on the registrar and the semantic review. "Latest
+/// import" is ordered the same way everywhere: `imported_at` (stamped with `clock_timestamp()`
+/// after the registry lock), then revision (review e908a8c H2). For each page the **latest**
+/// import decides: missing facts always block (`IMPORT_INCOMPLETE`); queue gates block
+/// (`IMPORT_GATED`) unless a user-approved exception exists for exactly this test sprint, repo,
+/// page and that import's content digest. A later trusted import without gates is the release
+/// record.
+fn notion_gate(
+    tx: &mut Transaction,
+    spec: &Value,
+    sprint_id: &str,
+    repo: &str,
+) -> Result<(), Resp> {
+    let mut pages: Vec<String> = tx
+        .query(
+            "SELECT DISTINCT page_id FROM notion_imports WHERE test_id = $1",
+            &[&sprint_id],
+        )?
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    for source in spec["sources"].as_array().into_iter().flatten() {
+        let mut ids = Vec::new();
+        page_ids_in(source, &mut ids);
+        let named: Vec<String> = tx
+            .query(
+                "SELECT DISTINCT page_id FROM notion_imports WHERE page_id = ANY($1)",
+                &[&ids],
+            )?
+            .iter()
+            .map(|r| r.get(0))
+            .collect();
+        // the cited content digest also decides, unless one of the named pages itself was
+        // imported with it (review e908a8c H1: a reference rewritten to another imported page
+        // must not hide the page whose content is cited; review 7afd4d1 G2: identical content
+        // of a page the source names does not pull in other pages)
+        let digest = source["digest"].as_str().unwrap_or_default().to_string();
+        let carried: bool = !named.is_empty()
+            && tx
+                .query_one(
+                    "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE page_id = ANY($1) AND content_digest = $2)",
+                    &[&named, &digest],
+                )?
+                .get(0);
+        pages.extend(named);
+        if !carried {
+            pages.extend(
+                tx.query(
+                    "SELECT DISTINCT page_id FROM notion_imports WHERE content_digest = $1",
+                    &[&digest],
+                )?
+                .iter()
+                .map(|r| r.get::<_, String>(0)),
+            );
+        }
+    }
+    pages.sort();
+    pages.dedup();
+    for page in pages {
+        let row = tx.query_one(
+            "SELECT gates, missing, response, test_id, content_digest FROM notion_imports
+             WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1",
+            &[&page],
+        )?;
+        let (gates, missing): (Value, Value) = match (
+            row.get::<_, Option<Value>>(0),
+            row.get::<_, Option<Value>>(1),
+        ) {
+            (Some(g), Some(m)) => (g, m),
+            _ => {
+                // imported before C2: derive from the import service's stored response
+                let response: Value = row.get(2);
+                let reasons: Vec<String> = response["conversion"]["unresolved_bindings"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|x| x.as_str().map(str::to_string))
+                    .collect();
+                let (g, m) = legacy_split(&reasons);
+                (json!(g), json!(m))
+            }
+        };
+        let test_id: String = row.get(3);
+        let latest_digest: String = row.get(4);
+        if missing.as_array().is_some_and(|m| !m.is_empty()) {
+            return Err(one(
+                409,
+                "IMPORT_INCOMPLETE",
+                "sprint_id",
+                &format!(
+                    "the latest import of a cited Notion page lacks required facts: {missing}"
+                ),
+                "re-import once the Notion task states them; an exception does not lift this",
+            ));
+        }
+        if gates.as_array().is_some_and(|g| !g.is_empty()) {
+            // review 9a421b7 F4, 7afd4d1 G2: the exception is bound to the page and the import
+            // content it approved
+            let excepted: bool = test_id == sprint_id
+                && tx
+                    .query_one(
+                        "SELECT EXISTS (SELECT 1 FROM exec_exceptions WHERE test_id = $1 AND repo_id = $2
+                           AND lifts = 'queue_gates' AND page_id = $3 AND content_digest = $4)",
+                        &[&sprint_id, &repo, &page, &latest_digest],
+                    )?
+                    .get(0);
+            if !excepted {
+                return Err(one(
+                    409,
+                    "IMPORT_GATED",
+                    "sprint_id",
+                    &format!(
+                        "the latest import of a cited Notion page records unreleased queue gates: {gates}"
+                    ),
+                    "wait for a trusted import that records the release, or a user-approved exception for this test and content",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Split the reasons of an import recorded before C2 into (queue gates, missing facts), using the
+/// importer's own fixed reason templates. The converter's binding items are resolved by binding,
+/// not by the import. Anything else is treated as a missing fact (fail closed).
+pub fn legacy_split(reasons: &[String]) -> (Vec<String>, Vec<String>) {
+    const GATES: [&str; 4] = [
+        "Notion 큐 구획 '",
+        "Notion 큐 구획 없음",
+        "Notion 작업 상태 '",
+        "Notion 차단 대상 미해제:",
+    ];
+    const BINDING: [&str; 4] = [
+        "실제 repository_url",
+        "시간/토큰/교정 한도",
+        "착수 조건",
+        "limits",
+    ];
+    let mut gates = Vec::new();
+    let mut missing = Vec::new();
+    for r in reasons {
+        if GATES.iter().any(|p| r.starts_with(p)) {
+            gates.push(r.clone());
+        } else if !BINDING.contains(&r.as_str()) {
+            missing.push(r.clone());
+        }
+    }
+    (gates, missing)
+}
+
+/// `POST /v0/coordinator/exceptions` (X-01 C2): a person records a PoC execution exception for one
+/// imported test sprint. It is a separate record; the Notion task and its gates stay as they are.
+fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
+    need_client_scope(who, "exceptions:approve", false)?;
+    if who.kind != Kind::User {
+        return Err(problem(
+            403,
+            "SCOPE_DENIED",
+            "exceptions are approved by a person",
+        ));
+    }
+    let body = parse_body(req.body)?;
+    only_keys(
+        &body,
+        &[
+            "exception_id",
+            "test_id",
+            "repo_id",
+            "lifts",
+            "scope",
+            "decision_ref",
+        ],
+    )?;
+    let repo = str_field(&body, "repo_id", 256)?.to_string();
+    if !who.in_repo(&repo) {
+        return Err(problem(
+            403,
+            "REPO_SCOPE_DENIED",
+            "repo not in this credential's scope",
+        ));
+    }
+    let id = str_field(&body, "exception_id", 128)?.to_string();
+    let test_id = str_field(&body, "test_id", 64)?.to_string();
+    if body["lifts"] != "queue_gates" {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "lifts",
+            "lifts must be queue_gates",
+            "use queue_gates",
+        ));
+    }
+    if !body["scope"].is_object() {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "scope",
+            "scope is an object (branch, purpose, limits)",
+            "fix scope",
+        ));
+    }
+    let decision_ref = str_field(&body, "decision_ref", 512)?.to_string();
+    lock(tx, "registry")?;
+    if let Some(row) = tx.query_opt(
+        "SELECT request FROM exec_exceptions WHERE exception_id = $1",
+        &[&id],
+    )? {
+        let stored: Value = row.get(0);
+        return if stored == body {
+            ok(200, json!({"exception_id": id, "replay": true}))
+        } else {
+            Err(one(
+                409,
+                "EVENT_CONTENT_CONFLICT",
+                "exception_id",
+                "exception_id used with other content",
+                "use a new id",
+            ))
+        };
+    }
+    let latest: Option<(String, String, String)> = tx
+        .query_opt(
+            "SELECT s.repo_id, n.content_digest, n.page_id FROM notion_imports n JOIN sprint_revisions s
+               ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
+             WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1",
+            &[&test_id],
+        )?
+        .map(|r| (r.get(0), r.get(1), r.get(2)));
+    let Some((owner, approved_digest, page_id)) = latest.filter(|(o, _, _)| *o == repo) else {
+        return Err(one(
+            422,
+            "UNKNOWN_TASK",
+            "test_id",
+            "no imported test sprint with this id in this repo",
+            "name an imported test sprint",
+        ));
+    };
+    let _ = owner;
+    tx.execute(
+        "INSERT INTO exec_exceptions (exception_id, test_id, repo_id, lifts, scope, decision_ref, request,
+            approved_by, content_digest, page_id)
+         VALUES ($1,$2,$3,'queue_gates',$4,$5,$6,$7,$8,$9)",
+        &[&id, &test_id, &repo, &body["scope"], &decision_ref, &body, &who.name, &approved_digest, &page_id],
+    )?;
+    history(
+        tx,
+        &who.name,
+        "exception.approved",
+        &json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "decision_ref": decision_ref, "approved_content_digest": approved_digest, "approved_page_id": page_id}),
+    )?;
+    ok(
+        201,
+        json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "lifts": "queue_gates", "approved_content_digest": approved_digest, "approved_page_id": page_id, "replay": false}),
+    )
 }
 
 /// Per-request additions to a repo binding (Notion import, X-01).
@@ -1825,6 +2185,8 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         ));
     }
     let spec: Value = rev_row.get(3);
+    // C2: execution is allowed only when the server's Notion records allow it (review 9a421b7 F1)
+    notion_gate(tx, &spec, &sprint_id, &repo)?;
     let Some(task) = find_task(&spec, &task_id) else {
         return Err(one(
             422,
@@ -2760,4 +3122,31 @@ fn deliver(tx: &mut Transaction, who: &Caller, id: &str, req: &Req) -> R {
 /// Apply the schema (idempotent `CREATE ... IF NOT EXISTS`).
 pub fn migrate(db: &mut impl GenericClient) -> Result<(), postgres::Error> {
     db.batch_execute(include_str!("schema.sql"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::legacy_split;
+
+    #[test]
+    fn legacy_reasons_split_fail_closed() {
+        let r = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let (g, m) = legacy_split(&r(&[
+            "Notion 큐 구획 '조건 대기': 현재 실행 대상이 아님",
+            "Notion 작업 상태 '결정대기': 실행 재개가 아님",
+            "Notion 차단 대상 미해제: X",
+            "실제 repository_url",
+            "시간/토큰/교정 한도",
+            "착수 조건",
+        ]));
+        assert_eq!(g.len(), 3);
+        assert!(m.is_empty(), "{m:?}");
+        // importer missing-fact templates and unknown text both block (fail closed)
+        let (g, m) = legacy_split(&r(&[
+            "수용 기준(필수 인수 판정 표)을 원본에서 읽지 못함",
+            "선행 해제됨",
+        ]));
+        assert!(g.is_empty());
+        assert_eq!(m.len(), 2);
+    }
 }

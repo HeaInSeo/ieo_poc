@@ -1,0 +1,26 @@
+# X-01 C2 live re-check after review 9a421b7 corrections · commit 9cb0e3a · 2026-11-13T13:42:25Z · backup taken before the migration
+$ health: {"policy_digest":"e19a54ad636efea9df1534e7b28446853fa1d05cedff4ba40d1b4e2ff96e8e41","schem…
+## schema after migration
+notion_imports pkey: PRIMARY KEY (page_id, sprint_revision)
+exception EX-POCX-SORI-OC08-T01-20261113 content_digest NULL
+## before
+2 revisions, 2 imports, 1 exceptions, 5 history, 0 assignments
+## 1. derived executable spec; the earlier exception has no approved content digest (fail closed) → refused
+['IMPORT_GATED'] -> HTTP 409
+2 revisions, 2 imports, 1 exceptions, 5 history, 0 assignments
+## 2. decision ③ re-recorded as an exception bound to the latest import's content digest
+{"exception_id":"EX-POCX-SORI-OC08-T01-20261113-r2","lifts":"queue_gates","replay":false,"repo_id":"HeaInSeo/sori","test_id":"POCX-SORI-OC08-T01"} -> HTTP 201
+2 revisions, 2 imports, 2 exceptions, 6 history, 0 assignments
+## 3. imports unchanged (Notion task not modified)
+1|3f8a300fcae5|t
+2|20181522c3dd|t
+## 4. re-import of the verbatim C1 collection (real Notion content, digest 3f8a300f…) — latest import is no longer the X-01 simulated edit
+{"http": 201, "replay": false, "revision": 3, "mode": "draft", "gates_unresolved": 5}
+3 revisions, 3 imports, 2 exceptions
+3|3f8a300fcae5|3|0
+## 5. decision ③ exception bound to the real content's digest
+{"exception_id":"EX-POCX-SORI-OC08-T01-20261113-r3","lifts":"queue_gates","replay":false,"repo_id":"HeaInSeo/sori","test_id":"POCX-SORI-OC08-T01"} -> HTTP 201
+3 revisions, 3 imports, 3 exceptions
+EX-POCX-SORI-OC08-T01-20261113|NULL
+EX-POCX-SORI-OC08-T01-20261113-r2|20181522c3dd
+EX-POCX-SORI-OC08-T01-20261113-r3|3f8a300fcae5

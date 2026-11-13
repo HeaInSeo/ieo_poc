@@ -50,16 +50,26 @@ fn ready_page_extracts_without_unresolved_reasons() {
     assert_eq!(e.criteria.len(), 2);
     assert_eq!(e.criteria[1].id, "X-02");
     assert_eq!(e.criteria[1].input, "13/14 [경계]");
-    assert!(e.unresolved.is_empty(), "{:?}", e.unresolved);
+    assert!(
+        e.unresolved.is_empty() && e.gates.is_empty(),
+        "{:?} {:?}",
+        e.unresolved,
+        e.gates
+    );
 }
 
 #[test]
 fn queue_gates_become_unresolved_reasons() {
     let e = extract(&page("조건 대기", "결정대기", "KEEP_GATED / 선행 A1"));
-    assert_eq!(e.unresolved.len(), 3, "{:?}", e.unresolved);
-    assert!(e.unresolved[0].contains("조건 대기"));
-    assert!(e.unresolved[1].contains("결정대기"));
-    assert!(e.unresolved[2].starts_with("Notion 차단 대상 미해제: KEEP_GATED"));
+    // C2: queue gates are recorded apart from missing facts
+    assert!(e.unresolved.is_empty(), "{:?}", e.unresolved);
+    assert_eq!(e.gates.len(), 3, "{:?}", e.gates);
+    assert!(e.gates[0].contains("조건 대기"));
+    assert!(e.gates[1].contains("결정대기"));
+    assert!(e.gates[2].starts_with("Notion 차단 대상 미해제: KEEP_GATED"));
+    let r = import_request(&page("조건 대기", "결정대기", "KEEP_GATED"), "T-1", "x").expect("req");
+    assert_eq!(r["gates"].as_array().map(Vec::len), Some(3));
+    assert_eq!(r["unresolved"], json!([]));
 }
 
 #[test]

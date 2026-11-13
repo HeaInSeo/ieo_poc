@@ -139,8 +139,11 @@ pub struct Extracted {
     pub goal: Option<String>,
     pub criteria: Vec<Criterion>,
     pub prerequisites: Option<String>,
-    /// Reasons the draft is not executable (missing facts, unreleased queue gates).
+    /// Missing facts: the page does not state something a sprint needs. An exception never lifts these.
     pub unresolved: Vec<String>,
+    /// Queue gates the page records (section, state, blocking target). Lifted only by a later import
+    /// that records their release, or by a user-approved exception (X-01 C2).
+    pub gates: Vec<String>,
 }
 
 fn strip_tags(s: &str) -> String {
@@ -248,18 +251,19 @@ pub fn extract(p: &NotionPage) -> Extracted {
     if criteria.is_empty() {
         unresolved.push("수용 기준(필수 인수 판정 표)을 원본에서 읽지 못함".into());
     }
+    let mut gates = Vec::new();
     match prop("큐 구획") {
         Some(q) if q == "현재" => {}
-        Some(q) => unresolved.push(format!("Notion 큐 구획 '{q}': 현재 실행 대상이 아님")),
-        None => unresolved.push("Notion 큐 구획 없음".into()),
+        Some(q) => gates.push(format!("Notion 큐 구획 '{q}': 현재 실행 대상이 아님")),
+        None => gates.push("Notion 큐 구획 없음".into()),
     }
     if let Some(s) = prop("작업 상태")
         && s != "실행재개"
     {
-        unresolved.push(format!("Notion 작업 상태 '{s}': 실행 재개가 아님"));
+        gates.push(format!("Notion 작업 상태 '{s}': 실행 재개가 아님"));
     }
     if let Some(b) = prop("차단 대상") {
-        unresolved.push(format!("Notion 차단 대상 미해제: {}", truncate(&b, 400)));
+        gates.push(format!("Notion 차단 대상 미해제: {}", truncate(&b, 400)));
     }
     Extracted {
         task_id,
@@ -269,6 +273,7 @@ pub fn extract(p: &NotionPage) -> Extracted {
         criteria,
         prerequisites,
         unresolved,
+        gates,
     }
 }
 
@@ -328,6 +333,7 @@ pub fn import_request(p: &NotionPage, test_id: &str, observed_at: &str) -> Resul
                    "fetched_via": p.fetched_via, "observed_at": observed_at},
         "input": input,
         "unresolved": e.unresolved,
+        "gates": e.gates,
     }))
 }
 
