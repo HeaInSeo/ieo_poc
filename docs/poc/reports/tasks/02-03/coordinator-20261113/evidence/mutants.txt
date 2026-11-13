@@ -34,3 +34,4 @@ M32 latest-side definition drops verification (review R1): killed ['prerequisite
 M27 prerequisite verdict of a changed task counts (review N3): killed ['prerequisites_need_a_verified_accepted_verdict', 'verdicts_judge_the_assigned_revision_and_a_changed_task_needs_a_new_verdict', ...]
 # result: 31 of 32 killed; M13 survives as an equivalent mutant. PostgreSQL turns COMMIT of a failed transaction into ROLLBACK, and no handler refuses after a successful write. The property (a failure after the first write leaves no row) is fixed by a_failure_after_the_first_write_rolls_back_the_whole_request (fault injection).
 dirty after run: none
+# [정정 2026-11-13, 최종 검토 66958e2 S2] 위 재지정 M27(`IS NOT NULL OR true OR NULL = …`)은 OR가 AND보다 약하게 묶여 G1 WHERE 전체를 참으로 만든다. 즉 판정 행이 하나라도 있으면 모든 선행 조건이 충족되는 더 넓은 변이다. 이름의 의도대로 비교만 `AND true`로 바꾼 변이도 N3·R1 시험이 검출한다(검토자 재현). 검출 수 31/32는 그대로다.
