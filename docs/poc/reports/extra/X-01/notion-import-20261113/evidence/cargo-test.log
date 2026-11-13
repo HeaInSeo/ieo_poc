@@ -1,0 +1,210 @@
+# commit 2a8c16c884aea8a7327be40e04810bfbf400d2e8 · 2026-11-13T12:20:37Z · git status --porcelain (before run):
+# (empty above = clean tree; written outside the repo, copied in afterwards)
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+$ cargo fmt --all -- --check
+FMT=0
+$ cargo clippy --all-targets --locked -- -D warnings
+CLIPPY=0
+$ cargo test --locked --all-targets
+     Running unittests src/lib.rs (target/debug/deps/ieo_coord-80a305ca317e46ae)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/ieo-coord.rs (target/debug/deps/ieo_coord-afebf6676f9eeba0)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/coordinator.rs (target/debug/deps/coordinator-e0bb76a8b34c20c9)
+test credentials_refuse_inconsistent_principals ... ok
+test policy_is_pinned_and_fails_closed ... ok
+test every_emitted_code_is_declared_in_the_openapi_contract ... ok
+test a_binding_sprint_id_is_reserved_against_imports ... ok
+test a_pinned_continuation_obeys_the_latest_attempt_ceiling ... ok
+test a_draft_revision_never_changes_a_running_execution ... ok
+test a_draft_with_unbound_limits_does_not_block_a_running_execution ... ok
+test a_running_assignment_stays_on_its_revision ... ok
+test a_sprint_cannot_be_moved_to_another_repo ... ok
+test a_failure_after_the_first_write_rolls_back_the_whole_request ... ok
+test a_raised_ceiling_reached_again_asks_again ... ok
+test an_import_replay_answers_only_within_its_repo ... ok
+test a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id ... ok
+test an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source ... ok
+test an_imported_draft_with_unresolved_reasons_cannot_execute ... ok
+test an_import_owned_sprint_changes_only_through_imports ... ok
+test authentication_and_scope_refusals_change_nothing ... ok
+test attempt_ceiling_is_cumulative_and_records_one_decision_request ... ok
+test concurrent_duplicates_and_competing_issuers ... ok
+test draft_and_superseded_revisions_are_not_assignable ... ok
+test converting_a_sprint_again_is_a_new_revision_not_a_task_conflict ... ok
+test claims_late_duplicate_stale_and_mismatched ... ok
+test development_and_guardrail_claims_race_into_one_ordered_stream ... ok
+test github_reviews_count_only_at_the_head_and_comments_do_not_clear_changes_requested ... ok
+test event_pages_are_append_only_and_reads_change_nothing ... ok
+test health_is_liveness_only_and_needs_no_credential ... ok
+test independent_repos_progress_separately ... ok
+test human_input_conversion_needs_an_approved_binding ... ok
+test import_sprint_numbers_and_own_revisions_do_not_conflict ... ok
+test label_and_estimate_changes_keep_a_prerequisite_verdict_but_definition_changes_void_it ... ok
+test notion_import_registers_a_draft_once_and_revises_on_change ... ok
+test only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling ... ok
+test ownership_head_is_compare_and_swap ... ok
+test registration_is_format_intake_and_semantic_review_is_separate ... ok
+test prerequisites_need_a_verified_accepted_verdict ... ok
+test self_review_is_refused ... ok
+test repro_requests_new_must_be_current_replays_are_not_requeued ... ok
+test verdicts_judge_the_assigned_revision_and_a_changed_task_needs_a_new_verdict ... ok
+test whoever_registered_or_promoted_a_revision_cannot_review_it ... ok
+test review_inputs_are_current_independent_and_for_the_head ... ok
+test verdict_uses_github_and_run_evidence_for_the_recorded_sha_only ... ok
+test one_assignment_id_raced_by_two_roles_never_errors ... ok
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.92s
+     Running unittests src/lib.rs (target/debug/deps/ieo_evidence-6e5a2c02fe2a0bc3)
+test redact::tests::rejects_short_secret ... ok
+test time::tests::known_instants ... ok
+test redact::tests::rejects_secrets_that_json_would_escape ... ok
+test redact::tests::clean_text_untouched ... ok
+test redact::tests::masks_value_hash_and_token_shape ... ok
+test clock::tests::mock_clock_moves_only_when_advanced ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/bin/ieo-evidence.rs (target/debug/deps/ieo_evidence-3c7ded9f69a10676)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/collector.rs (target/debug/deps/collector-60a14e5ae90e33f3)
+test launch_failure_still_writes_record ... ok
+test leftover_member_after_normal_exit_is_killed_and_recorded ... ok
+test model_request_must_state_session_mode ... ok
+test nonzero_exit_is_failure_with_stderr_kept ... ok
+test evidence_is_never_overwritten_and_ids_are_checked ... ok
+test exit_zero_without_required_evidence_is_incomplete ... ok
+test secrets_never_reach_evidence_files ... ok
+test environment_is_cleared_to_the_allow_list ... ok
+test model_run_real_stream_measures_parent_child_session ... ok
+test model_run_exit_zero_without_result_event_is_incomplete ... ok
+test result_without_usage_fields_is_unmeasured ... ok
+test normal_success_records_everything ... ok
+test attribution_mismatch_is_reported ... ok
+test model_usage_missing_falls_back_to_parent_plus_children ... ok
+test result_is_error_is_failure_unless_expected ... ok
+test deny_test_needs_nonzero_exit_and_its_marker ... ok
+test aggregate_includes_children_failures_retries_and_reviews ... ok
+test wrong_resume_base_is_withdrawn_and_compaction_is_counted ... ok
+test resumed_session_usage_is_split_from_the_cumulative_total ... ok
+test late_output_within_drain_window_is_kept ... ok
+test late_stderr_from_detached_descendant_is_kept_like_stdout ... ok
+test intentional_model_abort_expects_no_result ... ok
+test timeout_sends_term_and_is_failure ... ok
+test intentional_abort_judged_by_expected_outcome ... ok
+test every_record_matches_the_schema ... ok
+test stray_background_process_does_not_hang_the_collector ... ok
+test timeout_escalates_to_kill_when_term_ignored ... ok
+test group_member_ignoring_term_is_killed_after_grace ... ok
+test output_held_by_detached_descendant_is_kept_and_flagged ... ok
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.04s
+     Running unittests src/lib.rs (target/debug/deps/ieo_notion-8a877494d7099127)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/ieo-notion.rs (target/debug/deps/ieo_notion-e4596c660c8e1e2d)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/importer.rs (target/debug/deps/importer-f236f0a930c0f759)
+test page_ids_from_urls ... ok
+test missing_facts_are_named_not_invented ... ok
+test connector_fetch_result_is_parsed ... ok
+test queue_gates_become_unresolved_reasons ... ok
+test ready_page_extracts_without_unresolved_reasons ... ok
+test digest_tracks_content_not_read_path ... ok
+test snapshot_round_trips_and_detects_tampering ... ok
+test notion_failures_are_errors_and_never_leak_the_token ... ok
+test rest_api_reader_produces_the_same_shape ... ok
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/ieo_report-1c86c97481c78acd)
+test tests::timestamps ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/report_contract.rs (target/debug/deps/report_contract-bca8f4ce93aab3b6)
+test agents_cannot_read_client_views_and_repro_is_guardrail_only ... ok
+test completion_summary_scopes ... ok
+test body_sha_must_match_the_assignment_sha ... ok
+test claim_authorization ... ok
+test headline_states_evidence_level_and_claimed_completion ... ok
+test late_claim_from_issued_old_assignment_is_preserved_not_judged ... ok
+test input4_reobservation_is_suppressed ... ok
+test never_issued_assignment_or_generation_is_409 ... ok
+test render_has_five_parts_in_order ... ok
+test same_id_replay_is_checked_before_assignment ... ok
+test material_changes_notify_and_reorders_do_not ... ok
+test bad_next_check_at_is_rejected ... ok
+test late_before_deadline_rejected ... ok
+test reject_without_findings ... ok
+test undecided_shown_normal ... ok
+test wrong_actor_role ... ok
+test delay_without_reason ... ok
+test developer_claims_verified ... ok
+test decision_deadline_is_not_a_date ... ok
+test recommendation_must_be_an_option ... ok
+test reversed_forecast ... ok
+test estimated_without_measurement ... ok
+test options_mismatch_alone_is_rejected ... ok
+test finding_lacks_original_log ... ok
+test input1_current_ci_with_old_sha_approval_needs_current_review ... ok
+test input2_lost_response_is_held_without_user_resend ... ok
+test input3_decision_request_is_actionable ... ok
+test missing_contract_revision ... ok
+test old_actor_string ... ok
+test decision_mismatch ... ok
+test delay_reasons_are_rendered ... ok
+test fractional_seconds_are_ordered ... ok
+test four_role_examples_are_valid ... ok
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (target/debug/deps/ieo_spec-32835a8a2b857833)
+test digest::tests::keys_sorted_and_unicode_raw ... ok
+test rejection::tests::code_serializes_screaming ... ok
+test digest::tests::digest_ignores_digest_field ... ok
+test rejection::tests::pointer_conversion ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/ieo-spec.rs (target/debug/deps/ieo_spec-aa7c7241d19c3c5f)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/conversion.rs (target/debug/deps/conversion-0d1cde317ce73b17)
+test sprint_number_must_fit_two_digits ... ok
+test cycle_among_human_tasks ... ok
+test undecided_deadline_needs_reason ... ok
+test generated_id_colliding_with_registered_task_is_rejected ... ok
+test overflowing_minutes_are_rejected_not_panicking ... ok
+test reversed_estimate ... ok
+test missing_required_human_field ... ok
+test unresolved_prerequisite_matches_documented_example ... ok
+test duplicate_task_names ... ok
+test estimate_without_evidence_is_format_error ... ok
+test deadline_set_requires_timestamp ... ok
+test integral_float_minutes_are_converted_not_zeroed ... ok
+test set_deadline_reason_and_generated_fields_are_recorded ... ok
+test ids_are_stable_for_same_input ... ok
+test criteria_outside_profile_go_to_semantic_review_not_approved ... ok
+test converts_to_valid_draft_with_ids_estimates_and_digest ... ok
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/registration.rs (target/debug/deps/registration-f081e05362f4dca8)
+test all_nine_package_digests_reproduce ... ok
+test ready_without_repository_url_fails_format_layer ... ok
+test ready_with_unresolved_bindings_is_format_error ... ok
+test missing_field_is_distinguished ... ok
+test baseline_poc01_draft_accepted_and_digest_matches_package ... ok
+test prerequisite_with_wrong_plan_version_is_undefined ... ok
+test dependency_cycle ... ok
+test undefined_prerequisite ... ok
+test unknown_profile_item_and_unknown_profile ... ok
+test spec_estimate_range_order_checked ... ok
+test every_rejection_has_field_and_correction ... ok
+test duplicate_task_id_within_spec ... ok
+test duplicate_task_id_across_registered_sprint ... ok
+test lower_revision_after_higher_is_superseded ... ok
+test revision_identity_conflict_and_idempotent_resubmit ... ok
+test digest_mismatch ... ok
+test schema_violation_other_than_missing ... ok
+test old_draft_revision_cannot_be_promoted_after_newer_exists ... ok
+test bound_ready_spec_accepted_for_executable_registration ... ok
+test registry_never_overwrites_a_revision_or_narrows_its_mode ... ok
+test historical_lookup_of_old_revision_does_not_reactivate_it ... ok
+test registry_recomputes_the_digest_and_refuses_missing_or_forged_ones ... ok
+test non_integer_numbers_rejected_before_digest ... ok
+test unbound_draft_rejected_only_for_executable_registration ... ok
+test draft_registered_spec_is_not_idempotent_for_executable_intake ... ok
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+TEST=0
+$ python docs/poc/scripts/test_render_progress.py
+RESULT PASS 0
+$ python docs/poc/scripts/validate_package.py
+EXIT=0
+$ openapi-spec-validator contracts/ieo-api-v0.openapi.yaml
+ieo-api-v0.openapi.yaml: OK

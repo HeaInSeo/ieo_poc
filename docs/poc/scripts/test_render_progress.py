@@ -82,6 +82,27 @@ with tempfile.TemporaryDirectory() as td:
 
 with tempfile.TemporaryDirectory() as td:
     root = fresh(td)
+    # X-01 (amendment A3): an accepted extra task is listed apart and never changes 73/12 counts
+    st0 = json.loads((root / "progress/state.json").read_text())
+    main_done0 = sum(t["track"] == "main" and t["status"] == "검수 완료" for t in st0["tasks"])
+    def accept_extra(s):
+        s.setdefault("extra_tasks", []).append({"task_id": "X-99", "title": "시험 추가 작업", "track": "extra",
+            "kind": "구현", "status": "검수 완료", "verification_level": "verified",
+            "evidence": ["https://example.invalid/x"], "prerequisites": []})
+    mutate(root, accept_extra)
+    rc, out = run(root)
+    status = (root / "progress/STATUS.md").read_text()
+    check("extra_task_listed_apart", rc == 0 and "X-99" in status and "추가 작업" in (root / "progress/TASKS.md").read_text(), out)
+    check("extra_task_not_counted", f"| 주계획 | {main_done0}/73 |" in status, status[:600])
+    mutate(root, lambda s: s["extra_tasks"][-1].update({"task_id": "01-01"}))
+    rc, out = run(root)
+    check("extra_task_id_collision_rejected", rc == 1, out)
+    mutate(root, lambda s: s["extra_tasks"][-1].update({"task_id": "X-99", "evidence": []}))
+    rc, out = run(root)
+    check("extra_task_accepted_without_evidence_rejected", rc == 1, out)
+
+with tempfile.TemporaryDirectory() as td:
+    root = fresh(td)
     base = views_digest(root)
     # 3. invalid ledger: accepted task without evidence -> exit 1, views untouched
     def no_evidence(s):

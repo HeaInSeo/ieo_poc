@@ -1,0 +1,13 @@
+# X-01 live re-check 2 · commit 68be8db (code) · 2026-11-13T12:09:51Z · same persistent DB
+$ health: {"policy_digest":"e19a54ad636efea9df1534e7b28446853fa1d05cedff4ba40d1b4e2ff96e8e41","schema_version":"ieo-coord-v0","scope":"liveness only; not a P04 result","status":"up"}
+## before
+2 revisions, 2 imports, 4 history, 0 assignments
+## real snapshot again → replay
+{"http": 200, "replay": true, "revision": 1, "state": "SUPERSEDED"}
+2 revisions, 2 imports, 4 history, 0 assignments
+## S2: registering a spec over the imported sprint through /v0/sprints → refused
+"code":"EVENT_CONTENT_CONFLICT", -> HTTP 409
+2 revisions, 2 imports, 4 history, 0 assignments
+## draft assignment still refused
+"code":"UNBOUND_DRAFT", -> HTTP 422
+2 revisions, 2 imports, 4 history, 0 assignments

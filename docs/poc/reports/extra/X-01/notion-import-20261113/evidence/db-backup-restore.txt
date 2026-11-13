@@ -1,0 +1,7 @@
+# persistent PoC DB backup/restore check · 2026-11-13T09:46:14Z
+container ieo-poc-db · image docker.io/library/postgres:17-bookworm@sha256:665dc7b3… · data: bind mount <private data dir>/pg -> /var/lib/postgresql/data (outside the repository) · port 127.0.0.1:55433
+backup: podman exec ieo-poc-db pg_dump -U ieo -d ieo -Fc > <private data dir>/backups/ieo-20261113T094114Z.dump (36,184 bytes, mode 0600)
+restore: CREATE DATABASE restore_check; pg_restore -d restore_check < dump; compare; DROP DATABASE restore_check
+ieo:           2 rev, 2 imports, 4 history, digests 91ed78ddd5d2,e5516fc8369c
+restore_check: 2 rev, 2 imports, 4 history, digests 91ed78ddd5d2,e5516fc8369c
+test-only container ieo-poc-0203-pg (tmpfs) is unchanged: used by cargo tests only, data not kept by design

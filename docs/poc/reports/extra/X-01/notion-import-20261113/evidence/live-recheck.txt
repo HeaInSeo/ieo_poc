@@ -1,0 +1,13 @@
+# X-01 live re-check after review corrections · commit 530b5d1 · 2026-11-13T11:57:46Z · same persistent DB (rows from the first run kept)
+$ health: {"policy_digest":"470914abbf5f5206568e6c62bd22fbd617440aba5650e6a0c2eafa82935a37a0","schema_version":"ieo-coord-v0","scope":"liveness only; not a P04 result","status":"up"}
+## R0. before
+2 revisions, 2 imports, 4 history, 0 assignments
+## R1. real snapshot again → replay (no new rows)
+{"http": 200, "replay": true, "revision": 1, "state": "SUPERSEDED", "superseded_by": 2}
+2 revisions, 2 imports, 4 history, 0 assignments
+## R2. draft assignment still refused
+"code":"UNBOUND_DRAFT", -> HTTP 422
+2 revisions, 2 imports, 4 history, 0 assignments
+## R3. test_id equal to the Notion task id → refused, nothing stored
+{"http": 400, "refusal": "SCHEMA_VIOLATION"}
+2 revisions, 2 imports, 4 history, 0 assignments

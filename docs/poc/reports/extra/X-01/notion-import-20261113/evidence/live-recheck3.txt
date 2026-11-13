@@ -1,0 +1,13 @@
+# X-01 live re-check 3 · commit 2a8c16c (code) · 2026-11-13T12:23:23Z · same persistent DB
+$ health: {"policy_digest":"e19a54ad636efea9df1534e7b28446853fa1d05cedff4ba40d1b4e2ff96e8e41","schema_version":"ieo-coord-v0","scope":"liveness only; not a P04 result","status":"up"}
+## before
+2 revisions, 2 imports, 4 history, 0 assignments
+## real snapshot again → replay
+{"http": 200, "replay": true, "revision": 1, "state": "SUPERSEDED"}
+2 revisions, 2 imports, 4 history, 0 assignments
+## the stored draft (rev 2) as executable through /v0/sprints → binding check refuses (unresolved reasons, unbound limits)
+['UNBOUND_DRAFT'] -> HTTP 422
+2 revisions, 2 imports, 4 history, 0 assignments
+## draft assignment still refused
+"code":"UNBOUND_DRAFT", -> HTTP 422
+2 revisions, 2 imports, 4 history, 0 assignments

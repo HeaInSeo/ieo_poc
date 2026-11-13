@@ -1,6 +1,6 @@
 # 실험·후속 후보 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0014` · 원장 SHA-256 `dff4a7171b7b079ce773fa2dc7fd2cfc00844f4eed8eac349281583d037c6a4e`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0015` · 원장 SHA-256 `fb892678275003d0099630668651eb22f90a2768461faad4ff659ed29c65a388`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 

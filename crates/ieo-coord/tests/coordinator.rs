@@ -25,7 +25,39 @@ const MERGE: &str = "4444444444444444444444444444444444444444";
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
+/// At most this many test environments (each: a server with DB workers + a database) run at
+/// once, so the suite stays under PostgreSQL's default max_connections (100) at any size.
+const MAX_ENVS: usize = 8;
+static ENVS: (std::sync::Mutex<usize>, std::sync::Condvar) =
+    (std::sync::Mutex::new(0), std::sync::Condvar::new());
+
+struct Permit;
+
+impl Permit {
+    fn acquire() -> Self {
+        let (m, cv) = &ENVS;
+        let mut n = m.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        while *n >= MAX_ENVS {
+            n = cv
+                .wait(n)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+        }
+        *n += 1;
+        Permit
+    }
+}
+
+impl Drop for Permit {
+    fn drop(&mut self) {
+        let (m, cv) = &ENVS;
+        let mut n = m.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        *n -= 1;
+        cv.notify_one();
+    }
+}
+
 struct Env {
+    _permit: Permit,
     addr: String,
     base: Config,
     dbname: String,
@@ -139,6 +171,7 @@ const PRINCIPALS: [PrincipalRow; 12] = [
 
 fn start() -> Option<Env> {
     let base = base_config()?;
+    let permit = Permit::acquire();
     let n = COUNTER.fetch_add(1, Ordering::SeqCst);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -169,10 +202,10 @@ fn start() -> Option<Env> {
     let mut manifest: Value = serde_json::from_str(MANIFEST).expect("manifest");
     // an approved test profile for the human-input binding of repo-a
     if let Some(p) = manifest["inspection_profiles"].as_array_mut() {
-        p.push(json!({"profile_id": "hum-profile", "revision": 1, "items": {"11-01.accept": {}}}));
+        p.push(json!({"profile_id": "hum-profile", "revision": 1, "items": {"11-01.accept": {}, "11-02.accept": {}, "11-03.accept": {}, "12-01.accept": {}}}));
     }
     let bindings = json!({"repo-a": {
-        "sprint_id": "HUM-01", "sprint_number": 11, "plan_version": "v1.3.3",
+        "sprint_id": "HUM-01", "sprint_number": 11, "import_sprint_numbers": [11, 12], "plan_version": "v1.3.3",
         "repository_url": null, "timezone": "Asia/Seoul", "track": "핵심",
         "acceptance_profile_id": "hum-profile", "acceptance_profile_revision": 1,
         "delegation": {"allowed": ["승인된 범위의 구현"], "forbidden": ["범위 밖 repo 쓰기"],
@@ -199,9 +232,10 @@ fn start() -> Option<Env> {
     let app = Arc::new(app);
     let c2 = cfg.clone();
     std::thread::spawn(move || {
-        let _ = serve(server, app, &c2, 6);
+        let _ = serve(server, app, &c2, 3); // 3 workers: ~30 parallel tests stay under max_connections 100
     });
     Some(Env {
+        _permit: permit,
         addr,
         base,
         dbname,
@@ -1982,4 +2016,656 @@ fn label_and_estimate_changes_keep_a_prerequisite_verdict_but_definition_changes
         "expected_current": {"assignment_id": "A2", "generation": 0}});
     let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &a3);
     assert_eq!((st, code(&b)), (409, "PREREQUISITE_UNMET".into()), "{b}");
+}
+
+// --- X-01 Notion import ---
+
+fn notion_import(test_id: &str, digest_char: char, unresolved: Value) -> Value {
+    json!({
+        "test_id": test_id,
+        "source": {"system": "notion", "page_id": "0123456789abcdef0123456789abcdef",
+                   "url": "https://app.notion.com/p/0123456789abcdef0123456789abcdef",
+                   "last_edited_time": "2026-11-01T00:00:00.000Z",
+                   "content_digest": digest_char.to_string().repeat(64),
+                   "source_task_id": "OP-SYNTH-0001", "fetched_via": "test",
+                   "observed_at": "2026-11-13T00:00:00Z"},
+        "input": {"title": "합성 작업", "repo": "repo-a", "goal": "합성 목표",
+                  "out_of_scope": [], "decisions": [],
+                  "deadline": {"state": "undecided", "at": null, "reason": "원본에 기한 없음"},
+                  "tasks": [{"name": "X-01 정상", "output": "결과", "done_when": "수용",
+                             "how_to_check": "X-01: 정상"}]},
+        "unresolved": unresolved
+    })
+}
+
+#[test]
+fn notion_import_registers_a_draft_once_and_revises_on_change() {
+    let Some(e) = start() else { return };
+    let gate = json!(["Notion 큐 구획 '조건 대기': 현재 실행 대상이 아님"]);
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'a', gate.clone()),
+    );
+    assert_eq!(st, 201, "{r}");
+    assert_eq!(r["registration"]["mode"], "draft");
+    assert_eq!(r["registration"]["revision"], 1);
+    assert_eq!(r["import"]["source_task_id"], "OP-SYNTH-0001");
+    let (_, rev1) = e.get("alice", "/v0/sprints/POCX-T01/revisions/1");
+    assert_eq!(rev1["registration_state"], "draft");
+    let spec = &rev1["spec"];
+    assert!(
+        spec["unresolved_bindings"]
+            .to_string()
+            .contains("조건 대기"),
+        "{spec}"
+    );
+    assert!(
+        spec["sources"].as_array().is_some_and(|s| s
+            .iter()
+            .any(|x| x["kind"] == "notion_page" && x["digest"] == "a".repeat(64))),
+        "{spec}"
+    );
+    // same page, same content: replay, nothing new
+    let before = e.counts();
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'a', gate.clone()),
+    );
+    assert_eq!(
+        (
+            st,
+            r["replay"].clone(),
+            r["registration"]["revision"].clone()
+        ),
+        (200, json!(true), json!(1))
+    );
+    assert_eq!(e.counts(), before);
+    // changed content: revision 2; revision 1 is kept unchanged
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'b', gate.clone()),
+    );
+    assert_eq!(
+        (st, r["registration"]["revision"].clone()),
+        (201, json!(2)),
+        "{r}"
+    );
+    assert_eq!(
+        e.get("alice", "/v0/sprints/POCX-T01/revisions/1").1["digest"],
+        rev1["digest"]
+    );
+    // replay of the first content now reports it as superseded
+    let (_, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'a', gate.clone()),
+    );
+    assert_eq!(
+        (
+            r["registration"]["state"].clone(),
+            r["registration"]["superseded_by"].clone()
+        ),
+        (json!("SUPERSEDED"), json!(2))
+    );
+    // the same content under another test id, or another page under this test id → 409
+    assert_eq!(
+        code(
+            &e.post(
+                "alice",
+                "/v0/imports/notion",
+                &notion_import("POCX-T02", 'a', gate.clone())
+            )
+            .1
+        ),
+        "EVENT_CONTENT_CONFLICT"
+    );
+    let mut other = notion_import("POCX-T01", 'c', gate);
+    other["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
+    assert_eq!(
+        code(&e.post("alice", "/v0/imports/notion", &other).1),
+        "EVENT_CONTENT_CONFLICT"
+    );
+    // agents and other repos cannot import
+    assert_eq!(
+        e.post(
+            "dev-a",
+            "/v0/imports/notion",
+            &notion_import("POCX-T03", 'd', json!([]))
+        )
+        .0,
+        403
+    );
+    assert_eq!(
+        code(
+            &e.post(
+                "carol",
+                "/v0/imports/notion",
+                &notion_import("POCX-T03", 'd', json!([]))
+            )
+            .1
+        ),
+        "REPO_SCOPE_DENIED"
+    );
+}
+
+#[test]
+fn an_imported_draft_with_unresolved_reasons_cannot_execute() {
+    let Some(e) = start() else { return };
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'a', json!(["Notion 차단 대상 미해제: 선행 A1"])),
+    );
+    assert_eq!(st, 201, "{r}");
+    let spec = e.get("alice", "/v0/sprints/POCX-T01/revisions/1").1["spec"].clone();
+    // assigning the draft is refused
+    let (st, b) = e.post("assigner", "/v0/coordinator/assignments",
+        &json!({"repo_id": "repo-a", "role": "development", "assignment_id": "N1", "generation": 0,
+                "sprint_id": "POCX-T01", "sprint_revision": 1, "task_id": "11-01", "target_sha": SHA1,
+                "expected_current": null}));
+    assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
+    // promoting the stored draft as executable runs the binding check again and is refused
+    // while its limits are unbound and its reasons unresolved (01-07 UNBOUND_DRAFT)
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-key-01",
+        &spec,
+    );
+    assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
+    // flipping a copy to ready while reasons remain fails the format check (other sprint id)
+    let mut ready = spec.clone();
+    ready["registration_state"] = json!("ready");
+    ready["sprint_id"] = json!("COPY-OF-IMPORT");
+    ready["digest"] = json!(ieo_spec::spec_digest(&ready));
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-key-02",
+        &ready,
+    );
+    assert_eq!(st, 400, "{b}");
+}
+
+#[test]
+fn a_running_assignment_stays_on_its_revision() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // the source changes: revision 6 becomes the latest
+    let s6 = spec("repo-a", 6, 3);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-pin6", &s6)
+            .0,
+        201
+    );
+    // the running assignment continues on revision 5 (its own next generation)
+    assert_eq!(
+        assign(
+            &e,
+            "development",
+            "A1",
+            1,
+            "01-01",
+            SHA2,
+            json!({"assignment_id": "A1", "generation": 0})
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "dev-a",
+            "/v0/agent/reports",
+            &report("development", "pin-1", "A1", 1, "01-01", SHA2)
+        )
+        .0,
+        202
+    );
+    // a new assignment cannot start from the superseded revision
+    let (st, b) = assign(
+        &e,
+        "development",
+        "B1",
+        0,
+        "01-01",
+        SHA3,
+        json!({"assignment_id": "A1", "generation": 1}),
+    );
+    assert_eq!((st, code(&b)), (409, "REVISION_SUPERSEDED".into()));
+    // and a generation cannot jump to an older revision it was not on
+    let mut db = e.db();
+    let rev: i64 = db
+        .query_one(
+            "SELECT sprint_revision FROM assignments WHERE assignment_id = 'A1' AND generation = 1",
+            &[],
+        )
+        .expect("q")
+        .get(0);
+    assert_eq!(rev, 5);
+}
+
+#[test]
+fn import_sprint_numbers_and_own_revisions_do_not_conflict() {
+    let Some(e) = start() else { return };
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'a', json!([])),
+    );
+    assert_eq!(st, 201, "{r}");
+    assert_eq!(r["conversion"]["spec"]["tasks"][0]["task_id"], "11-01");
+    // another Notion page under another test id takes the next free number of the pool
+    let mut second = notion_import("POCX-T02", 'e', json!([]));
+    second["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
+    let (st, r) = e.post("alice", "/v0/imports/notion", &second);
+    assert_eq!(st, 201, "{r}");
+    assert_eq!(r["conversion"]["spec"]["tasks"][0]["task_id"], "12-01");
+    // the first test sprint keeps its number on a new revision
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'f', json!([])),
+    );
+    assert_eq!(
+        (st, r["conversion"]["spec"]["tasks"][0]["task_id"].clone()),
+        (201, json!("11-01")),
+        "{r}"
+    );
+    // pool exhausted → refused, nothing stored
+    let before = e.counts();
+    let mut third = notion_import("POCX-T03", '0', json!([]));
+    third["source"]["page_id"] = json!("00000000000000000000000000000000");
+    assert_eq!(
+        code(&e.post("alice", "/v0/imports/notion", &third).1),
+        "UNBOUND_DRAFT"
+    );
+    assert_eq!(e.counts(), before);
+}
+
+#[test]
+fn converting_a_sprint_again_is_a_new_revision_not_a_task_conflict() {
+    let Some(e) = start() else { return };
+    let input = |goal: &str| {
+        json!({"title": "예시", "repo": "repo-a", "goal": goal,
+        "deadline": {"state": "none", "at": null, "reason": "기한 없음"},
+        "tasks": [{"name": "검사 준비", "output": "시험 입력", "done_when": "입력 확정", "how_to_check": "목록 대조"}]})
+    };
+    assert_eq!(
+        e.post_k(
+            "alice",
+            "/v0/sprint-inputs",
+            "conv-rev-01",
+            &input("목표 1")
+        )
+        .0,
+        201
+    );
+    let (st, r) = e.post_k(
+        "alice",
+        "/v0/sprint-inputs",
+        "conv-rev-02",
+        &input("목표 2"),
+    );
+    assert_eq!(
+        (st, r["registration"]["revision"].clone()),
+        (201, json!(2)),
+        "{r}"
+    );
+}
+
+// --- review b8b619a corrections ---
+
+#[test]
+fn a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id() {
+    let Some(e) = start() else { return };
+    let input = json!({"title": "예시", "repo": "repo-a", "goal": "목표",
+        "deadline": {"state": "none", "at": null, "reason": "기한 없음"},
+        "tasks": [{"name": "검사 준비", "output": "시험 입력", "done_when": "입력 확정", "how_to_check": "목록 대조"}]});
+    assert_eq!(
+        e.post_k("alice", "/v0/sprint-inputs", "conv-r1-01", &input)
+            .0,
+        201
+    );
+    let before = e.counts();
+    // R1: an existing sprint not created by a Notion import
+    let (st, b) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("HUM-01", 'a', json!([])),
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    // the test id must differ from the Notion task id
+    let (st, b) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("OP-SYNTH-0001", 'a', json!([])),
+    );
+    assert_eq!((st, code(&b)), (400, "SCHEMA_VIOLATION".into()), "{b}");
+    assert_eq!(e.counts(), before);
+}
+
+#[test]
+fn an_import_replay_answers_only_within_its_repo() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "alice",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    // R2: carol (repo-b) sends the same page, digest and test id under her repo
+    let mut theirs = notion_import("POCX-T01", 'a', json!([]));
+    theirs["input"]["repo"] = json!("repo-b");
+    let (st, b) = e.post("carol", "/v0/imports/notion", &theirs);
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    assert!(
+        b.get("conversion").is_none() && b.get("registration").is_none(),
+        "no stored content: {b}"
+    );
+}
+
+#[test]
+fn a_pinned_continuation_obeys_the_latest_attempt_ceiling() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // R3: the newer revision lowers the ceiling to 0
+    let s6 = spec("repo-a", 6, 0);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-r3", &s6)
+            .0,
+        201
+    );
+    // only an executable, semantically reviewed revision sets the ceiling of a pinned run
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/6/semantic-review",
+            &json!({"decision": "passed", "reason": "ok", "digest": s6["digest"]})
+        )
+        .0,
+        201
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(
+        (st, b["outcome"].clone()),
+        (202, json!("limit_reached")),
+        "{b}"
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!((st, code(&b)), (409, "LIMIT_REACHED".into()), "{b}");
+}
+
+// --- review 38b671b corrections ---
+
+#[test]
+fn a_draft_revision_never_changes_a_running_execution() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 0);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // S1a: a newer *draft* revision raises the ceiling to 5 — the run stays at ceiling 0
+    let s6 = spec("repo-a", 6, 5);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=draft", "reg-key-s1a", &s6)
+            .0,
+        201
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(
+        (st, b["outcome"].clone()),
+        (202, json!("limit_reached")),
+        "{b}"
+    );
+}
+
+#[test]
+fn a_draft_with_unbound_limits_does_not_block_a_running_execution() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // S1b: a newer draft with null limits (e.g. a re-imported Notion task)
+    let mut s6 = spec("repo-a", 6, 3);
+    s6["registration_state"] = json!("draft");
+    s6["limits"] = json!({"elapsed_seconds": null, "total_tokens": null, "correction_attempts": null,
+                          "unresolved_reason": "한도 미정"});
+    s6["unresolved_bindings"] = json!(["limits"]);
+    s6["digest"] = json!(ieo_spec::spec_digest(&s6));
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=draft", "reg-key-s1b", &s6);
+    assert_eq!(st, 201, "{b}");
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(st, 201, "pinned run continues under its own ceiling: {b}");
+}
+
+#[test]
+fn an_import_owned_sprint_changes_only_through_imports() {
+    let Some(e) = start() else { return };
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'a', json!([])),
+    );
+    assert_eq!(st, 201, "{r}");
+    // S2: registering a spec over the import's sprint id is refused
+    let mut s = spec("repo-a", 2, 3);
+    s["sprint_id"] = json!("POCX-T01");
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    let before = e.counts();
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-s2", &s);
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    assert_eq!(e.counts(), before);
+}
+
+// --- review 7a48a4f corrections ---
+
+/// The import's latest revision, re-registered as executable with bound limits and no reasons.
+fn derived_executable(e: &Env, sprint_id: &str) -> Value {
+    let rev = e
+        .get("alice", &format!("/v0/sprints/{sprint_id}/revisions/1"))
+        .1;
+    let mut s = rev["spec"].clone();
+    s["revision"] = json!(2);
+    s["registration_state"] = json!("ready");
+    s["target"]["repository_url"] = json!("https://example.invalid/repo-a");
+    s["limits"] = json!({"elapsed_seconds": 3600, "total_tokens": 100000, "correction_attempts": 1,
+                         "unresolved_reason": null});
+    s["unresolved_bindings"] = json!([]);
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    s
+}
+
+#[test]
+fn an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "alice",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    // T1: derived from the latest import (same tasks + notion source), limits bound → executable
+    let good = derived_executable(&e, "POCX-T01");
+    let mut changed = good.clone();
+    changed["tasks"][0]["exit_condition"] = json!("다른 종료 조건");
+    changed["digest"] = json!(ieo_spec::spec_digest(&changed));
+    let before = e.counts();
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-t1-02",
+        &changed,
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    let mut other_source = good.clone();
+    other_source["sources"] = json!([other_source["sources"][0].clone()]);
+    other_source["digest"] = json!(ieo_spec::spec_digest(&other_source));
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-t1-03",
+        &other_source,
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    assert_eq!(e.counts(), before);
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-t1-01",
+        &good,
+    );
+    assert_eq!(
+        (st, b["mode"].clone(), b["revision"].clone()),
+        (201, json!("executable"), json!(2)),
+        "{b}"
+    );
+    // T2: a malformed body is a format error (400), not an ownership conflict
+    let mut bad = good.clone();
+    bad.as_object_mut().map(|m| m.remove("title"));
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints", "promote-t2-01", &bad).0,
+        400
+    );
+    // T5: another repo hits the repo rule first
+    let mut theirs = good.clone();
+    theirs["target"]["repo_id"] = json!("repo-b");
+    theirs["revision"] = json!(3);
+    theirs["digest"] = json!(ieo_spec::spec_digest(&theirs));
+    let (st, b) = e.post_k("carol", "/v0/sprints", "promote-t5-01", &theirs);
+    assert_eq!((st, code(&b)), (409, "SPRINT_REPO_CONFLICT".into()), "{b}");
+}
+
+#[test]
+fn a_binding_sprint_id_is_reserved_against_imports() {
+    let Some(e) = start() else { return };
+    // T3/Y1: HUM-01 is repo-a's binding sprint and does not exist yet
+    let (st, b) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("HUM-01", 'a', json!([])),
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+}
+
+#[test]
+fn only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 0);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // T3/Y3: executable but not reviewed (ceiling 5) → ignored
+    let s6 = spec("repo-a", 6, 5);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-y3", &s6)
+            .0,
+        201
+    );
+    // T3/Y4: reviewed but draft-only (ceiling 5) → ignored
+    let s7 = spec("repo-a", 7, 5);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=draft", "reg-key-y4", &s7)
+            .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/7/semantic-review",
+            &json!({"decision": "passed", "reason": "ok", "digest": s7["digest"]})
+        )
+        .0,
+        201
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(
+        (st, b["outcome"].clone()),
+        (202, json!("limit_reached")),
+        "{b}"
+    );
 }

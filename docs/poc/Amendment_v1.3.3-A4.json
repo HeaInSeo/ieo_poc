@@ -4,7 +4,7 @@
   "plan_version": "v1.3.3",
   "decision_ref": "Dogfooding_Quality_Improvement_DF-02.md",
   "status": "proposal_not_execution_approval",
-  "baseline_commit": "2c86f3da0c74c9d94140a0198a201fff566c6618",
+  "baseline_commit": "82c7db9921db58dffc6d43686c456d3ee3edf886",
   "baselines_unchanged": {
     "main_tasks": 73,
     "main_experiments": 31,
@@ -15,7 +15,7 @@
   "sprint_revisions": [],
   "changed_acceptance": [],
   "scope_limit": "DF-02 후속 계획 문서화만. 실행 등록·모델 예산·제품 코드·API·CI·진행 원장·Notion·DB·PR27 브랜치 변경 없음",
-  "merge_order": "PR27 처리 전 병합하지 않음. 최신 main 반영 후 A1/A2/(병합된 A3)/A4 적용 순서와 CI·검토 재확인",
+  "merge_order": "PR27 병합 후 main 82c7db9921db58dffc6d43686c456d3ee3edf886 통합. A1/A2/A3/A4 적용 순서·해시·명세·CI·통합 변경 검토 확인 뒤 기존 병합 절차 적용",
   "files": [
     {
       "path": "Console_Coordinator_PoC_Validation_Plan.md",
@@ -28,8 +28,8 @@
     {
       "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md",
       "original_sha256": "23f6b3245f9894670ddbd0dab5318a3af80ab4808d0c45c7acfa16a9ff079962",
-      "previous_sha256": "f2c283d7be0864db71cd091bd1bac52f7212be7a936eb1ada94d5b538718d400",
-      "sha256": "ae7cbd6c7c48e74927f66eceff557b49f4a8140ff8163defc345963701dd502a",
+      "previous_sha256": "7ae17496d4c154cfa3c9d794912d0278760595dbe5a427ed27f911fde33bb109",
+      "sha256": "35710c3cf11cf3f022eb6de62f90eaea9b6a978109e06c0b5cc7b36c390672c7",
       "change": "amended",
       "reason": "스프린트 06 뒤 별도 추가 작업 계획 안내; 73행·수용 기준·선행 불변"
     },
@@ -44,10 +44,11 @@
     {
       "path": "scripts/validate_package.py",
       "original_sha256": "bd43577b73f090c9f89c6685660e0f2063d546521661f8dc79f816b8ecc2448c",
-      "previous_sha256": "5ec6f24c74864954c706f56602012d26929fd6058a5c53ce95659f4a6b7c7be5",
-      "sha256": "4fbaec4abf8a0af3a00eb646f288e9de31963b42b4c26ac38a7dc7c8efc05312",
+      "previous_sha256": "9b836342e192baa44c621c1469989cdafe311679ec6f1e30cdd40582d739b370",
+      "sha256": "66790b488563329f28aed4a82bd0462f5765040906337573db1900dfb68abb63",
       "change": "amended",
       "reason": "프로파일·수용 기준 변경 없는 A4 문서 개정 검산; 패키지 해시 대조 보존"
     }
-  ]
+  ],
+  "initial_baseline_commit": "2c86f3da0c74c9d94140a0198a201fff566c6618"
 }

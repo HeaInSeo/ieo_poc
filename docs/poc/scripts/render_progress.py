@@ -53,6 +53,19 @@ def validate_state(root, s):
     for track, key in [('main', 'main_tasks'), ('followup', 'followup_tasks')]:
         if sum(t['track'] == track for t in s['tasks']) != s['baselines'][key]:
             raise ValueError('기준선과 작업 수 불일치: ' + track)
+    # Extra tasks (X-*, amendment A3) are listed apart and never enter the 73/12 counts.
+    extra_ids = [t['task_id'] for t in s.get('extra_tasks', [])]
+    if len(extra_ids) != len(set(extra_ids)) or set(extra_ids) & set(task_ids):
+        raise ValueError('중복 추가 작업 ID')
+    for t in s.get('extra_tasks', []):
+        if t.get('track') != 'extra' or not t['task_id'].startswith('X-'):
+            raise ValueError('추가 작업은 track=extra, ID X-*: ' + t['task_id'])
+        if t['status'] not in STATUSES:
+            raise ValueError('알 수 없는 추가 작업 상태: ' + t['task_id'])
+        if t['status'] == '검수 완료' and (
+            t.get('verification_level') != 'verified' or not t.get('evidence')
+        ):
+            raise ValueError('검수 완료에 verified/증거가 없음: ' + t['task_id'])
     exp_ids = [e['experiment_id'] for e in s['experiments']]
     if len(exp_ids) != len(set(exp_ids)):
         raise ValueError('중복 실험 ID')
@@ -122,6 +135,10 @@ def render(root):
         rows.append([title,f"{done}/{s['baselines'][key]}",f"{100 * done / s['baselines'][key]:.1f}%"])
     status += table(['구간','검수 완료','단순 작업 수 진행률'],rows)
     status += table(['구간','상태별 수'],[[title, ' · '.join(f"{st} {sum(t['status']==st for t in s['tasks'] if t['track']==track)}" for st in STATUSES)] for track,title in [('main','주계획'),('followup','후속')]])
+    extras = s.get('extra_tasks', [])
+    if extras:
+        status += '추가 작업은 사용자 지시로 더한 별도 범위다. 주계획 73·후속 12의 검수 완료 수와 진행률에 넣지 않는다.\n\n'
+        status += table(['추가 작업','상태','선행','최근 보고'],[[cell(t['task_id'])+' · '+cell(t['title']),cell(t['status']),cell(', '.join(t.get('prerequisites', [])) or '없음'),link(t.get('latest_report'))] for t in extras])
     status += table(['구간','평가 종료'],[[title,f"{sum(bool(e['evaluation_closed']) for e in s['experiments'] if e['track']==track)}/{s['baselines'][key]}"] for track,title,key in [('main','주계획 실험','main_experiments'),('followup','후속 후보','followup_candidates')]])
     status += '## 지금 확인할 내용\n\n'
     status += table(['항목','기록'],[
@@ -145,6 +162,11 @@ def render(root):
         task_md+=table(['작업','종류·구분','상태','결과·근거 수준','관측 시각','최근 보고','다음 행동'],[
             [cell(t['task_id'])+' · '+cell(t['title']),cell(t['kind'])+' / '+cell(t['group']),cell(t['status']),cell(t.get('result_state'))+' / '+cell(t.get('verification_level')),cell(t.get('last_observed_at')),link(t.get('latest_report')),cell(t.get('next_action'))]
             for t in s['tasks'] if t['track']==track])
+    if s.get('extra_tasks'):
+        task_md+='## 추가 작업 (73·12 완료 수 미산입)\n\n'
+        task_md+=table(['작업','종류','상태','결과·근거 수준','관측 시각','최근 보고','다음 행동'],[
+            [cell(t['task_id'])+' · '+cell(t['title']),cell(t['kind']),cell(t['status']),cell(t.get('result_state'))+' / '+cell(t.get('verification_level')),cell(t.get('last_observed_at')),link(t.get('latest_report')),cell(t.get('next_action'))]
+            for t in s['extra_tasks']])
     task_md+='[현황](STATUS.md) · [실험 결과](RESULTS.md)\n'
     results='# 실험·후속 후보 결과'+'\n\n'+stamp
     for track,title in [('main','주계획 실험'),('followup','후속 후보')]:
