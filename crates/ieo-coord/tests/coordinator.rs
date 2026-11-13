@@ -3619,10 +3619,10 @@ fn inverted_latest(e: &Env) {
 }
 
 #[test]
-fn i2_the_gate_reads_the_latest_import_by_import_time() {
+fn i2_the_gate_reads_the_highest_revision_whatever_the_clock() {
     let Some(e) = start() else { return };
     inverted_latest(&e);
-    // a copy citing P's page: the gate must read revision 1 (gated), not revision 2 (released)
+    // a copy citing P's page: the gate must read revision 2 (gated), not the later-stamped revision 1 (released)
     let mut copy = ready_from(&e, "POCX-T01", 2, 1);
     copy["sprint_id"] = json!("POCX-Z13");
     copy["tasks"][0]["task_id"] = json!("13-01");
@@ -3632,10 +3632,10 @@ fn i2_the_gate_reads_the_latest_import_by_import_time() {
 }
 
 #[test]
-fn i2_a_replay_matches_the_latest_import_by_import_time() {
+fn i2_a_replay_matches_the_highest_revision_whatever_the_clock() {
     let Some(e) = start() else { return };
     inverted_latest(&e);
-    // content a is the latest import by import time: a replay, not a new revision
+    // content a is the highest revision: a replay, not a new revision
     let (st, r) = e.post(
         "importer",
         "/v0/imports/notion",
@@ -3701,4 +3701,56 @@ fn i2_an_import_is_stamped_after_the_registry_lock() {
             "imported_at precedes the lock release: stamped at transaction start"
         );
     });
+}
+
+// --- review 6352413 K1 ---
+
+#[test]
+fn k1_a_page_imported_under_two_test_ids_fails_closed() {
+    let Some(e) = start() else { return };
+    const Q: &str = "fedcba9876543210fedcba9876543210";
+    // T01 on P: gated then released; T02 on Q: gated (both allowed today)
+    for (body, why) in [
+        (
+            notion_import_gated("POCX-T01", 'a', queue_gates(), json!([])),
+            "P gated",
+        ),
+        (
+            notion_import_gated("POCX-T01", 'b', json!([]), json!([])),
+            "P released",
+        ),
+        (
+            on_page(
+                notion_import_gated("POCX-T02", 'c', queue_gates(), json!([])),
+                Q,
+            ),
+            "Q gated",
+        ),
+    ] {
+        assert_eq!(
+            e.post("importer", "/v0/imports/notion", &body).0,
+            201,
+            "{why}"
+        );
+    }
+    // legacy state (allowed before a page was bound to one test id): Q's row relabelled to P
+    e.db()
+        .batch_execute(&format!(
+            "ALTER TABLE notion_imports DISABLE TRIGGER notion_imports_append_only;
+             UPDATE notion_imports SET page_id = '0123456789abcdef0123456789abcdef' WHERE page_id = '{Q}';
+             ALTER TABLE notion_imports ENABLE TRIGGER notion_imports_append_only;"
+        ))
+        .expect("legacy two test ids");
+    // revision numbers of two test ids cannot be compared: the page is refused, never released
+    let before = e.counts();
+    for (sprint, key) in [("POCX-T01", "k1-t01-key"), ("POCX-T02", "k1-t02-key")] {
+        let d = ready_from(&e, sprint, if sprint == "POCX-T01" { 2 } else { 1 }, 3);
+        let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", key, &d);
+        assert_eq!(
+            (st, code(&b)),
+            (409, "IMPORT_GATED".into()),
+            "{sprint}: {b}"
+        );
+    }
+    assert_eq!(e.counts(), before);
 }
