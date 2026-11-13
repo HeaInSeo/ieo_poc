@@ -51,9 +51,9 @@
 | 5 | Notion 연결 실패 시 DB 보존 | REST API에 도달하지 못하면 exit 2이고 코디네이터에 아무것도 보내지 않는다. 행 수 불변. 모의 서버의 500·404도 오류이며 토큰은 오류에 나오지 않는다 | 같은 파일 §5, `notion_failures_are_errors_and_never_leak_the_token` |
 | 6 | 02-04 준비 후 실제 개발 세션 | **미실행.** X-02로 분리했다. 선행 02-04 미수용, 모델 예산 미승인, 원 작업 큐 선행 미해제 | §5 |
 
-- 시험 162건 통과(ieo-notion 9건, 코디네이터 39건 중 X-01 관련 11건), 커밋 68be8db·깨끗한 트리, fmt·clippy 통과, 생성기 시험 PASS(추가 작업 4건 포함), `validate_package.py` EXIT 0, OpenAPI OK: [cargo-test.log](evidence/cargo-test.log).
-- 변이 13개를 모두 검출했다(검토 반영 X9~X13 포함): [mutants.txt](evidence/mutants.txt).
-- 검토 반영 뒤 같은 영속 DB에서 재확인: 재조회(200, 행 불변), 초안 배정 거부(422), test_id = Notion 작업 ID 거부(400, 행 불변): [live-recheck.txt](evidence/live-recheck.txt). 재검토 반영 뒤 다시 확인: 재조회 200, 가져오기 스프린트 위 `/v0/sprints` 등록 409, 초안 배정 422, 모두 행 불변: [live-recheck2.txt](evidence/live-recheck2.txt).
+- 시험 165건 통과(ieo-notion 9건, 코디네이터 42건 중 X-01 관련 14건), 커밋 2a8c16c·깨끗한 트리, fmt·clippy 통과, 생성기 시험 PASS(추가 작업 4건 포함), `validate_package.py` EXIT 0, OpenAPI OK: [cargo-test.log](evidence/cargo-test.log).
+- 변이 17개를 모두 검출했다(검토 반영 X9~X17 포함): [mutants.txt](evidence/mutants.txt).
+- 검토 반영 뒤 같은 영속 DB에서 재확인: 재조회(200, 행 불변), 초안 배정 거부(422), test_id = Notion 작업 ID 거부(400, 행 불변): [live-recheck.txt](evidence/live-recheck.txt). 재검토 반영 뒤 다시 확인: 재조회 200, 가져오기 스프린트 위 `/v0/sprints` 등록 409, 초안 배정 422, 모두 행 불변: [live-recheck2.txt](evidence/live-recheck2.txt). 마지막 교정 뒤: 재조회 200, 저장된 초안을 executable로 낸 등록은 422 `UNBOUND_DRAFT`(미해결 사유·미바인딩 한도), 초안 배정 422, 행 불변: [live-recheck3.txt](evidence/live-recheck3.txt).
 - 시험은 모의 데이터만 쓴다. 공개 저장소에는 큐 원문을 넣지 않았고, 증거 파일에는 ID·digest·상태 코드만 남겼다.
 - DB 등록 성공은 개발 완료가 아니다. OC08 자체는 구현되지 않았다.
 
