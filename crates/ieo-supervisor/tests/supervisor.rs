@@ -12,6 +12,16 @@ use std::path::{Path, PathBuf};
 
 const SID: &str = "6f1d2c3b-0000-4000-8000-000000000001";
 
+/// Serialises child-process spawns against the lock test (review 119ab95 P1): between fork and
+/// exec a child shares every descriptor of this process, including a session lock's O_CLOEXEC
+/// one, so a spawn on another test thread can make a just-released lock look held. Every test
+/// that starts a process holds this while spawning; the lock test holds it throughout.
+static SPAWN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn spawn_guard() -> std::sync::MutexGuard<'static, ()> {
+    SPAWN.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 /// A temporary directory removed on drop (restoring permissions first).
 struct Tmp(PathBuf);
 
@@ -135,7 +145,10 @@ fn environment_is_cleared_to_the_allow_list() {
     // the child sees exactly the allow-list, not this process's environment
     let mut cmd = std::process::Command::new("/usr/bin/env");
     env::apply(&mut cmd, &e).expect("apply");
-    let out = cmd.output().expect("run env");
+    let out = {
+        let _g = spawn_guard();
+        cmd.output().expect("run env")
+    };
     let mut seen: Vec<String> = String::from_utf8_lossy(&out.stdout)
         .lines()
         .filter_map(|l| l.split('=').next().map(str::to_string))
@@ -436,6 +449,7 @@ fn reconnect_decisions() {
 
 #[test]
 fn one_running_process_per_session() {
+    let _spawns = spawn_guard();
     let d = Tmp::new("lock");
     let me = std::process::id();
     let held = SessionLock::acquire(d.p(), SID, me).expect("first");
@@ -755,6 +769,7 @@ fn special_files_are_never_opened() {
     let fifo = |rel: &str| {
         let p = d.p().join(rel);
         std::fs::create_dir_all(p.parent().expect("parent")).expect("mk");
+        let _g = spawn_guard();
         let ok = std::process::Command::new("mkfifo")
             .arg(&p)
             .status()
@@ -840,4 +855,63 @@ fn overflowing_or_truncated_measurements_are_not_trusted() {
     assert!(budget::observation_check(fresh(&mixed)).is_err());
     assert!(budget::stream_stop(truncated).is_some());
     assert!(budget::stream_stop("not json at all").is_none());
+}
+
+// ---- review bc55edf R1–R3 ----
+
+#[test]
+fn an_overflowing_projection_stops() {
+    // one measured run of 2^63: spent fits in u64, spent + reserve does not
+    for run in [measured(1 << 63, 0, 0, 0), measured(0, 0, 0, 1 << 63)] {
+        let r = [rec(run.clone(), 1000)];
+        assert!(budget::spent(&r).unmeasured_runs.is_empty(), "{run}");
+        assert!(stops(&BUDGET_X02, &r), "{run}");
+        assert!(stops(&BUDGET_0204, &r), "{run}");
+    }
+}
+
+#[test]
+fn a_non_regular_claude_json_is_never_opened() {
+    let t = template();
+    // a FIFO: observed() must not block on it, and it is tamper
+    let d = Tmp::new("cfg-r3-fifo");
+    let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+    let ok = {
+        let _g = spawn_guard();
+        std::process::Command::new("mkfifo")
+            .arg(d.p().join(".claude.json"))
+            .status()
+            .expect("mkfifo")
+            .success()
+    };
+    assert!(ok);
+    let dir = d.p().to_path_buf();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(configdir::observed(&dir));
+    });
+    let observed = rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("observed() blocked on a FIFO .claude.json");
+    assert_ne!(observed, digest);
+    // a link to a regular outside file holding directive keys: tamper, and its content is not
+    // what is digested (changing it does not change the digest)
+    let outside = Tmp::new("outside-r3");
+    put(
+        outside.p(),
+        "c.json",
+        r#"{"mcpServers":{"x":{"command":"evil"}}}"#,
+    );
+    let l = Tmp::new("cfg-r3-link");
+    let digest = configdir::clean(l.p(), t.p()).expect("clean").digest;
+    std::os::unix::fs::symlink(outside.p().join("c.json"), l.p().join(".claude.json"))
+        .expect("link");
+    let observed = configdir::observed(l.p());
+    assert_ne!(observed, digest);
+    put(
+        outside.p(),
+        "c.json",
+        r#"{"mcpServers":{"y":{"command":"other"}}}"#,
+    );
+    assert_eq!(configdir::observed(l.p()), observed);
 }
