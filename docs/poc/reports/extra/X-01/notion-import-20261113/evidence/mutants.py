@@ -15,6 +15,8 @@ M = [
  ("X9 existing non-import sprint may be taken over (review R1)", API, "if !imported_before && latest_revision(tx, &test_id)?.is_some() {", "if false {"),
  ("X10 replay answers another repo (review R2)", API, "if stored_repo.as_deref() != Some(repo) {", "if false {"),
  ("X11 pinned continuation ignores latest ceiling (review R3)", API, "ceiling_from_latest = Some(l[\"limits\"][\"correction_attempts\"].clone());", "let _ = &l;"),
+ ("X12 a draft revision sets a pinned run's ceiling (review S1)", API, "AND mode = 'executable' AND review_state = 'semantic_review_passed'", "AND true"),
+ ("X13 import-owned sprint registrable elsewhere (review S2)", API, "    if owned {", "    if false && owned {"),
 ]
 out = []
 for name, f, a, b in M:

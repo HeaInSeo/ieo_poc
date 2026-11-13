@@ -2167,18 +2167,23 @@ fn an_imported_draft_with_unresolved_reasons_cannot_execute() {
                 "sprint_id": "POCX-T01", "sprint_revision": 1, "task_id": "11-01", "target_sha": SHA1,
                 "expected_current": null}));
     assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
-    // promoting the stored draft as executable is refused (unbound limits / unresolved reasons)
+    // promoting the stored draft through /v0/sprints is refused: the sprint belongs to the
+    // import (review 38b671b S2); the import path itself only registers drafts
     let (st, b) = e.post_k(
         "alice",
         "/v0/sprints?mode=executable",
         "promote-key-01",
         &spec,
     );
-    assert!(st == 422 || st == 400, "{st} {b}");
-    // flipping it to ready while reasons remain fails the format check
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    // flipping a copy to ready while reasons remain fails the format check (other sprint id)
     let mut ready = spec.clone();
     ready["registration_state"] = json!("ready");
-    ready["revision"] = json!(2);
+    ready["sprint_id"] = json!("COPY-OF-IMPORT");
     ready["digest"] = json!(ieo_spec::spec_digest(&ready));
     let (st, b) = e.post_k(
         "alice",
@@ -2396,6 +2401,16 @@ fn a_pinned_continuation_obeys_the_latest_attempt_ceiling() {
             .0,
         201
     );
+    // only an executable, semantically reviewed revision sets the ceiling of a pinned run
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/6/semantic-review",
+            &json!({"decision": "passed", "reason": "ok", "digest": s6["digest"]})
+        )
+        .0,
+        201
+    );
     let (st, b) = assign(
         &e,
         "development",
@@ -2420,4 +2435,89 @@ fn a_pinned_continuation_obeys_the_latest_attempt_ceiling() {
         json!({"assignment_id": "A1", "generation": 0}),
     );
     assert_eq!((st, code(&b)), (409, "LIMIT_REACHED".into()), "{b}");
+}
+
+// --- review 38b671b corrections ---
+
+#[test]
+fn a_draft_revision_never_changes_a_running_execution() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 0);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // S1a: a newer *draft* revision raises the ceiling to 5 — the run stays at ceiling 0
+    let s6 = spec("repo-a", 6, 5);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=draft", "reg-key-s1a", &s6)
+            .0,
+        201
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(
+        (st, b["outcome"].clone()),
+        (202, json!("limit_reached")),
+        "{b}"
+    );
+}
+
+#[test]
+fn a_draft_with_unbound_limits_does_not_block_a_running_execution() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // S1b: a newer draft with null limits (e.g. a re-imported Notion task)
+    let mut s6 = spec("repo-a", 6, 3);
+    s6["registration_state"] = json!("draft");
+    s6["limits"] = json!({"elapsed_seconds": null, "total_tokens": null, "correction_attempts": null,
+                          "unresolved_reason": "한도 미정"});
+    s6["unresolved_bindings"] = json!(["limits"]);
+    s6["digest"] = json!(ieo_spec::spec_digest(&s6));
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=draft", "reg-key-s1b", &s6);
+    assert_eq!(st, 201, "{b}");
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(st, 201, "pinned run continues under its own ceiling: {b}");
+}
+
+#[test]
+fn an_import_owned_sprint_changes_only_through_imports() {
+    let Some(e) = start() else { return };
+    let (st, r) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("POCX-T01", 'a', json!([])),
+    );
+    assert_eq!(st, 201, "{r}");
+    // S2: registering a spec over the import's sprint id is refused
+    let mut s = spec("repo-a", 2, 3);
+    s["sprint_id"] = json!("POCX-T01");
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    let before = e.counts();
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-s2", &s);
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    assert_eq!(e.counts(), before);
 }

@@ -1,6 +1,6 @@
 {
   "policy_id": "ieo-judgment-policy",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "freeze_item": "L07",
   "source_decision": "docs/poc/User_Decisions_2026-11-12_0103.md D12",
   "gap_sources": [
@@ -43,7 +43,7 @@
     {
       "rule_id": "RG2.approval_scope",
       "gap": "RG2",
-      "rule": "Object approval scope (not the decision-answer scope named RG2 in the 01-08 contract §5, which stays a field gap for the next contract revision because 02-03 records no decision answers). An approval covers exactly the object it names and nothing wider. A sprint_id belongs to the repo of its first registered revision; a revision naming another repo is refused (409 SPRINT_REPO_CONFLICT). A semantic review covers (sprint_id, revision, digest). An assignment covers (assignment_id, generation, target_sha). A verdict covers (task_id, head_sha, merged_sha). An approval never carries over to another revision, digest, generation or SHA. Exception by user decision 2026-11-13 (X-01): a running assignment's next generation may stay on the revision its previous generation used, so a later revision never changes a running execution; such a continuation is bounded by the latest revision's limits.correction_attempts (G4/G5), and new assignments use the latest revision only.",
+      "rule": "Object approval scope (not the decision-answer scope named RG2 in the 01-08 contract §5, which stays a field gap for the next contract revision because 02-03 records no decision answers). An approval covers exactly the object it names and nothing wider. A sprint_id belongs to the repo of its first registered revision; a revision naming another repo is refused (409 SPRINT_REPO_CONFLICT). A semantic review covers (sprint_id, revision, digest). An assignment covers (assignment_id, generation, target_sha). A verdict covers (task_id, head_sha, merged_sha). An approval never carries over to another revision, digest, generation or SHA. Exception by user decision 2026-11-13 (X-01): a running assignment's next generation may stay on the revision its previous generation used, so a later revision never changes a running execution; such a continuation is bounded by the limits.correction_attempts of the newest revision that is executable and semantically reviewed, else by its own revision's (G4/G5); a newer draft never changes a running execution, and new assignments use the latest revision only.",
       "effect_when_unmet": "The wider use is refused or reported as not confirmed."
     },
     {

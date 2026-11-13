@@ -7,10 +7,10 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub const POLICY_ID: &str = "ieo-judgment-policy";
-pub const POLICY_VERSION: &str = "0.5.0";
+pub const POLICY_VERSION: &str = "0.6.0";
 /// SHA-256 of `contracts/judgment-policy-v0.json` (file bytes). A test recomputes it.
 pub const PINNED_POLICY_DIGEST: &str =
-    "470914abbf5f5206568e6c62bd22fbd617440aba5650e6a0c2eafa82935a37a0";
+    "e19a54ad636efea9df1534e7b28446853fa1d05cedff4ba40d1b4e2ff96e8e41";
 
 /// Rules this implementation enforces. The file must list exactly these.
 pub const IMPLEMENTED_RULES: [&str; 7] = [

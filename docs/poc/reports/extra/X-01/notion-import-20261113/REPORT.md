@@ -6,7 +6,7 @@
 | 수용 기준 | 장부 §7 X-01 행 |
 | 산출물 | crate [`crates/ieo-notion`](../../../../../../crates/ieo-notion)(라이브러리 + CLI `ieo-notion snapshot|import`) · 코디네이터 `POST /v0/imports/notion`(OpenAPI 0.7.0) · `notion_imports` 표 · 진행 화면의 추가 작업 표시 |
 | 모델 호출 | 0회 |
-| 상태 | rev 2. 독립 검토 [b8b619a reject](reviews/review-pr27-b8b619a.md)(P2 R1~R3) → 교정(§6). X-01 검토 1/4·교정 1/3. 재검토 대기 |
+| 상태 | rev 3. 독립 검토 [b8b619a reject](reviews/review-pr27-b8b619a.md)(P2 R1~R3) → 교정(§6) → 재검토 [38b671b reject](reviews/review-pr27-38b671b.md)(P2 S1·S2) → 교정(§7). X-01 검토 2/4·교정 2/3. 재검토 대기 |
 
 ## 1. 사용한 Notion 원본과 선정
 
@@ -29,14 +29,14 @@
 
 | 요소 | 동작 |
 | --- | --- |
-| 읽기(`ieo-notion`) | 연결 결과 스냅샷 또는 REST API(`/v1/pages`, `/v1/blocks/*/children` 쪽 나눔 따름)를 같은 형태(속성 문자열 + 본문)로 정규화한다. 토큰은 Authorization 헤더로만 보내며 오류 메시지에 넣지 않는다. 쓰기 호출은 없다 |
-| 내용 digest | 속성과 본문의 정본 JSON SHA-256이다. 읽은 경로와 시각은 넣지 않는다. 스냅샷 파일은 기록된 digest와 내용이 다르면 거부한다 |
+| 읽기(`ieo-notion`) | 연결 결과 스냅샷 또는 REST API(`/v1/pages`, `/v1/blocks/*/children` 쪽 나눔 따름)를 속성 문자열 + 본문으로 정규화한다. 두 경로의 본문 표현은 다르다(REST는 제목·문단·목록·코드·표만 읽고 중첩·기타 블록은 생략). 그래서 같은 페이지도 경로가 바뀌면 digest가 달라 새 revision이 된다. 토큰은 Authorization 헤더로만 보내며 오류 메시지에 넣지 않는다. 쓰기 호출은 없다 |
+| 내용 digest | 속성과 본문의 정본 JSON SHA-256이다. 같은 경로의 반복 읽기는 같은 값이다. 스냅샷 파일은 기록된 digest와 내용이 다르면 거부한다 |
 | 추출 | 작업 ID, 제목, 대상 repo(`저장소 식별자`의 owner/name), 목표(`## 목표` 절 첫 문단 또는 `내용 요약`), 수용 기준(`## 필수 인수 판정` 표 → 판정 ID·입력·기대·증거), 선행 절 |
 | 미해결 사유 | 큐 구획이 `현재`가 아님, 작업 상태가 `실행재개`가 아님, `차단 대상`이 남음, 필수 속성·목표·수용 기준을 읽지 못함. 값을 지어내지 않는다(기한은 `undecided`와 이유) |
 | 변환·등록 | 사람 입력 v0 → 기존 01-07 변환기 → 기존 등록 검사. 서버가 repo의 승인 바인딩을 적용하고, 원본과 다른 **시험 ID**를 스프린트 ID로 쓴다. 출처에 `notion_page`(URL·수정 시각·digest)를 더하고 미해결 사유를 `unresolved_bindings`에 넣은 뒤 digest를 계산한다. 항상 draft다 |
 | 중복·개정 | (페이지, 내용 digest)가 같으면 200 재조회이며 새 행이 없다. 내용이 바뀌면 다음 revision이 되고 이전 revision은 그대로 남는다. 같은 내용을 다른 시험 ID로, 다른 페이지를 같은 시험 ID로 보내면 409. `notion_imports`는 추가 전용(트리거)이다 |
 | 실행 차단 | draft·미바인딩 한도·미해결 사유가 있으면 executable 등록과 배정이 거부된다(01-07·02-03 규칙 그대로) |
-| 실행 고정 | 실행 중인 배정의 다음 세대는 자기 revision에 머물 수 있다. 새 배정은 최신 revision만 쓴다. 따라서 원본이 바뀌어 새 revision이 생겨도 진행 중인 실행은 자동으로 바뀌지 않는다 |
+| 실행 고정 | 실행 중인 배정의 다음 세대는 자기 revision에 머물 수 있다. 그 상한은 더 새로운 revision 중 executable이고 의미 검토를 통과한 것의 `correction_attempts`이고, 그런 revision이 없으면 자기 revision의 값이다. draft(예: 다시 가져온 Notion 작업)는 실행 중인 배정을 바꾸지 않는다. 새 배정은 최신 revision만 쓴다. Notion 가져오기가 만든 스프린트는 가져오기 경로로만 바뀌고 `/v0/sprints`·`/v0/sprint-inputs`는 거부한다. 따라서 원본이 바뀌어 새 revision이 생겨도 진행 중인 실행은 자동으로 바뀌지 않는다 |
 | 작업 번호 | 새 시험 스프린트는 바인딩의 `import_sprint_numbers`에서 쓰이지 않은 첫 번호를 받고, 이후 revision도 그 번호를 유지한다 |
 | 함께 고친 결함 | 같은 스프린트의 이전 revision을 다른 스프린트로 보고 `TASK_ID_CONFLICT`를 내던 변환 경로(기존 `/v0/sprint-inputs`에도 있었다)를 고쳤다 |
 
@@ -104,3 +104,15 @@
 | R5 P3 REST 경로와 연결 경로의 digest 차이, 미지원 블록 생략 | 주석을 사실대로 고쳤다(경로를 바꾸면 새 revision). 서버 직접 조회가 열리면 한 경로로 통일한다 | — |
 | R6 P3 `unresolved`는 클라이언트 값, 번호 풀과 바인딩 번호 중복 가능 | 유지. 가져오기 도구가 원본에서 만든 사유를 보내며, 서버는 사유를 더 붙일 수만 있고 실행 가능으로 바꿀 수는 없다. 번호가 겹쳐도 나중 변환이 거부돼 오염은 없다 | — |
 | R7 P3 보고서의 큐 상태 원문 표기 | 교정. §1을 요약 표현으로 바꿨다 | — |
+
+## 7. 재검토 반영(rev 3)
+
+| 지적 | 처분 | 시험·변이 |
+| --- | --- | --- |
+| S1 P2 pin된 이어 쓰기의 상한을 draft를 포함한 최신 revision에서 가져옴(상한 상향 draft로 G5 초과, null 상한 draft로 실행 중단) | 교정. 더 새로운 revision 중 executable·의미 검토 통과한 것의 상한만 쓰고, 없으면 자기 revision 값. 정책 0.6.0, OpenAPI 문구 갱신 | `a_draft_revision_never_changes_a_running_execution`, `a_draft_with_unbound_limits_does_not_block_a_running_execution`, X12 |
+| S2 P2 순서를 뒤집으면 R1 우회(가져오기 스프린트 위에 `/v0/sprints`·`/v0/sprint-inputs`) | 교정. 가져오기가 만든 스프린트는 다른 등록 경로에서 409. 바인딩의 `sprint_id`는 시험 ID로 쓸 수 없다 | `an_import_owned_sprint_changes_only_through_imports`, `a_test_id_cannot_take_over_…`, X13 |
+| S3 P3 다른 repo 호출자의 409가 존재·출처를 드러냄 | 유지. 저장 내용은 나가지 않는다. 같은 페이지 ID·digest를 아는 호출자에게만 드러나며, 스프린트 ID 이름 공간은 02-03부터 전역이다(재검토 0fa839d N2, 02-05 이월과 같은 범위) | — |
+| S4 P3 OpenAPI 머리글의 "additive" | 교정(배정 동작 변경 명시) | — |
+| S5 P3 §2의 경로 무관 표현 | 교정 | — |
+| S6 P3 보관한 검토 파일의 큐 상태 표기 | 보관본의 그 인용 한 줄을 가리고 가린 사실을 그 자리에 적었다 | — |
+| S7 P3 정책 개정 뒤 이전 digest의 판정은 선행 증거가 아님 | 사실을 적어 둔다. 영속 DB에는 판정·배정이 0건이라 지금 영향은 없다. 정책을 바꿀 때마다 기존 판정을 새 digest로 다시 받아야 선행 조건이 열린다(G1 그대로) | — |

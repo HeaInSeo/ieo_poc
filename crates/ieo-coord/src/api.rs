@@ -586,6 +586,7 @@ fn register(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         let result = reevaluate(tx, stored)?;
         return ok(200, result);
     }
+    refuse_import_owned(tx, body["sprint_id"].as_str().unwrap_or_default())?;
     let (status, result) = register_spec(tx, ctx, who, &body, mode)?;
     idempotent_store(
         tx,
@@ -629,6 +630,7 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     }
     let b = &ctx.bindings[repo];
     let sprint_id = b["sprint_id"].as_str().unwrap_or_default().to_string();
+    refuse_import_owned(tx, &sprint_id)?;
     let (status, rec, registration) = convert_and_register(
         tx,
         ctx,
@@ -822,7 +824,13 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
             &[&test_id],
         )?
         .get(0);
-    if !imported_before && latest_revision(tx, &test_id)?.is_some() {
+    let reserved = ctx
+        .bindings
+        .as_object()
+        .into_iter()
+        .flatten()
+        .any(|(_, b)| b["sprint_id"].as_str() == Some(test_id.as_str()));
+    if !imported_before && (reserved || latest_revision(tx, &test_id)?.is_some()) {
         return Err(one(
             409,
             "EVENT_CONTENT_CONFLICT",
@@ -914,6 +922,26 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         &json!({"test_id": test_id, "page_id": page_id, "content_digest": digest, "revision": rev}),
     )?;
     ok(status, result)
+}
+
+/// A sprint created by a Notion import is changed only through the import path (review 38b671b S2).
+fn refuse_import_owned(tx: &mut Transaction, sprint_id: &str) -> Result<(), Resp> {
+    let owned: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE test_id = $1)",
+            &[&sprint_id],
+        )?
+        .get(0);
+    if owned {
+        return Err(one(
+            409,
+            "EVENT_CONTENT_CONFLICT",
+            "sprint_id",
+            "this sprint was created by a Notion import and changes only through that import",
+            "use another sprint_id or re-import the Notion task",
+        ));
+    }
+    Ok(())
 }
 
 /// Per-request additions to a repo binding (Notion import, X-01).
@@ -1741,13 +1769,19 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
                 "assign from the latest revision",
             ));
         }
-        let l: Value = tx
-            .query_one(
-                "SELECT spec FROM sprint_revisions WHERE sprint_id = $1 AND revision = $2",
-                &[&sprint_id, &latest],
-            )?
-            .get(0);
-        ceiling_from_latest = Some(l["limits"]["correction_attempts"].clone());
+        // the ceiling comes from the newest revision that could itself run (executable and
+        // semantically reviewed); a draft — e.g. a re-imported Notion task — changes nothing for
+        // a running execution (review 38b671b S1)
+        let _ = latest;
+        if let Some(r) = tx.query_opt(
+            "SELECT spec FROM sprint_revisions WHERE sprint_id = $1 AND revision > $2
+               AND mode = 'executable' AND review_state = 'semantic_review_passed'
+             ORDER BY revision DESC LIMIT 1",
+            &[&sprint_id, &sprint_rev],
+        )? {
+            let l: Value = r.get(0);
+            ceiling_from_latest = Some(l["limits"]["correction_attempts"].clone());
+        }
     }
     if rev_row.get::<_, &str>(1) != "executable" {
         return Err(one(
