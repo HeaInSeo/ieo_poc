@@ -6,9 +6,9 @@
 | 수용 기준 | `poc-acceptance-v1.3.3` rev 4 `02-03.accept`(장부 02-03 행과 같음): 명세 v0·보고 v0·인증된 HTTP/JSON API를 따르는 배정·권한 세대·사건 ID·이력·outbox·조회 모델 구현, 형식 검사와 의미 검토 분리, GitHub/실행 증거를 완료 판정 입력으로, 기동 확인과 P04 통과 구분 |
 | 선행 | 02-01·01-02·01-07·01-08 검수 완료(원장 snapshot `v1.3.3-EXEC-0013`, main `c501a44`에서 착수 확인) |
 | 산출물 | Rust crate [`crates/ieo-coord`](../../../../../../crates/ieo-coord)(라이브러리 + `ieo-coord migrate|serve`) · DB 스키마 [`schema.sql`](../../../../../../crates/ieo-coord/src/schema.sql) · 판정 정책 [`contracts/judgment-policy-v0.json`](../../../../../../contracts/judgment-policy-v0.json)(L07) · OpenAPI 0.6.0 · 01-08 계약 rev 4 |
-| 상한 | F05 구현 14,400초. 측정 시작 2026-11-13T07:25:10Z(선행 항목 읽기 몇 분은 이 시각 앞이라 포함하지 않음), 코드 커밋 0850eaf 07:44:10Z, 시험 보강 3e24286 07:47:36Z(약 1,350초), 검토 반영 dfac60a 08:00Z경(약 2,150초), 재검토 반영 eb7b0af 08:2xZ. 검토·교정은 F04(4회·3회) |
+| 상한 | F05 구현 14,400초. 측정 시작 2026-11-13T07:25:10Z(선행 항목 읽기 몇 분은 이 시각 앞이라 포함하지 않음), 코드 커밋 0850eaf 07:44:10Z, 시험 보강 3e24286 07:47:36Z(약 1,350초), 검토 반영 dfac60a 08:00Z경(약 2,150초), 재검토 반영 eb7b0af·02c61a0 08:17Z경(약 3,100초). 검토·교정은 F04(4회·3회) |
 | 모델 호출 | 0회. 실제 에이전트·GitHub 연결 없음(§5) |
-| 상태 | rev 3. 독립 검토 [1e98f17 reject](reviews/review-pr25-1e98f17.md)(P1 F1·F2) → 교정 dfac60a(§6) → 재검토 [0fa839d reject](reviews/review-pr25-0fa839d.md)(P2 N1) → 교정 eb7b0af(§7). 02-03 검토 2/4·교정 2/3. 재검토 대기 |
+| 상태 | rev 3. 독립 검토 [1e98f17 reject](reviews/review-pr25-1e98f17.md)(P1 F1·F2) → 교정 dfac60a(§6) → 재검토 [0fa839d reject](reviews/review-pr25-0fa839d.md)(P2 N1) → 교정 eb7b0af·02c61a0(§7). 02-03 검토 2/4·교정 2/3. 재검토 대기 |
 
 ## 1. 선행 항목 처분
 
@@ -87,8 +87,8 @@
 
 | 확인 | 결과 | 증거 |
 | --- | --- | --- |
-| fmt·clippy(-D warnings)·전체 시험 | 통과. 시험 **141건**: ieo-coord 27(PostgreSQL 실DB·실HTTP)·ieo-report 1+33·ieo-spec 4+16+25·ieo-evidence 6+29. 커밋 eb7b0af, 깨끗한 트리(실행 전 porcelain 빈 목록) | [cargo-test.log](evidence/cargo-test.log) |
-| 변이 | MUTANTS_LINE. M13(거부 시 롤백 대신 커밋)은 **동등 변이**다. PostgreSQL은 실패한 트랜잭션의 COMMIT을 롤백으로 처리하고, 현재 코드에는 실패 없이 쓰기 뒤 거부하는 경로가 없다. 결함 주입 시험이 같은 성질(첫 쓰기 뒤 실패 시 전부 롤백)을 직접 고정한다 | [mutants.txt](evidence/mutants.txt), [mutants.py](evidence/mutants.py) |
+| fmt·clippy(-D warnings)·전체 시험 | 통과. 시험 **141건**: ieo-coord 27(PostgreSQL 실DB·실HTTP)·ieo-report 1+33·ieo-spec 4+16+25·ieo-evidence 6+29. 커밋 02c61a0, 깨끗한 트리(실행 전 porcelain 빈 목록) | [cargo-test.log](evidence/cargo-test.log) |
+| 변이 | 30개 중 29개 검출(검토 반영 변이 M21~M30 포함, 커밋 02c61a0). M13(거부 시 롤백 대신 커밋)은 **동등 변이**다. PostgreSQL은 실패한 트랜잭션의 COMMIT을 롤백으로 처리하고, 현재 코드에는 실패 없이 쓰기 뒤 거부하는 경로가 없다. 결함 주입 시험이 같은 성질(첫 쓰기 뒤 실패 시 전부 롤백)을 직접 고정한다 | [mutants.txt](evidence/mutants.txt), [mutants.py](evidence/mutants.py) |
 | OpenAPI 0.6.0 | `openapi-spec-validator` OK. 서버가 내는 모든 오류 코드가 OpenAPI 열거에 있다(시험 `every_emitted_code_is_declared_in_the_openapi_contract`) | [openapi-validate.log](evidence/openapi-validate.log) |
 | 문서 정합 | `validate_package.py` EXIT=0, `render_progress.py --check` EXIT=0. 문서 정합 확인일 뿐 런타임 PASS가 아니다 | [validate.log](evidence/validate.log) |
 | 기동 확인(P04 아님) | 실제 바이너리를 띄워 health 200(`scope`에 P04 아님 명시), 자격 없는 요청 401, 다른 repo 스프린트 404, 이관 뒤 13개 표를 확인했다. 변경한 정책 파일로는 기동을 거부한다(exit 2). 토큰·DB 비밀번호는 기록에 없다 | [startup-smoke.txt](evidence/startup-smoke.txt) |
@@ -144,5 +144,5 @@
 | N1 P2 상한을 낮췄다가 이전 값으로 되돌리면 같은 decision 사건을 다시 넣어 매번 500 | 교정. 마지막 값만 기억하지 않고, 그 상한 값의 decision 사건이 이미 있는지로 판단한다. 있으면 409 `LIMIT_REACHED`(상태 변화 없음) | `a_raised_ceiling_reached_again_asks_again`(1→2→1), M28 |
 | N2 P3 sprint_id 선점·존재 노출 | §4 후속(repo별 sprint 바인딩) | — |
 | N3 P3 F3에 시험 없음, 바뀐 작업의 옛 판정이 선행 조건을 채움 | 교정. 판정 행에 판정한 revision을 기록하고, 선행 조건은 그 작업 정의가 최신 revision과 같을 때만 충족(정책 G1 0.3.0) | `verdicts_judge_the_assigned_revision_and_a_changed_task_needs_a_new_verdict`, M27·M30 |
-| N4 P3 경쟁 교정·재연결에 시험 없음, 배정 전역 직렬화 미기재 | 역할 간 같은 assignment_id 경쟁 시험(10회, 500 없음) 추가, §4 문구 교정. 재연결은 검토자 수동 재현으로 확인됨, 등록·배정 경쟁(F5)은 시간 창이 좁아 자동 시험을 두지 않았다 | `one_assignment_id_raced_by_two_roles_never_errors`, M29 |
+| N4 P3 경쟁 교정·재연결에 시험 없음, 배정 전역 직렬화 미기재 | 역할 간 같은 assignment_id 경쟁 시험(10회, 500 없음) 추가, §4 문구 교정. 배정이 잡는 `registry` 잠금이 모든 배정을 직렬화하므로 별도 assignment-id 잠금은 중복이라 제거했다(그 잠금 제거 변이 M29가 살아남은 이유). `registry` 잠금 제거 변이(M29 재지정)는 경쟁 시험이 검출한다. 재연결은 검토자 수동 재현으로 확인됨, 등록·배정 경쟁(F5)은 시간 창이 좁아 자동 시험을 두지 않았다 | `one_assignment_id_raced_by_two_roles_never_errors`, M29 |
 | N5 P3 이전 SHA changes_requested 무시와 GitHub PR 상태 차이 | §4 후속 | — |
