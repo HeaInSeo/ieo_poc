@@ -205,9 +205,31 @@ CREATE TABLE IF NOT EXISTS notion_imports (
     sprint_revision  bigint      NOT NULL,
     response         jsonb       NOT NULL,
     imported_by      text        NOT NULL,
+    -- X-01 C2: queue gates and missing facts as the import service recorded them (not spec text);
+    -- NULL = imported before C2 (derived fail-closed from the stored response, see import_gate)
+    gates            jsonb,
+    missing          jsonb,
     imported_at      timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (page_id, content_digest),
     FOREIGN KEY (test_id, sprint_revision) REFERENCES sprint_revisions (sprint_id, revision)
+);
+
+-- C2 migration for databases created before C2 (columns stay NULL on earlier rows)
+ALTER TABLE notion_imports ADD COLUMN IF NOT EXISTS gates jsonb;
+ALTER TABLE notion_imports ADD COLUMN IF NOT EXISTS missing jsonb;
+
+-- X-01 C2: user-approved execution exceptions for an imported test sprint. They lift the
+-- recorded queue gates only, for exactly one (test_id, repo); never missing facts or other checks.
+CREATE TABLE IF NOT EXISTS exec_exceptions (
+    exception_id text        PRIMARY KEY,
+    test_id      text        NOT NULL,
+    repo_id      text        NOT NULL,
+    lifts        text        NOT NULL CHECK (lifts = 'queue_gates'),
+    scope        jsonb       NOT NULL,
+    decision_ref text        NOT NULL,
+    request      jsonb       NOT NULL,
+    approved_by  text        NOT NULL,
+    approved_at  timestamptz NOT NULL DEFAULT now()
 );
 
 -- Append-only history: UPDATE/DELETE on these tables is refused by the database itself.
@@ -226,6 +248,8 @@ CREATE OR REPLACE TRIGGER semantic_reviews_append_only BEFORE UPDATE OR DELETE O
 CREATE OR REPLACE TRIGGER history_append_only BEFORE UPDATE OR DELETE ON history
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 CREATE OR REPLACE TRIGGER notion_imports_append_only BEFORE UPDATE OR DELETE ON notion_imports
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+CREATE OR REPLACE TRIGGER exec_exceptions_append_only BEFORE UPDATE OR DELETE ON exec_exceptions
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;

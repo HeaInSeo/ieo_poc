@@ -52,7 +52,7 @@ pub fn token_digest(token: &str) -> String {
 }
 
 const AGENT_SCOPES: [&str; 2] = ["agent:report", "agent:repro"];
-const CLIENT_SCOPES: [&str; 7] = [
+const CLIENT_SCOPES: [&str; 9] = [
     "sprints:register",
     "sprints:read",
     "review:semantic",
@@ -60,6 +60,8 @@ const CLIENT_SCOPES: [&str; 7] = [
     "evidence:ingest",
     "judge:verify",
     "outbox:deliver",
+    "notion:import",
+    "exceptions:approve",
 ];
 
 /// Token digest → caller. Loaded once at start-up from a JSON file of digests.
@@ -133,6 +135,14 @@ impl Credentials {
                     }
                     if scopes.contains("judge:verify") && kind != Kind::Service {
                         return Err(format!("{name}: judge:verify is for services only"));
+                    }
+                    // X-01 C2: only the import service writes trusted collection records, and only a
+                    // person approves an execution exception
+                    if scopes.contains("notion:import") && kind != Kind::Service {
+                        return Err(format!("{name}: notion:import is for services only"));
+                    }
+                    if scopes.contains("exceptions:approve") && kind != Kind::User {
+                        return Err(format!("{name}: exceptions:approve is for users only"));
                     }
                 }
             }

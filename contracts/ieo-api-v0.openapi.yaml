@@ -1,12 +1,15 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.7.0
+  version: 0.8.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.8.0 (X-01 follow-up C2): imports need the service-only scope `notion:import` and record queue gates apart from
+    missing facts; executable registration and assignment of an imported sprint are gated by those server records
+    (`IMPORT_GATED`, `IMPORT_INCOMPLETE`); user-approved exceptions (`POST /v0/coordinator/exceptions`).
     0.7.0 (X-01): Notion task import as a draft sprint (`POST /v0/imports/notion`, additive); behaviour change in
     issueAssignment: a running assignment's next generation may stay on its revision (pin); registerSprint for a
     sprint created by a Notion import accepts only a spec derived from its latest import.
@@ -44,7 +47,9 @@ paths:
         A sprint_id belongs to the repo of its first registered revision: a revision whose `target.repo_id`
         differs → 409 `SPRINT_REPO_CONFLICT` (policy RG2).
         A sprint created by a Notion import (X-01) accepts only a spec derived from its latest import (same tasks and
-        `notion_page` source digest); other content → 409 `EVENT_CONTENT_CONFLICT`.
+        `notion_page` source digest); other content → 409 `EVENT_CONTENT_CONFLICT`. With `mode=executable` the
+        server's import records decide (C2): missing facts → 409 `IMPORT_INCOMPLETE`; unreleased queue gates without a
+        user-approved exception → 409 `IMPORT_GATED`. Text in the spec (e.g. removed reasons) does not decide.
         Only the latest registered revision of a sprint is active (01-07 rev 3). After a newer revision
         exists, a new registration of an older revision (any mode) and an executable promotion of an
         older revision stored as draft → 409 `REVISION_SUPERSEDED`. An identical re-submission of an older
@@ -121,7 +126,8 @@ paths:
       operationId: importNotionTask
       summary: Register a task read from Notion as a draft sprint under a separate test ID (X-01)
       description: |
-        Required scope `sprints:register` for `input.repo` (agents → 403 `AGENT_READ_DENIED`). The importer
+        Required scope `notion:import` (service principals only) for `input.repo` (agents → 403
+        `AGENT_READ_DENIED`); a registrar with `sprints:register` cannot write import records (C2). The importer
         (`ieo-notion`) reads one Notion page, derives a HumanSprintInput v0 and sends the source identity
         (page id, URL, last edit time, SHA-256 content digest, original task ID) and the reasons the task is
         not executable (`unresolved`). The server applies the repo's approved binding, uses `test_id` as the
@@ -167,7 +173,53 @@ paths:
                     fetched_via: { type: string, minLength: 1 }
                     observed_at: { type: [string, 'null'] }
                 input: { $ref: '../docs/poc/HumanSprintInput_v0.schema.json' }
-                unresolved: { type: array, items: { type: string, minLength: 1 } }
+                unresolved:
+                  description: Missing facts. They always block execution; an exception never lifts them.
+                  type: array
+                  items: { type: string, minLength: 1 }
+                gates:
+                  description: |
+                    Queue gates the page records (section, state, blocking target). Stored with the import; while the
+                    latest import of the test sprint records gates, executable registration and assignment answer
+                    409 `IMPORT_GATED` unless a user-approved exception exists for exactly this (test_id, repo). A later
+                    import that records no gates is the release record.
+                  type: array
+                  items: { type: string, minLength: 1 }
+      responses:
+        '201': { $ref: '#/components/responses/CoordinatorResult' }
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/exceptions:
+    post:
+      tags: [coordinator]
+      operationId: recordExecutionException
+      summary: A person approves a PoC execution exception for one imported test sprint (X-01 C2)
+      description: |
+        Required scope `exceptions:approve`, held by user principals only, for `repo_id`. The exception lifts the queue
+        gates recorded by the import service for exactly this (test_id, repo) and nothing else: missing facts
+        (`IMPORT_INCOMPLETE`), binding, semantic review, limits and every other check still apply. It is a separate
+        record; the imported gates stay stored. `exception_id` is the idempotency key. Unknown imported test sprint in
+        this repo → 422 `UNKNOWN_TASK`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [exception_id, test_id, repo_id, lifts, scope, decision_ref]
+              properties:
+                exception_id: { type: string, minLength: 1 }
+                test_id: { type: string, minLength: 1 }
+                repo_id: { type: string, minLength: 1 }
+                lifts: { const: queue_gates }
+                scope: { type: object }
+                decision_ref: { type: string, minLength: 1 }
       responses:
         '201': { $ref: '#/components/responses/CoordinatorResult' }
         '200': { $ref: '#/components/responses/CoordinatorResult' }
@@ -701,7 +753,7 @@ components:
                  IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR,
                  STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH, OWNERSHIP_CONFLICT, PREREQUISITE_UNMET, LIMIT_REACHED,
                  SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
-                 NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT]
+                 NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

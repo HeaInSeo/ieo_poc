@@ -1,0 +1,6 @@
+# C2 current-limit reproduction on main 82c7db9 (scratch test, not committed) · 2026-11-13T13:17:58Z
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+C2-REPRO executable registration of gated import with reasons removed: HTTP 201 mode="executable"
+C2-REPRO semantic review: HTTP 201; assignment: HTTP 201 outcome="issued"
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 42 filtered out; finished in 0.64s

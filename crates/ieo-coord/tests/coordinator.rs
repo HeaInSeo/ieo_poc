@@ -88,7 +88,28 @@ type PrincipalRow = (
     Option<&'static str>,
 );
 
-const PRINCIPALS: [PrincipalRow; 12] = [
+const PRINCIPALS: [PrincipalRow; 15] = [
+    (
+        "importer",
+        "service",
+        &["notion:import", "sprints:read"],
+        &["repo-a"],
+        None,
+    ),
+    (
+        "importer-b",
+        "service",
+        &["notion:import", "sprints:read"],
+        &["repo-b"],
+        None,
+    ),
+    (
+        "uma",
+        "user",
+        &["exceptions:approve", "sprints:read"],
+        &["repo-a"],
+        None,
+    ),
     (
         "erin",
         "user",
@@ -2043,7 +2064,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     let Some(e) = start() else { return };
     let gate = json!(["Notion 큐 구획 '조건 대기': 현재 실행 대상이 아님"]);
     let (st, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'a', gate.clone()),
     );
@@ -2069,7 +2090,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     // same page, same content: replay, nothing new
     let before = e.counts();
     let (st, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'a', gate.clone()),
     );
@@ -2084,7 +2105,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     assert_eq!(e.counts(), before);
     // changed content: revision 2; revision 1 is kept unchanged
     let (st, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'b', gate.clone()),
     );
@@ -2099,7 +2120,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     );
     // replay of the first content now reports it as superseded
     let (_, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'a', gate.clone()),
     );
@@ -2114,7 +2135,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     assert_eq!(
         code(
             &e.post(
-                "alice",
+                "importer",
                 "/v0/imports/notion",
                 &notion_import("POCX-T02", 'a', gate.clone())
             )
@@ -2125,7 +2146,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     let mut other = notion_import("POCX-T01", 'c', gate);
     other["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
     assert_eq!(
-        code(&e.post("alice", "/v0/imports/notion", &other).1),
+        code(&e.post("importer", "/v0/imports/notion", &other).1),
         "EVENT_CONTENT_CONFLICT"
     );
     // agents and other repos cannot import
@@ -2141,7 +2162,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     assert_eq!(
         code(
             &e.post(
-                "carol",
+                "importer-b",
                 "/v0/imports/notion",
                 &notion_import("POCX-T03", 'd', json!([]))
             )
@@ -2155,27 +2176,32 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
 fn an_imported_draft_with_unresolved_reasons_cannot_execute() {
     let Some(e) = start() else { return };
     let (st, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
-        &notion_import("POCX-T01", 'a', json!(["Notion 차단 대상 미해제: 선행 A1"])),
+        &notion_import_gated(
+            "POCX-T01",
+            'a',
+            json!(["Notion 차단 대상 미해제: 선행 A1"]),
+            json!([]),
+        ),
     );
     assert_eq!(st, 201, "{r}");
     let spec = e.get("alice", "/v0/sprints/POCX-T01/revisions/1").1["spec"].clone();
-    // assigning the draft is refused
+    // assigning the draft is refused: the import gate (C2) answers first, then UNBOUND_DRAFT
     let (st, b) = e.post("assigner", "/v0/coordinator/assignments",
         &json!({"repo_id": "repo-a", "role": "development", "assignment_id": "N1", "generation": 0,
                 "sprint_id": "POCX-T01", "sprint_revision": 1, "task_id": "11-01", "target_sha": SHA1,
                 "expected_current": null}));
-    assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
-    // promoting the stored draft as executable runs the binding check again and is refused
-    // while its limits are unbound and its reasons unresolved (01-07 UNBOUND_DRAFT)
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    // promoting the stored draft as executable is refused by the import gate recorded by the
+    // import service (C2), before the binding check
     let (st, b) = e.post_k(
         "alice",
         "/v0/sprints?mode=executable",
         "promote-key-01",
         &spec,
     );
-    assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
     // flipping a copy to ready while reasons remain fails the format check (other sprint id)
     let mut ready = spec.clone();
     ready["registration_state"] = json!("ready");
@@ -2255,7 +2281,7 @@ fn a_running_assignment_stays_on_its_revision() {
 fn import_sprint_numbers_and_own_revisions_do_not_conflict() {
     let Some(e) = start() else { return };
     let (st, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'a', json!([])),
     );
@@ -2264,12 +2290,12 @@ fn import_sprint_numbers_and_own_revisions_do_not_conflict() {
     // another Notion page under another test id takes the next free number of the pool
     let mut second = notion_import("POCX-T02", 'e', json!([]));
     second["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
-    let (st, r) = e.post("alice", "/v0/imports/notion", &second);
+    let (st, r) = e.post("importer", "/v0/imports/notion", &second);
     assert_eq!(st, 201, "{r}");
     assert_eq!(r["conversion"]["spec"]["tasks"][0]["task_id"], "12-01");
     // the first test sprint keeps its number on a new revision
     let (st, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'f', json!([])),
     );
@@ -2283,7 +2309,7 @@ fn import_sprint_numbers_and_own_revisions_do_not_conflict() {
     let mut third = notion_import("POCX-T03", '0', json!([]));
     third["source"]["page_id"] = json!("00000000000000000000000000000000");
     assert_eq!(
-        code(&e.post("alice", "/v0/imports/notion", &third).1),
+        code(&e.post("importer", "/v0/imports/notion", &third).1),
         "UNBOUND_DRAFT"
     );
     assert_eq!(e.counts(), before);
@@ -2336,7 +2362,7 @@ fn a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id() {
     let before = e.counts();
     // R1: an existing sprint not created by a Notion import
     let (st, b) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("HUM-01", 'a', json!([])),
     );
@@ -2347,7 +2373,7 @@ fn a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id() {
     );
     // the test id must differ from the Notion task id
     let (st, b) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("OP-SYNTH-0001", 'a', json!([])),
     );
@@ -2360,7 +2386,7 @@ fn an_import_replay_answers_only_within_its_repo() {
     let Some(e) = start() else { return };
     assert_eq!(
         e.post(
-            "alice",
+            "importer",
             "/v0/imports/notion",
             &notion_import("POCX-T01", 'a', json!([]))
         )
@@ -2370,7 +2396,7 @@ fn an_import_replay_answers_only_within_its_repo() {
     // R2: carol (repo-b) sends the same page, digest and test id under her repo
     let mut theirs = notion_import("POCX-T01", 'a', json!([]));
     theirs["input"]["repo"] = json!("repo-b");
-    let (st, b) = e.post("carol", "/v0/imports/notion", &theirs);
+    let (st, b) = e.post("importer-b", "/v0/imports/notion", &theirs);
     assert_eq!(
         (st, code(&b)),
         (409, "EVENT_CONTENT_CONFLICT".into()),
@@ -2499,7 +2525,7 @@ fn a_draft_with_unbound_limits_does_not_block_a_running_execution() {
 fn an_import_owned_sprint_changes_only_through_imports() {
     let Some(e) = start() else { return };
     let (st, r) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("POCX-T01", 'a', json!([])),
     );
@@ -2541,7 +2567,7 @@ fn an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source() {
     let Some(e) = start() else { return };
     assert_eq!(
         e.post(
-            "alice",
+            "importer",
             "/v0/imports/notion",
             &notion_import("POCX-T01", 'a', json!([]))
         )
@@ -2612,7 +2638,7 @@ fn a_binding_sprint_id_is_reserved_against_imports() {
     let Some(e) = start() else { return };
     // T3/Y1: HUM-01 is repo-a's binding sprint and does not exist yet
     let (st, b) = e.post(
-        "alice",
+        "importer",
         "/v0/imports/notion",
         &notion_import("HUM-01", 'a', json!([])),
     );
@@ -2668,4 +2694,266 @@ fn only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling() {
         (202, json!("limit_reached")),
         "{b}"
     );
+}
+
+// --- X-01 follow-up C2: execution gate for imported tasks ---
+
+fn notion_import_gated(test_id: &str, digest_char: char, gates: Value, missing: Value) -> Value {
+    let mut b = notion_import(test_id, digest_char, missing);
+    b["gates"] = gates;
+    b
+}
+
+fn queue_gates() -> Value {
+    json!([
+        "Notion 큐 구획 '조건 대기': 현재 실행 대상이 아님",
+        "Notion 차단 대상 미해제: 선행 A1"
+    ])
+}
+
+fn exception(id: &str, test_id: &str, repo: &str) -> Value {
+    json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "lifts": "queue_gates",
+           "scope": {"branch": format!("poc/{test_id}"), "purpose": "PoC 시험", "merge_to_default": false},
+           "decision_ref": "User_Decisions_2026-11-13_x02.md ③"})
+}
+
+/// Register the derived spec executable, review it and assign it; returns the three statuses.
+fn promote_review_assign(e: &Env, derived: &Value, key: &str) -> (u16, Value, u16, u16) {
+    let (st1, b1) = e.post_k("alice", "/v0/sprints?mode=executable", key, derived);
+    let rev = derived["revision"].as_i64().unwrap_or_default();
+    let st2 = e
+        .post(
+            "bob",
+            &format!(
+                "/v0/sprints/{}/revisions/{rev}/semantic-review",
+                derived["sprint_id"].as_str().unwrap_or_default()
+            ),
+            &json!({"decision": "passed", "reason": "ok", "digest": derived["digest"]}),
+        )
+        .0;
+    let st3 = e.post("assigner", "/v0/coordinator/assignments",
+        &json!({"repo_id": "repo-a", "role": "development", "assignment_id": format!("A-{key}"), "generation": 0,
+                "sprint_id": derived["sprint_id"], "sprint_revision": rev, "task_id": "11-01", "target_sha": SHA1,
+                "expected_current": null})).0;
+    (st1, b1, st2, st3)
+}
+
+#[test]
+fn c2_gated_import_cannot_execute_even_with_reasons_removed() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    // the registrar removes every reason and binds limits (the reproduced bypass)
+    let derived = derived_executable(&e, "POCX-T01");
+    assert_eq!(derived["unresolved_bindings"], json!([]));
+    let before = e.counts();
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "c2-a-01-key",
+        &derived,
+    );
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    assert_eq!(e.counts(), before);
+    // a draft registration of the same derived spec is still allowed (no execution)
+    let mut draft = derived.clone();
+    draft["registration_state"] = json!("draft");
+    draft["digest"] = json!(ieo_spec::spec_digest(&draft));
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints", "c2-a-02-key", &draft).0,
+        201
+    );
+}
+
+#[test]
+fn c2_claimed_release_without_a_trusted_record_is_refused() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    // a registrar cannot write a "released" import record (only the import service can)
+    let (st, b) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import_gated("POCX-T01", 'b', json!([]), json!([])),
+    );
+    assert_eq!((st, code(&b)), (403, "SCOPE_DENIED".into()), "{b}");
+    // a release claimed in editable spec text changes nothing
+    let mut claimed = derived_executable(&e, "POCX-T01");
+    claimed["title"] = json!("선행 해제됨(확인함) — 실행 가능");
+    claimed["digest"] = json!(ieo_spec::spec_digest(&claimed));
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "c2-c-01-key",
+        &claimed,
+    );
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    // only a person can approve an exception
+    let (st, _) = e.post(
+        "importer",
+        "/v0/coordinator/exceptions",
+        &exception("EX-1", "POCX-T01", "repo-a"),
+    );
+    assert_eq!(st, 403);
+    let (st, _) = e.post(
+        "alice",
+        "/v0/coordinator/exceptions",
+        &exception("EX-1", "POCX-T01", "repo-a"),
+    );
+    assert_eq!(st, 403);
+}
+
+#[test]
+fn c2_a_user_exception_applies_only_to_its_test_and_repo() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    let mut second = notion_import_gated("POCX-T02", 'e', queue_gates(), json!([]));
+    second["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
+    assert_eq!(e.post("importer", "/v0/imports/notion", &second).0, 201);
+    // the exception for T02 does not unlock T01; one for another repo is refused
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-T02", "POCX-T02", "repo-a")
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-B", "POCX-T01", "repo-b")
+        )
+        .0,
+        403
+    );
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "c2-d-01-key",
+        &derived_executable(&e, "POCX-T01"),
+    );
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    // the exception for T01 unlocks T01 only: executable, reviewed, assigned
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-T01", "POCX-T01", "repo-a")
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-T01", "POCX-T01", "repo-a")
+        )
+        .0,
+        200
+    );
+    let (st1, b1, st2, st3) =
+        promote_review_assign(&e, &derived_executable(&e, "POCX-T01"), "c2-d-02-key");
+    assert_eq!((st1, st2, st3), (201, 201, 201), "{b1}");
+    // the imported record still carries its gates (the exception is a separate record)
+    let mut db = e.db();
+    let g: Value = db
+        .query_one(
+            "SELECT gates FROM notion_imports WHERE test_id = 'POCX-T01'",
+            &[],
+        )
+        .expect("q")
+        .get(0);
+    assert_eq!(g, queue_gates());
+}
+
+#[test]
+fn c2_an_exception_does_not_lift_missing_inputs() {
+    let Some(e) = start() else { return };
+    let missing = json!(["수용 기준(필수 인수 판정 표)을 원본에서 읽지 못함"]);
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), missing)
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "uma",
+            "/v0/coordinator/exceptions",
+            &exception("EX-T01", "POCX-T01", "repo-a")
+        )
+        .0,
+        201
+    );
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "c2-e-01-key",
+        &derived_executable(&e, "POCX-T01"),
+    );
+    assert_eq!((st, code(&b)), (409, "IMPORT_INCOMPLETE".into()), "{b}");
+}
+
+#[test]
+fn c2_a_trusted_release_and_review_allow_execution() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    // the import service records the released state (new content, no gates) → revision 2
+    let (st, r) = e.post(
+        "importer",
+        "/v0/imports/notion",
+        &notion_import_gated("POCX-T01", 'b', json!([]), json!([])),
+    );
+    assert_eq!(
+        (st, r["registration"]["revision"].clone()),
+        (201, json!(2)),
+        "{r}"
+    );
+    let rev = e.get("alice", "/v0/sprints/POCX-T01/revisions/2").1;
+    let mut d = rev["spec"].clone();
+    d["revision"] = json!(3);
+    d["registration_state"] = json!("ready");
+    d["target"]["repository_url"] = json!("https://example.invalid/repo-a");
+    d["limits"] = json!({"elapsed_seconds": 3600, "total_tokens": 100000, "correction_attempts": 1, "unresolved_reason": null});
+    d["unresolved_bindings"] = json!([]);
+    d["digest"] = json!(ieo_spec::spec_digest(&d));
+    let (st1, b1, st2, st3) = promote_review_assign(&e, &d, "c2-f-01-key");
+    assert_eq!((st1, st2, st3), (201, 201, 201), "{b1}");
 }
