@@ -1,33 +1,28 @@
-# X-01 C2 mutants at commit 9ec5eb7746297b3808662aa7889f8768a7ca1281 · 2026-11-13T16:33:29Z
-C1 registration ignores the Notion gate: killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_an_exception_covers_only_the_content_it_approved', 'c2_an_exception_does_not_lift_missing_inputs']
+# full mutants at commit 5277e6cf9babd38909a45564c402aae14b042591 · 2026-11-13T17:05:50Z
+C1 registration ignores the Notion gate: killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_an_exception_covers_only_the_content_it_approved', 'c2_a_user_exception_applies_only_to_its_test_and_repo']
 C2 assignment ignores the Notion gate: killed ['c2_a_re_gating_import_stops_a_running_assignment']
 C3 missing facts do not block: killed ['c2_an_exception_does_not_lift_missing_inputs']
 C4 an exception applies to any test sprint and page of the repo (review 7afd4d1 G2): killed ['g2_identical_content_on_two_pages_is_gated_and_excepted_per_page', 'h3_an_exception_recorded_without_a_page_never_matches']
 C4a exception not filtered by test sprint (page binding remains): SURVIVED []
 C4b exception not bound to the page (test sprint filter remains; review e908a8c H3): killed ['h3_an_exception_recorded_without_a_page_never_matches']
-C5 registrars may write import records: killed ['a_binding_sprint_id_is_reserved_against_imports', 'an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source', 'an_import_owned_sprint_changes_only_through_imports', 'an_imported_draft_with_unresolved_reasons_cannot_execute']
+C5 registrars may write import records: killed ['a_binding_sprint_id_is_reserved_against_imports', 'an_import_owned_sprint_changes_only_through_imports', 'an_import_replay_answers_only_within_its_repo', 'an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source']
 C6 legacy rows: unknown reasons not fail-closed: killed ['api::tests::legacy_reasons_split_fail_closed']
 C7 importer files a gate as a missing fact: killed ['queue_gates_become_unresolved_reasons']
-C8 gates stored empty (release forged): killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_re_gating_import_stops_a_running_assignment', 'c2_a_user_exception_applies_only_to_its_test_and_repo', 'c2_a_copy_under_another_sprint_id_is_still_gated']
-C9 page ids in sources not recognised (review 7afd4d1 G1): killed ['g2_identical_content_on_two_pages_is_gated_and_excepted_per_page', 'g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated']
+C8 gates stored empty (release forged): killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_a_re_gating_import_stops_a_running_assignment', 'c2_an_exception_covers_only_the_content_it_approved']
+C9 page ids in sources not recognised (review 7afd4d1 G1): killed ['g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated', 'g2_identical_content_on_two_pages_is_gated_and_excepted_per_page']
 C9b no digest fallback for a source without a page reference: killed ['h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content', 'g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated', 'i1_only_the_named_pages_latest_content_hides_the_cited_digest']
 C10 replay of an earlier content state (review F2): killed ['c2_content_returning_to_a_gated_state_gates_again', 'notion_import_registers_a_draft_once_and_revises_on_change']
 C11 exception not bound to the approved content (review F4): killed ['c2_an_exception_covers_only_the_content_it_approved']
 C12 a page may be imported under a second test id (review 7afd4d1 G3): killed ['g3_a_page_belongs_to_one_test_id']
 C13 a named page hides the cited content whatever its digest (review e908a8c H1): killed ['h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content', 'i1_only_the_named_pages_latest_content_hides_the_cited_digest']
 C13b the cited digest always pulls in every page with that content (G2 over-blocking): killed ['g2_identical_content_on_two_pages_is_gated_and_excepted_per_page']
-C14 registration derivation reads the latest import by import time first (review f0c4e87 J2): SURVIVED []
+C14 registration derivation reads the latest import by import time first (review f0c4e87 J2): killed ['h2_every_reader_takes_the_same_latest_import']
 C14b exception approval reads the latest import by import time first (review f0c4e87 J2): killed ['h2_every_reader_takes_the_same_latest_import']
 C15 carried compares with any past import of the named page (review aa38041 I1): killed ['i1_only_the_named_pages_latest_content_hides_the_cited_digest']
-C16 the gate reads the latest import by import time first (review f0c4e87 J2): killed ['h2_every_reader_takes_the_same_latest_import', 'i2_the_gate_reads_the_latest_import_by_import_time']
-C17 replay reads the latest import by import time first (review f0c4e87 J2): killed ['i2_a_replay_matches_the_latest_import_by_import_time']
+C16 the gate reads the latest import by import time first (review f0c4e87 J2): killed ['h2_every_reader_takes_the_same_latest_import', 'i2_the_gate_reads_the_highest_revision_whatever_the_clock']
+C17 replay reads the latest import by import time first (review f0c4e87 J2): killed ['i2_a_replay_matches_the_highest_revision_whatever_the_clock']
 C18 imports stamped at transaction start, before the registry lock (review aa38041 I2 X3): killed ['i2_an_import_is_stamped_after_the_registry_lock']
-dirty after run: none
-# note: C14 survived above (both orders refused the same spec, at different checks). h2 now also asserts that a spec derived from the older release is refused as stale (EVENT_CONTENT_CONFLICT); rerun at 929e611:
-# C14 rerun at commit 929e611ca17dde5c9a3c6e34d77fc505f35f8493 · 2026-11-13T16:37:49Z
-C14 registration derivation reads the latest import by import time first (review f0c4e87 J2): killed ['h2_every_reader_takes_the_same_latest_import']
-dirty after run: none
-# C19 at commit 2765f570dcefd2d888782869e90f228bbde7643e · 2026-11-13T16:52:25Z
 C19 a page under two test ids is judged by the higher revision (review 6352413 K1): killed ['k1_a_page_imported_under_two_test_ids_fails_closed']
+C20 page ids accepted in any spelling (review f571d1e L3): killed ['l3_page_ids_are_accepted_only_in_canonical_form']
 dirty after run: none
-# result: 24 mutants (C19 added for review 6352413 K1), 23 killed. C4a survives and is equivalent (one page per test id, C12 killed; exception bound to that page, C4b killed by h3).
+# result: 25 mutants in one run at one commit, 24 killed. C4a survives and is equivalent (one page per test id, C12 killed; exception bound to that page, C4b killed by h3).
