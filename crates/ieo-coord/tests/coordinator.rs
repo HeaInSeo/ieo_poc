@@ -1913,3 +1913,73 @@ fn one_assignment_id_raced_by_two_roles_never_errors() {
         assert_eq!(st, vec![201, 409], "round {round}");
     }
 }
+
+// --- review 4bc8081 correction ---
+
+#[test]
+fn label_and_estimate_changes_keep_a_prerequisite_verdict_but_definition_changes_void_it() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    assert_eq!(
+        assign(&e, "guardrail", "G1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "gr-a",
+            "/v0/agent/reports",
+            &report("guardrail", "gr-1", "G1", 0, "01-01", SHA1)
+        )
+        .0,
+        202
+    );
+    full_evidence(&e, SHA1, "l");
+    assert_eq!(judge(&e, "jl", "01-01").1["outcome"], "accepted");
+    let review = |rev: u64, s: &Value| {
+        e.post(
+            "bob",
+            &format!("/v0/sprints/POC-01/revisions/{rev}/semantic-review"),
+            &json!({"decision": "passed", "reason": "ok", "digest": s["digest"]}),
+        )
+        .0
+    };
+    let a2 = |rev: u64, aid: &str| {
+        json!({"repo_id": "repo-a", "role": "development", "assignment_id": aid,
+        "generation": 0, "sprint_id": "POC-01", "sprint_revision": rev, "task_id": "01-02", "target_sha": SHA2,
+        "expected_current": {"assignment_id": "A1", "generation": 0}})
+    };
+    // R1: revision 6 changes only the status label and estimate of 01-01 → verdict still counts
+    let mut s6 = spec("repo-a", 6, 3);
+    s6["tasks"][0]["status"] = json!("검수 완료");
+    s6["tasks"][0]["estimate"] = json!({"state": "measured", "range_seconds": {"min": 60, "max": 120},
+                                        "evidence": ["fixture://measured"], "reason": null});
+    s6["digest"] = json!(ieo_spec::spec_digest(&s6));
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-l6", &s6);
+    assert_eq!(st, 201, "{b}");
+    assert_eq!(review(6, &s6), 201);
+    // revision 7 changes 01-01's verification → the verdict no longer counts
+    let mut s7 = s6.clone();
+    s7["revision"] = json!(7);
+    s7["tasks"][0]["verification"] = json!("다른 검증 방법");
+    s7["digest"] = json!(ieo_spec::spec_digest(&s7));
+    let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &a2(6, "A2"));
+    assert_eq!(
+        st, 201,
+        "label/estimate change must not void the verdict: {b}"
+    );
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-l7", &s7)
+            .0,
+        201
+    );
+    assert_eq!(review(7, &s7), 201);
+    let a3 = json!({"repo_id": "repo-a", "role": "development", "assignment_id": "A3", "generation": 0,
+        "sprint_id": "POC-01", "sprint_revision": 7, "task_id": "01-02", "target_sha": SHA3,
+        "expected_current": {"assignment_id": "A2", "generation": 0}});
+    let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &a3);
+    assert_eq!((st, code(&b)), (409, "PREREQUISITE_UNMET".into()), "{b}");
+}

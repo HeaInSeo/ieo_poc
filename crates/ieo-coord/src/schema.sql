@@ -1,4 +1,6 @@
 -- ieo coordinator DB schema v0 (02-03). PostgreSQL 17.
+-- Pre-release: `CREATE ... IF NOT EXISTS` only creates missing objects and does not alter
+-- existing tables, so a dev DB created from an earlier commit of this PR must be recreated.
 -- Every write goes through one transaction per request; a non-2xx answer rolls it back,
 -- so a refused request leaves 0 rows behind (OpenAPI: "Every non-2xx response leaves
 -- server state unchanged").
@@ -166,6 +168,7 @@ CREATE TABLE IF NOT EXISTS judgments (
     judged_by     text        NOT NULL,
     judged_at     timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (repo_id, judgment_id),
+    FOREIGN KEY (sprint_id, sprint_revision) REFERENCES sprint_revisions (sprint_id, revision),
     FOREIGN KEY (event_sprint, event_seq) REFERENCES events (sprint_id, sprint_seq)
 );
 

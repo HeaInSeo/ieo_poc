@@ -1489,8 +1489,11 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     for p in task["prerequisites"].as_array().into_iter().flatten() {
         let pid = p["task_id"].as_str().unwrap_or_default();
         let need_accepted = p["required_state"] == "accepted";
-        // the verdict must have judged the prerequisite as it is defined *now*: the task in the
-        // verdict's revision must equal the task in its sprint's latest revision (review 0fa839d N3)
+        // the verdict must have judged the prerequisite as it is defined *now*: the fields a verdict
+        // depends on (outputs, acceptance, exit_condition, verification, requirement_ids) must be
+        // equal in the verdict's revision and the sprint's latest revision (review 0fa839d N3).
+        // Labels and bookkeeping (status, evidence, estimate, references) never void a verdict
+        // (review 4bc8081 R1). A task missing from either revision compares as NULL: unmet.
         let met: bool = tx
             .query_one(
                 "SELECT EXISTS (
@@ -1499,8 +1502,10 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
                    JOIN LATERAL (SELECT spec FROM sprint_revisions l WHERE l.sprint_id = j.sprint_id
                                  ORDER BY l.revision DESC LIMIT 1) lr ON true
                    WHERE j.task_id = $1 AND j.policy_digest = $2 AND ($3 = false OR j.outcome = 'accepted')
-                     AND (SELECT t FROM jsonb_array_elements(jr.spec->'tasks') t WHERE t->>'task_id' = $1)
-                       = (SELECT t FROM jsonb_array_elements(lr.spec->'tasks') t WHERE t->>'task_id' = $1))",
+                     AND (SELECT jsonb_build_object('outputs', t->'outputs', 'acceptance', t->'acceptance', 'exit_condition', t->'exit_condition', 'verification', t->'verification', 'requirement_ids', t->'requirement_ids')
+                            FROM jsonb_array_elements(jr.spec->'tasks') t WHERE t->>'task_id' = $1)
+                       = (SELECT jsonb_build_object('outputs', t->'outputs', 'acceptance', t->'acceptance', 'exit_condition', t->'exit_condition', 'verification', t->'verification', 'requirement_ids', t->'requirement_ids')
+                            FROM jsonb_array_elements(lr.spec->'tasks') t WHERE t->>'task_id' = $1))",
                 &[&pid, &ctx.policy.digest, &need_accepted],
             )?
             .get(0);

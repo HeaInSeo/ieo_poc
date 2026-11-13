@@ -381,12 +381,15 @@ paths:
         `expected_current` must equal the current head of (repo, role) (null when none), else 409
         `OWNERSHIP_CONFLICT`. Generation 0 needs an unused assignment_id; generation n>0 must follow the head
         (same assignment_id, n-1, same sprint and task) — else 409 `OWNERSHIP_CONFLICT` / 422.
-        Prerequisites need verified verdicts under the pinned policy (409 `PREREQUISITE_UNMET`, policy G1).
+        Prerequisites need verified verdicts under the pinned policy, judged against a revision whose definition of
+        the prerequisite task (outputs, acceptance, exit_condition, verification, requirement_ids) equals the one in
+        its sprint's latest revision (409 `PREREQUISITE_UNMET`, policy G1).
         Attempts are cumulative per (sprint, task, role) across assignments and generations (policy G4); the
         ceiling is the spec's `limits.correction_attempts`. The first request past the ceiling records one
         verified `decision_request` with its outbox entry and answers 202 `limit_reached` (the head is
-        unchanged); later ones at the same ceiling → 409 `LIMIT_REACHED` with no state change; a ceiling raised
-        by a newer revision and reached again records a new decision_request (policy G5).
+        unchanged). A ceiling value that was already asked → 409 `LIMIT_REACHED` with no state change; a newer
+        revision that changes the ceiling (up or down) to a value not asked before records a new
+        decision_request when the count exceeds it (policy G5).
       requestBody:
         required: true
         content:

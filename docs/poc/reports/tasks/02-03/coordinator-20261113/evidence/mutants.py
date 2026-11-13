@@ -33,6 +33,8 @@ M=[
  ("M28 asked ceiling not recognised (review N1)", API, "        if asked {", "        if asked && false {"),
  ("M29 registry lock removed from assign (review F5/F6/N4)", API, "    // both pass the unused-id check. Order: scope → registry.\n    lock(tx, \"registry\")?;\n", "    // both pass the unused-id check. Order: scope → registry.\n"),
  ("M30 verdict judges the latest revision (review F3/N3)", API, "    let rev: i64 = head.get(3);", "    let rev: i64 = latest_revision(tx, &sprint_id)?.unwrap_or_default();"),
+ ("M31 whole task object compared for prerequisites (review R1)", API, "SELECT jsonb_build_object('outputs', t->'outputs', 'acceptance', t->'acceptance', 'exit_condition', t->'exit_condition', 'verification', t->'verification', 'requirement_ids', t->'requirement_ids')\n                            FROM jsonb_array_elements(lr.spec", "SELECT t\n                            FROM jsonb_array_elements(lr.spec"),
+ ("M32 latest-side definition drops verification (review R1)", API, "'verification', t->'verification', 'requirement_ids', t->'requirement_ids')\n                            FROM jsonb_array_elements(lr.spec", "'requirement_ids', t->'requirement_ids')\n                            FROM jsonb_array_elements(lr.spec"),
 ]
 env=dict(os.environ)
 out=[]
