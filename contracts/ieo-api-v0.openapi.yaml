@@ -51,8 +51,8 @@ paths:
         server's import records decide (C2): missing facts → 409 `IMPORT_INCOMPLETE`; unreleased queue gates without a
         user-approved exception → 409 `IMPORT_GATED`. Text in the spec (e.g. removed reasons) does not decide.
         The gate applies to every executable spec whose sources name an imported Notion page id in any field (any
-        `kind`, any digest; dashed or plain), and to every imported page whose content digest a source cites unless a
-        page that source names was itself imported with that digest: a copy under another sprint_id is gated, also when
+        `kind`, any digest; dashed or plain), and to every imported page whose content digest a source cites unless the
+        latest import of a page that source names carries that digest: a copy under another sprint_id is gated, also when
         its reference is rewritten to another imported page, and the exception covers only the import's own test
         sprint and page. "Latest import" means the newest by import time (stamped after the registry lock), then
         revision, for every check. A copy whose sources cite neither the gated page's id nor its imported content
