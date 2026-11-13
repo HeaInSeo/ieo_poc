@@ -54,8 +54,8 @@ paths:
         `kind`, any digest; dashed or plain), and to every imported page whose content digest a source cites unless the
         latest import of a page that source names carries that digest: a copy under another sprint_id is gated, also when
         its reference is rewritten to another imported page, and the exception covers only the import's own test
-        sprint and page. "Latest import" means the newest by import time (stamped after the registry lock), then
-        revision, for every check. A copy whose sources cite neither the gated page's id nor its imported content
+        sprint and page. "Latest import" means the highest revision (assigned under the registry lock, so independent
+        of the clock), then import time, for every check. A copy whose sources cite neither the gated page's id nor its imported content
         digest (both dropped, or both rewritten, including to another imported page's id and digest) cannot be
         recognised by the server and rests on the registrar and the semantic review.
         Only the latest registered revision of a sprint is active (01-07 rev 3). After a newer revision

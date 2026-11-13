@@ -3498,6 +3498,20 @@ fn h2_every_reader_takes_the_same_latest_import() {
         &from3,
     );
     assert_ne!(st, 201, "{b}");
+    // a spec derived from the older release (revision 2) is no longer the latest derivation:
+    // refused as stale before the gate (revision 3 is the latest import, whatever the clock says)
+    let from2 = ready_from(&e, "POCX-T01", 2, 4);
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "h2-from2-key",
+        &from2,
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
     // the exception binds the same import the gate reads (revision 3's content)
     let (st, x) = e.post(
         "uma",
