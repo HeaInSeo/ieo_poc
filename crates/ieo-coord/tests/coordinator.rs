@@ -1523,3 +1523,84 @@ fn every_emitted_code_is_declared_in_the_openapi_contract() {
     let missing: Vec<&&str> = emitted.iter().filter(|c| !declared.contains(**c)).collect();
     assert!(missing.is_empty(), "codes not in OpenAPI: {missing:?}");
 }
+
+#[test]
+fn a_failure_after_the_first_write_rolls_back_the_whole_request() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    full_evidence(&e, SHA1, "f");
+    // fault injection: the outbox insert fails after the verdict event was written
+    let mut db = e.db();
+    db.batch_execute(
+        "CREATE FUNCTION fail_outbox() RETURNS trigger LANGUAGE plpgsql AS
+           $$ BEGIN RAISE EXCEPTION 'injected outbox failure'; END $$;
+         CREATE TRIGGER outbox_fault BEFORE INSERT ON outbox FOR EACH ROW EXECUTE FUNCTION fail_outbox();",
+    )
+    .expect("fault");
+    let before = e.counts();
+    let (st, b) = judge(&e, "j-fault", "01-01");
+    assert_eq!((st, code(&b)), (500, "INTERNAL".into()));
+    assert_eq!(
+        e.counts(),
+        before,
+        "no verdict event, judgment or history row without its outbox entry"
+    );
+    db.batch_execute("DROP TRIGGER outbox_fault ON outbox")
+        .expect("unfault");
+    assert_eq!(judge(&e, "j-fault", "01-01").0, 201);
+}
+
+#[test]
+fn development_and_guardrail_claims_race_into_one_ordered_stream() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    assert_eq!(
+        assign(&e, "guardrail", "G1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    let e = Arc::new(e);
+    // two scopes (separate scope locks) append to the same sprint at once
+    let hs: Vec<_> = (0..24)
+        .map(|i| {
+            let e = Arc::clone(&e);
+            std::thread::spawn(move || {
+                if i % 2 == 0 {
+                    e.post(
+                        "dev-a",
+                        "/v0/agent/reports",
+                        &report("development", &format!("rd-{i}"), "A1", 0, "01-01", SHA1),
+                    )
+                    .0
+                } else {
+                    e.post(
+                        "gr-a",
+                        "/v0/agent/reports",
+                        &report("guardrail", &format!("rg-{i}"), "G1", 0, "01-01", SHA1),
+                    )
+                    .0
+                }
+            })
+        })
+        .collect();
+    let st: Vec<u16> = hs.into_iter().map(|h| h.join().unwrap_or(0)).collect();
+    assert!(st.iter().all(|s| *s == 202), "{st:?}");
+    let mut db = e.db();
+    let seqs: Vec<i64> = db
+        .query(
+            "SELECT sprint_seq FROM events WHERE sprint_id = 'POC-01' ORDER BY sprint_seq",
+            &[],
+        )
+        .expect("q")
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    assert_eq!(seqs, (1..=24).collect::<Vec<i64>>());
+}
