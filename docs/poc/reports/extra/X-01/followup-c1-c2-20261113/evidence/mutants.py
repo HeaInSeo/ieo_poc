@@ -28,6 +28,7 @@ M = [
  ("C17 replay reads the latest import by import time first (review f0c4e87 J2)", API, "                 WHERE page_id = $1 ORDER BY sprint_revision DESC, imported_at DESC LIMIT 1)\",", "                 WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1)\","),
  ("C18 imports stamped at transaction start, before the registry lock (review aa38041 I2 X3)", API, "$9,$10,$11, clock_timestamp())", "$9,$10,$11, now())"),
  ("C19 a page under two test ids is judged by the higher revision (review 6352413 K1)", API, "        if test_ids > 1 {", "        if false {"),
+ ("C20 page ids accepted in any spelling (review f571d1e L3)", API, "    if !(page_id.len() == 32\n", "    if false && !(page_id.len() == 32\n"),
 ]
 for name, f, a, b in M:
     if ONLY and not any(name.startswith(o) for o in ONLY):

@@ -55,7 +55,8 @@ paths:
         latest import of a page that source names carries that digest: a copy under another sprint_id is gated, also when
         its reference is rewritten to another imported page, and the exception covers only the import's own test
         sprint and page. "Latest import" means the highest revision (assigned under the registry lock, so independent
-        of the clock), then import time, for every check. A copy whose sources cite neither the gated page's id nor its imported content
+        of the clock), then import time, for every check. A cited page with imports under more than one
+        test id (possible only in data from before that was refused) is refused (409 `IMPORT_GATED`). A copy whose sources cite neither the gated page's id nor its imported content
         digest (both dropped, or both rewritten, including to another imported page's id and digest) cannot be
         recognised by the server and rests on the registrar and the semantic review.
         Only the latest registered revision of a sprint is active (01-07 rev 3). After a newer revision
@@ -174,7 +175,7 @@ paths:
                   required: [system, page_id, url, last_edited_time, content_digest, source_task_id, fetched_via]
                   properties:
                     system: { const: notion }
-                    page_id: { type: string, minLength: 1 }
+                    page_id: { type: string, pattern: '^[0-9a-f]{32}$', description: canonical Notion page id (32 lowercase hex, no dashes) }
                     url: { type: string, minLength: 1 }
                     last_edited_time: { type: string, minLength: 1 }
                     content_digest: { type: string, pattern: '^[a-f0-9]{64}$' }

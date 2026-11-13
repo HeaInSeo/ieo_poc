@@ -755,6 +755,21 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         ));
     }
     let page_id = str_field(src, "page_id", 64)?.to_string();
+    // review f571d1e L3: one canonical form, so a page cannot be imported twice under different
+    // spellings (dashed, upper case) and slip past the one-test-id rule
+    if !(page_id.len() == 32
+        && page_id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
+    {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "source.page_id",
+            "not a Notion page id in canonical form (32 lowercase hex, no dashes)",
+            "send the page id without dashes, in lower case",
+        ));
+    }
     let url = str_field(src, "url", 1024)?.to_string();
     let edited = str_field(src, "last_edited_time", 64)?.to_string();
     let digest = str_field(src, "content_digest", 64)?.to_string();
@@ -1075,8 +1090,9 @@ fn page_ids_in(v: &Value, out: &mut Vec<String>) {
 /// import" is ordered the same way everywhere: revision first (assigned under the registry lock,
 /// so a clock that jumps backwards cannot make an older release look newer than a later
 /// re-gating import — review f0c4e87 J2), then `imported_at` (stamped with `clock_timestamp()`
-/// after the lock). A page imported under more than one test id (only possible before that was
-/// refused) has no comparable revision order and is refused (review 6352413 K1). For each page the **latest**
+/// after the lock). A page imported under more than one test id (possible only in data from before
+/// that was refused and page ids were required in canonical form) has no comparable revision
+/// order and is refused (review 6352413 K1, f571d1e L3). For each page the **latest**
 /// import decides: missing facts always block (`IMPORT_INCOMPLETE`); queue gates block
 /// (`IMPORT_GATED`) unless a user-approved exception exists for exactly this test sprint, repo,
 /// page and that import's content digest. A later trusted import without gates is the release

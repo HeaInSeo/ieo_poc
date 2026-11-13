@@ -1,0 +1,4 @@
+# persistent PoC DB read-only checks (review 6352413 K1, f571d1e L2/L3) · DB ieo-poc-db · 2026-11-13T17:05:41Z
+# columns: db_now | imports | non-canonical page ids | pages under >1 test id | distinct pages
+$ SELECT now(), count(imports), count(page_id !~ '^[0-9a-f]{32}$'), count(pages with count(DISTINCT test_id) > 1), count(DISTINCT page_id)
+2026-11-13 17:05:41.852346+00|3|0|0|1

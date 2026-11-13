@@ -3754,3 +3754,37 @@ fn k1_a_page_imported_under_two_test_ids_fails_closed() {
     }
     assert_eq!(e.counts(), before);
 }
+
+// --- review f571d1e L3 ---
+
+#[test]
+fn l3_page_ids_are_accepted_only_in_canonical_form() {
+    let Some(e) = start() else { return };
+    for (page, why) in [
+        ("01234567-89ab-cdef-0123-456789abcdef", "dashed"),
+        ("0123456789ABCDEF0123456789ABCDEF", "upper case"),
+        ("0123456789abcdef0123456789abcde", "31 characters"),
+        ("0123456789abcdef0123456789abcdeg", "not hex"),
+    ] {
+        let mut b = notion_import("POCX-T09", 'a', json!([]));
+        b["source"]["page_id"] = json!(page);
+        let before = e.counts();
+        let (st, r) = e.post("importer", "/v0/imports/notion", &b);
+        assert_eq!(
+            (st, code(&r)),
+            (400, "SCHEMA_VIOLATION".into()),
+            "{why}: {r}"
+        );
+        assert_eq!(e.counts(), before, "{why}");
+    }
+    // the canonical form of the same page is accepted
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import("POCX-T09", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+}
