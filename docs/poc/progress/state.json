@@ -1926,7 +1926,8 @@
     "판정 정책 L07(D12) 고정(PR #25): contracts/judgment-policy-v0.json 0.4.0, 버전·digest 고정 기계 판독 정책 참조 방식(명세 스키마 r4·9개 digest 불변). G1 선행 증거·G2 SHA 귀속·G3 독립 판정·G4 누적 시도(재시도·교정 한 상한으로 셈 — 별도 재시도 상한 값 미결정이라 새 숫자 없이 엄격 해석)·G5 한도 도달·RG2(대상 승인 범위 — 01-08 RG2 결정 답변 범위의 필드화는 다음 contract revision 후보)·G7 제외 범위. 계획 변경 아님, 완료 수 미산입",
     "추가 작업 X-01 검수 완료(PR #27, 개정 A3): Notion 작업 가져오기·초안 등록. 73·12 완료 수 미산입. 서버에 Notion 자격 없음(대화 연결 스냅샷으로 시험) — 서버 직접 조회는 통합 토큰 발급 결정 뒤. X-02(실제 개발 세션)는 02-04 수용·모델 예산·큐 선행 처분 대기 → 2026-11-13 사용자 결정으로 예산·자격·큐 선행(PoC 예외)·Sori PR·Notion 경로 처분, X-01 후속 C1·C2 병합(PR #30). X-02 남은 조건은 extra_tasks X-02",
     "02-04 진행 기록 1(PR #31·#32): 연결 단계 주의 — 토큰 상한 회차 중 정지, 역할 기동(fork)과 세션 잠금 해제 직렬화, 디버그 로그 끔, 범위 밖 읽기 불가 파일 미개방 시험 없음(reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md §3)",
-    "X-01 후속 C2 최종 검토 aa38041 P3 이월: I1 carried 판정을 지목 페이지의 최신 digest로, I2 실행 판정·재조회 순서와 clock_timestamp 시험 고정, I3 보고 문장 — X-02 실행 전 별도 PR"
+    "X-01 후속 C2 최종 검토 aa38041 P3 이월: I1 carried 판정을 지목 페이지의 최신 digest로, I2 실행 판정·재조회 순서와 clock_timestamp 시험 고정, I3 보고 문장 — X-02 실행 전 별도 PR",
+    "절차 이탈 추인 대기: PR #30은 검토 상한(4/4) 도달 뒤 strict base 갱신(7111a73, tree가 검토한 병합 상태와 동일·CI 통과)을 사용자에게 묻지 않고 병합했다(c5a3d3a). 2026-11-12 결정 §1(User_Decisions_2026-11-12_0104b.md)은 PR #14에 한한 예외 — 사후 독립 확인은 보고 PR 검토, 추인 여부는 사용자 결정"
   ],
   "notes": [
     "등록 전 분모는 73/12이며 현재 실행 진척은 이 원장에 기록한다.",
@@ -2230,7 +2231,7 @@
       "event_revision": 1,
       "task_id": "X-01",
       "observed_at": "2026-11-13T23:48:54+09:00",
-      "state": "X-01 후속 교정 C1·C2 병합(73·12 미산입). PR #30: 9a421b7 reject(P1 F1, P2 F2·F3) → 7afd4d1 reject(P2 G1) → e908a8c reject(P2 H1) → aa38041 approve(P3 I1~I3, 검토 4/4·교정 3/3) → strict 최신화 7111a73(tree = 검토한 병합 상태) → 조건부 병합 c5a3d3a. 시험 182건·변이 18/19(C4a 동등). 영속 DB 재적용·결정 ③ 예외 r4. 모델 호출 0",
+      "state": "X-01 후속 교정 C1·C2 병합(73·12 미산입). PR #30: 9a421b7 reject(P1 F1, P2 F2·F3) → 7afd4d1 reject(P2 G1) → e908a8c reject(P2 H1) → aa38041 approve(P3 I1~I3, 검토 4/4·교정 3/3) → strict 최신화 7111a73(tree = 검토한 병합 상태) → 조건부 병합 c5a3d3a — 상한 뒤 base 갱신을 사용자에게 묻지 않고 진행한 절차 이탈(2026-11-12 결정 §1은 PR #14 한정), 사용자 추인 대기. 시험 182건·변이 18/19(C4a 동등). 영속 DB 재적용·결정 ③ 예외 r4. 모델 호출 0",
       "evidence": [
         "reports/extra/X-01/followup-c1-c2-20261113/REPORT.md",
         "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr30-aa38041.md",
