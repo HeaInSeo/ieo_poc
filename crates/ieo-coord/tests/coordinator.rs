@@ -3649,8 +3649,25 @@ fn i2_an_import_is_stamped_after_the_registry_lock() {
             )
             .0
         });
-        // the import's transaction has started and waits on the lock
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        // wait until the import's transaction is actually queued on the lock (review f0c4e87 J3)
+        let mut watcher = e.db();
+        let t0 = std::time::Instant::now();
+        while watcher
+            .query_one(
+                "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted
+                   AND database = (SELECT oid FROM pg_database WHERE datname = current_database())",
+                &[],
+            )
+            .expect("pg_locks")
+            .get::<_, i64>(0)
+            == 0
+        {
+            assert!(
+                t0.elapsed().as_secs() < 10,
+                "the import never waited on the lock"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
         let released_at: std::time::SystemTime = tx
             .query_one("SELECT clock_timestamp()", &[])
             .expect("clock")
