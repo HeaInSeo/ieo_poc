@@ -29,7 +29,7 @@ M=[
  ("M24 decision request keyed without the ceiling value (review F6/N1)", API, "&[&repo, &format!(\"limit-{sprint_id}-{task_id}-{role}-c{ceiling}\")],", "&[&repo, &format!(\"limit-{sprint_id}-{task_id}-{role}\")],"),
  ("M25 promoter may review (review F10)", API, "if registrant == who.name || registered_it {", "if registrant == who.name {"),
  ("M26 stale note dropped when blocked (review F9)", API, "        stale.dedup();\n", "        stale.clear();\n"),
- ("M27 prerequisite verdict of a changed task counts (review N3)", API, "                     AND (SELECT t FROM jsonb_array_elements(jr.spec->'tasks') t WHERE t->>'task_id' = $1)\n                       = (SELECT t FROM jsonb_array_elements(lr.spec->'tasks') t WHERE t->>'task_id' = $1))", "                     AND true)"),
+ ("M27 prerequisite verdict of a changed task counts (review N3)", API, "\n                       = (SELECT jsonb_build_object", "\n                       IS NOT NULL OR true OR NULL = (SELECT jsonb_build_object"),
  ("M28 asked ceiling not recognised (review N1)", API, "        if asked {", "        if asked && false {"),
  ("M29 registry lock removed from assign (review F5/F6/N4)", API, "    // both pass the unused-id check. Order: scope → registry.\n    lock(tx, \"registry\")?;\n", "    // both pass the unused-id check. Order: scope → registry.\n"),
  ("M30 verdict judges the latest revision (review F3/N3)", API, "    let rev: i64 = head.get(3);", "    let rev: i64 = latest_revision(tx, &sprint_id)?.unwrap_or_default();"),

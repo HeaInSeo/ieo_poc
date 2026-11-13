@@ -1,4 +1,4 @@
-# commit 02c61a034434b1957f0d9f95597c312d57c9cb94 (+ report rev 3 files, uncommitted at run time)
+# commit efad0ee1722bed118250c5388388e8c3f97dabf1 (+ report rev 4 files, uncommitted at run time)
 $ python scripts/validate_package.py
 EXIT=0
 $ python scripts/render_progress.py --check

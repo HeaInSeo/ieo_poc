@@ -1,15 +1,15 @@
 # 02-03 startup smoke (liveness only; NOT a P04 result)
-# commit 02c61a034434b1957f0d9f95597c312d57c9cb94 · 2026-11-13T08:19:57Z · PostgreSQL 17.11 (image sha256:665dc7b3…)
+# commit efad0ee1722bed118250c5388388e8c3f97dabf1 · 2026-11-13T08:32:47Z · PostgreSQL 17.11 (image sha256:665dc7b3…)
 $ GET /v0/health (no credential)
-{"policy_digest":"01acce79251b7b81eefe1688cd22e6ce1142ca9e05469d7d73ec8103106a564a","schema_version":"ieo-coord-v0","scope":"liveness only; not a P04 result","status":"up"}  -> HTTP 200
+{"policy_digest":"7b54ae55fdee811222c30844d5ee9d673ab479478184eb341d74659c2689b759","schema_version":"ieo-coord-v0","scope":"liveness only; not a P04 result","status":"up"}  -> HTTP 200
 $ GET /v0/sprints/POC-01/state (no credential)
 {"code":"UNAUTHENTICATED","message":"missing or unknown bearer credential"}  -> HTTP 401
 $ GET /v0/sprints/POC-01/state (reader credential; token value not recorded)
 {"code":"NOT_FOUND","message":"unknown sprint or not visible to this principal"}  -> HTTP 404
 $ server stderr
-ieo-coord listening on 127.0.0.1:58080; policy 01acce79251b7b81eefe1688cd22e6ce1142ca9e05469d7d73ec8103106a564a
+ieo-coord listening on 127.0.0.1:58080; policy 7b54ae55fdee811222c30844d5ee9d673ab479478184eb341d74659c2689b759
 $ tables after migrate
 assignment_heads assignments events evidence history idempotency judgments outbox repro_requests schema_meta semantic_reviews sprint_revisions task_attempts
 $ ieo-coord serve with a modified policy file (fails closed)
-ieo-coord: judgment policy digest 3a76eb15e684e5e6e0f15aab3f4a9961323450a1d8ac75c4067d07bfad52786c is not the pinned 01acce79251b7b81eefe1688cd22e6ce1142ca9e05469d7d73ec8103106a564a
+ieo-coord: judgment policy digest f435b9aac2cb9ef6444013daef27644b2a6b8c4627ab6d1a20a42a1ec9b91e34 is not the pinned 7b54ae55fdee811222c30844d5ee9d673ab479478184eb341d74659c2689b759
   -> exit 2
