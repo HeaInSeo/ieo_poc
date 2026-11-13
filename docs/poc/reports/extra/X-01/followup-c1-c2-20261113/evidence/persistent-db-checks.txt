@@ -2,3 +2,4 @@
 # columns: db_now | imports | non-canonical page ids | pages under >1 test id | distinct pages
 $ SELECT now(), count(imports), count(page_id !~ '^[0-9a-f]{32}$'), count(pages with count(DISTINCT test_id) > 1), count(DISTINCT page_id)
 2026-11-13 17:05:41.852346+00|3|0|0|1
+# correction (review 784d60e M2): the "$ SELECT …" line above is a summary, not runnable SQL (taken literally, count(page_id !~ …) would count every row). The exact read-only SQL, its psql invocation and the same result are in c2-live-r4.txt.

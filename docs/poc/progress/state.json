@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0016",
-  "snapshot_created_at": "2026-11-13T23:48:54+09:00",
-  "last_actual_work_observed_at": "2026-11-13T23:48:54+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0017",
+  "snapshot_created_at": "2026-11-14T02:25:00+09:00",
+  "last_actual_work_observed_at": "2026-11-14T02:25:00+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료 + 후속 교정 C1·C2 병합(PR #30, 73·12 미산입) · 02-04 진행(모델 호출 없는 supervisor 핵심 PR #31·#32 병합, 수용 전)",
+  "phase": "02-03 검수 완료 · X-01 검수 완료 + 후속 교정 C1·C2(PR #30)와 후속 PR #34~#37 병합(73·12 미산입) · 02-04 진행(모델 호출 없는 supervisor 핵심 PR #31·#32 병합, 수용 전)",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -288,7 +288,7 @@
       "status": "진행",
       "last_observed_at": "2026-11-13T23:48:54+09:00",
       "latest_report": "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md",
-      "result_state": "진행 기록 1(수용 아님): crates/ieo-supervisor — 역할 인자(Edit(//…)만, session_id 재개), 허용 목록 환경, CLAUDE_CONFIG_DIR 지시성 digest·변조 탐지·정리(링크·특수 파일·읽기 오류 닫힌 실패), flock 세션 잠금, §5-1 체크포인트·재연결 결정, 결정 ① 예산 가드(미계측·넘침 중지, 추가 과금 없음 조건 미확인 시 보류). 시험 20건. PR #31 bc55edf approve(검토 3/4·교정 2/3) → 병합 0f446d6, PR #32 aeab3d9 approve(검토 2/4·교정 1/3) → 병합 3426c77, main CI success. 모델 호출 0(02-04 예산 사용 0)",
+      "result_state": "진행 기록 1(수용 아님): crates/ieo-supervisor — 역할 인자(Edit(//…)만, session_id 재개), 허용 목록 환경, CLAUDE_CONFIG_DIR 지시성 digest·변조 탐지·정리(링크·특수 파일·읽기 오류 닫힌 실패), flock 세션 잠금, §5-1 체크포인트·재연결 결정, 결정 ① 예산 가드(미계측·넘침 중지, 추가 과금 없음 조건 미확인 시 보류). 시험 20건. PR #31 bc55edf approve(검토 3/4·교정 2/3) → 병합 0f446d6, PR #32 aeab3d9 approve(검토 2/4·교정 1/3) → 병합 3426c77, main CI run 43441103331(0f446d6)·43442655596(3426c77) success. 모델 호출 0(02-04 예산 사용 0)",
       "verification_level": "unverified",
       "evidence": [
         "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md",
@@ -1926,8 +1926,8 @@
     "판정 정책 L07(D12) 고정(PR #25): contracts/judgment-policy-v0.json 0.4.0, 버전·digest 고정 기계 판독 정책 참조 방식(명세 스키마 r4·9개 digest 불변). G1 선행 증거·G2 SHA 귀속·G3 독립 판정·G4 누적 시도(재시도·교정 한 상한으로 셈 — 별도 재시도 상한 값 미결정이라 새 숫자 없이 엄격 해석)·G5 한도 도달·RG2(대상 승인 범위 — 01-08 RG2 결정 답변 범위의 필드화는 다음 contract revision 후보)·G7 제외 범위. 계획 변경 아님, 완료 수 미산입",
     "추가 작업 X-01 검수 완료(PR #27, 개정 A3): Notion 작업 가져오기·초안 등록. 73·12 완료 수 미산입. 서버에 Notion 자격 없음(대화 연결 스냅샷으로 시험) — 서버 직접 조회는 통합 토큰 발급 결정 뒤. X-02(실제 개발 세션)는 02-04 수용·모델 예산·큐 선행 처분 대기 → 2026-11-13 사용자 결정으로 예산·자격·큐 선행(PoC 예외)·Sori PR·Notion 경로 처분, X-01 후속 C1·C2 병합(PR #30). X-02 남은 조건은 extra_tasks X-02",
     "02-04 진행 기록 1(PR #31·#32): 연결 단계 주의 — 토큰 상한 회차 중 정지, 역할 기동(fork)과 세션 잠금 해제 직렬화, 디버그 로그 끔, 범위 밖 읽기 불가 파일 미개방 시험 없음(reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md §3)",
-    "X-01 후속 C2 최종 검토 aa38041 P3 이월: I1 carried 판정을 지목 페이지의 최신 digest로, I2 실행 판정·재조회 순서와 clock_timestamp 시험 고정, I3 보고 문장 — X-02 실행 전 별도 PR",
-    "절차 이탈 추인 대기: PR #30은 검토 상한(4/4) 도달 뒤 strict base 갱신(7111a73, tree가 검토한 병합 상태와 동일·CI 통과)을 사용자에게 묻지 않고 병합했다(c5a3d3a). 2026-11-12 결정 §1(User_Decisions_2026-11-12_0104b.md)은 PR #14에 한한 예외 — 사후 독립 확인은 보고 PR 검토, 추인 여부는 사용자 결정"
+    "절차 이탈 추인 대기: PR #30은 검토 상한(4/4) 도달 뒤 strict base 갱신(7111a73, tree가 검토한 병합 상태와 동일·CI 통과)을 사용자에게 묻지 않고 병합했다(c5a3d3a). 2026-11-12 결정 §1(User_Decisions_2026-11-12_0104b.md)은 PR #14에 한한 예외 — 사후 독립 확인은 보고 PR 검토, 추인 여부는 사용자 결정",
+    "X-01 후속 C2 P3 처리 완료: aa38041 I1~I3 → PR #34, f0c4e87 J1~J3 → #35, 6352413 K1~K2 → #36, f571d1e L1~L3 → #37, 784d60e M1~M3 → 보고 PR(문장·정확한 SQL·영속 재적용). 남은 관찰: from_snapshot의 page_id와 url ID 일치 미확인(X-02 착수 전 확인)"
   ],
   "notes": [
     "등록 전 분모는 73/12이며 현재 실행 진척은 이 원장에 기록한다.",
@@ -2252,14 +2252,27 @@
         "https://github.com/HeaInSeo/ieo_poc/pull/31",
         "https://github.com/HeaInSeo/ieo_poc/pull/32"
       ]
+    },
+    {
+      "event_id": "X-01-C2-FOLLOWUPS-20261114",
+      "event_revision": 1,
+      "task_id": "X-01",
+      "observed_at": "2026-11-14T02:25:00+09:00",
+      "state": "X-01 후속 C2의 P3 후속 PR #34~#37 병합(73·12 미산입): 각 첫 독립 검토 approve(f0c4e87·6352413·f571d1e·784d60e), 병합 803d3f6·50f407e·0086b0d·7e9f5ea, main CI success. 영속 코디네이터 main 7e9f5ea 재적용·읽기 전용 확인(c2-live-r4). 모델 호출 0",
+      "evidence": [
+        "reports/extra/X-01/followup-c1-c2-20261113/REPORT.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/evidence/c2-live-r4.txt",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr37-784d60e.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/37"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 C1·C2 병합(PR #30 c5a3d3a), 02-04 진행 기록 1(PR #31·#32 병합 3426c77, main CI success)",
+    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 C1·C2와 후속 PR #34~#37 병합(7e9f5ea), 02-04 진행 기록 1(PR #31·#32)",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main c5a3d3a37c4fdc0a68842980358723f760d27c81 (이 보고 PR 병합 전)",
+    "branch_sha": "main 7e9f5ead82a0624022383de2dd2bb7163c9f3c4f (이 보고 PR 병합 전)",
     "plan_and_spec": "v1.3.3-A1·A2·A3 · 명세 8개 rev 5·POC-02 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR(report/x01-c12-0204-core-20261113). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090, main c5a3d3a 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
+    "running": "보고 PR(report/x01-c2-followups-20261114). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090, main 7e9f5ea 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2283,7 +2296,7 @@
       "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "C2 후속 I1~I3 PR(하나씩) → 02-04 남은 부분(자격 확인·U3 Pod·PID 1·어댑터·실제 세션 시험, 결정 ① 02-04 예산) → X-02 준비(executable 등록·의미 검토) → X-02",
+    "next_action": "02-04 남은 부분(역할 자격 확인·U3 Pod·PID 1·어댑터·실제 세션 시험, 결정 ① 02-04 예산) → X-02 준비(executable 등록·의미 검토) → X-02. PR은 하나씩",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
@@ -2310,9 +2323,9 @@
         "02-03"
       ],
       "status": "검수 완료",
-      "last_observed_at": "2026-11-13T23:48:54+09:00",
+      "last_observed_at": "2026-11-14T02:25:00+09:00",
       "latest_report": "reports/extra/X-01/notion-import-20261113/REPORT.md",
-      "result_state": "crates/ieo-notion(읽기 전용: 연결 스냅샷·REST API) + 코디네이터 POST /v0/imports/notion(OpenAPI 0.7.0). 실제 Notion 작업 OP-OCI-RAC-OC08-20261018을 대화 연결로 읽은 비공개 스냅샷(서버에 Notion 자격 없음)으로 영속 DB에 시험 ID POCX-SORI-OC08-T01 draft 등록(201), 같은 입력 재조회(200·행 불변), 모의 변경으로 revision 2·revision 1 보존, 초안 배정·executable 승격 거부(422), Notion 읽기 실패 시 DB 불변. 실행 중 배정의 revision 고정(상한은 더 새로운 executable·검토 통과 revision 기준). 시험 165건·변이 17/17. 대상 repo HeaInSeo/sori poc/POCX-SORI-OC08-T01 = 기준 2fa7f5e(추가 커밋 0, PR 없음). DB 등록은 개발 완료가 아님. PR #27 b8b619a reject(P2 R1~R3) → 38b671b reject(P2 S1·S2) → 7a48a4f reject(P2 T1) → 74bd796 approve(X-01 검토 4/4·교정 3/3) → 병합 74b00fd · main CI success(run 43425920936). 모델 호출 0 · 후속 교정 C1·C2(사용자 결정 2026-11-13 이슈 A·B, 73·12 미산입): C1 Notion 원문 무전사 수집(변경 없음 확인), C2 서버 실행 통제 — 신뢰된 가져오기 기록(service 전용 notion:import)의 큐 차단·필수 정보로 executable 등록·배정을 판정, 사용자 승인 예외(user 전용, 시험 ID·repo·페이지·내용 digest에 묶임). PR #30 9a421b7·7afd4d1·e908a8c reject → aa38041 approve(검토 4/4·교정 3/3, P3 I1~I3 이월) → 최신화 병합 7111a73(tree 동일) → 병합 c5a3d3a. 영속 DB 재적용(c2-live-r3), 결정 ③ 예외 r4 기록. 모델 호출 0",
+      "result_state": "crates/ieo-notion(읽기 전용: 연결 스냅샷·REST API) + 코디네이터 POST /v0/imports/notion(OpenAPI 0.7.0). 실제 Notion 작업 OP-OCI-RAC-OC08-20261018을 대화 연결로 읽은 비공개 스냅샷(서버에 Notion 자격 없음)으로 영속 DB에 시험 ID POCX-SORI-OC08-T01 draft 등록(201), 같은 입력 재조회(200·행 불변), 모의 변경으로 revision 2·revision 1 보존, 초안 배정·executable 승격 거부(422), Notion 읽기 실패 시 DB 불변. 실행 중 배정의 revision 고정(상한은 더 새로운 executable·검토 통과 revision 기준). 시험 165건·변이 17/17. 대상 repo HeaInSeo/sori poc/POCX-SORI-OC08-T01 = 기준 2fa7f5e(추가 커밋 0, PR 없음). DB 등록은 개발 완료가 아님. PR #27 b8b619a reject(P2 R1~R3) → 38b671b reject(P2 S1·S2) → 7a48a4f reject(P2 T1) → 74bd796 approve(X-01 검토 4/4·교정 3/3) → 병합 74b00fd · main CI success(run 43425920936). 모델 호출 0 · 후속 교정 C1·C2(사용자 결정 2026-11-13 이슈 A·B, 73·12 미산입): C1 Notion 원문 무전사 수집(변경 없음 확인), C2 서버 실행 통제 — 신뢰된 가져오기 기록(service 전용 notion:import)의 큐 차단·필수 정보로 executable 등록·배정을 판정, 사용자 승인 예외(user 전용, 시험 ID·repo·페이지·내용 digest에 묶임). PR #30 9a421b7·7afd4d1·e908a8c reject → aa38041 approve(검토 4/4·교정 3/3, P3 I1~I3 이월) → 최신화 병합 7111a73(tree 동일) → 병합 c5a3d3a. 영속 DB 재적용(c2-live-r3), 결정 ③ 예외 r4 기록. 모델 호출 0 · 후속 PR #34(I1~I3)·#35(J1~J3: 최신 가져오기를 revision 우선으로, 시계 역행 열린 실패 제거)·#36(K1~K2: 두 시험 ID 아래 이전 페이지는 닫힌 실패)·#37(L1~L3: page_id 정규형만 수용) — 각 첫 검토 approve, 병합 803d3f6·50f407e·0086b0d·7e9f5ea, main CI run 43450158305·43466926083·43469160953 success. 시험 208건·변이 24/25(C4a 동등). 영속 코디네이터 main 7e9f5ea 재적용(c2-live-r4): 비정규 page_id 0·두 시험 ID 페이지 0, 대시 표기 page_id 400. 모델 호출 0",
       "verification_level": "verified",
       "evidence": [
         "reports/extra/X-01/notion-import-20261113/REPORT.md",
@@ -2332,9 +2345,20 @@
         "reports/extra/X-01/followup-c1-c2-20261113/evidence/c2-live-r3.txt",
         "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr30-aa38041.md",
         "reports/extra/X-01/notion-import-20261113/reviews/review-pr28-97ce523.md",
-        "https://github.com/HeaInSeo/ieo_poc/pull/30"
+        "https://github.com/HeaInSeo/ieo_poc/pull/30",
+        "reports/extra/X-01/followup-c1-c2-20261113/evidence/c2-live-r4.txt",
+        "reports/extra/X-01/followup-c1-c2-20261113/evidence/persistent-db-checks.txt",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr34-f0c4e87.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr35-6352413.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr36-f571d1e.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr37-784d60e.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr33-a3aae40.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/34",
+        "https://github.com/HeaInSeo/ieo_poc/pull/35",
+        "https://github.com/HeaInSeo/ieo_poc/pull/36",
+        "https://github.com/HeaInSeo/ieo_poc/pull/37"
       ],
-      "next_action": "X-02 착수 조건 충족 시(02-04 수용·모델 예산 승인·큐 선행 처분)",
+      "next_action": "없음(검수 완료). 이어지는 실행은 X-02(extra_tasks X-02의 next_action)",
       "unresolved": "최종 검토 74bd796 P3(담당·시점): U1 가져온 스프린트의 executable 등록은 작업·Notion 출처만 고정하고 제목·목표·위임·출처 메타·미해결 사유는 등록자가 바꿀 수 있음(큐 선행 미해제 상태의 실행 등록 차단이 서버가 아니라 등록자와 독립 의미 검토에 달림) → X-02 착수 전 조건으로 고정(executable 승격 전 큐 선행 해제 증거 또는 사용자 결정 필수, 필요하면 가드 확장). 같은 시점에 X-01 보고 §6 R6 문장('실행 가능으로 바꿀 수는 없다')·§8 T1 문장('한도·준비 상태를 바인딩')과 api.rs 거부 안내('bind only limits/readiness')를 실제 강제 범위(작업·Notion 출처만 고정)에 맞게 정정(PR #28 검토 E2); U2 소유 검사가 01-07 revision 검사보다 앞서 수정 재제출이 REVISION_* 대신 409 → 계약 검사 순서 명시는 02-05(문서 버전·배정 연결) 착수 전; U3 바인딩 sprint_id를 운영 중 기존 가져오기 시험 ID로 바꾸면 /v0/sprint-inputs가 그 스프린트에 쓸 수 있음(기동 검사 없음) → 02-04 기동 검사에 바인딩·가져오기 충돌 확인 추가; U4 T2·T5 경로 시험 미고정(변이 Z1·Z2·Z5 생존, 동작은 정상) → X-02 착수 전 시험 보강; U5 보관본 각주 렌더링 → 이 보고 PR에서 교정. 서버 직접 Notion 조회(통합 토큰)와 경로별 digest 차이는 토큰 발급 뒤 재시험"
     },
     {
@@ -2352,8 +2376,8 @@
       "result_state": "미실행",
       "verification_level": "unverified",
       "evidence": [],
-      "next_action": "C2 후속(I1~I3) PR 병합 → 02-04 수용 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음)",
-      "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, C2 후속 I1~I3, executable 등록·의미 검토"
+      "next_action": "02-04 수용 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음)",
+      "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, executable 등록·의미 검토. 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), from_snapshot의 page_id·url ID 일치 미확인(PR #37 검토 관찰)"
     }
   ]
 }
