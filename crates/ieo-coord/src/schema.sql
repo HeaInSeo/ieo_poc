@@ -206,13 +206,15 @@ CREATE TABLE IF NOT EXISTS notion_imports (
     response         jsonb       NOT NULL,
     imported_by      text        NOT NULL,
     -- X-01 C2: queue gates and missing facts as the import service recorded them (not spec text);
-    -- NULL = imported before C2 (derived fail-closed from the stored response, see import_gate)
+    -- NULL = imported before C2 (derived fail-closed from the stored response, see notion_gate)
     gates            jsonb,
     missing          jsonb,
     imported_at      timestamptz NOT NULL DEFAULT now(),
-    -- one row per (page, test-sprint revision): content that returns to an earlier digest is a new
-    -- row (review 9a421b7 F2)
-    PRIMARY KEY (page_id, sprint_revision),
+    -- one row per import, i.e. per test-sprint revision it created: content that returns to an
+    -- earlier digest is a new row (review 9a421b7 F2). Keyed by the sprint revision, which never
+    -- conflicts on earlier data where a page was imported under two test ids (review 7afd4d1 G4);
+    -- "latest import of a page" is ordered by imported_at.
+    PRIMARY KEY (test_id, sprint_revision),
     FOREIGN KEY (test_id, sprint_revision) REFERENCES sprint_revisions (sprint_id, revision)
 );
 
@@ -223,7 +225,14 @@ DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
              WHERE c.conname = 'notion_imports_pkey' AND a.attname = 'content_digest') THEN
     ALTER TABLE notion_imports DROP CONSTRAINT notion_imports_pkey;
-    ALTER TABLE notion_imports ADD PRIMARY KEY (page_id, sprint_revision);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'notion_imports_pkey') THEN
+    ALTER TABLE notion_imports ADD PRIMARY KEY (test_id, sprint_revision);
+  ELSIF EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+                WHERE c.conname = 'notion_imports_pkey' AND a.attname = 'page_id') THEN
+    -- (page_id, sprint_revision) from 7afd4d1
+    ALTER TABLE notion_imports DROP CONSTRAINT notion_imports_pkey;
+    ALTER TABLE notion_imports ADD PRIMARY KEY (test_id, sprint_revision);
   END IF;
 END $$;
 
@@ -241,9 +250,12 @@ CREATE TABLE IF NOT EXISTS exec_exceptions (
     -- content digest of the import the exception was approved against (review 9a421b7 F4);
     -- a later, different gated import needs a new approval. NULL (earlier rows) never matches.
     content_digest text,
+    -- the Notion page of that import (review 7afd4d1 G2: digests do not name a page). NULL never matches.
+    page_id      text,
     approved_at  timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE exec_exceptions ADD COLUMN IF NOT EXISTS content_digest text;
+ALTER TABLE exec_exceptions ADD COLUMN IF NOT EXISTS page_id text;
 
 -- Append-only history: UPDATE/DELETE on these tables is refused by the database itself.
 CREATE OR REPLACE FUNCTION forbid_change() RETURNS trigger LANGUAGE plpgsql AS

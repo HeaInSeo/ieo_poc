@@ -3165,3 +3165,241 @@ fn c2_a_re_gating_import_stops_a_running_assignment() {
                 "expected_current": {"assignment_id": "A-regate-run-key", "generation": 0}}));
     assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
 }
+
+// --- review 7afd4d1 G1–G4 ---
+
+type SourceEdit = Box<dyn Fn(&mut Value)>;
+
+fn on_page(mut b: Value, page: &str) -> Value {
+    b["source"]["page_id"] = json!(page);
+    b["source"]["url"] = json!(format!("https://app.notion.com/p/Synthetic-Task-{page}"));
+    b
+}
+
+/// A copy of POCX-T01's derived spec under another sprint and task id, with `edit` applied to its
+/// Notion source.
+fn copy_of_t01(e: &Env, sprint: &str, edit: impl Fn(&mut Value)) -> Value {
+    let mut copy = derived_executable(e, "POCX-T01");
+    copy["sprint_id"] = json!(sprint);
+    copy["revision"] = json!(1);
+    copy["tasks"][0]["task_id"] = json!("13-01");
+    for s in copy["sources"].as_array_mut().into_iter().flatten() {
+        if s["kind"] == "notion_page" {
+            edit(s);
+        }
+    }
+    copy["digest"] = json!(ieo_spec::spec_digest(&copy));
+    copy
+}
+
+#[test]
+fn g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    let variants: [(&str, SourceEdit); 4] = [
+        ("relabelled kind", Box::new(|s| s["kind"] = json!("notion"))),
+        (
+            "other digest",
+            Box::new(|s| s["digest"] = json!("f".repeat(64))),
+        ),
+        (
+            "both, dashed id in another field",
+            Box::new(|s| {
+                s["kind"] = json!("document");
+                s["digest"] = json!("f".repeat(64));
+                s["ref"] = json!("fixture://moved");
+                s["revision"] = json!("01234567-89ab-cdef-0123-456789abcdef");
+            }),
+        ),
+        (
+            "reference dropped, digest kept",
+            Box::new(|s| {
+                s["kind"] = json!("document");
+                s["ref"] = json!("fixture://moved");
+            }),
+        ),
+    ];
+    for (i, (name, edit)) in variants.iter().enumerate() {
+        let copy = copy_of_t01(&e, &format!("POCX-Z0{i}"), edit);
+        let before = e.counts();
+        let (st, b) = e.post_k(
+            "alice",
+            "/v0/sprints?mode=executable",
+            &format!("g1-copy-key-{i}"),
+            &copy,
+        );
+        assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{name}: {b}");
+        assert_eq!(e.counts(), before, "{name}");
+    }
+    // documented residual (REPORT §2.3): a copy that drops both the page reference and the
+    // digest is not recognised by the server; the registrar and the semantic review own it
+    let copy = copy_of_t01(&e, "POCX-Z09", |s| {
+        s["kind"] = json!("document");
+        s["ref"] = json!("fixture://moved");
+        s["digest"] = json!("f".repeat(64));
+    });
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "g1-residual-key",
+        &copy,
+    );
+    assert_eq!(st, 201, "{b}");
+}
+
+#[test]
+fn g2_identical_content_on_two_pages_is_gated_and_excepted_per_page() {
+    let Some(e) = start() else { return };
+    const Q: &str = "fedcba9876543210fedcba9876543210";
+    // P (POCX-T01) and Q (POCX-T02) with the same gated content digest
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    let (st, r) = e.post(
+        "importer",
+        "/v0/imports/notion",
+        &on_page(
+            notion_import_gated("POCX-T02", 'a', queue_gates(), json!([])),
+            Q,
+        ),
+    );
+    assert_eq!(st, 201, "{r}");
+    // T02's own exception covers T02 (no over-block through page P's digest)
+    let (st, x) = e.post(
+        "uma",
+        "/v0/coordinator/exceptions",
+        &exception("EX-T02", "POCX-T02", "repo-a"),
+    );
+    assert_eq!((st, x["approved_page_id"].clone()), (201, json!(Q)), "{x}");
+    let d2 = derived_executable(&e, "POCX-T02");
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "g2-t02-key", &d2);
+    assert_eq!(st, 201, "{b}");
+    // Q is released; P stays gated and T02's exception never covers P
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &on_page(
+                notion_import_gated("POCX-T02", 'c', json!([]), json!([])),
+                Q
+            )
+        )
+        .0,
+        201
+    );
+    let d1 = derived_executable(&e, "POCX-T01");
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "g2-t01-key", &d1);
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+}
+
+#[test]
+fn g3_a_page_belongs_to_one_test_id() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    for (digest, key) in [('a', "same content"), ('b', "new content")] {
+        let before = e.counts();
+        let (st, b) = e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import("POCX-T09", digest, json!([])),
+        );
+        assert_eq!(
+            (st, code(&b)),
+            (409, "EVENT_CONTENT_CONFLICT".into()),
+            "{key}: {b}"
+        );
+        assert_eq!(e.counts(), before, "{key}");
+    }
+}
+
+#[test]
+fn g4_migration_from_earlier_keys_keeps_a_page_imported_under_two_test_ids() {
+    let Some(e) = start() else { return };
+    const Q: &str = "fedcba9876543210fedcba9876543210";
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &on_page(notion_import("POCX-T02", 'b', json!([])), Q)
+        )
+        .0,
+        201
+    );
+    let mut db = e.db();
+    // the state an earlier schema allowed: one page under two test ids (both revision 1)
+    for old_pk in ["page_id, content_digest", "test_id, sprint_revision"] {
+        db.batch_execute(&format!(
+            "ALTER TABLE notion_imports DISABLE TRIGGER notion_imports_append_only;
+             ALTER TABLE notion_imports DROP CONSTRAINT notion_imports_pkey;
+             UPDATE notion_imports SET page_id = '0123456789abcdef0123456789abcdef';
+             ALTER TABLE notion_imports ADD PRIMARY KEY ({old_pk});
+             ALTER TABLE notion_imports ENABLE TRIGGER notion_imports_append_only;"
+        ))
+        .expect("old schema");
+        migrate(&mut db).expect("migrate");
+        migrate(&mut db).expect("migrate again");
+        let cols: Vec<String> = db
+            .query(
+                "SELECT a.attname::text FROM pg_constraint c JOIN pg_attribute a
+                   ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+                 WHERE c.conname = 'notion_imports_pkey' ORDER BY a.attname",
+                &[],
+            )
+            .expect("pk")
+            .iter()
+            .map(|r| r.get(0))
+            .collect();
+        assert_eq!(cols, vec!["sprint_revision", "test_id"], "from ({old_pk})");
+    }
+    // the 7afd4d1 key (page_id, sprint_revision) on data it allows migrates too
+    db.batch_execute(
+        "ALTER TABLE notion_imports DISABLE TRIGGER notion_imports_append_only;
+         DELETE FROM notion_imports WHERE test_id = 'POCX-T02';
+         ALTER TABLE notion_imports DROP CONSTRAINT notion_imports_pkey;
+         ALTER TABLE notion_imports ADD PRIMARY KEY (page_id, sprint_revision);
+         ALTER TABLE notion_imports ENABLE TRIGGER notion_imports_append_only;",
+    )
+    .expect("7afd4d1 schema");
+    migrate(&mut db).expect("migrate");
+    let n: i64 = db
+        .query_one(
+            "SELECT count(*) FROM pg_constraint c JOIN pg_attribute a
+               ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+             WHERE c.conname = 'notion_imports_pkey' AND a.attname = 'page_id'",
+            &[],
+        )
+        .expect("pk")
+        .get(0);
+    assert_eq!(n, 0);
+}

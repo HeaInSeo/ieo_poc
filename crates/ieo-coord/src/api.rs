@@ -818,7 +818,8 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
     // earlier state (A→B→A) becomes a new revision so its gates apply again
     if let Some(row) = tx.query_opt(
         "SELECT test_id, response FROM notion_imports WHERE page_id = $1 AND content_digest = $2
-           AND sprint_revision = (SELECT max(sprint_revision) FROM notion_imports WHERE page_id = $1)",
+           AND (test_id, sprint_revision) = (SELECT test_id, sprint_revision FROM notion_imports
+                 WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1)",
         &[&page_id, &digest],
     )? {
         if row.get::<_, &str>(0) != test_id {
@@ -1038,39 +1039,87 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Re
     ))
 }
 
+/// Candidate Notion page ids (32 lowercase hex) in any string of a source, dashed or not: every
+/// 32-character window of each hex run, so a page id inside a URL slug is found. Over-inclusion
+/// is harmless (only ids of imported pages match).
+fn page_ids_in(v: &Value, out: &mut Vec<String>) {
+    match v {
+        Value::String(t) => {
+            let flat: String = t
+                .chars()
+                .filter(|c| *c != '-')
+                .collect::<String>()
+                .to_lowercase();
+            for run in flat.split(|c: char| !c.is_ascii_hexdigit()) {
+                for i in 0..=run.len().saturating_sub(32) {
+                    if run.len() >= 32 {
+                        out.push(run[i..i + 32].to_string());
+                    }
+                }
+            }
+        }
+        Value::Array(a) => a.iter().for_each(|x| page_ids_in(x, out)),
+        Value::Object(m) => m.values().for_each(|x| page_ids_in(x, out)),
+        _ => {}
+    }
+}
+
 /// X-01 C2: the execution gate, from server records only — never from spec text a registrar can
-/// edit. The Notion pages concerned are those imported for this sprint and those whose imported
-/// content a `notion_page` source of the spec cites (a copy under another sprint id is caught;
-/// a copy that drops the source cannot be recognised and rests on the registrar and the semantic
-/// review). For each page the **latest** import decides: missing facts always block
-/// (`IMPORT_INCOMPLETE`); queue gates block (`IMPORT_GATED`) unless a user-approved exception
-/// exists for exactly this test sprint, repo and that import's content digest. A later trusted
-/// import without gates is the release record.
+/// edit. The Notion pages concerned are (1) those imported for this sprint, (2) every imported page
+/// whose id appears in any field of any source, whatever its `kind` or digest (review 7afd4d1
+/// G1), and (3) for a source naming no imported page id, imported pages whose content digest it
+/// cites. Only a copy that drops or rewrites both the page reference and the digest is not
+/// recognised; it rests on the registrar and the semantic review. For each page the **latest**
+/// import decides: missing facts always block (`IMPORT_INCOMPLETE`); queue gates block
+/// (`IMPORT_GATED`) unless a user-approved exception exists for exactly this test sprint, repo,
+/// page and that import's content digest. A later trusted import without gates is the release
+/// record.
 fn notion_gate(
     tx: &mut Transaction,
     spec: &Value,
     sprint_id: &str,
     repo: &str,
 ) -> Result<(), Resp> {
-    let digests: Vec<String> = spec["sources"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|x| x["kind"] == "notion_page")
-        .filter_map(|x| x["digest"].as_str().map(str::to_string))
-        .collect();
-    let pages: Vec<String> = tx
+    let mut pages: Vec<String> = tx
         .query(
-            "SELECT DISTINCT page_id FROM notion_imports WHERE test_id = $1 OR content_digest = ANY($2)",
-            &[&sprint_id, &digests],
+            "SELECT DISTINCT page_id FROM notion_imports WHERE test_id = $1",
+            &[&sprint_id],
         )?
         .iter()
         .map(|r| r.get(0))
         .collect();
+    for source in spec["sources"].as_array().into_iter().flatten() {
+        let mut ids = Vec::new();
+        page_ids_in(source, &mut ids);
+        let named: Vec<String> = tx
+            .query(
+                "SELECT DISTINCT page_id FROM notion_imports WHERE page_id = ANY($1)",
+                &[&ids],
+            )?
+            .iter()
+            .map(|r| r.get(0))
+            .collect();
+        let found = if named.is_empty() {
+            // no page reference left: fall back to the cited content digest (any kind)
+            let digest = source["digest"].as_str().unwrap_or_default().to_string();
+            tx.query(
+                "SELECT DISTINCT page_id FROM notion_imports WHERE content_digest = $1",
+                &[&digest],
+            )?
+            .iter()
+            .map(|r| r.get(0))
+            .collect()
+        } else {
+            named
+        };
+        pages.extend(found);
+    }
+    pages.sort();
+    pages.dedup();
     for page in pages {
         let row = tx.query_one(
             "SELECT gates, missing, response, test_id, content_digest FROM notion_imports
-             WHERE page_id = $1 ORDER BY sprint_revision DESC LIMIT 1",
+             WHERE page_id = $1 ORDER BY imported_at DESC, sprint_revision DESC LIMIT 1",
             &[&page],
         )?;
         let (gates, missing): (Value, Value) = match (
@@ -1105,13 +1154,14 @@ fn notion_gate(
             ));
         }
         if gates.as_array().is_some_and(|g| !g.is_empty()) {
-            // review 9a421b7 F4: the exception is bound to the import content it approved
+            // review 9a421b7 F4, 7afd4d1 G2: the exception is bound to the page and the import
+            // content it approved
             let excepted: bool = test_id == sprint_id
                 && tx
                     .query_one(
                         "SELECT EXISTS (SELECT 1 FROM exec_exceptions WHERE test_id = $1 AND repo_id = $2
-                           AND lifts = 'queue_gates' AND content_digest = $3)",
-                        &[&sprint_id, &repo, &latest_digest],
+                           AND lifts = 'queue_gates' AND page_id = $3 AND content_digest = $4)",
+                        &[&sprint_id, &repo, &page, &latest_digest],
                     )?
                     .get(0);
             if !excepted {
@@ -1228,15 +1278,15 @@ fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
             ))
         };
     }
-    let latest: Option<(String, String)> = tx
+    let latest: Option<(String, String, String)> = tx
         .query_opt(
-            "SELECT s.repo_id, n.content_digest FROM notion_imports n JOIN sprint_revisions s
+            "SELECT s.repo_id, n.content_digest, n.page_id FROM notion_imports n JOIN sprint_revisions s
                ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
              WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1",
             &[&test_id],
         )?
-        .map(|r| (r.get(0), r.get(1)));
-    let Some((owner, approved_digest)) = latest.filter(|(o, _)| *o == repo) else {
+        .map(|r| (r.get(0), r.get(1), r.get(2)));
+    let Some((owner, approved_digest, page_id)) = latest.filter(|(o, _, _)| *o == repo) else {
         return Err(one(
             422,
             "UNKNOWN_TASK",
@@ -1248,19 +1298,19 @@ fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
     let _ = owner;
     tx.execute(
         "INSERT INTO exec_exceptions (exception_id, test_id, repo_id, lifts, scope, decision_ref, request,
-            approved_by, content_digest)
-         VALUES ($1,$2,$3,'queue_gates',$4,$5,$6,$7,$8)",
-        &[&id, &test_id, &repo, &body["scope"], &decision_ref, &body, &who.name, &approved_digest],
+            approved_by, content_digest, page_id)
+         VALUES ($1,$2,$3,'queue_gates',$4,$5,$6,$7,$8,$9)",
+        &[&id, &test_id, &repo, &body["scope"], &decision_ref, &body, &who.name, &approved_digest, &page_id],
     )?;
     history(
         tx,
         &who.name,
         "exception.approved",
-        &json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "decision_ref": decision_ref, "approved_content_digest": approved_digest}),
+        &json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "decision_ref": decision_ref, "approved_content_digest": approved_digest, "approved_page_id": page_id}),
     )?;
     ok(
         201,
-        json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "lifts": "queue_gates", "approved_content_digest": approved_digest, "replay": false}),
+        json!({"exception_id": id, "test_id": test_id, "repo_id": repo, "lifts": "queue_gates", "approved_content_digest": approved_digest, "approved_page_id": page_id, "replay": false}),
     )
 }
 
