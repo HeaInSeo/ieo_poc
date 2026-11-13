@@ -6,7 +6,7 @@ M = [
  ("C1 registration ignores the Notion gate", API, "    if mode == CheckMode::Executable\n        && ieo_spec::schema::format_rejections", "    if false\n        && ieo_spec::schema::format_rejections"),
  ("C2 assignment ignores the Notion gate", API, "    notion_gate(tx, &spec, &sprint_id, &repo)?;\n", ""),
  ("C3 missing facts do not block", API, "        if missing.as_array().is_some_and(|m| !m.is_empty()) {", "        if false {"),
- ("C4 an exception applies to any test sprint", API, "            let excepted: bool = test_id == sprint_id", "            let excepted: bool = true"),
+ ("C4 an exception applies to any test sprint of the repo", API, "WHERE test_id = $1 AND repo_id = $2\n                           AND lifts = 'queue_gates' AND content_digest = $3", "WHERE (test_id = $1 OR true) AND repo_id = $2\n                           AND lifts = 'queue_gates' AND content_digest = $3"),
  ("C5 registrars may write import records", API, "    need_client_scope(who, \"notion:import\", true)?;", "    need_client_scope(who, \"sprints:register\", true)?;"),
  ("C6 legacy rows: unknown reasons not fail-closed", API, "        } else if !BINDING.contains(&r.as_str()) {", "        } else if false {"),
  ("C7 importer files a gate as a missing fact", LIB, "        gates.push(format!(\"Notion 차단 대상 미해제: {}\", truncate(&b, 400)));", "        unresolved.push(format!(\"Notion 차단 대상 미해제: {}\", truncate(&b, 400)));"),

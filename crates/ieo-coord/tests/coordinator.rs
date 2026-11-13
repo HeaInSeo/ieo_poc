@@ -3124,3 +3124,44 @@ fn c2_an_exception_covers_only_the_content_it_approved() {
     let (st1, b1, st2, st3) = promote_review_assign(&e, &d, "f4-after-key");
     assert_eq!((st1, st2, st3), (201, 201, 201), "{b1}");
 }
+
+#[test]
+fn c2_a_re_gating_import_stops_a_running_assignment() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'b', json!([]), json!([]))
+        )
+        .0,
+        201
+    );
+    let d = ready_from(&e, "POCX-T01", 2, 3);
+    let (st1, b1, st2, st3) = promote_review_assign(&e, &d, "regate-run-key");
+    assert_eq!((st1, st2, st3), (201, 201, 201), "{b1}");
+    // the Notion task becomes gated again → the running assignment's next generation is refused
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'd', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    let (st, b) = e.post("assigner", "/v0/coordinator/assignments",
+        &json!({"repo_id": "repo-a", "role": "development", "assignment_id": "A-regate-run-key", "generation": 1,
+                "sprint_id": "POCX-T01", "sprint_revision": 3, "task_id": "11-01", "target_sha": SHA2,
+                "expected_current": {"assignment_id": "A-regate-run-key", "generation": 0}}));
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+}
