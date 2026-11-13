@@ -16,7 +16,11 @@ M = [
  ("X10 replay answers another repo (review R2)", API, "if stored_repo.as_deref() != Some(repo) {", "if false {"),
  ("X11 pinned continuation ignores latest ceiling (review R3)", API, "ceiling_from_latest = Some(l[\"limits\"][\"correction_attempts\"].clone());", "let _ = &l;"),
  ("X12 a draft revision sets a pinned run's ceiling (review S1)", API, "AND mode = 'executable' AND review_state = 'semantic_review_passed'", "AND true"),
- ("X13 import-owned sprint registrable elsewhere (review S2)", API, "    if owned {", "    if false && owned {"),
+ ("X13 import-owned sprint registrable with other content (review S2)", API, "    if same_source && spec[\"tasks\"] == imported[\"tasks\"] {", "    if true {"),
+ ("X14 promotion of the derived spec refused (review T1)", API, "    if same_source && spec[\"tasks\"] == imported[\"tasks\"] {", "    if false {"),
+ ("X15 binding sprint_id not reserved (review T3/Y1)", API, "    if !imported_before && (reserved || latest_revision(tx, &test_id)?.is_some()) {", "    if !imported_before && latest_revision(tx, &test_id)?.is_some() {"),
+ ("X16 unreviewed newer revision sets the ceiling (review T3/Y3)", API, " AND review_state = 'semantic_review_passed'", ""),
+ ("X17 draft newer revision sets the ceiling (review T3/Y4)", API, "AND mode = 'executable' AND", "AND"),
 ]
 out = []
 for name, f, a, b in M:

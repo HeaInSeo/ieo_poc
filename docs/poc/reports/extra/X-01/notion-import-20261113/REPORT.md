@@ -6,7 +6,7 @@
 | 수용 기준 | 장부 §7 X-01 행 |
 | 산출물 | crate [`crates/ieo-notion`](../../../../../../crates/ieo-notion)(라이브러리 + CLI `ieo-notion snapshot|import`) · 코디네이터 `POST /v0/imports/notion`(OpenAPI 0.7.0) · `notion_imports` 표 · 진행 화면의 추가 작업 표시 |
 | 모델 호출 | 0회 |
-| 상태 | rev 3. 독립 검토 [b8b619a reject](reviews/review-pr27-b8b619a.md)(P2 R1~R3) → 교정(§6) → 재검토 [38b671b reject](reviews/review-pr27-38b671b.md)(P2 S1·S2) → 교정(§7). X-01 검토 2/4·교정 2/3. 재검토 대기 |
+| 상태 | rev 4. 독립 검토 [b8b619a reject](reviews/review-pr27-b8b619a.md)(P2 R1~R3) → 교정(§6) → 재검토 [38b671b reject](reviews/review-pr27-38b671b.md)(P2 S1·S2) → 교정(§7) → 재검토 2 [7a48a4f reject](reviews/review-pr27-7a48a4f.md)(P2 T1) → 교정(§8). X-01 검토 3/4·**교정 3/3(상한 도달)**. 마지막 검토(4/4) 대기 |
 
 ## 1. 사용한 Notion 원본과 선정
 
@@ -36,7 +36,7 @@
 | 변환·등록 | 사람 입력 v0 → 기존 01-07 변환기 → 기존 등록 검사. 서버가 repo의 승인 바인딩을 적용하고, 원본과 다른 **시험 ID**를 스프린트 ID로 쓴다. 출처에 `notion_page`(URL·수정 시각·digest)를 더하고 미해결 사유를 `unresolved_bindings`에 넣은 뒤 digest를 계산한다. 항상 draft다 |
 | 중복·개정 | (페이지, 내용 digest)가 같으면 200 재조회이며 새 행이 없다. 내용이 바뀌면 다음 revision이 되고 이전 revision은 그대로 남는다. 같은 내용을 다른 시험 ID로, 다른 페이지를 같은 시험 ID로 보내면 409. `notion_imports`는 추가 전용(트리거)이다 |
 | 실행 차단 | draft·미바인딩 한도·미해결 사유가 있으면 executable 등록과 배정이 거부된다(01-07·02-03 규칙 그대로) |
-| 실행 고정 | 실행 중인 배정의 다음 세대는 자기 revision에 머물 수 있다. 그 상한은 더 새로운 revision 중 executable이고 의미 검토를 통과한 것의 `correction_attempts`이고, 그런 revision이 없으면 자기 revision의 값이다. draft(예: 다시 가져온 Notion 작업)는 실행 중인 배정을 바꾸지 않는다. 새 배정은 최신 revision만 쓴다. Notion 가져오기가 만든 스프린트는 가져오기 경로로만 바뀌고 `/v0/sprints`·`/v0/sprint-inputs`는 거부한다. 따라서 원본이 바뀌어 새 revision이 생겨도 진행 중인 실행은 자동으로 바뀌지 않는다 |
+| 실행 고정 | 실행 중인 배정의 다음 세대는 자기 revision에 머물 수 있다. 그 상한은 더 새로운 revision 중 executable이고 의미 검토를 통과한 것의 `correction_attempts`이고, 그런 revision이 없으면 자기 revision의 값이다. draft(예: 다시 가져온 Notion 작업)는 실행 중인 배정을 바꾸지 않는다. 새 배정은 최신 revision만 쓴다. Notion 가져오기가 만든 스프린트에 `/v0/sprints`로 등록할 수 있는 것은 최신 가져오기에서 파생한 명세(같은 작업과 같은 `notion_page` 출처 digest)뿐이다. 이것이 한도를 바인딩하고 미해결 사유를 정리해 executable로 올리는 경로이고, 다른 내용은 409다. 바인딩의 `sprint_id`는 시험 ID로 쓸 수 없어 `/v0/sprint-inputs`는 가져온 스프린트에 쓰지 않는다. 따라서 원본이 바뀌어 새 revision이 생겨도 진행 중인 실행은 자동으로 바뀌지 않는다 |
 | 작업 번호 | 새 시험 스프린트는 바인딩의 `import_sprint_numbers`에서 쓰이지 않은 첫 번호를 받고, 이후 revision도 그 번호를 유지한다 |
 | 함께 고친 결함 | 같은 스프린트의 이전 revision을 다른 스프린트로 보고 `TASK_ID_CONFLICT`를 내던 변환 경로(기존 `/v0/sprint-inputs`에도 있었다)를 고쳤다 |
 
@@ -47,7 +47,7 @@
 | 1 | 실제 Notion 작업 1건 조회 → 명세 변환 → DB 초안 등록 | OC08 스냅샷(digest `3f8a300f…`)을 영속 DB의 코디네이터에 등록했다. HTTP 201, 시험 ID `POCX-SORI-OC08-T01` revision 1, draft·의미 검토 대기, 미해결 사유 5건(큐 구획·작업 상태·차단 대상 3건과 한도·바인딩 미정 2건). 작업 91-01~03이 OC08-01~03에 대응한다 | [live-check.txt](evidence/live-check.txt) §1 |
 | 2 | 같은 입력 재등록의 중복 방지 | HTTP 200 `replay=true`, revision 1, 행 수 불변 | 같은 파일 §2, 시험 `notion_import_registers_a_draft_once_and_revises_on_change` |
 | 3 | 원본 변경 시 새 revision, 기존 기록 보존 | **모의 변경**(비공개 스냅샷 복사본의 속성 1개 수정, Notion은 수정 안 함)으로 revision 2(digest `e5516fc8…`)를 만들었다. revision 1(`91ed78dd…`)은 그대로다 | 같은 파일 §3 |
-| 4 | 필수 조건이 빠진 작업의 실행 차단 | 초안 배정 422 `UNBOUND_DRAFT`, 행 수 불변. 시험에서는 executable 승격과 ready 전환도 거부(400/422) | 같은 파일 §4, `an_imported_draft_with_unresolved_reasons_cannot_execute` |
+| 4 | 필수 조건이 빠진 작업의 실행 차단 | 초안 배정 422 `UNBOUND_DRAFT`, 행 수 불변. 시험에서는 미해결 사유가 남은 초안의 executable 승격(422 `UNBOUND_DRAFT`)과 ready 전환(400)도 거부 | 같은 파일 §4, `an_imported_draft_with_unresolved_reasons_cannot_execute` |
 | 5 | Notion 연결 실패 시 DB 보존 | REST API에 도달하지 못하면 exit 2이고 코디네이터에 아무것도 보내지 않는다. 행 수 불변. 모의 서버의 500·404도 오류이며 토큰은 오류에 나오지 않는다 | 같은 파일 §5, `notion_failures_are_errors_and_never_leak_the_token` |
 | 6 | 02-04 준비 후 실제 개발 세션 | **미실행.** X-02로 분리했다. 선행 02-04 미수용, 모델 예산 미승인, 원 작업 큐 선행 미해제 | §5 |
 
@@ -116,3 +116,13 @@
 | S5 P3 §2의 경로 무관 표현 | 교정 | — |
 | S6 P3 보관한 검토 파일의 큐 상태 표기 | 보관본의 그 인용 한 줄을 가리고 가린 사실을 그 자리에 적었다 | — |
 | S7 P3 정책 개정 뒤 이전 digest의 판정은 선행 증거가 아님 | 사실을 적어 둔다. 영속 DB에는 판정·배정이 0건이라 지금 영향은 없다. 정책을 바꿀 때마다 기존 판정을 새 digest로 다시 받아야 선행 조건이 열린다(G1 그대로) | — |
+
+## 8. 재검토 2 반영(rev 4)
+
+| 지적 | 처분 | 시험·변이 |
+| --- | --- | --- |
+| T1 P2 가져오기 스프린트가 executable이 될 길이 없음(가져오기는 draft만, `/v0/sprints`는 전부 409) | 교정. 최신 가져오기에서 파생한 명세(같은 작업·같은 `notion_page` 출처 digest)는 `/v0/sprints`로 등록할 수 있다. 한도·준비 상태를 바인딩해 executable로 올리는 경로다. 작업이나 출처가 다르면 409 | `an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source`, X13·X14 |
+| T2 P3 형식 오류보다 소유 409가 먼저, 문서 미반영 | 교정. 소유 검사는 형식 검사를 통과한 같은 repo 명세에만 적용된다(형식 오류 400). OpenAPI registerSprint·import 설명과 보고 §3 문구를 고쳤다 | 같은 시험 |
+| T3 P3 예약 sprint_id·상한 조건의 시험 부재 | 시험 추가. 변환 경로의 소유 검사는 예약 규칙 때문에 도달할 수 없어 제거하고, 그 사실을 코드 주석에 적었다 | `a_binding_sprint_id_is_reserved_against_imports`, `only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling`, X15~X17 |
+| T4 P3 새로 보관한 검토의 큐 상태 토큰 인용 | 그 셀의 토큰 인용만 가리고 가린 사실을 그 자리에 적었다 | — |
+| T5 P3 다른 repo에 가져오기 출처가 드러남 | 교정. 다른 repo의 명세는 소유 검사 전에 `SPRINT_REPO_CONFLICT`로 끝난다 | 같은 시험 |

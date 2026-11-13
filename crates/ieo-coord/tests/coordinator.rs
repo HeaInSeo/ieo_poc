@@ -2167,19 +2167,15 @@ fn an_imported_draft_with_unresolved_reasons_cannot_execute() {
                 "sprint_id": "POCX-T01", "sprint_revision": 1, "task_id": "11-01", "target_sha": SHA1,
                 "expected_current": null}));
     assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
-    // promoting the stored draft through /v0/sprints is refused: the sprint belongs to the
-    // import (review 38b671b S2); the import path itself only registers drafts
+    // promoting the stored draft as executable runs the binding check again and is refused
+    // while its limits are unbound and its reasons unresolved (01-07 UNBOUND_DRAFT)
     let (st, b) = e.post_k(
         "alice",
         "/v0/sprints?mode=executable",
         "promote-key-01",
         &spec,
     );
-    assert_eq!(
-        (st, code(&b)),
-        (409, "EVENT_CONTENT_CONFLICT".into()),
-        "{b}"
-    );
+    assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
     // flipping a copy to ready while reasons remain fails the format check (other sprint id)
     let mut ready = spec.clone();
     ready["registration_state"] = json!("ready");
@@ -2520,4 +2516,156 @@ fn an_import_owned_sprint_changes_only_through_imports() {
         "{b}"
     );
     assert_eq!(e.counts(), before);
+}
+
+// --- review 7a48a4f corrections ---
+
+/// The import's latest revision, re-registered as executable with bound limits and no reasons.
+fn derived_executable(e: &Env, sprint_id: &str) -> Value {
+    let rev = e
+        .get("alice", &format!("/v0/sprints/{sprint_id}/revisions/1"))
+        .1;
+    let mut s = rev["spec"].clone();
+    s["revision"] = json!(2);
+    s["registration_state"] = json!("ready");
+    s["target"]["repository_url"] = json!("https://example.invalid/repo-a");
+    s["limits"] = json!({"elapsed_seconds": 3600, "total_tokens": 100000, "correction_attempts": 1,
+                         "unresolved_reason": null});
+    s["unresolved_bindings"] = json!([]);
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    s
+}
+
+#[test]
+fn an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "alice",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    // T1: derived from the latest import (same tasks + notion source), limits bound → executable
+    let good = derived_executable(&e, "POCX-T01");
+    let mut changed = good.clone();
+    changed["tasks"][0]["exit_condition"] = json!("다른 종료 조건");
+    changed["digest"] = json!(ieo_spec::spec_digest(&changed));
+    let before = e.counts();
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-t1-02",
+        &changed,
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    let mut other_source = good.clone();
+    other_source["sources"] = json!([other_source["sources"][0].clone()]);
+    other_source["digest"] = json!(ieo_spec::spec_digest(&other_source));
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-t1-03",
+        &other_source,
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    assert_eq!(e.counts(), before);
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "promote-t1-01",
+        &good,
+    );
+    assert_eq!(
+        (st, b["mode"].clone(), b["revision"].clone()),
+        (201, json!("executable"), json!(2)),
+        "{b}"
+    );
+    // T2: a malformed body is a format error (400), not an ownership conflict
+    let mut bad = good.clone();
+    bad.as_object_mut().map(|m| m.remove("title"));
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints", "promote-t2-01", &bad).0,
+        400
+    );
+    // T5: another repo hits the repo rule first
+    let mut theirs = good.clone();
+    theirs["target"]["repo_id"] = json!("repo-b");
+    theirs["revision"] = json!(3);
+    theirs["digest"] = json!(ieo_spec::spec_digest(&theirs));
+    let (st, b) = e.post_k("carol", "/v0/sprints", "promote-t5-01", &theirs);
+    assert_eq!((st, code(&b)), (409, "SPRINT_REPO_CONFLICT".into()), "{b}");
+}
+
+#[test]
+fn a_binding_sprint_id_is_reserved_against_imports() {
+    let Some(e) = start() else { return };
+    // T3/Y1: HUM-01 is repo-a's binding sprint and does not exist yet
+    let (st, b) = e.post(
+        "alice",
+        "/v0/imports/notion",
+        &notion_import("HUM-01", 'a', json!([])),
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+}
+
+#[test]
+fn only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 0);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // T3/Y3: executable but not reviewed (ceiling 5) → ignored
+    let s6 = spec("repo-a", 6, 5);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "reg-key-y3", &s6)
+            .0,
+        201
+    );
+    // T3/Y4: reviewed but draft-only (ceiling 5) → ignored
+    let s7 = spec("repo-a", 7, 5);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=draft", "reg-key-y4", &s7)
+            .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/7/semantic-review",
+            &json!({"decision": "passed", "reason": "ok", "digest": s7["digest"]})
+        )
+        .0,
+        201
+    );
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(
+        (st, b["outcome"].clone()),
+        (202, json!("limit_reached")),
+        "{b}"
+    );
 }

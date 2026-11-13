@@ -586,7 +586,7 @@ fn register(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         let result = reevaluate(tx, stored)?;
         return ok(200, result);
     }
-    refuse_import_owned(tx, body["sprint_id"].as_str().unwrap_or_default())?;
+    guard_import_owned(tx, &body)?;
     let (status, result) = register_spec(tx, ctx, who, &body, mode)?;
     idempotent_store(
         tx,
@@ -629,8 +629,8 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         return ok(200, stored);
     }
     let b = &ctx.bindings[repo];
+    // a binding's sprint_id is reserved against imports, so this sprint is never import-owned
     let sprint_id = b["sprint_id"].as_str().unwrap_or_default().to_string();
-    refuse_import_owned(tx, &sprint_id)?;
     let (status, rec, registration) = convert_and_register(
         tx,
         ctx,
@@ -924,24 +924,47 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
     ok(status, result)
 }
 
-/// A sprint created by a Notion import is changed only through the import path (review 38b671b S2).
-fn refuse_import_owned(tx: &mut Transaction, sprint_id: &str) -> Result<(), Resp> {
-    let owned: bool = tx
-        .query_one(
-            "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE test_id = $1)",
-            &[&sprint_id],
-        )?
-        .get(0);
-    if owned {
-        return Err(one(
-            409,
-            "EVENT_CONTENT_CONFLICT",
-            "sprint_id",
-            "this sprint was created by a Notion import and changes only through that import",
-            "use another sprint_id or re-import the Notion task",
-        ));
+/// A sprint created by a Notion import (X-01) accepts a `/v0/sprints` registration only when the
+/// spec is derived from its latest import: the same tasks and the same `notion_page` source digest.
+/// That is how an imported draft becomes executable once its limits are bound and its reasons are
+/// resolved (review 7a48a4f T1); any other content → 409 (review 38b671b S2). Malformed bodies
+/// and other repos fall through to the normal checks (400 / `SPRINT_REPO_CONFLICT`, T2/T5).
+fn guard_import_owned(tx: &mut Transaction, spec: &Value) -> Result<(), Resp> {
+    let sid = spec["sprint_id"].as_str().unwrap_or_default();
+    let Some(row) = tx.query_opt(
+        "SELECT n.content_digest, s.repo_id, s.spec FROM notion_imports n
+           JOIN sprint_revisions s ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
+         WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1",
+        &[&sid],
+    )?
+    else {
+        return Ok(());
+    };
+    let digest: String = row.get(0);
+    let owner: String = row.get(1);
+    let imported: Value = row.get(2);
+    if spec["target"]["repo_id"].as_str() != Some(owner.as_str())
+        || !ieo_spec::schema::format_rejections(ieo_spec::schema::sprint_spec_validator(), spec)
+            .is_empty()
+    {
+        return Ok(());
     }
-    Ok(())
+    let same_source = spec["sources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|x| x["kind"] == "notion_page" && x["digest"].as_str() == Some(digest.as_str()));
+    if same_source && spec["tasks"] == imported["tasks"] {
+        return Ok(());
+    }
+    Err(one(
+        409,
+        "EVENT_CONTENT_CONFLICT",
+        "sprint_id",
+        "this sprint was created by a Notion import; only a spec derived from its latest import \
+         (same tasks and notion_page source) may be registered here",
+        "re-import the Notion task, or keep its tasks and source and bind only limits/readiness",
+    ))
 }
 
 /// Per-request additions to a repo binding (Notion import, X-01).

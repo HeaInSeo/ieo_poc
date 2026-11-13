@@ -8,8 +8,8 @@ info:
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
     0.7.0 (X-01): Notion task import as a draft sprint (`POST /v0/imports/notion`, additive); behaviour change in
-    issueAssignment: a running assignment's next generation may stay on its revision (pin), and sprints owned by a
-    Notion import refuse `registerSprint`/`convertHumanInput`.
+    issueAssignment: a running assignment's next generation may stay on its revision (pin); registerSprint for a
+    sprint created by a Notion import accepts only a spec derived from its latest import.
     0.5.0 (L08, not backward compatible with 0.4.0 clients): RegistrationResult state SUPERSEDED + superseded_by,
     codes REVISION_SUPERSEDED and ASSIGNMENT_SHA_MISMATCH, required ClaimReceipt disposition fields.
     - Registration acceptance is intake for semantic review, not execution intake or completion.
@@ -43,6 +43,8 @@ paths:
         `mode=executable` goes through the binding check again (01-07 rule).
         A sprint_id belongs to the repo of its first registered revision: a revision whose `target.repo_id`
         differs → 409 `SPRINT_REPO_CONFLICT` (policy RG2).
+        A sprint created by a Notion import (X-01) accepts only a spec derived from its latest import (same tasks and
+        `notion_page` source digest); other content → 409 `EVENT_CONTENT_CONFLICT`.
         Only the latest registered revision of a sprint is active (01-07 rev 3). After a newer revision
         exists, a new registration of an older revision (any mode) and an executable promotion of an
         older revision stored as draft → 409 `REVISION_SUPERSEDED`. An identical re-submission of an older
@@ -133,8 +135,11 @@ paths:
         import (another repo → 409 without stored content). A `test_id` that names an existing sprint not created
         by a Notion import → 409 `EVENT_CONTENT_CONFLICT`; a `test_id` equal to the Notion task ID → 400.
         Content that returns to an earlier digest (A→B→A) is a replay of that earlier import, not a new revision.
-        A `test_id` may not be a binding's `sprint_id` (reserved for human input conversion). A sprint created by an
-        import changes only through imports: `registerSprint`/`convertHumanInput` for it → 409 `EVENT_CONTENT_CONFLICT`. A new test sprint takes the first number of the
+        A `test_id` may not be a binding's `sprint_id` (reserved for human input conversion, so `convertHumanInput`
+        never writes an imported sprint). `registerSprint` for an imported sprint accepts only a spec derived from its
+        latest import (same tasks and the same `notion_page` source digest) — the way to bind limits and make it
+        executable; other content → 409 `EVENT_CONTENT_CONFLICT` (format errors stay 400, another repo
+        `SPRINT_REPO_CONFLICT`). A new test sprint takes the first number of the
         binding's `import_sprint_numbers` that no registered task uses; none free → 422 `UNBOUND_DRAFT`.
         Nothing is written to Notion. An assignment already running keeps its revision; only its own next
         generation may continue on that revision after a newer one is registered.
