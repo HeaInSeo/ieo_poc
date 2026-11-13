@@ -1,14 +1,17 @@
-# X-01 mutants at commit 530b5d118f06291aff071272e79ba14b54bd0b23 · 2026-11-13T11:56:08Z · full 'cargo test --locked --all-targets' per mutant · files restored by git checkout
+# X-01 mutants at commit 68be8db6dbaf0c015df04b604b74950849a6b783 · 2026-11-13T12:07:40Z · full 'cargo test --locked --all-targets' per mutant · files restored by git checkout
 X1 import replay disabled (same content re-registers): killed ['an_import_replay_answers_only_within_its_repo', 'notion_import_registers_a_draft_once_and_revises_on_change']
-X2 running assignment not pinned to its revision: killed ['a_running_assignment_stays_on_its_revision', 'a_pinned_continuation_obeys_the_latest_attempt_ceiling']
+X2 running assignment not pinned to its revision: killed ['a_draft_revision_never_changes_a_running_execution', 'a_running_assignment_stays_on_its_revision', 'a_pinned_continuation_obeys_the_latest_attempt_ceiling', 'a_draft_with_unbound_limits_does_not_block_a_running_execution']
 X3 own earlier revision treated as another sprint: killed ['converting_a_sprint_again_is_a_new_revision_not_a_task_conflict', 'import_sprint_numbers_and_own_revisions_do_not_conflict', 'notion_import_registers_a_draft_once_and_revises_on_change']
 X4 importer ignores the Notion queue section: killed ['queue_gates_become_unresolved_reasons']
 X5 another page may reuse a test_id: killed ['notion_import_registers_a_draft_once_and_revises_on_change']
 X6 importer's unresolved reasons dropped: killed ['notion_import_registers_a_draft_once_and_revises_on_change']
 X7 snapshot tampering not detected: killed ['snapshot_round_trips_and_detects_tampering']
 X8 Notion source not recorded on the spec: killed ['notion_import_registers_a_draft_once_and_revises_on_change']
-X9 existing non-import sprint may be taken over (review R1): killed ['a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id']
 X10 replay answers another repo (review R2): killed ['an_import_replay_answers_only_within_its_repo']
 X11 pinned continuation ignores latest ceiling (review R3): killed ['a_pinned_continuation_obeys_the_latest_attempt_ceiling']
+X12 a draft revision sets a pinned run's ceiling (review S1): killed ['a_draft_with_unbound_limits_does_not_block_a_running_execution', 'a_draft_revision_never_changes_a_running_execution']
+X13 import-owned sprint registrable elsewhere (review S2): killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'an_import_owned_sprint_changes_only_through_imports']
+# X9's pattern no longer matched after the S2 change; re-targeted and run at the same commit:
+X9 existing non-import sprint may be taken over (review R1): killed ['a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id']
 dirty after run: none
-# result: 11 of 11 killed
+# result: 13 of 13 killed
