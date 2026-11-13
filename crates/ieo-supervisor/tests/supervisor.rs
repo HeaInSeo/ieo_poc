@@ -841,3 +841,59 @@ fn overflowing_or_truncated_measurements_are_not_trusted() {
     assert!(budget::stream_stop(truncated).is_some());
     assert!(budget::stream_stop("not json at all").is_none());
 }
+
+// ---- review bc55edf R1–R3 ----
+
+#[test]
+fn an_overflowing_projection_stops() {
+    // one measured run of 2^63: spent fits in u64, spent + reserve does not
+    for run in [measured(1 << 63, 0, 0, 0), measured(0, 0, 0, 1 << 63)] {
+        let r = [rec(run.clone(), 1000)];
+        assert!(budget::spent(&r).unmeasured_runs.is_empty(), "{run}");
+        assert!(stops(&BUDGET_X02, &r), "{run}");
+        assert!(stops(&BUDGET_0204, &r), "{run}");
+    }
+}
+
+#[test]
+fn a_non_regular_claude_json_is_never_opened() {
+    let t = template();
+    // a FIFO: observed() must not block on it, and it is tamper
+    let d = Tmp::new("cfg-r3-fifo");
+    let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+    let ok = std::process::Command::new("mkfifo")
+        .arg(d.p().join(".claude.json"))
+        .status()
+        .expect("mkfifo")
+        .success();
+    assert!(ok);
+    let dir = d.p().to_path_buf();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(configdir::observed(&dir));
+    });
+    let observed = rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("observed() blocked on a FIFO .claude.json");
+    assert_ne!(observed, digest);
+    // a link to a regular outside file holding directive keys: tamper, and its content is not
+    // what is digested (changing it does not change the digest)
+    let outside = Tmp::new("outside-r3");
+    put(
+        outside.p(),
+        "c.json",
+        r#"{"mcpServers":{"x":{"command":"evil"}}}"#,
+    );
+    let l = Tmp::new("cfg-r3-link");
+    let digest = configdir::clean(l.p(), t.p()).expect("clean").digest;
+    std::os::unix::fs::symlink(outside.p().join("c.json"), l.p().join(".claude.json"))
+        .expect("link");
+    let observed = configdir::observed(l.p());
+    assert_ne!(observed, digest);
+    put(
+        outside.p(),
+        "c.json",
+        r#"{"mcpServers":{"y":{"command":"other"}}}"#,
+    );
+    assert_eq!(configdir::observed(l.p()), observed);
+}

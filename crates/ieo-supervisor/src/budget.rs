@@ -267,7 +267,11 @@ pub fn next(budget: &Budget, records: &[Value], observation: Option<Observation<
         };
     }
     let reserve = s.largest_run_billable;
-    if s.billable_tokens + reserve > budget.billable_tokens {
+    // an overflowing projection is over the cap (review bc55edf R1)
+    if s.billable_tokens
+        .checked_add(reserve)
+        .is_none_or(|t| t > budget.billable_tokens)
+    {
         return Decision::Stop {
             reason: format!(
                 "billable tokens {} + reserve {} exceed the cap {}",
@@ -276,7 +280,10 @@ pub fn next(budget: &Budget, records: &[Value], observation: Option<Observation<
         };
     }
     let reserve_cr = s.largest_run_cache_read;
-    if s.cache_read_tokens + reserve_cr > budget.cache_read_tokens {
+    if s.cache_read_tokens
+        .checked_add(reserve_cr)
+        .is_none_or(|t| t > budget.cache_read_tokens)
+    {
         return Decision::Stop {
             reason: format!(
                 "cache_read {} + reserve {} exceed the cap {}",
