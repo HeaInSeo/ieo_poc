@@ -1,0 +1,26 @@
+# X-01 live check · commit fbfb685 · 2026-11-13T09:41:01Z · coordinator 127.0.0.1:58090 · DB ieo-poc-db (persistent, bind mount)
+## 0. before
+0 revisions, 0 imports, 0 history, 0 assignments
+## 1. real Notion task (connector snapshot of OP-OCI-RAC-OC08-20261018, page 3fd86e6dd1d181a3a9cace91920adac0, digest 3f8a300fcae5d319ec4f952c3ce2c51912f4fe2593447c008e3c93b46ed7292b) → draft
+exit=0
+{"http": 201, "test_id": "POCX-SORI-OC08-T01", "replay": false, "revision": 1, "state": "ACCEPTED_FOR_SEMANTIC_REVIEW", "mode": "draft", "spec_digest": "91ed78ddd5d21e63", "unresolved_n": 5, "refusal": null}
+1 revisions, 1 imports, 2 history, 0 assignments
+## 2. same input again → replay, no new rows
+exit=0
+{"http": 200, "test_id": "POCX-SORI-OC08-T01", "replay": true, "revision": 1, "state": "ACCEPTED_FOR_SEMANTIC_REVIEW", "mode": "draft", "spec_digest": "91ed78ddd5d21e63", "unresolved_n": 5, "refusal": null}
+1 revisions, 1 imports, 2 history, 0 assignments
+## 3. source change (SIMULATED: private copy of the snapshot with one property edited; Notion itself was not modified) → revision 2, revision 1 kept
+exit=0
+{"http": 201, "test_id": "POCX-SORI-OC08-T01", "replay": false, "revision": 2, "state": "ACCEPTED_FOR_SEMANTIC_REVIEW", "mode": "draft", "spec_digest": "e5516fc8369ccc68", "unresolved_n": 5, "refusal": null}
+2 revisions, 2 imports, 4 history, 0 assignments
+$ revision 1 still stored:
+1|draft|draft|pending_semantic_review|91ed78ddd5d21e63
+2|draft|draft|pending_semantic_review|e5516fc8369ccc68
+## 4. execution blocked: assignment of the draft
+{"rejections":[{"code":"UNBOUND_DRAFT","correction":"register it with mode=executable","field":"sprint_revision","message":"the revision is registered as draft only","retryable_after_edit":true}]}  -> HTTP 422
+
+2 revisions, 2 imports, 4 history, 0 assignments
+## 5. Notion read failure (REST API unreachable) → nothing sent, DB unchanged
+exit=2
+ieo-notion: Notion API /v1/pages/3fd86e6dd1d181a3a9cace91920adac0 unreachable: Connection Failed
+2 revisions, 2 imports, 4 history, 0 assignments

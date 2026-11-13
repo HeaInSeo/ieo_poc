@@ -1,0 +1,9 @@
+# target repo test branch · 2026-11-13T09:46:14Z
+repo: https://github.com/HeaInSeo/sori (default branch: master, gh api)
+existing workspace /opt/go/src/github.com/HeaInSeo/sori: inspected only (branch master, clean); not used for the test
+test clone: fresh git clone into <private data dir>/targets/sori
+base SHA (origin/master at branch time): 2fa7f5e12fa4474b194acf0d6e1a0273666642c1
+branch: poc/POCX-SORI-OC08-T01 pushed; remote ref: 2fa7f5e12fa4474b194acf0d6e1a0273666642c1	refs/heads/poc/POCX-SORI-OC08-T01
+commits beyond base: 0 (no development session has run; X-02 needs 02-04 and an approved model budget)
+pull request: none opened (the Sori queue allows one modifying PR at a time; PR #48 is open and holds the Sori slot)
+overlap check: PR #48 changes internal/admininit/*, jobledger/*; OC08 targets chunked/validate.go (ValidateIndex) — no file overlap

@@ -1,0 +1,11 @@
+# X-01 mutants at commit ce30341 (code identical to the evidence commit; the later commit adds report files only) · full 'cargo test --locked --all-targets' per mutant · files restored by git checkout
+X1 import replay disabled (same content re-registers): killed ['notion_import_registers_a_draft_once_and_revises_on_change']
+X2 running assignment not pinned to its revision: killed ['a_running_assignment_stays_on_its_revision']
+X3 own earlier revision treated as another sprint: killed ['converting_a_sprint_again_is_a_new_revision_not_a_task_conflict', 'import_sprint_numbers_and_own_revisions_do_not_conflict', 'notion_import_registers_a_draft_once_and_revises_on_change']
+X4 importer ignores the Notion queue section: killed ['queue_gates_become_unresolved_reasons']
+X5 another page may reuse a test_id: killed ['notion_import_registers_a_draft_once_and_revises_on_change']
+X6 importer's unresolved reasons dropped: killed ['notion_import_registers_a_draft_once_and_revises_on_change']
+X7 snapshot tampering not detected: killed ['snapshot_round_trips_and_detects_tampering']
+X8 Notion source not recorded on the spec: killed ['notion_import_registers_a_draft_once_and_revises_on_change']
+dirty after run: none
+# result: 8 of 8 killed
