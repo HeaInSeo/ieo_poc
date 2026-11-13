@@ -446,12 +446,13 @@ fn one_running_process_per_session() {
         Some(LockError::Running { pid: None })
     );
     drop(held);
-    // a holder in another process blocks; its death releases the lock
-    let mut child = std::process::Command::new("flock")
+    // a holder in another process blocks; its death releases the lock. The holder is one
+    // process (sh execs into sleep with the locked descriptor), so killing it closes the fd.
+    let mut child = std::process::Command::new("sh")
+        .args(["-c", "exec 9<>\"$0\" && flock 9 && exec sleep 30"])
         .arg(&path)
-        .args(["sleep", "30"])
         .spawn()
-        .expect("flock(1)");
+        .expect("holder");
     let t0 = std::time::Instant::now();
     while SessionLock::acquire(d.p(), SID, me).is_ok() {
         assert!(t0.elapsed().as_secs() < 10, "child never took the lock");
