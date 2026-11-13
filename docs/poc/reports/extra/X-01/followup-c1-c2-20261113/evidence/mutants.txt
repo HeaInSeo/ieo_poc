@@ -1,11 +1,14 @@
-# X-01 C2 mutants at commit 85f689c7d0f2f4e8add17a6d108a996bbe354cee · 2026-11-13T13:25:19Z
-C1 registration ignores the import gate: killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_user_exception_applies_only_to_its_test_and_repo', 'c2_gated_import_cannot_execute_even_with_reasons_removed', 'c2_claimed_release_without_a_trusted_record_is_refused']
-C2 assignment ignores the import gate: killed ['an_imported_draft_with_unresolved_reasons_cannot_execute']
+# X-01 C2 mutants at commit d699998738f14b497882fcf90959f45da72a1bfe · 2026-11-13T13:45:49Z
+C1 registration ignores the Notion gate: killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_a_user_exception_applies_only_to_its_test_and_repo', 'c2_an_exception_does_not_lift_missing_inputs']
+C2 assignment ignores the Notion gate: killed ['c2_a_re_gating_import_stops_a_running_assignment']
 C3 missing facts do not block: killed ['c2_an_exception_does_not_lift_missing_inputs']
-C4 an exception applies to any test/repo: killed ['c2_a_user_exception_applies_only_to_its_test_and_repo']
-C5 registrars may write import records: killed ['a_binding_sprint_id_is_reserved_against_imports', 'an_import_replay_answers_only_within_its_repo', 'an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source', 'an_import_owned_sprint_changes_only_through_imports']
+C4 an exception applies to any test sprint of the repo: SURVIVED []
+C5 registrars may write import records: killed ['a_binding_sprint_id_is_reserved_against_imports', 'an_import_owned_sprint_changes_only_through_imports', 'an_import_replay_answers_only_within_its_repo', 'an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source']
 C6 legacy rows: unknown reasons not fail-closed: killed ['api::tests::legacy_reasons_split_fail_closed']
 C7 importer files a gate as a missing fact: killed ['queue_gates_become_unresolved_reasons']
-C8 gates stored empty (release forged): killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_user_exception_applies_only_to_its_test_and_repo', 'c2_claimed_release_without_a_trusted_record_is_refused', 'c2_gated_import_cannot_execute_even_with_reasons_removed']
+C8 gates stored empty (release forged): killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_a_re_gating_import_stops_a_running_assignment', 'c2_a_user_exception_applies_only_to_its_test_and_repo']
+C9 copies under another sprint id not recognised (review F1): killed ['c2_a_copy_under_another_sprint_id_is_still_gated']
+C10 replay of an earlier content state (review F2): killed ['c2_content_returning_to_a_gated_state_gates_again', 'notion_import_registers_a_draft_once_and_revises_on_change']
+C11 exception not bound to the approved content (review F4): killed ['c2_an_exception_covers_only_the_content_it_approved']
 dirty after run: none
-# result: 8 of 8 killed
+# result: 10 of 11 killed. C4 is equivalent: since review 9a421b7 F4 an exception is bound to the content digest of its own test sprint's latest import, and the gate also requires the import's test_id to equal the sprint being run, so an exception of another test sprint can never match even without the test_id filter in the query (defence in depth).

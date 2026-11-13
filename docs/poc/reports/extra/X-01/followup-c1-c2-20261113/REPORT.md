@@ -54,14 +54,15 @@
 | 예외가 있어도 필수 기술 입력 부족 | 실행 차단 | 409 `IMPORT_INCOMPLETE`(`c2_an_exception_does_not_lift_…`) |
 | 정당한 해제·검토·필수 조건 충족 | 정상 실행 허용 | gates 없는 새 가져오기 → 파생 executable 201 → 의미 검토 201 → 배정 201(`c2_a_trusted_release_…`). 이후 내용이 차단 상태로 돌아가면 다시 409(`c2_content_returning_…`) |
 
-허용 경로 두 가지(예외, 신뢰된 해제)가 실제로 통과하므로 항상 거부하는 구현이 아니다. 변이 11개를 모두 검출했다: [mutants.txt](evidence/mutants.txt). 시험 결과는 [cargo-test.log](evidence/cargo-test.log).
+허용 경로 두 가지(예외, 신뢰된 해제)가 실제로 통과하므로 항상 거부하는 구현이 아니다. 차단 내용이 다시 생기면 실행 중 배정의 다음 세대도 409다(`c2_a_re_gating_…`). 변이 11개 중 10개를 검출했다. C4는 동등 변이다: 예외는 자기 시험 스프린트 가져오기의 내용 digest에 묶여 있어, 질의의 시험 ID 조건을 빼도 다른 시험의 예외는 일치할 수 없다(이중 방어). 근거: [mutants.txt](evidence/mutants.txt). 시험은 175건 통과: [cargo-test.log](evidence/cargo-test.log).
 
 ### 2.5 영속 DB에 적용(OC08 시험)
 
-배포 전 `pg_dump`로 백업했다. 이관은 열 추가, 기본 키를 (page, revision)으로 변경, 예외에 승인 내용 digest 추가다. C2 이전 OC08 행 2건은 그대로 두었다. 결과는 [c2-live.txt](evidence/c2-live.txt)에 있다.
+배포 전 `pg_dump`로 백업했다. 이관은 열 추가, 기본 키를 (page, revision)으로 변경, 예외에 승인 내용 digest 추가다. C2 이전 OC08 행 2건은 그대로 두었다. 결과는 [c2-live.txt](evidence/c2-live.txt)와 검토 반영 뒤 재확인 [c2-live-r2.txt](evidence/c2-live-r2.txt)에 있다.
 - 예외 없이 사유를 지운 파생 executable 명세는 409 `IMPORT_GATED`이고 행은 바뀌지 않았다.
 - 결정 ③을 user 승인 자격으로 별도 예외에 기록했다(201). 범위는 기록으로 남긴 `poc/POCX-SORI-OC08-T01`, 기준 SHA `2fa7f5e1…`, 기본 브랜치 병합·배포 없음, 원 작업 담당·상태·claim·차단 사유 유지다. 첫 검토 전에 기록한 예외 1건에는 승인 내용 digest가 없다. 이 행은 이관 뒤 일치하지 않아(닫힌 실패) 효력이 없고, 같은 결정으로 digest를 가진 예외를 새로 기록했다(§c2-live 재확인).
 - 가져오기 service 자격은 예외를, 승인 자격은 가져오기를 할 수 없다(각 403).
+- 재확인 결과, 시험 스프린트의 최신 가져오기는 X-01 당시의 **모의 변경**(revision 2)이었다. 그래서 C1의 원문 수집본(실제 내용, digest `3f8a300f…`)을 다시 가져왔다. 되돌림 규칙에 따라 revision 3이 됐고 gates 3·missing 0이 저장됐다. 결정 ③의 예외는 이 실제 내용 digest에 묶어 `EX-POCX-SORI-OC08-T01-20261113-r3`으로 다시 기록했다. 앞의 두 예외(digest 없음, 모의 내용)는 추가 전용 기록으로 남지만 일치하지 않아 효력이 없다.
 - Notion 원 작업은 바꾸지 않았다. 실행용 executable revision 등록은 X-02 준비 단계에서 한다.
 
 ## 3. 독립 검토 반영(rev 2)
