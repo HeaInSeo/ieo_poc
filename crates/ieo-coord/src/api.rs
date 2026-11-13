@@ -1067,8 +1067,8 @@ fn page_ids_in(v: &Value, out: &mut Vec<String>) {
 /// X-01 C2: the execution gate, from server records only — never from spec text a registrar can
 /// edit. The Notion pages concerned are (1) those imported for this sprint, (2) every imported page
 /// whose id appears in any field of any source, whatever its `kind` or digest (review 7afd4d1
-/// G1), and (3) every imported page whose content digest a source cites, unless a page that
-/// source names was itself imported with that digest (review e908a8c H1). A copy whose sources
+/// G1), and (3) every imported page whose content digest a source cites, unless the latest
+/// import of a page that source names carries that digest (review e908a8c H1, aa38041 I1). A copy whose sources
 /// no longer cite the gated page's id nor its imported content digest — both dropped, or both
 /// rewritten (including to another imported page's id and digest) — is not recognised; it rests
 /// on the registrar and the semantic review. "Latest
@@ -1103,15 +1103,18 @@ fn notion_gate(
             .iter()
             .map(|r| r.get(0))
             .collect();
-        // the cited content digest also decides, unless one of the named pages itself was
-        // imported with it (review e908a8c H1: a reference rewritten to another imported page
+        // the cited content digest also decides, unless the latest import of one of the named
+        // pages carries it (review e908a8c H1: a reference rewritten to another imported page
         // must not hide the page whose content is cited; review 7afd4d1 G2: identical content
-        // of a page the source names does not pull in other pages)
+        // of a page the source names does not pull in other pages; review aa38041 I1: only the
+        // named page's latest import counts, not content it carried once)
         let digest = source["digest"].as_str().unwrap_or_default().to_string();
         let carried: bool = !named.is_empty()
             && tx
                 .query_one(
-                    "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE page_id = ANY($1) AND content_digest = $2)",
+                    "SELECT EXISTS (SELECT 1 FROM (SELECT DISTINCT ON (page_id) content_digest FROM notion_imports
+                       WHERE page_id = ANY($1) ORDER BY page_id, imported_at DESC, sprint_revision DESC) l
+                     WHERE l.content_digest = $2)",
                     &[&named, &digest],
                 )?
                 .get(0);
