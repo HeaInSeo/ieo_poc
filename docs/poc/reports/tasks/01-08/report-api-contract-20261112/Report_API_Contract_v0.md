@@ -1,6 +1,6 @@
 # 01-08 · 진행 보고 v0 · 등록/조회 API 계약
 
-2026-11-12 KST · 계획 v1.3.3 · contract_revision 4 · 문서 revision 3(2026-11-12, 02-03 선행 교정: 검수 후속 N1 — 합법적인 옛 배정의 늦은 결과 보존·현재 판정 제외, 멱등 재조회와 새 stale 요청 구분. [사용자 지시](../../../../User_Decisions_2026-11-12_0103.md)) · revision 2(독립 검토 8637403 reject F1~F12 반영) · 선행 01-07([등록 검사 계약](../../01-07/spec-contract-20261112/Registration_Contract_v0.md)).
+2026-11-12 KST · 계획 v1.3.3 · contract_revision 4 · 문서 revision 4(2026-11-13, 02-03: 검수 후속 01-08 N2 — 완료 표현이 확인된 범위와 미완료 범위를 모두 쓴다. PR #10 검토 N1·N3·N4 — 검사 순서·409 목록의 `ASSIGNMENT_SHA_MISMATCH`, 재전송 영수증 필드 관계, 현재 판정 입력의 시점. 구현 `crates/ieo-coord`) · revision 3(2026-11-12, 02-03 선행 교정: 검수 후속 N1 — 합법적인 옛 배정의 늦은 결과 보존·현재 판정 제외, 멱등 재조회와 새 stale 요청 구분. [사용자 지시](../../../../User_Decisions_2026-11-12_0103.md)) · revision 2(독립 검토 8637403 reject F1~F12 반영) · 선행 01-07([등록 검사 계약](../../01-07/spec-contract-20261112/Registration_Contract_v0.md)).
 
 | 구성 | 정본 | 이번 회차 |
 | --- | --- | --- |
@@ -19,11 +19,11 @@
 | 코디네이터 → 사람/클라이언트 (`GET …/state`, `GET …/events`) | `coordinator_to_client` | **verified** | 코디네이터 | `coordinator_verdict`, `decision_request` |
 
 - 에이전트 자격은 (repo_id, role) 하나에 묶이고 `agent:*` 범위만 가진다. 본문의 `actor.name`·라벨은 인가 근거가 아니다. 역할 불일치 → 403 `ROLE_MISMATCH`, verified/코디네이터 보고 제출 → 403 `VERIFIED_FROM_AGENT_DENIED`, 다른 repo → 403 `REPO_SCOPE_DENIED`, `/v0/sprints*` 조회 → 403 `AGENT_READ_DENIED`(역할끼리 서로의 claim을 보지 못함, §1.2). 거부 시 상태 변화·사건 0건.
-- **같은 ID 재전송을 배정 검사보다 먼저** 본다(rev 3). 조회 범위는 자격의 (repo, role)이며 다른 범위의 ID는 보지 않는다(존재 노출 없음). 재전송 영수증의 `counts_for_current_judgment`는 응답 시점에 다시 계산한다. 저장된 claim(`event_id`·`event_revision`)·재현 요청(`request_id`)과 내용이 같으면 200 재조회로 저장 결과를 돌려주고 상태를 바꾸지 않는다(배정이 그 사이 바뀌었어도 같음, 재현은 다시 대기열에 넣지 않음). 내용이 다르면 409 `EVENT_CONTENT_CONFLICT`.
-- 새 claim: `assignment_id`·`generation`이 그 (repo, role)의 **현재 배정**이면 202 `disposition=current`(현재 판정 입력 가능). 코디네이터가 같은 (repo, role)에 **실제로 발급했던 옛 배정·세대**면 202 `disposition=preserved_late`: 그 배정과 코디네이터 DB에 기록된 그 배정의 SHA에 귀속해 보존하고, 현재 판정에 쓰지 않으며 옛 배정을 다시 활성화하지 않는다(§1.9). 발급된 적 없는 배정·세대면 409 `STALE_ASSIGNMENT`. 본문에 `body.target_sha`가 있으면 그 배정에 코디네이터가 기록한 SHA와 같아야 하며 다르면 409 `ASSIGNMENT_SHA_MISMATCH`다(한 claim에 SHA 두 개 금지, rev 3 검토 반영).
-- 현재 판정(검토 최신성·완료 표현)의 입력은 `counts_for_current_judgment`가 참인 claim뿐이다. SHA만으로 거르지 않는다. 옛 세대가 현재와 같은 SHA를 가질 수 있기 때문이다.
+- **같은 ID 재전송을 배정 검사보다 먼저** 본다(rev 3). 조회 범위는 자격의 (repo, role)이며 다른 범위의 ID는 보지 않는다(존재 노출 없음). 재전송 영수증의 `counts_for_current_judgment`는 응답 시점에 다시 계산한다. 영수증의 `disposition`은 저장 당시 값(`current`/`preserved_late`)을 그대로 돌려주므로, 배정이 그 뒤 바뀌면 `disposition=current`이면서 `counts_for_current_judgment=false`일 수 있다(rev 4, PR #10 N3). 저장된 claim(`event_id`·`event_revision`)·재현 요청(`request_id`)과 내용이 같으면 200 재조회로 저장 결과를 돌려주고 상태를 바꾸지 않는다(배정이 그 사이 바뀌었어도 같음, 재현은 다시 대기열에 넣지 않음). 내용이 다르면 409 `EVENT_CONTENT_CONFLICT`.
+- 새 claim: `assignment_id`·`generation`이 그 (repo, role)의 **현재 배정**이면 202 `disposition=current`(현재 판정 입력 가능). 코디네이터가 같은 (repo, role)에 **실제로 발급했던 옛 배정·세대**면 202 `disposition=preserved_late`: 그 배정과 코디네이터 DB에 기록된 그 배정의 SHA에 귀속해 보존하고, 현재 판정에 쓰지 않으며 옛 배정을 다시 활성화하지 않는다(§1.9). 발급된 적 없는 배정·세대면 409 `STALE_ASSIGNMENT`. 본문에 `body.target_sha`가 있으면 그 배정에 코디네이터가 기록한 SHA와 같아야 하며 다르면 409 `ASSIGNMENT_SHA_MISMATCH`다(한 claim에 SHA 두 개 금지, rev 3 검토 반영). 본문 SHA가 `null`이면(`development_progress`가 `sha_unavailable_reason`과 함께 허용) 대조하지 않고 배정의 SHA에 귀속한다(rev 4).
+- 현재 판정(검토 최신성·완료 표현)의 입력은 `counts_for_current_judgment`가 참인 claim뿐이다. SHA만으로 거르지 않는다. 옛 세대가 현재와 같은 SHA를 가질 수 있기 때문이다. 이 값은 **판정 시점**에 다시 계산한다: 판정 시점의 현재 (`assignment_id`, `generation`)과 같은 claim만 입력이다. 접수 때 `current`였어도 그 뒤 세대가 바뀌었으면(같은 SHA라도) 입력이 아니다(rev 4, PR #10 N4, 02-03 시험 `review_inputs_are_current_independent_and_for_the_head`).
 - 새 재현 요청은 실행을 새로 시작하므로 **현재 배정과 그 배정의 SHA**만 받는다. 옛 배정·세대나 다른 SHA는 409 `STALE_ASSIGNMENT`.
-- 검사 순서(에이전트 경로, rev 3): 401(자격) → 403(범위·역할, 본문의 repo/channel/report_type만 읽음) → 200/409 같은 ID 재전송(동일성) → 배정 분류(현재·옛 발급이면 계속, 발급 이력 없음이면 409 `STALE_ASSIGNMENT`) → 400(형식) → 422(의미) → 202 저장(`current`/`preserved_late`). 클라이언트 등록 경로는 401 → 403 → 400 → 409 → 422 그대로다.
+- 검사 순서(에이전트 경로, rev 3): 401(자격) → 403(범위·역할, 본문의 repo/channel/report_type만 읽음) → 200/409 같은 ID 재전송(동일성) → 배정 분류(현재·옛 발급이면 계속, 발급 이력 없음이면 409 `STALE_ASSIGNMENT`) → 본문 SHA 대조(409 `ASSIGNMENT_SHA_MISMATCH`, 본문 SHA `null`이면 생략) → 400(형식) → 422(의미) → 202 저장(`current`/`preserved_late`). 클라이언트 등록 경로는 401 → 403 → 400 → 409 → 422 그대로다.
 - claim 저장(202)은 판정이 아니다. 완료 판정은 GitHub·현재 SHA·실행 증거 대조로 코디네이터가 하며 에이전트의 별도 완료 메시지를 필수 입력으로 요구하지 않는다(02-07).
 - `(event_id, event_revision)`이 멱등 키다. 같은 내용 재전송 200, 다른 내용 409 `EVENT_CONTENT_CONFLICT`.
 - `GET …/state`는 verified와 `latest_claims`를 **다른 필드**로 돌려 클라이언트가 claim을 판정으로 오인하지 못하게 한다. 외부 전달 상태(`pending/sent/unknown`)는 작업 판정과 별도 필드다.
@@ -37,7 +37,7 @@
 | `GET /v0/sprints/{id}/revisions/{rev}` | `sprints:read` | 불변 명세·digest·검토/접수 상태 | 401/403/404 |
 | `GET /v0/sprints/{id}/state` | `sprints:read` | verified 현재 상태, claim 별도, 마지막 관측 시각, 전달 상태 | 401/403/404 |
 | `GET /v0/sprints/{id}/events?cursor=&limit=` | `sprints:read` | 추가 전용 커밋 순서. `next_cursor`는 항상 마지막 반환 사건 뒤 위치(빈 페이지면 입력 위치), `has_more`. 이미 돌려준 사건은 바뀌지 않고, 가득 차지 않은 페이지는 이후 새 사건을 더 담을 수 있다 | 400 `INVALID_CURSOR`, 401/403/404 |
-| `POST /v0/agent/reports` | `agent:report`(repo, role 고정) | 202 저장(`current` 또는 `preserved_late`, 귀속 SHA·현재 판정 사용 여부 포함), 200 동일 재전송 | 403(위 §1), 409 `STALE_ASSIGNMENT`(발급 이력 없음)·`EVENT_CONTENT_CONFLICT`, 400/422 |
+| `POST /v0/agent/reports` | `agent:report`(repo, role 고정) | 202 저장(`current` 또는 `preserved_late`, 귀속 SHA·현재 판정 사용 여부 포함), 200 동일 재전송 | 403(위 §1), 409 `STALE_ASSIGNMENT`(발급 이력 없음)·`ASSIGNMENT_SHA_MISMATCH`(본문 SHA ≠ 배정 SHA)·`EVENT_CONTENT_CONFLICT`, 400/422 |
 | `POST /v0/agent/repro-requests`, `GET …/{request_id}` | `agent:repro`(repo, **guardrail만**; 조회도 같은 repo Guardrail만) | 202 대기열, 200 동일 재요청; 상태·실행기 이미지 digest·종료 코드·원본 로그 참조 | 403(개발 자격·다른 repo·클라이언트), 409 `STALE_ASSIGNMENT`(새 요청의 옛 배정·다른 SHA)·`EVENT_CONTENT_CONFLICT`, 400/422 |
 
 - 재현 요청은 01-02 계약 §2.1의 Guardrail 독립 재현 경로다. 코디네이터 소유·자격 없는 일회성 격리 실행기에서 대상 SHA로 실행하고 원본 로그를 Guardrail 입력 위치로 돌려준다. 실행 결과는 Guardrail claim의 증거이며 판정이 아니다. 실행기 구현 02-06, 검증 P07.
@@ -60,13 +60,13 @@
 
 **재알림 규칙**(`notification`): 처음 보는 사건은 알린다. 이전에 알린 revision 대비 다음이 바뀌면 다시 알린다: 단계, 운영 상태, 대기 사유, 다음 담당, 재개 조건, 결정의 필요 여부(새로 필요/철회)·질문·선택지·권고·시한·기본 조치, 일정(상태·기한·남은 작업·예상·지연 사유·지연 영향 작업), 역할 본문 판정(검토 의견·대상 SHA·발견, 증거 대조 결과, 막힌 이유), 증거·영향 작업·모르는 사실의 **집합**. `observed_at`·`next_check_at`·`event_revision`·목록 순서·`next_action` 문구만 바뀐 재관측은 DB에 남기고 알리지 않는다.
 
-**완료 표현**(`completion_summary`, 코디네이터가 확인한 사실에서 생성): 현재 SHA CI 통과 → 현재 SHA 독립 검토 승인 → 병합 → 병합 SHA의 main CI → 필수 산출물 → 후속 인수를 각각 따로 판정하고, 확인된 범위와 첫 미완료 범위를 쓴다. 모두 참일 때만 “작업 완료”다. 이전 SHA 승인은 현재 SHA 승인이 아니며 문구에 “현재 판정에 쓰지 않음”을 붙인다(`review_currency`). 외부 요청 결과 미확인은 성공·실패·미전송과 구분해 그대로 쓴다.
+**완료 표현**(`completion_summary`, 코디네이터가 확인한 사실에서 생성): 현재 SHA CI 통과 → 현재 SHA 독립 검토 승인 → 병합 → 병합 SHA의 main CI → 필수 산출물 → 후속 인수를 각각 따로 판정하고, 확인된 범위 **전부**와 미완료 범위 **전부**를 쓴다(rev 4, 검수 후속 N2: 앞 범위가 비어도 뒤의 확인된 범위, 예를 들어 현재 SHA 승인 없는 병합을 숨기지 않는다). 모두 참일 때만 “작업 완료”다. 이전 SHA 승인은 현재 SHA 승인이 아니며 문구에 “현재 판정에 쓰지 않음”을 붙인다(`review_currency`). 외부 요청 결과 미확인은 성공·실패·미전송과 구분해 그대로 쓴다.
 
 **설계 로그의 시험 입력 4개**(적합성 사례로 보존):
 
 | 입력 | 기대 해석 | 사례 |
 | --- | --- | --- |
-| 현재 커밋 CI 통과 + 이전 커밋 독립 승인 | `completion_summary`가 “현재 SHA … CI 통과까지만 확인. 미완료: 현재 SHA … 독립 검토 승인 (이전 SHA 승인 …은 현재 판정에 쓰지 않음)”을 생성, `REVIEW_PENDING`, 완료로 읽히지 않음 | `input1_…` |
+| 현재 커밋 CI 통과 + 이전 커밋 독립 승인 | `completion_summary`가 “현재 SHA … CI 통과 · …만 확인. 미완료: 현재 SHA … 독립 검토 승인 (이전 SHA 승인 …은 현재 판정에 쓰지 않음)”을 생성, `REVIEW_PENDING`, 완료로 읽히지 않음 | `input1_…` |
 | 외부 요청 응답 유실·원 결과 미확인 | 인계 보류, 담당이 원 요청 대조, 사용자 재전송 결정 불필요, 같은 요청 재전송 안 함 | `input2_…` |
 | 승인 일정 불가로 범위/일정 결정 필요 | 질문·선택지별 영향·권고와 이유·시한·미응답 조치를 읽을 수 있음 | `input3_…` |
 | 같은 사건 재관측 | 새 증거·영향 변화 없으면 추가 알림 0건; 새 증거/결정 필요/재개 조건 변화면 알림 | `input4_…` |

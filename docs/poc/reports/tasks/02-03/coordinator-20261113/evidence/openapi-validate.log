@@ -1,0 +1,4 @@
+# commit efad0ee1722bed118250c5388388e8c3f97dabf1
+$ openapi-spec-validator contracts/ieo-api-v0.openapi.yaml
+ieo-api-v0.openapi.yaml: OK
+EXIT=0

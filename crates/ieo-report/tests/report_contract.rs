@@ -625,7 +625,30 @@ fn completion_summary_scopes() {
     no_outputs.required_outputs_present = false;
     let t = completion_summary(&no_outputs);
     assert!(
-        t.contains("main CI 통과까지만 확인") && t.contains("미완료: 필수 산출물 확인"),
+        t.contains("main CI 통과 · 후속 작업 인수만 확인")
+            && t.contains("미완료: 필수 산출물 확인"),
+        "{t}"
+    );
+    // 01-08 N2: a merge without a current-SHA approval stays visible, and the gap is named.
+    let mut merged_unreviewed = all.clone();
+    merged_unreviewed.review = Some(ReviewCurrency::ReviewNeededOnCurrentSha {
+        stale_approvals: vec!["e".repeat(40)],
+    });
+    let t = completion_summary(&merged_unreviewed);
+    assert!(
+        t.contains(&format!("병합 {}", "d".repeat(7)))
+            && t.contains("미완료: 현재 SHA cccccc")
+            && t.contains("독립 검토 승인 (이전 SHA 승인 eeeeeee은 현재 판정에 쓰지 않음)")
+            && !t.starts_with("작업 완료"),
+        "{t}"
+    );
+    // every missing scope is listed, not only the first
+    let mut two_gaps = all.clone();
+    two_gaps.ci_passed_on_head = false;
+    two_gaps.main_ci_passed = false;
+    let t = completion_summary(&two_gaps);
+    assert!(
+        t.contains("미완료: 현재 SHA cccccc") && t.contains(" · 병합 SHA의 main CI 통과"),
         "{t}"
     );
     assert_eq!(

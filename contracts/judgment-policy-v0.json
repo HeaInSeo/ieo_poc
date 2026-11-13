@@ -1,0 +1,56 @@
+{
+  "policy_id": "ieo-judgment-policy",
+  "version": "0.4.0",
+  "freeze_item": "L07",
+  "source_decision": "docs/poc/User_Decisions_2026-11-12_0103.md D12",
+  "gap_sources": [
+    "docs/poc/reports/tasks/01-07/spec-contract-20261112/Registration_Contract_v0.md §4 G1-G7",
+    "docs/poc/reports/tasks/01-08/report-api-contract-20261112/Report_API_Contract_v0.md §5 RG2"
+  ],
+  "binding": "The coordinator pins this file by (policy_id, version, SHA-256 of the file bytes). It refuses to start when the file's digest differs from the pinned digest or when a rule_id below is not implemented. Every assignment and every verified judgment records the digest it was made under. Changing a rule means a new version and a new digest, reviewed independently.",
+  "numeric_values": "This policy sets no numeric limit. Limit values come only from the registered SprintSpec (limits.*), which executable registration already refuses while they are null (UNBOUND_DRAFT).",
+  "rules": [
+    {
+      "rule_id": "G1.prerequisite_evidence",
+      "gap": "G1",
+      "rule": "A prerequisite is met only by a verified coordinator_verdict stored by the coordinator for that task_id, judged against a revision whose definition of that task equals its definition in the sprint's latest revision. The definition is the fields a verdict depends on: outputs, acceptance, exit_condition, verification and requirement_ids. A change to any of them needs a new verdict; a change to status, evidence, estimate or references does not. required_state=accepted needs outcome=accepted. required_state=result_recorded accepts any verified verdict. Agent claims, status labels in a spec and verdicts made under a different policy digest never satisfy a prerequisite.",
+      "effect_when_unmet": "New assignment refused: 409 PREREQUISITE_UNMET, state unchanged."
+    },
+    {
+      "rule_id": "G2.sha_attribution",
+      "gap": "G2",
+      "rule": "The head SHA of a judgment is the target_sha the coordinator recorded for the current development assignment. The verdict judges the task and outputs of the sprint revision that assignment was issued from. CI and run evidence count only for that SHA. An approval counts only for that SHA. Merge evidence counts only when its head_sha is that SHA. Main CI counts only for the merge SHA named by that merge evidence. A SHA written in an agent body is never the source of attribution.",
+      "effect_when_unmet": "The scope is reported as not confirmed. It is never filled from another SHA."
+    },
+    {
+      "rule_id": "G3.independent_judgment",
+      "gap": "G3",
+      "rule": "Only a service principal with scope judge:verify records a verdict. Agent credentials never carry it. Review inputs are (a) guardrail_review claims whose (assignment_id, generation) is the current guardrail assignment at judgment time and whose target_sha is the head SHA, and (b) GitHub reviews at the head SHA whose reviewer differs from the change author: per reviewer the latest approved, changes_requested or dismissed review counts (a later commented review does not clear changes_requested; dismissed clears it), and reviews of other SHAs never count. The author string is supplied by the evidence service; verifying it against GitHub is the real collector's job. A semantic review of a sprint revision must come from a principal other than the one that registered it.",
+      "effect_when_unmet": "Verdict request 403. Self-review and non-current claims are excluded from the review scope."
+    },
+    {
+      "rule_id": "G4.cumulative_attempts",
+      "gap": "G4",
+      "rule": "Attempts are counted per (sprint_id, task_id, role) across all assignments and generations. Every generation issued after the first consumes one attempt. A retry without a change is also a new generation and also consumes one: retries and corrections share one ceiling, because no separate retry ceiling value has been decided and this policy invents none (interpretation, stricter than a separate counter). The ceiling is the registered spec's limits.correction_attempts. Re-issuing to a new assignment_id does not reset the counter.",
+      "effect_when_unmet": "See G5."
+    },
+    {
+      "rule_id": "G5.limit_reached",
+      "gap": "G5",
+      "rule": "When the next generation would exceed the ceiling, the coordinator issues no new generation. In the same transaction it records one decision_request (verified) and its outbox entry, and marks the task limit_reached. The current owner keeps the assignment. Nothing continues automatically until a user decision is recorded outside this policy.",
+      "effect_when_unmet": "409 LIMIT_REACHED for the refused generation. One decision_request is recorded per (task, role, ceiling value). If a newer revision changes the ceiling (up or down) to a value not asked before and the count exceeds it, a new decision_request is recorded. If that value was already asked, the answer is 409 LIMIT_REACHED and nothing changes."
+    },
+    {
+      "rule_id": "RG2.approval_scope",
+      "gap": "RG2",
+      "rule": "Object approval scope (not the decision-answer scope named RG2 in the 01-08 contract §5, which stays a field gap for the next contract revision because 02-03 records no decision answers). An approval covers exactly the object it names and nothing wider. A sprint_id belongs to the repo of its first registered revision; a revision naming another repo is refused (409 SPRINT_REPO_CONFLICT). A semantic review covers (sprint_id, revision, digest). An assignment covers (assignment_id, generation, target_sha). A verdict covers (task_id, head_sha, merged_sha). An approval never carries over to another revision, digest, generation or SHA.",
+      "effect_when_unmet": "The wider use is refused or reported as not confirmed."
+    },
+    {
+      "rule_id": "G7.exclusion_scope",
+      "gap": "G7",
+      "rule": "A verdict judges only the task's outputs with required=true. Items the human input marked out_of_scope, fields preserved_unrepresented by conversion, and optional outputs are never verdict inputs. A verdict never states them as done.",
+      "effect_when_unmet": "Not applicable. The excluded items are listed in the verdict as not judged."
+    }
+  ]
+}
