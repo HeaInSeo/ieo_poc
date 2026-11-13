@@ -970,8 +970,8 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
     let rev = registration["revision"].as_i64().unwrap_or_default();
     tx.execute(
         "INSERT INTO notion_imports (page_id, content_digest, test_id, url, last_edited_time,
-            source, sprint_revision, response, imported_by, gates, missing)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+            source, sprint_revision, response, imported_by, gates, missing, imported_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, clock_timestamp())",
         &[
             &page_id,
             &digest,
@@ -1005,7 +1005,7 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Re
     let Some(row) = tx.query_opt(
         "SELECT n.content_digest, s.repo_id, s.spec FROM notion_imports n
            JOIN sprint_revisions s ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
-         WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1",
+         WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1",
         &[&sid],
     )?
     else {
@@ -1067,9 +1067,13 @@ fn page_ids_in(v: &Value, out: &mut Vec<String>) {
 /// X-01 C2: the execution gate, from server records only — never from spec text a registrar can
 /// edit. The Notion pages concerned are (1) those imported for this sprint, (2) every imported page
 /// whose id appears in any field of any source, whatever its `kind` or digest (review 7afd4d1
-/// G1), and (3) for a source naming no imported page id, imported pages whose content digest it
-/// cites. Only a copy that drops or rewrites both the page reference and the digest is not
-/// recognised; it rests on the registrar and the semantic review. For each page the **latest**
+/// G1), and (3) every imported page whose content digest a source cites, unless a page that
+/// source names was itself imported with that digest (review e908a8c H1). A copy whose sources
+/// no longer cite the gated page's id nor its imported content digest — both dropped, or both
+/// rewritten (including to another imported page's id and digest) — is not recognised; it rests
+/// on the registrar and the semantic review. "Latest
+/// import" is ordered the same way everywhere: `imported_at` (stamped with `clock_timestamp()`
+/// after the registry lock), then revision (review e908a8c H2). For each page the **latest**
 /// import decides: missing facts always block (`IMPORT_INCOMPLETE`); queue gates block
 /// (`IMPORT_GATED`) unless a user-approved exception exists for exactly this test sprint, repo,
 /// page and that import's content digest. A later trusted import without gates is the release
@@ -1099,20 +1103,29 @@ fn notion_gate(
             .iter()
             .map(|r| r.get(0))
             .collect();
-        let found = if named.is_empty() {
-            // no page reference left: fall back to the cited content digest (any kind)
-            let digest = source["digest"].as_str().unwrap_or_default().to_string();
-            tx.query(
-                "SELECT DISTINCT page_id FROM notion_imports WHERE content_digest = $1",
-                &[&digest],
-            )?
-            .iter()
-            .map(|r| r.get(0))
-            .collect()
-        } else {
-            named
-        };
-        pages.extend(found);
+        // the cited content digest also decides, unless one of the named pages itself was
+        // imported with it (review e908a8c H1: a reference rewritten to another imported page
+        // must not hide the page whose content is cited; review 7afd4d1 G2: identical content
+        // of a page the source names does not pull in other pages)
+        let digest = source["digest"].as_str().unwrap_or_default().to_string();
+        let carried: bool = !named.is_empty()
+            && tx
+                .query_one(
+                    "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE page_id = ANY($1) AND content_digest = $2)",
+                    &[&named, &digest],
+                )?
+                .get(0);
+        pages.extend(named);
+        if !carried {
+            pages.extend(
+                tx.query(
+                    "SELECT DISTINCT page_id FROM notion_imports WHERE content_digest = $1",
+                    &[&digest],
+                )?
+                .iter()
+                .map(|r| r.get::<_, String>(0)),
+            );
+        }
     }
     pages.sort();
     pages.dedup();
@@ -1282,7 +1295,7 @@ fn record_exception(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
         .query_opt(
             "SELECT s.repo_id, n.content_digest, n.page_id FROM notion_imports n JOIN sprint_revisions s
                ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
-             WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1",
+             WHERE n.test_id = $1 ORDER BY n.imported_at DESC, n.sprint_revision DESC LIMIT 1",
             &[&test_id],
         )?
         .map(|r| (r.get(0), r.get(1), r.get(2)));

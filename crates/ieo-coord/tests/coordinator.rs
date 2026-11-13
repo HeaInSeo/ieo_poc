@@ -3403,3 +3403,136 @@ fn g4_migration_from_earlier_keys_keeps_a_page_imported_under_two_test_ids() {
         .get(0);
     assert_eq!(n, 0);
 }
+
+// --- review e908a8c H1–H3 ---
+
+#[test]
+fn h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content() {
+    let Some(e) = start() else { return };
+    const Q: &str = "fedcba9876543210fedcba9876543210";
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    // another page, released (no gates), with its own content
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &on_page(
+                notion_import_gated("POCX-T02", 'b', json!([]), json!([])),
+                Q
+            )
+        )
+        .0,
+        201
+    );
+    let q_url = format!("https://app.notion.com/p/Synthetic-Task-{Q}");
+    // the reference now names Q, the cited content is still P's gated import
+    let copy = copy_of_t01(&e, "POCX-Z10", |s| s["ref"] = json!(q_url));
+    let before = e.counts();
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "h1-copy-key", &copy);
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    assert_eq!(e.counts(), before);
+    // documented residual (REPORT §2.3): reference and digest both rewritten to Q's import
+    let copy = copy_of_t01(&e, "POCX-Z11", |s| {
+        s["ref"] = json!(q_url);
+        s["digest"] = json!("b".repeat(64));
+    });
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "h1-residual-key",
+        &copy,
+    );
+    assert_eq!(st, 201, "{b}");
+}
+
+#[test]
+fn h2_every_reader_takes_the_same_latest_import() {
+    let Some(e) = start() else { return };
+    for (digest, gates) in [('a', queue_gates()), ('b', json!([])), ('c', queue_gates())] {
+        assert_eq!(
+            e.post(
+                "importer",
+                "/v0/imports/notion",
+                &notion_import_gated("POCX-T01", digest, gates, json!([]))
+            )
+            .0,
+            201
+        );
+    }
+    let mut db = e.db();
+    // new rows are stamped after the registry lock: import order = revision order
+    let order: Vec<i64> = db
+        .query(
+            "SELECT sprint_revision FROM notion_imports WHERE test_id = 'POCX-T01' ORDER BY imported_at",
+            &[],
+        )
+        .expect("order")
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    assert_eq!(order, vec![1, 2, 3]);
+    // an inverted state (as two racing imports could leave before the stamp moved behind the
+    // lock): revision 3 stamped before revision 2. Every reader must then agree on revision 2.
+    db.batch_execute(
+        "ALTER TABLE notion_imports DISABLE TRIGGER notion_imports_append_only;
+         UPDATE notion_imports SET imported_at = (SELECT imported_at FROM notion_imports
+           WHERE test_id = 'POCX-T01' AND sprint_revision = 2) - interval '1 millisecond'
+         WHERE test_id = 'POCX-T01' AND sprint_revision = 3;
+         ALTER TABLE notion_imports ENABLE TRIGGER notion_imports_append_only;",
+    )
+    .expect("invert");
+    // a spec derived from revision 3 is not the latest import's derivation
+    let from3 = ready_from(&e, "POCX-T01", 3, 4);
+    let (st, b) = e.post_k(
+        "alice",
+        "/v0/sprints?mode=executable",
+        "h2-from3-key",
+        &from3,
+    );
+    assert_ne!(st, 201, "{b}");
+    // the exception binds the same import the gate reads (revision 2's content)
+    let (st, x) = e.post(
+        "uma",
+        "/v0/coordinator/exceptions",
+        &exception("EX-H2", "POCX-T01", "repo-a"),
+    );
+    assert_eq!(
+        (st, x["approved_content_digest"].clone()),
+        (201, json!("b".repeat(64))),
+        "{x}"
+    );
+}
+
+#[test]
+fn h3_an_exception_recorded_without_a_page_never_matches() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    // a row as recorded before correction 2 (no page_id), otherwise matching in every field
+    e.db()
+        .execute(
+            "INSERT INTO exec_exceptions (exception_id, test_id, repo_id, lifts, scope, decision_ref,
+                request, approved_by, content_digest, page_id)
+             VALUES ('EX-LEGACY', 'POCX-T01', 'repo-a', 'queue_gates', '{}', 'legacy', '{}', 'uma', $1, NULL)",
+            &[&"a".repeat(64)],
+        )
+        .expect("legacy exception");
+    let d = derived_executable(&e, "POCX-T01");
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "h3-legacy-key", &d);
+    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+}
