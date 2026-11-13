@@ -1348,9 +1348,9 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         }
     };
     lock(tx, &format!("scope:{repo}:{role}"))?;
-    // an assignment_id is global across roles (F6); the registry lock keeps the revision
-    // checks below stable until commit (review 1e98f17 F5). Order: scope → id → registry.
-    lock(tx, &format!("assignment-id:{aid}"))?;
+    // the registry lock keeps the revision checks below stable until commit (review 1e98f17 F5)
+    // and serializes all assignments, so one assignment_id raced by two roles (F6) cannot
+    // both pass the unused-id check. Order: scope → registry.
     lock(tx, "registry")?;
     // same (assignment, generation) again: historical re-query, never a re-activation
     if let Some(row) = tx.query_opt(

@@ -6,16 +6,16 @@
 | 수용 기준 | `poc-acceptance-v1.3.3` rev 4 `02-03.accept`(장부 02-03 행과 같음): 명세 v0·보고 v0·인증된 HTTP/JSON API를 따르는 배정·권한 세대·사건 ID·이력·outbox·조회 모델 구현, 형식 검사와 의미 검토 분리, GitHub/실행 증거를 완료 판정 입력으로, 기동 확인과 P04 통과 구분 |
 | 선행 | 02-01·01-02·01-07·01-08 검수 완료(원장 snapshot `v1.3.3-EXEC-0013`, main `c501a44`에서 착수 확인) |
 | 산출물 | Rust crate [`crates/ieo-coord`](../../../../../../crates/ieo-coord)(라이브러리 + `ieo-coord migrate|serve`) · DB 스키마 [`schema.sql`](../../../../../../crates/ieo-coord/src/schema.sql) · 판정 정책 [`contracts/judgment-policy-v0.json`](../../../../../../contracts/judgment-policy-v0.json)(L07) · OpenAPI 0.6.0 · 01-08 계약 rev 4 |
-| 상한 | F05 구현 14,400초. 측정 시작 2026-11-13T07:25:10Z(선행 항목 읽기 몇 분은 이 시각 앞이라 포함하지 않음), 코드 커밋 0850eaf 07:44:10Z, 시험 보강 3e24286 07:47:36Z(약 1,350초), 검토 반영 dfac60a 08:00Z경(약 2,150초). 검토·교정은 F04(4회·3회) |
+| 상한 | F05 구현 14,400초. 측정 시작 2026-11-13T07:25:10Z(선행 항목 읽기 몇 분은 이 시각 앞이라 포함하지 않음), 코드 커밋 0850eaf 07:44:10Z, 시험 보강 3e24286 07:47:36Z(약 1,350초), 검토 반영 dfac60a 08:00Z경(약 2,150초), 재검토 반영 eb7b0af 08:2xZ. 검토·교정은 F04(4회·3회) |
 | 모델 호출 | 0회. 실제 에이전트·GitHub 연결 없음(§5) |
-| 상태 | rev 2. 독립 검토 [1e98f17 reject](reviews/review-pr25-1e98f17.md)(P1 F1·F2, P3 F3~F10) → 교정 dfac60a(§6). 02-03 검토 1/4·교정 1/3. 재검토 대기 |
+| 상태 | rev 3. 독립 검토 [1e98f17 reject](reviews/review-pr25-1e98f17.md)(P1 F1·F2) → 교정 dfac60a(§6) → 재검토 [0fa839d reject](reviews/review-pr25-0fa839d.md)(P2 N1) → 교정 eb7b0af(§7). 02-03 검토 2/4·교정 2/3. 재검토 대기 |
 
 ## 1. 선행 항목 처분
 
 | 항목 | 착수 시 상태 | 처분 | 근거 |
 | --- | --- | --- | --- |
 | L08 두 결함(01-08 N1·01-07 N1) | PR #10에서 교정·검토 승인(ea902dd)·병합(066f5fb) | **재사용**. 영속 구현이 같은 규칙을 그대로 쓴다(`ieo_report::authorize_claim`/`authorize_repro`, `Registry`) | 시험 `claims_late_duplicate_stale_and_mismatched`·`repro_requests_new_must_be_current_replays_are_not_requeued`·`draft_and_superseded_revisions_are_not_assignable` |
-| L07 권한·판정 의미 공백(D12) | 미처리 | **이번에 고정**. 최소 방식 중 “버전·digest가 고정된 기계 판독 정책 참조”를 택했다. 명세 스키마(r4)와 9개 명세 digest를 바꾸지 않기 위해서다. 정책 파일(현재 0.2.0, digest `6d44407e…`)은 G1 선행 증거·G2 SHA 귀속·G3 독립 판정·G4 누적 시도·G5 한도 도달·RG2 승인 범위·G7 제외 범위를 규칙으로 적는다. 숫자 값은 새로 정하지 않는다(상한 값은 명세 `limits`에서만). 코디네이터는 고정 digest와 다른 바이트, 또는 구현과 다른 규칙 집합이면 기동하지 않는다. 배정·판정마다 정책 digest를 기록한다 | §2.4, 시험 `policy_is_pinned_and_fails_closed`, 기동 확인 [startup-smoke.txt](evidence/startup-smoke.txt) 마지막 항목 |
+| L07 권한·판정 의미 공백(D12) | 미처리 | **이번에 고정**. 최소 방식 중 “버전·digest가 고정된 기계 판독 정책 참조”를 택했다. 명세 스키마(r4)와 9개 명세 digest를 바꾸지 않기 위해서다. 정책 파일(현재 0.3.0, digest `01acce79…`)은 G1 선행 증거·G2 SHA 귀속·G3 독립 판정·G4 누적 시도·G5 한도 도달·RG2 승인 범위·G7 제외 범위를 규칙으로 적는다. 숫자 값은 새로 정하지 않는다(상한 값은 명세 `limits`에서만). 코디네이터는 고정 digest와 다른 바이트, 또는 구현과 다른 규칙 집합이면 기동하지 않는다. 배정·판정마다 정책 digest를 기록한다 | §2.4, 시험 `policy_is_pinned_and_fails_closed`, 기동 확인 [startup-smoke.txt](evidence/startup-smoke.txt) 마지막 항목 |
 | 01-08 N2 | 미처리 | **교정**. `completion_summary`가 확인된 범위 전부와 미완료 범위 전부를 쓴다. 현재 SHA 승인 없는 병합도 숨기지 않는다. 계약 01-08 rev 4 | `report_contract.rs::completion_summary_scopes`, 변이 M20 |
 | PR #10 N1 | 문서 공백 | **교정**. 01-08 계약 검사 순서에 본문 SHA 대조 단계, `POST /v0/agent/reports` 409 목록에 `ASSIGNMENT_SHA_MISMATCH`, 본문 SHA `null` 처리 명시, OpenAPI 단어 중복 제거 | 계약 rev 4 §1·§2 |
 | PR #10 N2 | Registry가 호출자 digest 문자열을 신뢰 | **교정**. `Registry::add_spec_with_mode`가 digest를 다시 계산해 없거나 다르면 기록하지 않는다 | `registry_recomputes_the_digest_and_refuses_missing_or_forged_ones`, 변이 M19 |
@@ -75,11 +75,11 @@
 
 | 규칙 | 강제 위치 |
 | --- | --- |
-| G1 선행 증거 | 배정 발급: 같은 정책 digest의 verified 판정(`accepted` 또는 `result_recorded`)이 없으면 409 `PREREQUISITE_UNMET` |
+| G1 선행 증거 | 배정 발급: 같은 정책 digest의 verified 판정(`accepted` 또는 `result_recorded`)이 없으면 409 `PREREQUISITE_UNMET`. 판정이 본 revision의 그 작업 정의가 스프린트 최신 revision의 정의와 같아야 한다(작업이 바뀌면 새 판정 필요, 재검토 N3) |
 | G2 SHA 귀속 | 판정: 머리 SHA·병합 SHA로만 증거를 고른다. claim 저장: 배정의 SHA에 귀속 |
 | G3 독립 판정 | `judge:verify`는 service만 가진다. 자기 검토(의미 검토 등록자, GitHub 작성자=검토자)는 제외한다. 현재 세대 claim만 검토 입력이다 |
 | G4 누적 시도 | (sprint, task, role)별로 배정 ID와 세대를 가로질러 센다. 첫 발급 뒤 세대마다 1회를 쓰며, 상한은 명세 `limits.correction_attempts`. **해석**: G4 공백은 교정과 별도의 재시도 상한이지만 그 값이 결정된 적이 없어, 재시도와 교정을 한 상한으로 센다(더 엄격한 쪽, 새 숫자 없음, 검토 F7). 별도 상한이 필요하면 사용자 결정 뒤 정책 새 버전에서 나눈다 |
-| G5 한도 도달 | 상한을 넘는 첫 요청: 새 세대 없이 verified `decision_request`와 outbox를 한 번 기록하고 202 `limit_reached`(현재 담당 유지, 기본 조치 “정지 유지”). 같은 상한에서 이후 요청은 409 `LIMIT_REACHED`이며 상태 변화가 없다. 새 revision으로 상한을 올린 뒤 다시 도달하면 새 decision_request를 기록한다(검토 F6) |
+| G5 한도 도달 | 상한을 넘는 첫 요청: 새 세대 없이 verified `decision_request`와 outbox를 한 번 기록하고 202 `limit_reached`(현재 담당 유지, 기본 조치 “정지 유지”). 이미 물었던 상한 값이면(언제 물었든) 409 `LIMIT_REACHED`이며 상태 변화가 없다. 새 revision이 아직 묻지 않은 값으로 상한을 바꾼 뒤 도달하면 새 decision_request를 기록한다(검토 F6, 재검토 N1) |
 | RG2 승인 범위 | **대상 승인 범위**로 해석했다(검토 F7). 01-08 §5의 RG2(결정 답변이 허용하는 행동 범위)는 02-03이 결정 답변을 기록하지 않으므로 쓰이지 않으며, 필드화는 다음 contract revision 후보로 남는다. sprint_id는 한 repo에 속하고, 의미 검토는 digest를 명시하며, 배정은 (배정, 세대, SHA), 판정은 (작업, 배정 revision, 머리 SHA, 병합 SHA)에만 적용한다 |
 | G7 제외 범위 | 선택 산출물·`out_of_scope`·`preserved_unrepresented`는 판정 입력이 아니다 |
 
@@ -87,8 +87,8 @@
 
 | 확인 | 결과 | 증거 |
 | --- | --- | --- |
-| fmt·clippy(-D warnings)·전체 시험 | 통과. 시험 **139건**: ieo-coord 25(PostgreSQL 실DB·실HTTP)·ieo-report 1+33·ieo-spec 4+16+25·ieo-evidence 6+29. 커밋 dfac60a, 깨끗한 트리(실행 전 porcelain 빈 목록) | [cargo-test.log](evidence/cargo-test.log) |
-| 변이 | 26개 중 25개 검출(검토 반영 변이 M21~M26 포함, 커밋 dfac60a). M13(거부 시 롤백 대신 커밋)은 **동등 변이**다. PostgreSQL은 실패한 트랜잭션의 COMMIT을 롤백으로 처리하고, 현재 코드에는 실패 없이 쓰기 뒤 거부하는 경로가 없다. 결함 주입 시험이 같은 성질(첫 쓰기 뒤 실패 시 전부 롤백)을 직접 고정한다 | [mutants.txt](evidence/mutants.txt), [mutants.py](evidence/mutants.py) |
+| fmt·clippy(-D warnings)·전체 시험 | 통과. 시험 **141건**: ieo-coord 27(PostgreSQL 실DB·실HTTP)·ieo-report 1+33·ieo-spec 4+16+25·ieo-evidence 6+29. 커밋 eb7b0af, 깨끗한 트리(실행 전 porcelain 빈 목록) | [cargo-test.log](evidence/cargo-test.log) |
+| 변이 | MUTANTS_LINE. M13(거부 시 롤백 대신 커밋)은 **동등 변이**다. PostgreSQL은 실패한 트랜잭션의 COMMIT을 롤백으로 처리하고, 현재 코드에는 실패 없이 쓰기 뒤 거부하는 경로가 없다. 결함 주입 시험이 같은 성질(첫 쓰기 뒤 실패 시 전부 롤백)을 직접 고정한다 | [mutants.txt](evidence/mutants.txt), [mutants.py](evidence/mutants.py) |
 | OpenAPI 0.6.0 | `openapi-spec-validator` OK. 서버가 내는 모든 오류 코드가 OpenAPI 열거에 있다(시험 `every_emitted_code_is_declared_in_the_openapi_contract`) | [openapi-validate.log](evidence/openapi-validate.log) |
 | 문서 정합 | `validate_package.py` EXIT=0, `render_progress.py --check` EXIT=0. 문서 정합 확인일 뿐 런타임 PASS가 아니다 | [validate.log](evidence/validate.log) |
 | 기동 확인(P04 아님) | 실제 바이너리를 띄워 health 200(`scope`에 P04 아님 명시), 자격 없는 요청 401, 다른 repo 스프린트 404, 이관 뒤 13개 표를 확인했다. 변경한 정책 파일로는 기동을 거부한다(exit 2). 토큰·DB 비밀번호는 기록에 없다 | [startup-smoke.txt](evidence/startup-smoke.txt) |
@@ -108,7 +108,9 @@
 | 판정과 outbox의 원자 기록 검증, 보고 대기, 에이전트 완료 메시지 없는 정상 회차 판정 | 02-07. 이 작업은 판정·outbox·판정 행을 한 트랜잭션에 기록하는 모델과, 실패 주입 시 함께 롤백되는 시험까지 한다 |
 | 사용자 결정 기록 경로(G5 뒤 재개, RG1·RG2 필드화) | 결정 API는 이번 범위가 아니다. G5 뒤에는 자동으로 계속하지 않는다. 필드화는 정책상 다음 contract revision 후보로 둔다(D12의 “표현 개선은 후속”) |
 | 시간·토큰 한도(`elapsed_seconds`·`total_tokens`) 집행 | 02-04 supervisor(02-01 계측기 연결). 토큰 총량 정의는 L01/L02 |
-| 쓰기 처리량·잠금 경합의 성능 특성 | 측정하지 않았다. 등록은 전역 잠금 하나로 직렬화하고, 사건은 스프린트별 잠금을 쓴다. 독립 repo의 동시 진행 시험은 04-04 |
+| 쓰기 처리량·잠금 경합의 성능 특성 | 측정하지 않았다. 등록·의미 검토·**배정**은 전역 `registry` 잠금 하나로 직렬화된다(배정은 검토 F5 교정 뒤부터, 재검토 N4). 사건은 스프린트별 잠금을 쓴다. 독립 repo의 동시 진행 시험은 04-04 |
+| sprint_id 이름 공간(첫 등록 repo가 가짐, 다른 repo의 draft로 선점 가능하고 409가 존재를 드러냄, 재검토 N2) | repo별 승인된 sprint 바인딩(01-07 §3의 바인딩, 02-05 문서 버전·배정 연결)에서 sprint_id를 repo에 미리 묶는다 |
+| 새 push 뒤 이전 SHA의 changes_requested를 무시하는 규칙과 GitHub PR 상태의 차이(재검토 N5) | 실제 수집기(02-04·02-05)에서 PR 수준 검토 상태를 함께 수집할지 정한다 |
 
 ## 5. 비용·한도
 
@@ -132,3 +134,15 @@
 | F8 P3 보고 수치·깨끗한 트리 표기 | 교정(§3 내역, 로그 재생성) | — |
 | F9 P3 reject가 막을 때 이전 SHA 승인 표시가 사라짐 | 교정 | 위 F2 시험, M26 |
 | F10 P3 커서·500 선언·DB 끊김·승격자 검토 | 500을 모든 엔드포인트에 선언, worker가 DB에 다시 연결하고 실패하면 500으로 응답, 승격자도 검토 불가(`whoever_registered_or_promoted_a_revision_cannot_review_it`, M25). 커서는 유지: 계약상 커서는 “위치”이며 기존 사건 뒤의 위치(`s3`)는 유효한 위치라 정상 페이지를 돌려준다 | — |
+
+## 7. 재검토 반영(rev 3)
+
+[재검토 0fa839d](reviews/review-pr25-0fa839d.md): reject(P2 1건). P1 F1·F2는 해소로 판정됐다.
+
+| 지적 | 처분 | 시험·변이 |
+| --- | --- | --- |
+| N1 P2 상한을 낮췄다가 이전 값으로 되돌리면 같은 decision 사건을 다시 넣어 매번 500 | 교정. 마지막 값만 기억하지 않고, 그 상한 값의 decision 사건이 이미 있는지로 판단한다. 있으면 409 `LIMIT_REACHED`(상태 변화 없음) | `a_raised_ceiling_reached_again_asks_again`(1→2→1), M28 |
+| N2 P3 sprint_id 선점·존재 노출 | §4 후속(repo별 sprint 바인딩) | — |
+| N3 P3 F3에 시험 없음, 바뀐 작업의 옛 판정이 선행 조건을 채움 | 교정. 판정 행에 판정한 revision을 기록하고, 선행 조건은 그 작업 정의가 최신 revision과 같을 때만 충족(정책 G1 0.3.0) | `verdicts_judge_the_assigned_revision_and_a_changed_task_needs_a_new_verdict`, M27·M30 |
+| N4 P3 경쟁 교정·재연결에 시험 없음, 배정 전역 직렬화 미기재 | 역할 간 같은 assignment_id 경쟁 시험(10회, 500 없음) 추가, §4 문구 교정. 재연결은 검토자 수동 재현으로 확인됨, 등록·배정 경쟁(F5)은 시간 창이 좁아 자동 시험을 두지 않았다 | `one_assignment_id_raced_by_two_roles_never_errors`, M29 |
+| N5 P3 이전 SHA changes_requested 무시와 GitHub PR 상태 차이 | §4 후속 | — |
