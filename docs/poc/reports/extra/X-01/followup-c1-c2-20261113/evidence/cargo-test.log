@@ -1,4 +1,4 @@
-# commit c40ed034d7057edf7fdd5a46bb6254d5ebfb2896 · 2026-11-13T16:38:11Z · git status --porcelain (before run):
+# commit c547f78e72e7a8c671e643f3cf3bd20b9c0b6178 · 2026-11-13T16:52:50Z · git status --porcelain (before run):
  M docs/poc/reports/extra/X-01/followup-c1-c2-20261113/evidence/cargo-test.log
 # (empty above = clean tree)
 rustc 1.99.1 (58cf8f9c3 2026-10-13)
@@ -6,12 +6,11 @@ $ cargo fmt --all -- --check
 EXIT=0
 $ cargo clippy --all-targets --locked -- -D warnings
     Checking ieo-coord v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/crates/ieo-coord)
-    Checking ieo-notion v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/crates/ieo-notion)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.55s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.90s
 EXIT=0
 $ cargo test --locked --all-targets
    Compiling ieo-coord v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/crates/ieo-coord)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.32s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.36s
      Running unittests src/lib.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/ieo_coord-80a305ca317e46ae)
 
 running 1 test
@@ -27,7 +26,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
      Running tests/coordinator.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/coordinator-e0bb76a8b34c20c9)
 
-running 62 tests
+running 63 tests
 test credentials_refuse_inconsistent_principals ... ok
 test policy_is_pinned_and_fails_closed ... ok
 test every_emitted_code_is_declared_in_the_openapi_contract ... ok
@@ -36,62 +35,63 @@ test a_draft_revision_never_changes_a_running_execution ... ok
 test a_draft_with_unbound_limits_does_not_block_a_running_execution ... ok
 test a_pinned_continuation_obeys_the_latest_attempt_ceiling ... ok
 test a_running_assignment_stays_on_its_revision ... ok
-test a_sprint_cannot_be_moved_to_another_repo ... ok
-test a_raised_ceiling_reached_again_asks_again ... ok
+test an_import_owned_sprint_changes_only_through_imports ... ok
 test a_failure_after_the_first_write_rolls_back_the_whole_request ... ok
+test a_raised_ceiling_reached_again_asks_again ... ok
 test an_import_replay_answers_only_within_its_repo ... ok
 test an_imported_draft_with_unresolved_reasons_cannot_execute ... ok
 test a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id ... ok
-test an_import_owned_sprint_changes_only_through_imports ... ok
-test an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source ... ok
 test authentication_and_scope_refusals_change_nothing ... ok
+test a_sprint_cannot_be_moved_to_another_repo ... ok
+test an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source ... ok
+test c2_a_re_gating_import_stops_a_running_assignment ... ok
 test attempt_ceiling_is_cumulative_and_records_one_decision_request ... ok
 test c2_a_copy_under_another_sprint_id_is_still_gated ... ok
 test c2_a_trusted_release_and_review_allow_execution ... ok
-test c2_a_re_gating_import_stops_a_running_assignment ... ok
 test c2_an_exception_covers_only_the_content_it_approved ... ok
-test c2_a_user_exception_applies_only_to_its_test_and_repo ... ok
 test c2_an_exception_does_not_lift_missing_inputs ... ok
+test c2_a_user_exception_applies_only_to_its_test_and_repo ... ok
+test c2_gated_import_cannot_execute_even_with_reasons_removed ... ok
 test c2_content_returning_to_a_gated_state_gates_again ... ok
 test c2_claimed_release_without_a_trusted_record_is_refused ... ok
-test c2_gated_import_cannot_execute_even_with_reasons_removed ... ok
 test converting_a_sprint_again_is_a_new_revision_not_a_task_conflict ... ok
 test draft_and_superseded_revisions_are_not_assignable ... ok
-test concurrent_duplicates_and_competing_issuers ... ok
-test claims_late_duplicate_stale_and_mismatched ... ok
 test development_and_guardrail_claims_race_into_one_ordered_stream ... ok
+test claims_late_duplicate_stale_and_mismatched ... ok
+test concurrent_duplicates_and_competing_issuers ... ok
 test g2_identical_content_on_two_pages_is_gated_and_excepted_per_page ... ok
 test event_pages_are_append_only_and_reads_change_nothing ... ok
-test g4_migration_from_earlier_keys_keeps_a_page_imported_under_two_test_ids ... ok
 test github_reviews_count_only_at_the_head_and_comments_do_not_clear_changes_requested ... ok
+test g4_migration_from_earlier_keys_keeps_a_page_imported_under_two_test_ids ... ok
 test g3_a_page_belongs_to_one_test_id ... ok
-test g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated ... ok
-test h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content ... ok
-test health_is_liveness_only_and_needs_no_credential ... ok
 test h2_every_reader_takes_the_same_latest_import ... ok
+test h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content ... ok
+test g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated ... ok
+test health_is_liveness_only_and_needs_no_credential ... ok
 test h3_an_exception_recorded_without_a_page_never_matches ... ok
 test human_input_conversion_needs_an_approved_binding ... ok
-test i2_the_gate_reads_the_latest_import_by_import_time ... ok
-test i2_an_import_is_stamped_after_the_registry_lock ... ok
+test i2_a_replay_matches_the_highest_revision_whatever_the_clock ... ok
 test i1_only_the_named_pages_latest_content_hides_the_cited_digest ... ok
-test i2_a_replay_matches_the_latest_import_by_import_time ... ok
 test independent_repos_progress_separately ... ok
+test i2_an_import_is_stamped_after_the_registry_lock ... ok
+test i2_the_gate_reads_the_highest_revision_whatever_the_clock ... ok
 test import_sprint_numbers_and_own_revisions_do_not_conflict ... ok
+test k1_a_page_imported_under_two_test_ids_fails_closed ... ok
 test label_and_estimate_changes_keep_a_prerequisite_verdict_but_definition_changes_void_it ... ok
 test notion_import_registers_a_draft_once_and_revises_on_change ... ok
-test only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling ... ok
 test prerequisites_need_a_verified_accepted_verdict ... ok
-test registration_is_format_intake_and_semantic_review_is_separate ... ok
 test ownership_head_is_compare_and_swap ... ok
+test only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling ... ok
+test registration_is_format_intake_and_semantic_review_is_separate ... ok
+test review_inputs_are_current_independent_and_for_the_head ... ok
+test whoever_registered_or_promoted_a_revision_cannot_review_it ... ok
 test self_review_is_refused ... ok
 test repro_requests_new_must_be_current_replays_are_not_requeued ... ok
-test whoever_registered_or_promoted_a_revision_cannot_review_it ... ok
-test review_inputs_are_current_independent_and_for_the_head ... ok
+test one_assignment_id_raced_by_two_roles_never_errors ... ok
 test verdicts_judge_the_assigned_revision_and_a_changed_task_needs_a_new_verdict ... ok
 test verdict_uses_github_and_run_evidence_for_the_recorded_sha_only ... ok
-test one_assignment_id_raced_by_two_roles_never_errors ... ok
 
-test result: ok. 62 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.41s
+test result: ok. 63 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.56s
 
      Running unittests src/lib.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/ieo_evidence-6e5a2c02fe2a0bc3)
 
@@ -114,20 +114,20 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/collector.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/collector-60a14e5ae90e33f3)
 
 running 29 tests
-test model_request_must_state_session_mode ... ok
 test launch_failure_still_writes_record ... ok
-test nonzero_exit_is_failure_with_stderr_kept ... ok
-test result_without_usage_fields_is_unmeasured ... ok
-test leftover_member_after_normal_exit_is_killed_and_recorded ... ok
-test exit_zero_without_required_evidence_is_incomplete ... ok
-test evidence_is_never_overwritten_and_ids_are_checked ... ok
-test secrets_never_reach_evidence_files ... ok
-test model_run_real_stream_measures_parent_child_session ... ok
+test model_request_must_state_session_mode ... ok
 test environment_is_cleared_to_the_allow_list ... ok
+test nonzero_exit_is_failure_with_stderr_kept ... ok
+test evidence_is_never_overwritten_and_ids_are_checked ... ok
+test leftover_member_after_normal_exit_is_killed_and_recorded ... ok
 test model_run_exit_zero_without_result_event_is_incomplete ... ok
+test exit_zero_without_required_evidence_is_incomplete ... ok
+test result_without_usage_fields_is_unmeasured ... ok
+test model_run_real_stream_measures_parent_child_session ... ok
+test secrets_never_reach_evidence_files ... ok
 test normal_success_records_everything ... ok
-test attribution_mismatch_is_reported ... ok
 test model_usage_missing_falls_back_to_parent_plus_children ... ok
+test attribution_mismatch_is_reported ... ok
 test result_is_error_is_failure_unless_expected ... ok
 test deny_test_needs_nonzero_exit_and_its_marker ... ok
 test aggregate_includes_children_failures_retries_and_reviews ... ok
@@ -144,7 +144,7 @@ test timeout_escalates_to_kill_when_term_ignored ... ok
 test group_member_ignoring_term_is_killed_after_grace ... ok
 test output_held_by_detached_descendant_is_kept_and_flagged ... ok
 
-test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.03s
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.04s
 
      Running unittests src/lib.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/ieo_notion-8a877494d7099127)
 
@@ -162,12 +162,12 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 9 tests
 test page_ids_from_urls ... ok
-test connector_fetch_result_is_parsed ... ok
-test digest_tracks_content_not_read_path ... ok
-test missing_facts_are_named_not_invented ... ok
 test ready_page_extracts_without_unresolved_reasons ... ok
-test queue_gates_become_unresolved_reasons ... ok
+test connector_fetch_result_is_parsed ... ok
+test missing_facts_are_named_not_invented ... ok
 test snapshot_round_trips_and_detects_tampering ... ok
+test digest_tracks_content_not_read_path ... ok
+test queue_gates_become_unresolved_reasons ... ok
 test notion_failures_are_errors_and_never_leak_the_token ... ok
 test rest_api_reader_produces_the_same_shape ... ok
 
@@ -184,36 +184,36 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 33 tests
 test agents_cannot_read_client_views_and_repro_is_guardrail_only ... ok
-test body_sha_must_match_the_assignment_sha ... ok
 test completion_summary_scopes ... ok
+test body_sha_must_match_the_assignment_sha ... ok
 test claim_authorization ... ok
 test headline_states_evidence_level_and_claimed_completion ... ok
-test input4_reobservation_is_suppressed ... ok
 test late_claim_from_issued_old_assignment_is_preserved_not_judged ... ok
+test input4_reobservation_is_suppressed ... ok
 test never_issued_assignment_or_generation_is_409 ... ok
 test render_has_five_parts_in_order ... ok
-test material_changes_notify_and_reorders_do_not ... ok
 test same_id_replay_is_checked_before_assignment ... ok
+test material_changes_notify_and_reorders_do_not ... ok
 test bad_next_check_at_is_rejected ... ok
 test late_before_deadline_rejected ... ok
+test finding_lacks_original_log ... ok
+test estimated_without_measurement ... ok
+test reject_without_findings ... ok
+test wrong_actor_role ... ok
 test missing_contract_revision ... ok
 test options_mismatch_alone_is_rejected ... ok
-test wrong_actor_role ... ok
-test developer_claims_verified ... ok
-test delay_reasons_are_rendered ... ok
-test input2_lost_response_is_held_without_user_resend ... ok
-test input1_current_ci_with_old_sha_approval_needs_current_review ... ok
-test recommendation_must_be_an_option ... ok
-test reversed_forecast ... ok
-test input3_decision_request_is_actionable ... ok
-test reject_without_findings ... ok
-test estimated_without_measurement ... ok
-test old_actor_string ... ok
-test finding_lacks_original_log ... ok
 test decision_deadline_is_not_a_date ... ok
-test delay_without_reason ... ok
 test undecided_shown_normal ... ok
+test developer_claims_verified ... ok
+test input2_lost_response_is_held_without_user_resend ... ok
+test input3_decision_request_is_actionable ... ok
+test reversed_forecast ... ok
+test input1_current_ci_with_old_sha_approval_needs_current_review ... ok
+test delay_reasons_are_rendered ... ok
+test old_actor_string ... ok
+test recommendation_must_be_an_option ... ok
 test decision_mismatch ... ok
+test delay_without_reason ... ok
 test fractional_seconds_are_ordered ... ok
 test four_role_examples_are_valid ... ok
 
@@ -223,9 +223,9 @@ test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 running 4 tests
 test digest::tests::keys_sorted_and_unicode_raw ... ok
+test rejection::tests::code_serializes_screaming ... ok
 test digest::tests::digest_ignores_digest_field ... ok
 test rejection::tests::pointer_conversion ... ok
-test rejection::tests::code_serializes_screaming ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -238,18 +238,18 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
      Running tests/conversion.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/conversion-0d1cde317ce73b17)
 
 running 16 tests
-test cycle_among_human_tasks ... ok
-test reversed_estimate ... ok
-test unresolved_prerequisite_matches_documented_example ... ok
 test duplicate_task_names ... ok
 test undecided_deadline_needs_reason ... ok
-test sprint_number_must_fit_two_digits ... ok
-test overflowing_minutes_are_rejected_not_panicking ... ok
 test missing_required_human_field ... ok
+test unresolved_prerequisite_matches_documented_example ... ok
+test overflowing_minutes_are_rejected_not_panicking ... ok
 test generated_id_colliding_with_registered_task_is_rejected ... ok
+test sprint_number_must_fit_two_digits ... ok
 test estimate_without_evidence_is_format_error ... ok
-test deadline_set_requires_timestamp ... ok
+test reversed_estimate ... ok
+test cycle_among_human_tasks ... ok
 test set_deadline_reason_and_generated_fields_are_recorded ... ok
+test deadline_set_requires_timestamp ... ok
 test integral_float_minutes_are_converted_not_zeroed ... ok
 test ids_are_stable_for_same_input ... ok
 test criteria_outside_profile_go_to_semantic_review_not_approved ... ok
@@ -261,32 +261,32 @@ test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 running 25 tests
 test all_nine_package_digests_reproduce ... ok
-test ready_with_unresolved_bindings_is_format_error ... ok
-test missing_field_is_distinguished ... ok
 test schema_violation_other_than_missing ... ok
+test missing_field_is_distinguished ... ok
+test ready_with_unresolved_bindings_is_format_error ... ok
+test ready_without_repository_url_fails_format_layer ... ok
 test bound_ready_spec_accepted_for_executable_registration ... ok
 test digest_mismatch ... ok
-test spec_estimate_range_order_checked ... ok
-test dependency_cycle ... ok
+test unknown_profile_item_and_unknown_profile ... ok
 test undefined_prerequisite ... ok
 test baseline_poc01_draft_accepted_and_digest_matches_package ... ok
+test spec_estimate_range_order_checked ... ok
+test prerequisite_with_wrong_plan_version_is_undefined ... ok
+test dependency_cycle ... ok
+test every_rejection_has_field_and_correction ... ok
 test duplicate_task_id_within_spec ... ok
 test duplicate_task_id_across_registered_sprint ... ok
 test lower_revision_after_higher_is_superseded ... ok
 test revision_identity_conflict_and_idempotent_resubmit ... ok
-test ready_without_repository_url_fails_format_layer ... ok
 test old_draft_revision_cannot_be_promoted_after_newer_exists ... ok
-test every_rejection_has_field_and_correction ... ok
 test registry_never_overwrites_a_revision_or_narrows_its_mode ... ok
-test prerequisite_with_wrong_plan_version_is_undefined ... ok
-test unknown_profile_item_and_unknown_profile ... ok
 test historical_lookup_of_old_revision_does_not_reactivate_it ... ok
 test registry_recomputes_the_digest_and_refuses_missing_or_forged_ones ... ok
 test unbound_draft_rejected_only_for_executable_registration ... ok
 test non_integer_numbers_rejected_before_digest ... ok
 test draft_registered_spec_is_not_idempotent_for_executable_intake ... ok
 
-test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
 
      Running unittests src/lib.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/ieo_supervisor-75dd506bae522722)
 
@@ -301,20 +301,20 @@ test budget_constants_match_decision_1 ... ok
 test an_overflowing_projection_stops ... ok
 test checkpoint_record_has_the_5_1_fields ... ok
 test budget_counts_every_run_and_never_reads_missing_as_zero ... ok
-test overflowing_or_truncated_measurements_are_not_trusted ... ok
 test role_arguments_use_edit_paths_and_session_id_only ... ok
+test overflowing_or_truncated_measurements_are_not_trusted ... ok
 test reconnect_decisions ... ok
 test environment_is_cleared_to_the_allow_list ... ok
 test budget_boundaries ... ok
-test cleanup_leaves_the_root_mode_alone ... ok
 test extra_usage_must_be_off_before_and_during_a_call ... ok
+test cleanup_leaves_the_root_mode_alone ... ok
 test a_cleanup_never_follows_links_and_reopens_hidden_directories ... ok
-test a_cleanup_keeps_only_session_records_and_installs_the_template ... ok
 test c_normal_cli_writes_are_not_tamper ... ok
-test one_running_process_per_session ... ok
-test claude_json_directive_keys_are_all_digested ... ok
-test any_link_is_tamper_and_is_never_followed ... ok
+test a_cleanup_keeps_only_session_records_and_installs_the_template ... ok
 test a_non_regular_claude_json_is_never_opened ... ok
+test any_link_is_tamper_and_is_never_followed ... ok
+test claude_json_directive_keys_are_all_digested ... ok
+test one_running_process_per_session ... ok
 test b_tamper_after_a_checkpoint_is_detected_and_not_resumed ... ok
 test special_files_are_never_opened ... ok
 

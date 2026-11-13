@@ -1075,7 +1075,8 @@ fn page_ids_in(v: &Value, out: &mut Vec<String>) {
 /// import" is ordered the same way everywhere: revision first (assigned under the registry lock,
 /// so a clock that jumps backwards cannot make an older release look newer than a later
 /// re-gating import — review f0c4e87 J2), then `imported_at` (stamped with `clock_timestamp()`
-/// after the lock; it only orders pages imported under two test ids before that was refused). For each page the **latest**
+/// after the lock). A page imported under more than one test id (only possible before that was
+/// refused) has no comparable revision order and is refused (review 6352413 K1). For each page the **latest**
 /// import decides: missing facts always block (`IMPORT_INCOMPLETE`); queue gates block
 /// (`IMPORT_GATED`) unless a user-approved exception exists for exactly this test sprint, repo,
 /// page and that import's content digest. A later trusted import without gates is the release
@@ -1135,6 +1136,23 @@ fn notion_gate(
     pages.sort();
     pages.dedup();
     for page in pages {
+        // review 6352413 K1: a page imported under more than one test id (only possible before
+        // that was refused) has no comparable revision order; it fails closed
+        let test_ids: i64 = tx
+            .query_one(
+                "SELECT count(DISTINCT test_id) FROM notion_imports WHERE page_id = $1",
+                &[&page],
+            )?
+            .get(0);
+        if test_ids > 1 {
+            return Err(one(
+                409,
+                "IMPORT_GATED",
+                "sprint_id",
+                "a cited Notion page was imported under more than one test id; its latest import cannot be determined",
+                "resolve the earlier duplicate import outside the API before executing this page's work",
+            ));
+        }
         let row = tx.query_one(
             "SELECT gates, missing, response, test_id, content_digest FROM notion_imports
              WHERE page_id = $1 ORDER BY sprint_revision DESC, imported_at DESC LIMIT 1",

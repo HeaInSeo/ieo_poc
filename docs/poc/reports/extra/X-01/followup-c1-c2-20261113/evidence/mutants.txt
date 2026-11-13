@@ -27,4 +27,7 @@ dirty after run: none
 # C14 rerun at commit 929e611ca17dde5c9a3c6e34d77fc505f35f8493 · 2026-11-13T16:37:49Z
 C14 registration derivation reads the latest import by import time first (review f0c4e87 J2): killed ['h2_every_reader_takes_the_same_latest_import']
 dirty after run: none
-# result: 23 mutants, 22 killed. C4a survives and is equivalent (one page per test id, C12 killed; exception bound to that page, C4b killed by h3).
+# C19 at commit 2765f570dcefd2d888782869e90f228bbde7643e · 2026-11-13T16:52:25Z
+C19 a page under two test ids is judged by the higher revision (review 6352413 K1): killed ['k1_a_page_imported_under_two_test_ids_fails_closed']
+dirty after run: none
+# result: 24 mutants (C19 added for review 6352413 K1), 23 killed. C4a survives and is equivalent (one page per test id, C12 killed; exception bound to that page, C4b killed by h3).
