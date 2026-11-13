@@ -193,6 +193,23 @@ CREATE TABLE IF NOT EXISTS history (
     at        timestamptz NOT NULL DEFAULT now()
 );
 
+-- Notion imports (X-01): one row per (page, content digest). Same content again is a replay;
+-- changed content becomes the next revision of the test sprint. Rows are never changed.
+CREATE TABLE IF NOT EXISTS notion_imports (
+    page_id          text        NOT NULL,
+    content_digest   text        NOT NULL CHECK (content_digest ~ '^[a-f0-9]{64}$'),
+    test_id          text        NOT NULL,
+    url              text        NOT NULL,
+    last_edited_time text        NOT NULL,
+    source           jsonb       NOT NULL,
+    sprint_revision  bigint      NOT NULL,
+    response         jsonb       NOT NULL,
+    imported_by      text        NOT NULL,
+    imported_at      timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (page_id, content_digest),
+    FOREIGN KEY (test_id, sprint_revision) REFERENCES sprint_revisions (sprint_id, revision)
+);
+
 -- Append-only history: UPDATE/DELETE on these tables is refused by the database itself.
 CREATE OR REPLACE FUNCTION forbid_change() RETURNS trigger LANGUAGE plpgsql AS
 $$ BEGIN RAISE EXCEPTION 'append-only table %', TG_TABLE_NAME; END $$;
@@ -207,6 +224,8 @@ CREATE OR REPLACE TRIGGER judgments_append_only BEFORE UPDATE OR DELETE ON judgm
 CREATE OR REPLACE TRIGGER semantic_reviews_append_only BEFORE UPDATE OR DELETE ON semantic_reviews
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 CREATE OR REPLACE TRIGGER history_append_only BEFORE UPDATE OR DELETE ON history
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+CREATE OR REPLACE TRIGGER notion_imports_append_only BEFORE UPDATE OR DELETE ON notion_imports
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;

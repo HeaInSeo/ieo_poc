@@ -2246,5 +2246,41 @@
       "main_experiments": 31,
       "reason": "2026-11-12 리뷰 요청: P36 한 작업/실험 추가. 기존 ID와 후속 분모 보존."
     }
+  ],
+  "extra_tasks": [
+    {
+      "task_id": "X-01",
+      "title": "Notion 작업 가져오기·초안 등록",
+      "track": "extra",
+      "kind": "구현",
+      "prerequisites": [
+        "02-03"
+      ],
+      "status": "진행",
+      "last_observed_at": null,
+      "latest_report": null,
+      "result_state": "구현·검증 중(PR 대기)",
+      "verification_level": "unverified",
+      "evidence": [],
+      "next_action": "독립 검토 → 조건부 병합 → 원장 갱신"
+    },
+    {
+      "task_id": "X-02",
+      "title": "Notion 시험 작업의 실제 개발 세션 연결",
+      "track": "extra",
+      "kind": "검증",
+      "prerequisites": [
+        "X-01",
+        "02-04"
+      ],
+      "status": "조건 대기",
+      "last_observed_at": null,
+      "latest_report": null,
+      "result_state": "미실행",
+      "verification_level": "unverified",
+      "evidence": [],
+      "next_action": "선행 X-01·02-04 수용, 모델 예산 승인, 원 작업 큐 선행 해제 또는 사용자 결정 뒤 착수",
+      "unresolved": "모델 예산 미승인(01-04 예산 전용 금지) · 선정 작업 OP-OCI-RAC-OC08-20261018의 큐 선행(OC01·OC02 수용·merged, Sori 단일 슬롯) 미해제"
+    }
   ]
 }

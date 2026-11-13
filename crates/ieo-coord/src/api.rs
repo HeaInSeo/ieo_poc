@@ -289,6 +289,7 @@ pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Re
     match route {
         ("POST", ["v0", "sprints"]) => run(db, &|tx| register(tx, ctx, who, req)),
         ("POST", ["v0", "sprint-inputs"]) => run(db, &|tx| convert(tx, ctx, who, req)),
+        ("POST", ["v0", "imports", "notion"]) => run(db, &|tx| import_notion(tx, ctx, who, req)),
         ("GET", ["v0", "sprints", id, "revisions", rev]) => {
             run(db, &|tx| get_revision(tx, who, id, rev))
         }
@@ -585,6 +586,7 @@ fn register(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         let result = reevaluate(tx, stored)?;
         return ok(200, result);
     }
+    guard_import_owned(tx, &body)?;
     let (status, result) = register_spec(tx, ctx, who, &body, mode)?;
     idempotent_store(
         tx,
@@ -627,6 +629,366 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         return ok(200, stored);
     }
     let b = &ctx.bindings[repo];
+    // a binding's sprint_id is reserved against imports, so this sprint is never import-owned
+    let sprint_id = b["sprint_id"].as_str().unwrap_or_default().to_string();
+    let (status, rec, registration) = convert_and_register(
+        tx,
+        ctx,
+        who,
+        &body,
+        repo,
+        Imported {
+            sprint_id,
+            sprint_number: None,
+            extra_sources: vec![],
+            extra_unresolved: vec![],
+            input_ref: format!("sprint-input:{body_digest}"),
+        },
+    )?;
+    let result = json!({"conversion": rec, "registration": registration});
+    idempotent_store(
+        tx,
+        who,
+        "convertHumanInput",
+        key,
+        &body_digest,
+        "draft",
+        &result,
+    )?;
+    ok(status, result)
+}
+
+fn is_hex64(s: &str) -> bool {
+    s.len() == 64
+        && s.bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// `POST /v0/imports/notion` (X-01): register a task read from Notion as a **draft** sprint
+/// under a test ID that is distinct from the Notion task ID. The importer sends the source
+/// identity (page, URL, last edit, content digest) and the human input it derived; the server
+/// applies the repo's binding, adds the Notion page as a source and the importer's unresolved
+/// reasons, and registers through the normal 01-07 checks. Same page + same content → 200
+/// replay (nothing new). Changed content → the next revision; earlier revisions stay stored.
+/// Nothing here can make a spec executable: that still needs `mode=executable` registration,
+/// bound limits, no unresolved reasons and an independent semantic review.
+fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
+    need_client_scope(who, "sprints:register", true)?;
+    let body = parse_body(req.body)?;
+    let input = &body["input"];
+    let Some(repo) = input["repo"].as_str() else {
+        return Err(one(
+            400,
+            "MISSING_FIELD",
+            "input.repo",
+            "input.repo is required",
+            "supply input.repo",
+        ));
+    };
+    if !who.in_repo(repo) {
+        return Err(problem(
+            403,
+            "REPO_SCOPE_DENIED",
+            "repo not in this credential's scope",
+        ));
+    }
+    only_keys(&body, &["test_id", "source", "input", "unresolved"])?;
+    let test_id = str_field(&body, "test_id", 64)?.to_string();
+    if !test_id
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.')
+    {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "test_id",
+            "test_id is [A-Za-z0-9._-]",
+            "fix test_id",
+        ));
+    }
+    let src = &body["source"];
+    only_keys(
+        src,
+        &[
+            "system",
+            "page_id",
+            "url",
+            "last_edited_time",
+            "content_digest",
+            "source_task_id",
+            "fetched_via",
+            "observed_at",
+        ],
+    )?;
+    if src["system"] != "notion" {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "source.system",
+            "source.system must be notion",
+            "fix source",
+        ));
+    }
+    let page_id = str_field(src, "page_id", 64)?.to_string();
+    let url = str_field(src, "url", 1024)?.to_string();
+    let edited = str_field(src, "last_edited_time", 64)?.to_string();
+    let digest = str_field(src, "content_digest", 64)?.to_string();
+    if !is_hex64(&digest) {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "source.content_digest",
+            "not a SHA-256 hex",
+            "fix the digest",
+        ));
+    }
+    let source_task_id = str_field(src, "source_task_id", 256)?.to_string();
+    if test_id == source_task_id {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "test_id",
+            "the test id must differ from the Notion task id",
+            "choose a separate test id",
+        ));
+    }
+    str_field(src, "fetched_via", 128)?;
+    let unresolved: Vec<String> = match &body["unresolved"] {
+        Value::Null => vec![],
+        Value::Array(a) if a.iter().all(|x| x.as_str().is_some_and(|s| !s.is_empty())) => a
+            .iter()
+            .filter_map(|x| x.as_str().map(str::to_string))
+            .collect(),
+        _ => {
+            return Err(one(
+                400,
+                "SCHEMA_VIOLATION",
+                "unresolved",
+                "unresolved is a list of strings",
+                "fix unresolved",
+            ));
+        }
+    };
+    lock(tx, "registry")?;
+    if let Some(row) = tx.query_opt(
+        "SELECT test_id, response FROM notion_imports WHERE page_id = $1 AND content_digest = $2",
+        &[&page_id, &digest],
+    )? {
+        if row.get::<_, &str>(0) != test_id {
+            return Err(one(
+                409,
+                "EVENT_CONTENT_CONFLICT",
+                "test_id",
+                "this Notion page content was imported under another test_id",
+                "use the test_id of the earlier import",
+            ));
+        }
+        // a replay answers only within the repo the import belongs to (review b8b619a R2)
+        let stored_repo: Option<String> = tx
+            .query_opt(
+                "SELECT repo_id FROM sprint_revisions WHERE sprint_id = $1 LIMIT 1",
+                &[&test_id],
+            )?
+            .map(|r| r.get(0));
+        if stored_repo.as_deref() != Some(repo) {
+            return Err(one(
+                409,
+                "EVENT_CONTENT_CONFLICT",
+                "input.repo",
+                "this Notion page content was imported for another repo",
+                "import under the repo of the earlier import",
+            ));
+        }
+        let mut stored: Value = row.get(1);
+        stored["registration"] = reevaluate(tx, stored["registration"].take())?;
+        stored["replay"] = json!(true);
+        return ok(200, stored);
+    }
+    if let Some(row) = tx.query_opt(
+        "SELECT page_id FROM notion_imports WHERE test_id = $1 LIMIT 1",
+        &[&test_id],
+    )? && row.get::<_, &str>(0) != page_id
+    {
+        return Err(one(
+            409,
+            "EVENT_CONTENT_CONFLICT",
+            "test_id",
+            "this test_id belongs to another Notion page",
+            "use a new test_id",
+        ));
+    }
+    // a test id is never an existing sprint that no Notion import created (review b8b619a R1)
+    let imported_before: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE test_id = $1)",
+            &[&test_id],
+        )?
+        .get(0);
+    let reserved = ctx
+        .bindings
+        .as_object()
+        .into_iter()
+        .flatten()
+        .any(|(_, b)| b["sprint_id"].as_str() == Some(test_id.as_str()));
+    if !imported_before && (reserved || latest_revision(tx, &test_id)?.is_some()) {
+        return Err(one(
+            409,
+            "EVENT_CONTENT_CONFLICT",
+            "test_id",
+            "test_id names an existing sprint that was not created by a Notion import",
+            "use a new test_id",
+        ));
+    }
+    // task-ID prefix: the test sprint keeps the number it was first given; a new test sprint
+    // takes the first number of the binding's import pool that no other sprint uses
+    let b = &ctx.bindings[repo];
+    let existing: Option<String> = tx
+        .query_opt(
+            "SELECT spec->'tasks'->0->>'task_id' FROM sprint_revisions WHERE sprint_id = $1
+             ORDER BY revision DESC LIMIT 1",
+            &[&test_id],
+        )?
+        .and_then(|r| r.get(0));
+    let number = match existing.and_then(|t| t.get(..2).and_then(|n| n.parse::<u8>().ok())) {
+        Some(n) => n,
+        None => {
+            let pool: Vec<u8> = b["import_sprint_numbers"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|n| n.as_u64().and_then(|n| u8::try_from(n).ok()))
+                .collect();
+            let mut free = None;
+            for n in pool {
+                let prefix = format!("{n:02}-%");
+                let used: bool = tx
+                    .query_one(
+                        "SELECT EXISTS (SELECT 1 FROM sprint_revisions, jsonb_array_elements(spec->'tasks') t
+                           WHERE t->>'task_id' LIKE $1)",
+                        &[&prefix],
+                    )?
+                    .get(0);
+                if !used {
+                    free = Some(n);
+                    break;
+                }
+            }
+            let Some(n) = free else {
+                return Err(one(
+                    422,
+                    "UNBOUND_DRAFT",
+                    "input.repo",
+                    "the repo binding has no free import sprint number",
+                    "add numbers to the binding's import_sprint_numbers",
+                ));
+            };
+            n
+        }
+    };
+    let observed = src["observed_at"].as_str().map(str::to_string);
+    let notion_source = json!({"kind": "notion_page", "ref": url, "revision": edited,
+                               "digest": digest, "observed_at": observed});
+    let (status, rec, registration) = convert_and_register(
+        tx,
+        ctx,
+        who,
+        input,
+        repo,
+        Imported {
+            sprint_id: test_id.clone(),
+            sprint_number: Some(number),
+            extra_sources: vec![notion_source],
+            extra_unresolved: unresolved,
+            input_ref: format!("notion:{page_id}@{digest}"),
+        },
+    )?;
+    let import = json!({"test_id": test_id, "source_task_id": source_task_id, "page_id": page_id,
+                        "url": url, "last_edited_time": edited, "content_digest": digest});
+    let result = json!({"import": import, "conversion": rec, "registration": registration,
+                        "replay": false});
+    let rev = registration["revision"].as_i64().unwrap_or_default();
+    tx.execute(
+        "INSERT INTO notion_imports (page_id, content_digest, test_id, url, last_edited_time,
+            source, sprint_revision, response, imported_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        &[
+            &page_id, &digest, &test_id, &url, &edited, src, &rev, &result, &who.name,
+        ],
+    )?;
+    history(
+        tx,
+        &who.name,
+        "notion.imported",
+        &json!({"test_id": test_id, "page_id": page_id, "content_digest": digest, "revision": rev}),
+    )?;
+    ok(status, result)
+}
+
+/// A sprint created by a Notion import (X-01) accepts a `/v0/sprints` registration only when the
+/// spec is derived from its latest import: the same tasks and the same `notion_page` source digest.
+/// That is how an imported draft becomes executable once its limits are bound and its reasons are
+/// resolved (review 7a48a4f T1); any other content → 409 (review 38b671b S2). Malformed bodies
+/// and other repos fall through to the normal checks (400 / `SPRINT_REPO_CONFLICT`, T2/T5).
+fn guard_import_owned(tx: &mut Transaction, spec: &Value) -> Result<(), Resp> {
+    let sid = spec["sprint_id"].as_str().unwrap_or_default();
+    let Some(row) = tx.query_opt(
+        "SELECT n.content_digest, s.repo_id, s.spec FROM notion_imports n
+           JOIN sprint_revisions s ON s.sprint_id = n.test_id AND s.revision = n.sprint_revision
+         WHERE n.test_id = $1 ORDER BY n.sprint_revision DESC LIMIT 1",
+        &[&sid],
+    )?
+    else {
+        return Ok(());
+    };
+    let digest: String = row.get(0);
+    let owner: String = row.get(1);
+    let imported: Value = row.get(2);
+    if spec["target"]["repo_id"].as_str() != Some(owner.as_str())
+        || !ieo_spec::schema::format_rejections(ieo_spec::schema::sprint_spec_validator(), spec)
+            .is_empty()
+    {
+        return Ok(());
+    }
+    let same_source = spec["sources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|x| x["kind"] == "notion_page" && x["digest"].as_str() == Some(digest.as_str()));
+    if same_source && spec["tasks"] == imported["tasks"] {
+        return Ok(());
+    }
+    Err(one(
+        409,
+        "EVENT_CONTENT_CONFLICT",
+        "sprint_id",
+        "this sprint was created by a Notion import; only a spec derived from its latest import \
+         (same tasks and notion_page source) may be registered here",
+        "re-import the Notion task, or keep its tasks and source and bind only limits/readiness",
+    ))
+}
+
+/// Per-request additions to a repo binding (Notion import, X-01).
+struct Imported {
+    sprint_id: String,
+    /// Two-digit task-ID prefix; `None` = the binding's `sprint_number`.
+    sprint_number: Option<u8>,
+    extra_sources: Vec<Value>,
+    extra_unresolved: Vec<String>,
+    input_ref: String,
+}
+
+/// Convert a human input with the repo's approved binding and register the result as a
+/// draft. Extra sources and unresolved reasons are added before the digest is computed, so
+/// a spec with any unresolved reason can never be stored as `ready` (01-07 checks).
+fn convert_and_register(
+    tx: &mut Transaction,
+    ctx: &Ctx,
+    who: &Caller,
+    input: &Value,
+    repo: &str,
+    imp: Imported,
+) -> Result<(u16, ieo_spec::ConversionRecord, Value), Resp> {
+    let b = &ctx.bindings[repo];
     if !b.is_object() {
         return Err(one(
             422,
@@ -636,18 +998,22 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "the repo's binding (sprint number, delegation, sources, profile, limits) must be approved first",
         ));
     }
-    let sprint_id = b["sprint_id"].as_str().unwrap_or_default().to_string();
-    let next_rev = latest_revision(tx, &sprint_id)?.unwrap_or(0) + 1;
+    let next_rev = latest_revision(tx, &imp.sprint_id)?.unwrap_or(0) + 1;
+    // tasks of *other* sprints (a sprint's own earlier revision is not a conflict)
     let mut registered = BTreeMap::new();
     for row in tx.query(
-        "SELECT DISTINCT ON (sprint_id) spec FROM sprint_revisions ORDER BY sprint_id, revision DESC",
-        &[],
+        "SELECT DISTINCT ON (sprint_id) spec FROM sprint_revisions WHERE sprint_id <> $1
+         ORDER BY sprint_id, revision DESC",
+        &[&imp.sprint_id],
     )? {
         let spec: Value = row.get(0);
         for t in spec["tasks"].as_array().into_iter().flatten() {
             registered.insert(
                 t["task_id"].as_str().unwrap_or_default().to_string(),
-                spec["plan_version"].as_str().unwrap_or_default().to_string(),
+                spec["plan_version"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
             );
         }
     }
@@ -664,8 +1030,10 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         .map(|m| m.keys().cloned().collect())
         .unwrap_or_default();
     let cctx = ConversionContext {
-        sprint_id,
-        sprint_number: u8::try_from(b["sprint_number"].as_u64().unwrap_or_default()).unwrap_or(0),
+        sprint_id: imp.sprint_id.clone(),
+        sprint_number: imp.sprint_number.unwrap_or_else(|| {
+            u8::try_from(b["sprint_number"].as_u64().unwrap_or_default()).unwrap_or(0)
+        }),
         revision: u64::try_from(next_rev).unwrap_or_default(),
         plan_version: b["plan_version"].as_str().unwrap_or_default().to_string(),
         repository_url: b["repository_url"].as_str().map(str::to_string),
@@ -680,9 +1048,9 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         human_validation: b["human_validation"].clone(),
         sources: b["sources"].clone(),
         registered_tasks: registered,
-        input_ref: format!("sprint-input:{body_digest}"),
+        input_ref: imp.input_ref.clone(),
     };
-    let rec = convert_human_input(&body, &cctx).map_err(|rs| {
+    let mut rec = convert_human_input(input, &cctx).map_err(|rs| {
         let status = rs.iter().map(|r| r.code.http_status()).min().unwrap_or(400);
         rejected(
             status,
@@ -691,18 +1059,23 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
                 .collect(),
         )
     })?;
+    if !imp.extra_sources.is_empty() || !imp.extra_unresolved.is_empty() {
+        if let Some(src) = rec.spec["sources"].as_array_mut() {
+            src.extend(imp.extra_sources.iter().cloned());
+        }
+        for u in &imp.extra_unresolved {
+            if !rec.unresolved_bindings.contains(u) {
+                rec.unresolved_bindings.push(u.clone());
+            }
+        }
+        rec.spec["unresolved_bindings"] = json!(rec.unresolved_bindings);
+        if !rec.unresolved_bindings.is_empty() {
+            rec.spec["registration_state"] = json!("draft");
+        }
+        rec.spec["digest"] = json!(ieo_spec::spec_digest(&rec.spec));
+    }
     let (status, registration) = register_spec(tx, ctx, who, &rec.spec, CheckMode::Draft)?;
-    let result = json!({"conversion": rec, "registration": registration});
-    idempotent_store(
-        tx,
-        who,
-        "convertHumanInput",
-        key,
-        &body_digest,
-        "draft",
-        &result,
-    )?;
-    ok(status, result)
+    Ok((status, rec, registration))
 }
 
 /// Sprint row visible to this client, else 404 (a sprint of another repo is not revealed).
@@ -1394,14 +1767,44 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "assign within the revision's repo",
         ));
     }
-    if latest_revision(tx, &sprint_id)?.is_some_and(|l| l > sprint_rev) {
-        return Err(one(
-            409,
-            "REVISION_SUPERSEDED",
-            "sprint_revision",
-            "a newer revision is active",
-            "assign from the latest revision",
-        ));
+    // a pinned continuation is bounded by the latest revision's attempt ceiling (review b8b619a R3)
+    let mut ceiling_from_latest: Option<Value> = None;
+    if let Some(latest) = latest_revision(tx, &sprint_id)?
+        && latest > sprint_rev
+    {
+        // X-01: a running assignment stays on the revision it started from. A later revision
+        // (e.g. a re-imported Notion task) never changes it; only its own next generation may
+        // continue on that pinned revision. New assignments need the latest revision.
+        let pinned = generation > 0
+            && tx
+                .query_opt(
+                    "SELECT 1 FROM assignments WHERE assignment_id = $1 AND generation = $2
+                       AND sprint_id = $3 AND sprint_revision = $4",
+                    &[&aid, &i64_of(generation - 1), &sprint_id, &sprint_rev],
+                )?
+                .is_some();
+        if !pinned {
+            return Err(one(
+                409,
+                "REVISION_SUPERSEDED",
+                "sprint_revision",
+                "a newer revision is active",
+                "assign from the latest revision",
+            ));
+        }
+        // the ceiling comes from the newest revision that could itself run (executable and
+        // semantically reviewed); a draft — e.g. a re-imported Notion task — changes nothing for
+        // a running execution (review 38b671b S1)
+        let _ = latest;
+        if let Some(r) = tx.query_opt(
+            "SELECT spec FROM sprint_revisions WHERE sprint_id = $1 AND revision > $2
+               AND mode = 'executable' AND review_state = 'semantic_review_passed'
+             ORDER BY revision DESC LIMIT 1",
+            &[&sprint_id, &sprint_rev],
+        )? {
+            let l: Value = r.get(0);
+            ceiling_from_latest = Some(l["limits"]["correction_attempts"].clone());
+        }
     }
     if rev_row.get::<_, &str>(1) != "executable" {
         return Err(one(
@@ -1527,7 +1930,10 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         &[&sprint_id, &task_id, &role],
     )?;
     let issued = attempts.map_or(0, |r| r.get::<_, i64>(0));
-    let Some(ceiling) = spec["limits"]["correction_attempts"].as_i64() else {
+    let ceiling_value = ceiling_from_latest
+        .clone()
+        .unwrap_or_else(|| spec["limits"]["correction_attempts"].clone());
+    let Some(ceiling) = ceiling_value.as_i64() else {
         return Err(one(
             422,
             "UNBOUND_DRAFT",

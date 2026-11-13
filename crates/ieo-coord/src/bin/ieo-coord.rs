@@ -1,5 +1,5 @@
 //! `ieo-coord migrate` | `ieo-coord serve --listen ADDR --tokens FILE --manifest FILE
-//!  --policy FILE [--bindings FILE] [--workers N]`. The DB URL is read from `IEO_DB_URL`.
+//!  --policy FILE [--bindings FILE] [--profiles FILE] [--workers N]`. The DB URL is read from `IEO_DB_URL`.
 
 use ieo_coord::api::{Ctx, migrate};
 use ieo_coord::auth::Credentials;
@@ -37,7 +37,16 @@ fn run() -> Result<(), String> {
             let bytes = std::fs::read(&policy_path).map_err(|e| format!("{policy_path}: {e}"))?;
             let policy = policy::load(&bytes)?;
             let creds = Credentials::from_json(&read_json(&need("--tokens")?)?)?;
-            let manifest = read_json(&need("--manifest")?)?;
+            let mut manifest = read_json(&need("--manifest")?)?;
+            // extra approved acceptance profiles (e.g. a test binding's profile), appended
+            if let Some(p) = arg(&args, "--profiles") {
+                let extra = read_json(&p)?;
+                let list = extra.as_array().ok_or("--profiles must be a JSON array")?.clone();
+                match manifest["inspection_profiles"].as_array_mut() {
+                    Some(ps) => ps.extend(list),
+                    None => manifest["inspection_profiles"] = serde_json::Value::Array(list),
+                }
+            }
             let bindings = match arg(&args, "--bindings") {
                 Some(p) => read_json(&p)?,
                 None => serde_json::json!({}),
@@ -58,7 +67,7 @@ fn run() -> Result<(), String> {
             };
             serve(Arc::new(server), Arc::new(app), &cfg, workers)
         }
-        _ => Err("usage: ieo-coord migrate | serve --listen ADDR --tokens FILE --manifest FILE --policy FILE [--bindings FILE] [--workers N]".into()),
+        _ => Err("usage: ieo-coord migrate | serve --listen ADDR --tokens FILE --manifest FILE --policy FILE [--bindings FILE] [--profiles FILE] [--workers N]".into()),
     }
 }
 
