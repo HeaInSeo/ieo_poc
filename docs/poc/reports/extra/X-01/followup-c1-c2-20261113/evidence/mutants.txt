@@ -1,22 +1,22 @@
-# X-01 C2 mutants at commit 8d76ee794a6b4eab6461f8ba07fe4c80c1a85d57 · 2026-11-13T14:07:05Z
-C1 registration ignores the Notion gate: killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_an_exception_covers_only_the_content_it_approved', 'c2_an_exception_does_not_lift_missing_inputs']
+# X-01 C2 mutants at commit a33a8e2847523d9645a3ed4178f599d68c882e23 · 2026-11-13T14:27:20Z
+C1 registration ignores the Notion gate: killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_an_exception_does_not_lift_missing_inputs', 'c2_a_user_exception_applies_only_to_its_test_and_repo']
 C2 assignment ignores the Notion gate: killed ['c2_a_re_gating_import_stops_a_running_assignment']
 C3 missing facts do not block: killed ['c2_an_exception_does_not_lift_missing_inputs']
-C4 an exception applies to any test sprint and page of the repo (review 7afd4d1 G2): killed ['g2_identical_content_on_two_pages_is_gated_and_excepted_per_page']
+C4 an exception applies to any test sprint and page of the repo (review 7afd4d1 G2): killed ['g2_identical_content_on_two_pages_is_gated_and_excepted_per_page', 'h3_an_exception_recorded_without_a_page_never_matches']
 C4a exception not filtered by test sprint (page binding remains): SURVIVED []
-C4b exception not bound to the page (test sprint filter remains): SURVIVED []
-C5 registrars may write import records: killed ['a_binding_sprint_id_is_reserved_against_imports', 'an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source', 'an_import_replay_answers_only_within_its_repo', 'an_import_owned_sprint_changes_only_through_imports']
+C4b exception not bound to the page (test sprint filter remains; review e908a8c H3): killed ['h3_an_exception_recorded_without_a_page_never_matches']
+C5 registrars may write import records: killed ['a_binding_sprint_id_is_reserved_against_imports', 'an_import_owned_sprint_changes_only_through_imports', 'an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source', 'a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id']
 C6 legacy rows: unknown reasons not fail-closed: killed ['api::tests::legacy_reasons_split_fail_closed']
 C7 importer files a gate as a missing fact: killed ['queue_gates_become_unresolved_reasons']
-C8 gates stored empty (release forged): killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_re_gating_import_stops_a_running_assignment', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_a_user_exception_applies_only_to_its_test_and_repo']
-C9 page ids in sources not recognised (review 7afd4d1 G1): killed ['(build/other failure)']
-C9b no digest fallback for a source without a page reference: killed ['g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated']
+C8 gates stored empty (release forged): killed ['an_imported_draft_with_unresolved_reasons_cannot_execute', 'c2_a_copy_under_another_sprint_id_is_still_gated', 'c2_a_re_gating_import_stops_a_running_assignment', 'c2_a_user_exception_applies_only_to_its_test_and_repo']
+C9 page ids in sources not recognised (review 7afd4d1 G1): killed ['g2_identical_content_on_two_pages_is_gated_and_excepted_per_page', 'g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated']
+C9b no digest fallback for a source without a page reference: killed ['h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content', 'g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated']
 C10 replay of an earlier content state (review F2): killed ['c2_content_returning_to_a_gated_state_gates_again', 'notion_import_registers_a_draft_once_and_revises_on_change']
 C11 exception not bound to the approved content (review F4): killed ['c2_an_exception_covers_only_the_content_it_approved']
 C12 a page may be imported under a second test id (review 7afd4d1 G3): killed ['g3_a_page_belongs_to_one_test_id']
+C13 a named page hides the cited content whatever its digest (review e908a8c H1): killed ['h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content']
+C13b the cited digest always pulls in every page with that content (G2 over-blocking): killed ['g2_identical_content_on_two_pages_is_gated_and_excepted_per_page']
+C14 registration reads the latest import by revision only (review e908a8c H2): killed ['h2_every_reader_takes_the_same_latest_import']
+C14b exception approval reads the latest import by revision only (review e908a8c H2): killed ['h2_every_reader_takes_the_same_latest_import']
 dirty after run: none
-# note: C9 above was the pre-retarget mutant (removing the call left an unused binding, a build failure, not a test kill). It was retargeted to compile (mutants.py at a57ba9d) and rerun alone:
-# C9 rerun at commit a57ba9d9a86e2262588865d2d9017a41d7839e76 · 2026-11-13T14:09:32Z
-C9 page ids in sources not recognised (review 7afd4d1 G1): killed ['g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated', 'g2_identical_content_on_two_pages_is_gated_and_excepted_per_page']
-dirty after run: none
-# result: 15 mutants, 13 killed by tests (C9 counted from the rerun). C4a and C4b each remove one of two overlapping exception filters (test sprint, page); with one page per test id (C12 killed) and the exception bound to that test's page, either filter alone decides the same; removing both (C4) is killed by g2_identical_content_on_two_pages_is_gated_and_excepted_per_page.
+# result: 19 mutants, 18 killed. C4a (drop the test-sprint filter of the exception query) survives and is equivalent: a page belongs to one test id (C12 killed) and an exception is bound to its test's page (C4b killed by h3), so the page filter alone decides the same (confirmed by review e908a8c). C9b's name predates correction 3: it removes the digest query, which now runs for every source unless a named page carries the digest.
