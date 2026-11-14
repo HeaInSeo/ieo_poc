@@ -1,0 +1,167 @@
+{
+ "attempt_id": "D6",
+ "role": "development",
+ "command_id": "development-reconnect",
+ "session": {
+  "mode": "new",
+  "resume_base_attempt": null,
+  "session_id": "c84c7b5c-fb50-4323-8fda-26033ea2433b"
+ },
+ "duration_ms": 3861,
+ "stop_required": false,
+ "stop_reason": null,
+ "outcome": {
+  "stop": "Exited",
+  "stopped_by_guard": false,
+  "exit_code": 0,
+  "cleanup_failed": false,
+  "tamper": {
+   "checkpoint_digest": "1661779da5702828b2b8c381a72c2367ce226a982252b1d41a350e7f0be7ce64",
+   "config_tamper_detected": true,
+   "new_session_id": "c84c7b5c-fb50-4323-8fda-26033ea2433b",
+   "observed_digest": "98e3b2f64d06dc34931204fbac99c0a163e20faf3b47ed2201f3e491c508325c",
+   "old_session_id": "58f8976d-3ee3-465f-baac-6102e3321779"
+  },
+  "config_cleanup": {
+   "credentials_removed": [],
+   "digest": "1661779da5702828b2b8c381a72c2367ce226a982252b1d41a350e7f0be7ce64",
+   "removed": 10
+  },
+  "env_names": [
+   "HOME",
+   "PATH",
+   "LANG",
+   "CLAUDE_CONFIG_DIR",
+   "CLAUDE_CODE_OAUTH_TOKEN"
+  ]
+ },
+ "init": {
+  "session_id": "c84c7b5c-fb50-4323-8fda-26033ea2433b",
+  "tools": [
+   "Task",
+   "Bash",
+   "CronCreate",
+   "CronDelete",
+   "CronList",
+   "DesignSync",
+   "Edit",
+   "EnterWorktree",
+   "ExitWorktree",
+   "ListAgents",
+   "Monitor",
+   "NotebookEdit",
+   "PushNotification",
+   "Read",
+   "RemoteTrigger",
+   "ReportFindings",
+   "ScheduleWakeup",
+   "SendMessage",
+   "Skill",
+   "TaskStop",
+   "ToolSearch",
+   "WebFetch",
+   "WebSearch",
+   "Workflow",
+   "Write"
+  ],
+  "mcp_servers": [],
+  "agents": [
+   "claude",
+   "Explore",
+   "general-purpose",
+   "Plan",
+   "reader",
+   "statusline-setup"
+  ],
+  "skills": [
+   "deep-research",
+   "design",
+   "design-sync",
+   "dataviz",
+   "update-config",
+   "verify",
+   "debug",
+   "code-review",
+   "simplify",
+   "batch",
+   "fewer-permission-prompts",
+   "doctor",
+   "loop",
+   "schedule",
+   "claude-api",
+   "workflow-authoring",
+   "run",
+   "run-skill-generator",
+   "plugin-authoring"
+  ],
+  "plugins": [
+   {
+    "name": "cc-plugin-agents-md",
+    "path": "builtin",
+    "source": "cc-plugin-agents-md@builtin"
+   },
+   {
+    "name": "cc-plugin-telemetry",
+    "path": "builtin",
+    "source": "cc-plugin-telemetry@builtin"
+   },
+   {
+    "name": "cc-plugin-privacy",
+    "path": "builtin",
+    "source": "cc-plugin-privacy@builtin"
+   },
+   {
+    "name": "cc-plugin-plugin-authoring",
+    "path": "builtin",
+    "source": "cc-plugin-plugin-authoring@builtin"
+   }
+  ],
+  "memory_paths": null,
+  "apiKeySource": "none",
+  "model": "claude-sonnet-5-5",
+  "permissionMode": "dontAsk",
+  "cwd": "/state/work/fixture0204"
+ },
+ "init_slash_commands": 53,
+ "tool_uses": [],
+ "tool_errors": [],
+ "result": {
+  "subtype": "success",
+  "is_error": false,
+  "session_id": "c84c7b5c-fb50-4323-8fda-26033ea2433b",
+  "text": "FRESH"
+ },
+ "compact_boundaries": 0,
+ "rate_limit": [
+  {
+   "status": "allowed",
+   "overageStatus": "rejected",
+   "isUsingOverage": false
+  }
+ ],
+ "usage_run": {
+  "source": "새 세션: result.modelUsage",
+  "state": "measured",
+  "tokens": {
+   "cache_creation": 4017,
+   "cache_read": 12535,
+   "input": 2,
+   "output": 6
+  }
+ },
+ "usage_session": {
+  "source": "result.modelUsage",
+  "state": "measured",
+  "tokens": {
+   "cache_creation": 4017,
+   "cache_read": 12535,
+   "input": 2,
+   "output": 6
+  }
+ },
+ "stream": {
+  "bytes": 6663,
+  "sha256": "bf7f7beed5d729697de5dcb064cfc3939b7eb1dd3144c16a6ee6863d47f9299e"
+ },
+ "children": []
+}

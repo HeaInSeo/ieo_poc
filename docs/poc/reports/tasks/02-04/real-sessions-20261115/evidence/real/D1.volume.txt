@@ -1,0 +1,12 @@
+# before D1
+drwxrwxr-x. 4 20001 20001 system_u:object_r:container_file_t:s0 32 11월 15 02:40 <W>/development/state
+drwxrwxr-x. 4 20001 20001 system_u:object_r:container_file_t:s0 74 11월 15 02:40 <W>/development/state/claude
+# after D1
+drwxrwxr-x. 8 20001 20001 system_u:object_r:container_file_t:s0  106 11월 15 02:41 <W>/development/state
+drwxrwxr-x. 6 20001 20001 system_u:object_r:container_file_t:s0 4096 11월 15 02:40 <W>/development/state/claude
+# files
+work/fixture0204/HOOK-RAN absent
+guardrail-scratch/g1.txt absent
+review/fixture/g1-denied.txt absent
+inputs/0204-RT/g1-denied.txt absent
+claude/skills/tamper0204/SKILL.md absent
