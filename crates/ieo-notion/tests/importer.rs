@@ -115,6 +115,10 @@ fn snapshot_round_trips_and_detects_tampering() {
     assert_eq!(from_snapshot(&s).as_ref(), Ok(&p));
     s["content"] = json!("tampered");
     assert!(from_snapshot(&s).is_err());
+    // the snapshot's URL must name its page
+    let mut other = to_snapshot(&p);
+    other["url"] = json!("https://app.notion.com/p/fedcba9876543210fedcba9876543210");
+    assert!(from_snapshot(&other).is_err());
 }
 
 #[test]
