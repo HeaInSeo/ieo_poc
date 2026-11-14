@@ -2161,6 +2161,7 @@ fn notion_import_registers_a_draft_once_and_revises_on_change() {
     );
     let mut other = notion_import("POCX-T01", 'c', gate);
     other["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
+    other["source"]["url"] = json!("https://app.notion.com/p/fedcba9876543210fedcba9876543210");
     assert_eq!(
         code(&e.post("importer", "/v0/imports/notion", &other).1),
         "EVENT_CONTENT_CONFLICT"
@@ -2306,6 +2307,7 @@ fn import_sprint_numbers_and_own_revisions_do_not_conflict() {
     // another Notion page under another test id takes the next free number of the pool
     let mut second = notion_import("POCX-T02", 'e', json!([]));
     second["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
+    second["source"]["url"] = json!("https://app.notion.com/p/fedcba9876543210fedcba9876543210");
     let (st, r) = e.post("importer", "/v0/imports/notion", &second);
     assert_eq!(st, 201, "{r}");
     assert_eq!(r["conversion"]["spec"]["tasks"][0]["task_id"], "12-01");
@@ -2324,6 +2326,7 @@ fn import_sprint_numbers_and_own_revisions_do_not_conflict() {
     let before = e.counts();
     let mut third = notion_import("POCX-T03", '0', json!([]));
     third["source"]["page_id"] = json!("00000000000000000000000000000000");
+    third["source"]["url"] = json!("https://app.notion.com/p/00000000000000000000000000000000");
     assert_eq!(
         code(&e.post("importer", "/v0/imports/notion", &third).1),
         "UNBOUND_DRAFT"
@@ -2847,6 +2850,7 @@ fn c2_a_user_exception_applies_only_to_its_test_and_repo() {
     );
     let mut second = notion_import_gated("POCX-T02", 'e', queue_gates(), json!([]));
     second["source"]["page_id"] = json!("fedcba9876543210fedcba9876543210");
+    second["source"]["url"] = json!("https://app.notion.com/p/fedcba9876543210fedcba9876543210");
     assert_eq!(e.post("importer", "/v0/imports/notion", &second).0, 201);
     // the exception for T02 does not unlock T01; one for another repo is refused
     assert_eq!(
@@ -3787,4 +3791,77 @@ fn l3_page_ids_are_accepted_only_in_canonical_form() {
         .0,
         201
     );
+}
+
+// --- X-02 prep: the URL must name the imported page (user decision 2026-11-14 §5) ---
+
+#[test]
+fn an_import_whose_url_names_another_page_is_refused() {
+    let Some(e) = start() else { return };
+    for (url, why) in [
+        (
+            "https://app.notion.com/p/fedcba9876543210fedcba9876543210",
+            "another page",
+        ),
+        (
+            "https://app.notion.com/p/Task-fedcba9876543210fedcba9876543210",
+            "another page with a title",
+        ),
+        ("https://app.notion.com/p/notion", "no page id"),
+        (
+            "https://app.notion.com/p/0123456789abcdef0123456789abcdef/sub",
+            "page id not in the last segment",
+        ),
+    ] {
+        let mut b = notion_import("POCX-T01", 'a', json!([]));
+        b["source"]["url"] = json!(url);
+        let before = e.counts();
+        let (st, r) = e.post("importer", "/v0/imports/notion", &b);
+        assert_eq!(
+            (st, code(&r)),
+            (400, "SCHEMA_VIOLATION".into()),
+            "{why}: {r}"
+        );
+        assert_eq!(e.counts(), before, "{why}");
+    }
+    // the same page in the forms Notion uses is accepted
+    for (i, url) in [
+        "https://app.notion.com/p/0123456789abcdef0123456789abcdef",
+        "https://www.notion.so/Synthetic-Task-0123456789abcdef0123456789abcdef?pvs=4",
+        "https://www.notion.so/01234567-89ab-cdef-0123-456789abcdef#section",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let mut b = notion_import("POCX-T01", 'a', json!([]));
+        b["source"]["url"] = json!(url);
+        let (st, r) = e.post("importer", "/v0/imports/notion", &b);
+        assert!(st == 201 || (i > 0 && st == 200), "{url}: {st} {r}");
+    }
+}
+
+#[test]
+fn url_page_ids_are_read_strictly() {
+    use ieo_coord::api::url_page_id;
+    let id = "0123456789abcdef0123456789abcdef";
+    for (url, want) in [
+        (format!("https://app.notion.com/p/{id}"), Some(id)),
+        (format!("https://www.notion.so/Cafe-{id}"), Some(id)),
+        (
+            format!(
+                "https://www.notion.so/{}",
+                "01234567-89ab-cdef-0123-456789abcdef"
+            ),
+            Some(id),
+        ),
+        (
+            format!("https://www.notion.so/{}", id.to_uppercase()),
+            Some(id),
+        ),
+        (format!("https://www.notion.so/{id}/"), Some(id)),
+        ("https://app.notion.com/p/short".to_string(), None),
+        (format!("https://app.notion.com/{id}/x"), None),
+    ] {
+        assert_eq!(url_page_id(&url).as_deref(), want, "{url}");
+    }
 }

@@ -54,6 +54,23 @@ pub fn unescape(s: &str) -> String {
     out
 }
 
+/// The page id a Notion URL names, strictly: the last path segment without dashes must end in 32
+/// hex characters (lower-cased). Same rule as the coordinator's import check.
+pub fn url_page_id(url: &str) -> Option<String> {
+    let path = url.split(['?', '#']).next()?;
+    let seg: String = path
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()?
+        .chars()
+        .filter(|c| *c != '-')
+        .collect();
+    let tail = seg.get(seg.len().checked_sub(32)?..)?;
+    tail.chars()
+        .all(|c| c.is_ascii_hexdigit())
+        .then(|| tail.to_ascii_lowercase())
+}
+
 /// Page id (32 hex) from a Notion URL or a dashed UUID.
 pub fn page_id_from(s: &str) -> Option<String> {
     let tail = s.split(['?', '#']).next()?;
@@ -367,6 +384,10 @@ pub fn from_snapshot(v: &Value) -> Result<NotionPage, String> {
         content: s("content")?,
         fetched_via: s("fetched_via")?,
     };
+    // X-02 prep: the snapshot's URL must name the snapshot's page (the coordinator checks the same)
+    if url_page_id(&p.url).as_deref() != Some(p.page_id.as_str()) {
+        return Err("snapshot.url does not name snapshot.page_id".into());
+    }
     if v["content_digest"].as_str() != Some(content_digest(&p).as_str()) {
         return Err("snapshot content_digest does not match its content".into());
     }

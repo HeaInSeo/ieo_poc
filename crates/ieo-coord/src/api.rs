@@ -679,6 +679,23 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     ok(status, result)
 }
 
+/// The Notion page id a URL names: the last path segment (query and fragment removed), dashes
+/// removed, must end in 32 hex characters; those, in lower case, are the id. `None` otherwise.
+pub fn url_page_id(url: &str) -> Option<String> {
+    let path = url.split(['?', '#']).next()?;
+    let seg: String = path
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()?
+        .chars()
+        .filter(|c| *c != '-')
+        .collect();
+    let tail = seg.get(seg.len().checked_sub(32)?..)?;
+    tail.chars()
+        .all(|c| c.is_ascii_hexdigit())
+        .then(|| tail.to_ascii_lowercase())
+}
+
 fn is_hex64(s: &str) -> bool {
     s.len() == 64
         && s.bytes()
@@ -771,6 +788,16 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
         ));
     }
     let url = str_field(src, "url", 1024)?.to_string();
+    // X-02 prep (user decision 2026-11-14 §5): the page the URL names must be the imported page
+    if url_page_id(&url).as_deref() != Some(page_id.as_str()) {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            "source.url",
+            "the page id in the URL does not match source.page_id",
+            "send the URL of the imported page",
+        ));
+    }
     let edited = str_field(src, "last_edited_time", 64)?.to_string();
     let digest = str_field(src, "content_digest", 64)?.to_string();
     if !is_hex64(&digest) {
