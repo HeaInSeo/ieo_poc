@@ -28,6 +28,18 @@ impl Tmp {
 }
 impl Drop for Tmp {
     fn drop(&mut self) {
+        // a failing test must not leak the fake's processes
+        if let Ok(rd) = std::fs::read_dir(&self.0) {
+            for e in rd.flatten() {
+                if e.path().extension().is_some_and(|x| x == "pid")
+                    && let Ok(pid) = std::fs::read_to_string(e.path())
+                {
+                    let _ = Command::new("kill")
+                        .args(["-s", "KILL", pid.trim()])
+                        .status();
+                }
+            }
+        }
         let _ = std::fs::remove_dir_all(&self.0);
     }
 }
@@ -122,6 +134,9 @@ fn a_normal_run_is_allowed_and_measured() {
         ),
         (1921, 3198, 2)
     );
+    assert!(!o.cleanup_failed);
+    // the end of the run is noticed at once, not at the deadline
+    assert!(o.elapsed < Duration::from_secs(3), "{:?}", o.elapsed);
     let copied = std::fs::read_to_string(d.p().join("stdout.jsonl")).expect("copy");
     assert_eq!(copied.lines().count(), lines.len());
 }
@@ -243,62 +258,262 @@ fn an_extra_usage_or_limit_signal_stops_the_run() {
     }
 }
 
-#[test]
-fn limits_for_the_next_run_come_from_the_budget() {
-    let s = budget::spent(&[]);
-    let l = Limits::for_next(&BUDGET_0204, &s).expect("room");
-    assert_eq!(
-        (
-            l.timeout,
-            l.timeout_is_total,
-            l.billable_room,
-            l.cache_read_room
-        ),
-        (Duration::from_secs(1_800), false, 1_500_000, 15_000_000)
-    );
-    let rec = |ms: u64, b: u64, cr: u64| {
-        json!({"model_request": true, "attempt_id": "a", "command_id": "c", "duration_ms": ms,
-               "usage": {"run": {"state": "measured", "tokens": {"input": b, "output": 0, "cache_creation": 0, "cache_read": cr}}}})
-    };
-    let s = budget::spent(&[rec(13_000_000, 1_000_000, 10_000_000)]);
-    let l = Limits::for_next(&BUDGET_X02, &s).expect("room");
-    assert_eq!(
-        (
-            l.timeout,
-            l.timeout_is_total,
-            l.billable_room,
-            l.cache_read_room
-        ),
-        (Duration::from_secs(1_400), true, 2_000_000, 20_000_000)
-    );
-    // no room: no limits
-    let six: Vec<_> = (0..6).map(|_| rec(1_000, 1, 0)).collect();
-    assert!(Limits::for_next(&BUDGET_X02, &budget::spent(&six)).is_none());
+fn ok_obs(stream: &str) -> Option<budget::Observation<'_>> {
+    Some(budget::Observation {
+        stream,
+        age_seconds: 1,
+    })
+}
+
+fn rec(ms: u64, b: u64, cr: u64) -> serde_json::Value {
+    json!({"model_request": true, "attempt_id": "a", "command_id": "c", "duration_ms": ms,
+           "usage": {"run": {"state": "measured", "tokens": {"input": b, "output": 0, "cache_creation": 0, "cache_read": cr}}}})
 }
 
 #[test]
-fn a_run_without_measurement_blocks_the_next_call() {
-    // the guard observed usage, but the run ended without a result event (killed): its record is
-    // unmeasured, and the pre-run check stops the budget — observed in-run sums never replace it
-    let killed = json!({"model_request": true, "attempt_id": "a", "command_id": "c", "duration_ms": 1_000,
-                        "usage": {"run": {"state": "unmeasured", "reason": "no result event (stopped by guard)"}}});
-    let ok_stream = rate("rejected");
-    let obs = budget::Observation {
-        stream: &ok_stream,
-        age_seconds: 1,
-    };
+fn limits_for_the_next_run_come_from_the_pre_run_decision() {
+    let ok = rate("rejected");
+    let l = Limits::for_next(&BUDGET_0204, &[], ok_obs(&ok)).expect("room");
+    // the stop grace is taken out of the window, so the stop completes within the limit
+    assert_eq!(
+        (
+            l.timeout,
+            l.timeout_is_total,
+            l.billable_room,
+            l.cache_read_room,
+            l.grace
+        ),
+        (
+            Duration::from_secs(1_790),
+            false,
+            1_500_000,
+            15_000_000,
+            run::GRACE
+        )
+    );
+    let l = Limits::for_next(
+        &BUDGET_X02,
+        &[rec(13_000_000, 1_000_000, 10_000_000)],
+        ok_obs(&ok),
+    )
+    .expect("room");
+    assert_eq!(
+        (
+            l.timeout,
+            l.timeout_is_total,
+            l.billable_room,
+            l.cache_read_room
+        ),
+        (Duration::from_secs(1_390), true, 2_000_000, 20_000_000)
+    );
+    // exactly the per-run limit left is not "total"
+    let l = Limits::for_next(&BUDGET_X02, &[rec(10_800_000, 1, 0)], ok_obs(&ok)).expect("room");
+    assert_eq!(
+        (l.timeout, l.timeout_is_total),
+        (Duration::from_secs(3_590), false)
+    );
+    // refused whenever the pre-run decision refuses, and without room
+    let unmeasured = json!({"model_request": true, "attempt_id": "a", "command_id": "c", "duration_ms": 1,
+                            "usage": {"run": {"state": "unmeasured", "reason": "x"}}});
+    let bad = rate("allowed_warning");
+    let cases: Vec<(
+        Vec<serde_json::Value>,
+        Option<budget::Observation<'_>>,
+        &str,
+    )> = vec![
+        (vec![unmeasured], ok_obs(&ok), "unmeasured run"),
+        (
+            vec![json!({"duration_ms": 1})],
+            ok_obs(&ok),
+            "unclassified record",
+        ),
+        (
+            (0..6).map(|_| rec(1_000, 1, 0)).collect(),
+            ok_obs(&ok),
+            "no runs left",
+        ),
+        (vec![], ok_obs(&bad), "extra usage possible"),
+        (vec![], None, "no observation"),
+        (
+            vec![rec(14_395_000, 1, 0)],
+            ok_obs(&ok),
+            "time left within the grace",
+        ),
+    ];
+    for (records, obs, why) in cases {
+        assert!(
+            Limits::for_next(&BUDGET_X02, &records, obs).is_err(),
+            "{why}"
+        );
+    }
     assert!(matches!(
-        budget::next(&BUDGET_0204, &[killed], Some(obs)),
-        Decision::Stop { .. }
+        Limits::for_next(&BUDGET_X02, &[], None),
+        Err(Decision::Hold { .. })
     ));
 }
 
 #[test]
-fn children_left_behind_by_a_normal_exit_are_cleaned_up() {
-    let d = Tmp::new("orphan");
+fn a_stop_with_sigterm_first_lets_the_process_exit_within_the_grace() {
+    let d = Tmp::new("term-first");
+    let marker = d.p().join("got-term");
+    let tail = format!(
+        "trap 'echo term > {}; exit 0' TERM\nwhile :; do sleep 0.1; done",
+        marker.display()
+    );
+    let mut l = limits(500);
+    l.grace = Duration::from_secs(5);
+    let o = go(d.p(), fake(d.p(), &[], &tail), l);
+    assert_eq!((o.stop.clone(), o.exit_code), (Stop::RunTimeout, Some(0)));
+    assert!(marker.exists(), "SIGTERM was not sent first");
+    assert!(
+        o.elapsed < Duration::from_secs(3),
+        "the grace was not cut short: {:?}",
+        o.elapsed
+    );
+}
+
+#[test]
+fn the_drain_after_exit_is_bounded_and_descendants_are_killed() {
+    let d = Tmp::new("drain");
     let pid = d.p().join("child.pid");
-    let tail = format!("sleep 300 & echo $! > {}\nexit 0", pid.display());
-    let o = go(d.p(), fake(d.p(), &[], &tail), limits(10_000));
-    assert_eq!((o.stop.clone(), o.exit_code), (Stop::Exited, Some(0)));
-    assert!(gone(&pid), "a background child outlived a normal exit");
+    // the leader exits; a background child keeps the pipe open and writes forever
+    let tail = format!(
+        "(while :; do echo noise; sleep 0.1; done) & echo $! > {}\nexit 0",
+        pid.display()
+    );
+    let o = go(d.p(), fake(d.p(), &[], &tail), limits(60_000));
+    assert_eq!(o.stop, Stop::Exited);
+    assert!(o.elapsed < Duration::from_secs(6), "{:?}", o.elapsed);
+    assert!(gone(&pid));
+}
+
+#[test]
+fn lines_after_the_leader_exits_are_still_checked() {
+    let d = Tmp::new("late");
+    let pid = d.p().join("child.pid");
+    // a descendant writes a usage line after the leader has gone
+    let late = assistant("late", 1, 5_000, 0, 0);
+    let tail = format!(
+        "(sleep 0.5; printf '%s\\n' '{late}'; sleep 300) & echo $! > {}\nexit 0",
+        pid.display()
+    );
+    let mut l = limits(60_000);
+    l.billable_room = 1_000;
+    let o = go(d.p(), fake(d.p(), &[], &tail), l);
+    assert_eq!(o.stop, Stop::TokenCap);
+    assert!(gone(&pid));
+}
+
+#[test]
+fn a_closed_or_unreadable_stream_stops_a_running_process() {
+    let d = Tmp::new("closed");
+    let o = go(
+        d.p(),
+        fake(d.p(), &[], "exec >&-\nsleep 300"),
+        limits(60_000),
+    );
+    assert!(matches!(o.stop, Stop::StreamLost(_)), "{:?}", o.stop);
+    assert!(o.elapsed < Duration::from_secs(6), "{:?}", o.elapsed);
+    // bytes that are not UTF-8 do not blind the guard
+    let d = Tmp::new("bytes");
+    let tail = format!(
+        "printf '\\377\\376 not utf-8\\n'\nprintf '%s\\n' '{}'\nsleep 300",
+        assistant("m1", 1, 5_000, 0, 0)
+    );
+    let mut l = limits(60_000);
+    l.billable_room = 1_000;
+    let o = go(d.p(), fake(d.p(), &[], &tail), l);
+    assert_eq!(o.stop, Stop::TokenCap);
+}
+
+#[test]
+fn usage_lines_without_an_id_or_fields_are_counted_separately() {
+    let d = Tmp::new("noid");
+    let noid =
+        json!({"type": "assistant", "message": {"usage": {"input_tokens": 1, "output_tokens": 599,
+                      "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}})
+        .to_string();
+    let partial =
+        json!({"type": "assistant", "message": {"id": "m9", "usage": {"input_tokens": 3}}})
+            .to_string();
+    let o = go(
+        d.p(),
+        fake(d.p(), &[noid.clone(), noid, partial], "exit 0"),
+        limits(10_000),
+    );
+    assert_eq!(
+        (
+            o.observed.billable,
+            o.observed.messages,
+            o.observed.incomplete_lines
+        ),
+        (1_203, 3, 1)
+    );
+}
+
+#[test]
+fn an_unwritable_evidence_path_fails_before_anything_starts() {
+    let d = Tmp::new("nopath");
+    let marker = d.p().join("started");
+    let cmd = fake(
+        d.p(),
+        &[],
+        &format!("echo x > {}\nsleep 300", marker.display()),
+    );
+    let r = run::run(
+        cmd,
+        limits(5_000),
+        &d.p().join("missing-dir/stdout.jsonl"),
+        &d.p().join("stderr.txt"),
+    );
+    assert!(r.is_err());
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(
+        !marker.exists(),
+        "the process was started although evidence cannot be written"
+    );
+}
+
+/// The record the 02-01 collector makes for a run, in the shape `budget` reads.
+fn collected(stdout: &Path, ms: u64) -> serde_json::Value {
+    use ieo_evidence::record::SessionMode;
+    let bytes = std::fs::read(stdout).expect("stdout");
+    let parsed = ieo_evidence::stream::parse(&bytes, SessionMode::New, None);
+    json!({"model_request": true, "attempt_id": "a", "command_id": "c", "duration_ms": ms,
+           "usage": {"run": serde_json::to_value(&parsed.usage.run).expect("usage")}})
+}
+
+#[test]
+fn a_guard_stop_leaves_the_run_unmeasured_and_blocks_the_next_call() {
+    let ok = rate("rejected");
+    // stopped by the guard before its result event: the collector cannot measure it
+    let d = Tmp::new("unmeasured");
+    let mut l = limits(10_000);
+    l.billable_room = 1_000;
+    let o = go(
+        d.p(),
+        fake(d.p(), &[assistant("m1", 1, 2_000, 0, 0)], "sleep 300"),
+        l,
+    );
+    assert_eq!(o.stop, Stop::TokenCap);
+    let r = collected(&d.p().join("stdout.jsonl"), o.elapsed.as_millis() as u64);
+    assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{r}");
+    assert!(matches!(
+        budget::next(&BUDGET_0204, std::slice::from_ref(&r), ok_obs(&ok)),
+        Decision::Stop { .. }
+    ));
+    assert!(Limits::for_next(&BUDGET_0204, &[r], ok_obs(&ok)).is_err());
+    // positive control: a complete real stream (01-04) is measured and allows the next call
+    let real = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/01-P1-development/stdout.jsonl"
+    ))
+    .expect("stored 01-04 stream");
+    let d = Tmp::new("measured");
+    let lines: Vec<String> = real.lines().map(str::to_string).collect();
+    let o = go(d.p(), fake(d.p(), &lines, "exit 0"), limits(10_000));
+    assert_eq!(o.stop, Stop::Exited);
+    let r = collected(&d.p().join("stdout.jsonl"), o.elapsed.as_millis() as u64);
+    assert_eq!(r["usage"]["run"]["state"], "measured", "{r}");
+    assert!(Limits::for_next(&BUDGET_0204, &[r], ok_obs(&real)).is_ok());
 }

@@ -1,43 +1,61 @@
 //! In-run budget enforcement around one role process (user decision 2026-11-14 §3).
 //!
-//! [`crate::budget::next`] decides *before* a run whether it may start. This module enforces the
-//! limits *during* the run and cleans up afterwards:
+//! [`crate::budget::next`] decides *before* a run whether it may start ([`Limits::for_next`]
+//! wraps it). This module enforces limits *during* the run and cleans up afterwards:
 //!
-//! * **time**: the run gets `min(per-run limit, total time left)`; at the deadline the whole
-//!   process group gets SIGTERM, then SIGKILL after a grace period.
-//! * **observed tokens**: every stream-json `assistant` message carries a `usage` object. The guard
-//!   sums it (per message id, the largest value seen, parent and child messages alike) and stops
-//!   the group once the observed billable tokens (input + output + cache_creation) or cache_read
-//!   reach the room left in the budget.
+//! * **time**: the run gets `min(per-run limit, total time left) − grace`, so that the stop
+//!   (SIGTERM to the whole process group, SIGKILL after the grace) completes within the limit.
+//! * **observed tokens**: stream-json `assistant` lines carry a `usage` object; the guard sums it
+//!   (per message id, the largest value seen; parent and child messages alike) and stops the group
+//!   once observed billable tokens (input + output + cache_creation) or cache_read reach the room
+//!   left in the budget.
 //! * **extra usage / limits**: any `rate_limit_event` that breaks the no-extra-billing condition
 //!   ([`crate::budget::stream_stop`]) stops the group at once.
-//! * **cleanup**: after the leader exits (for any reason) the group gets SIGKILL, so no child
-//!   process outlives the run.
+//! * **blindness**: when the stream ends or cannot be read while the process is still running, the
+//!   guard can no longer observe usage or limit signals, so it stops the group
+//!   ([`Stop::StreamLost`]). Bytes that are not UTF-8 are read lossily, never dropped.
+//! * **cleanup on every path**: after the leader exits, after a stop, and on any internal error,
+//!   the group gets SIGKILL; if signalling the group fails, the leader is killed directly and the
+//!   failure is reported ([`Outcome::cleanup_failed`]).
 //!
-//! **Limits of this guard** (it is not a provider-side limit):
-//! * Usage is known only when a message's `usage` appears in the stream, i.e. after the model
-//!   request that produced it has completed. A stop therefore happens *after* the request that
-//!   crossed the room; that request's tokens are spent and are reported as an overrun.
-//! * The first `rate_limit_event` of a session appears only after the first request; the
-//!   pre-run check ([`crate::budget::observation_check`]) is what holds a call before it starts.
-//! * The authoritative per-run share is computed afterwards from the run's `result` event by the
-//!   02-01 collector (`ieo-evidence`); a run without it is unmeasured and stops the next call
-//!   ([`crate::budget::next`]). The observed sum here is only the in-run stop signal.
+//! **Limits of this guard — it observes and then stops; it is not a provider-side limit:**
+//! * The `usage` on an `assistant` line is **not final**. The CLI writes the usage known when the
+//!   message starts: input and cache figures are complete, but `output_tokens` is only the start
+//!   value (02-01 fixture r1-new: 5 in the stream, 612 in `result`). Model calls the CLI makes on
+//!   its own — compaction, side calls — appear in no `assistant` line at all (l3-compact: 0 in the
+//!   stream, 26,400 in `modelUsage`). The observed sum is therefore a **lower bound**; the stop
+//!   comes only after the request that crossed the room, whose tokens are already spent.
+//! * Final usage is known only at the end, from the `result` event; the 02-01 collector
+//!   (`ieo-evidence`) computes the run share from it. A run stopped before its `result` is
+//!   unmeasured, and the next call is blocked ([`crate::budget::next`]).
+//! * The first `rate_limit_event` of a session appears only after the first request; holding a
+//!   call before that request is the pre-run observation's job (with the subscription and
+//!   environment check), not this guard's.
+//! * A descendant that leaves the process group (`setsid`) is not reached by group signals; inside
+//!   a role container, stopping the container is the last cleanup (adapter step).
 
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+
+/// How long the guard keeps reading after the leader exited (bounded; descendants are killed
+/// afterwards).
+const DRAIN: Duration = Duration::from_secs(2);
+
+/// SIGTERM → SIGKILL grace used by [`Limits::for_next`].
+pub const GRACE: Duration = Duration::from_secs(10);
 
 /// What the guard allows for one run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
+    /// Time until the stop starts; the stop itself takes at most `grace` more.
     pub timeout: Duration,
-    /// The timeout is the total time left (smaller than the per-run limit).
+    /// The timeout comes from the total time left (smaller than the per-run limit).
     pub timeout_is_total: bool,
     pub billable_room: u64,
     pub cache_read_room: u64,
@@ -46,23 +64,38 @@ pub struct Limits {
 }
 
 impl Limits {
-    /// Limits for the next run of `budget`, or `None` when the budget allows no run.
+    /// Limits for the next run: `budget::next` must say `Start`, and every room must be positive.
+    /// Otherwise the decision that refuses the run is returned.
     pub fn for_next(
         budget: &crate::budget::Budget,
-        spent: &crate::budget::Spent,
-    ) -> Option<Limits> {
-        if spent.runs >= budget.max_runs || spent.seconds >= budget.total_seconds {
-            return None;
+        records: &[Value],
+        observation: Option<crate::budget::Observation<'_>>,
+    ) -> Result<Limits, crate::budget::Decision> {
+        use crate::budget::Decision;
+        let decision = crate::budget::next(budget, records, observation);
+        let Decision::Start { timeout_seconds } = decision else {
+            return Err(decision);
+        };
+        let s = crate::budget::spent(records);
+        let stop = |reason: String| Err(Decision::Stop { reason });
+        let billable_room = budget.billable_tokens.saturating_sub(s.billable_tokens);
+        let cache_read_room = budget.cache_read_tokens.saturating_sub(s.cache_read_tokens);
+        if billable_room == 0 || cache_read_room == 0 {
+            return stop("no token room left".into());
         }
-        let left = budget.total_seconds - spent.seconds;
-        Some(Limits {
-            timeout: Duration::from_secs(budget.per_run_seconds.min(left)),
-            timeout_is_total: left < budget.per_run_seconds,
-            billable_room: budget.billable_tokens.checked_sub(spent.billable_tokens)?,
-            cache_read_room: budget
-                .cache_read_tokens
-                .checked_sub(spent.cache_read_tokens)?,
-            grace: Duration::from_secs(10),
+        let window = Duration::from_secs(timeout_seconds);
+        if window <= GRACE {
+            return stop(format!(
+                "{timeout_seconds} s left is not more than the {} s stop grace",
+                GRACE.as_secs()
+            ));
+        }
+        Ok(Limits {
+            timeout: window - GRACE,
+            timeout_is_total: timeout_seconds < budget.per_run_seconds,
+            billable_room,
+            cache_read_room,
+            grace: GRACE,
         })
     }
 }
@@ -80,13 +113,18 @@ pub enum Stop {
     CacheReadCap,
     /// A rate-limit event broke the no-extra-billing condition.
     Overage(String),
+    /// The stream ended or could not be read while the process kept running.
+    StreamLost(String),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Observed {
+    /// Lower bound (see the module limits).
     pub billable: u64,
     pub cache_read: u64,
     pub messages: usize,
+    /// `assistant` lines whose usage was missing or not a number in some field.
+    pub incomplete_lines: usize,
 }
 
 #[derive(Debug)]
@@ -96,166 +134,299 @@ pub struct Outcome {
     pub exit_code: Option<i32>,
     pub observed: Observed,
     pub elapsed: Duration,
+    /// Signalling the process group failed at least once (the leader was killed directly).
+    pub cleanup_failed: bool,
 }
 
-fn usage_of(v: &Value) -> Option<(String, [u64; 4])> {
-    if v["type"] != "assistant" {
-        return None;
+enum Event {
+    Line(String),
+    /// The pipe closed.
+    End,
+    /// Reading failed.
+    Broken,
+}
+
+#[derive(Default)]
+struct Usage {
+    per_message: BTreeMap<String, [u64; 4]>,
+    unnamed: usize,
+    observed: Observed,
+}
+
+impl Usage {
+    fn add(&mut self, v: &Value) {
+        if v["type"] != "assistant" {
+            return;
+        }
+        let m = &v["message"];
+        let u = &m["usage"];
+        let fields = [
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+        ]
+        .map(|k| u[k].as_u64());
+        if fields.iter().any(Option::is_none) {
+            self.observed.incomplete_lines += 1;
+        }
+        let vals = fields.map(|x| x.unwrap_or(0));
+        let id = match m["id"].as_str() {
+            Some(id) if !id.is_empty() => id.to_string(),
+            _ => {
+                // no id: never merged with another line
+                self.unnamed += 1;
+                format!("\u{0}unnamed-{}", self.unnamed)
+            }
+        };
+        let e = self.per_message.entry(id).or_insert([0; 4]);
+        for (slot, v) in e.iter_mut().zip(vals) {
+            *slot = (*slot).max(v);
+        }
+        self.observed.messages = self.per_message.len();
+        self.observed.billable = self
+            .per_message
+            .values()
+            .map(|u| u[0].saturating_add(u[1]).saturating_add(u[2]))
+            .fold(0, u64::saturating_add);
+        self.observed.cache_read = self
+            .per_message
+            .values()
+            .map(|u| u[3])
+            .fold(0, u64::saturating_add);
     }
-    let m = &v["message"];
-    let u = &m["usage"];
-    let n = |k: &str| u[k].as_u64().unwrap_or(0);
-    Some((
-        m["id"].as_str().unwrap_or_default().to_string(),
-        [
-            n("input_tokens"),
-            n("output_tokens"),
-            n("cache_creation_input_tokens"),
-            n("cache_read_input_tokens"),
-        ],
-    ))
 }
 
-/// Signal the whole process group (`kill -s SIG -- -PGID`; the workspace forbids `unsafe`, so
-/// no direct kill(2)). The group exists until its last member exits.
-fn signal_group(pgid: u32, sig: &str) {
-    let _ = Command::new("kill")
+/// Signal the whole process group (`kill -s SIG -- -PGID`; the workspace forbids `unsafe`, so no
+/// direct kill(2)). Returns whether the signal was delivered; a group that no longer exists
+/// counts as delivered (nothing is left to signal).
+fn signal_group(pgid: u32, sig: &str) -> bool {
+    match Command::new("kill")
         .args(["-s", sig, "--", &format!("-{pgid}")])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status();
+        .status()
+    {
+        Ok(s) if s.success() => true,
+        Ok(_) => !Path::new(&format!("/proc/{pgid}")).exists(),
+        Err(_) => false,
+    }
 }
 
-/// Run `cmd` (its own process group) under `limits`, copying stdout to `stdout_path` and
-/// stderr to `stderr_path`.
+/// Stop the group: SIGTERM, wait up to `grace`, then SIGKILL. Falls back to killing the leader
+/// directly when group signalling fails. Returns the leader's status when it could be waited for.
+fn stop_group(
+    child: &mut Child,
+    pgid: u32,
+    grace: Duration,
+    failed: &mut bool,
+) -> Option<ExitStatus> {
+    if !signal_group(pgid, "TERM") {
+        *failed = true;
+    }
+    let until = Instant::now() + grace;
+    loop {
+        if let Ok(Some(s)) = child.try_wait() {
+            return Some(s);
+        }
+        if Instant::now() >= until {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    if !signal_group(pgid, "KILL") {
+        *failed = true;
+    }
+    let _ = child.kill();
+    match child.wait() {
+        Ok(s) => Some(s),
+        Err(_) => {
+            *failed = true;
+            None
+        }
+    }
+}
+
+/// Run `cmd` (its own process group) under `limits`, copying stdout to `stdout_path` and stderr
+/// to `stderr_path`. On every return path — including errors — no process of the group is left
+/// running (best effort for descendants that left the group, see the module limits).
 pub fn run(
     mut cmd: Command,
     limits: Limits,
     stdout_path: &Path,
     stderr_path: &Path,
 ) -> std::io::Result<Outcome> {
+    // everything that can fail before the process exists happens before spawn
+    let mut out = std::fs::File::create(stdout_path)?;
+    let err = std::fs::File::create(stderr_path)?;
     let started = Instant::now();
     cmd.process_group(0)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(std::fs::File::create(stderr_path)?);
+        .stderr(err);
     let mut child = cmd.spawn()?;
     let pgid = child.id();
-    let stdout = child.stdout.take().expect("piped stdout");
-    let (tx, rx) = mpsc::channel::<String>();
+    let Some(stdout) = child.stdout.take() else {
+        let mut failed = false;
+        stop_group(&mut child, pgid, limits.grace, &mut failed);
+        return Err(std::io::Error::other("no stdout pipe"));
+    };
+    let (tx, rx) = mpsc::channel::<Event>();
     let reader = std::thread::spawn(move || {
-        for line in BufReader::new(stdout).lines() {
-            let Ok(line) = line else { break };
-            if tx.send(line).is_err() {
-                break;
+        let mut r = BufReader::new(stdout);
+        let mut buf = Vec::new();
+        loop {
+            buf.clear();
+            match r.read_until(b'\n', &mut buf) {
+                Ok(0) => {
+                    let _ = tx.send(Event::End);
+                    break;
+                }
+                Ok(_) => {
+                    let line = String::from_utf8_lossy(&buf)
+                        .trim_end_matches(['\n', '\r'])
+                        .to_string();
+                    if tx.send(Event::Line(line)).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => {
+                    let _ = tx.send(Event::Broken);
+                    break;
+                }
             }
         }
     });
-    let mut out = std::fs::File::create(stdout_path)?;
-    let mut per_message: BTreeMap<String, [u64; 4]> = BTreeMap::new();
-    let mut observed = Observed::default();
+    let mut cleanup_failed = false;
+    let mut usage = Usage::default();
+    let watched = watch(&mut child, &rx, &mut out, &mut usage, &limits, started);
+    // cleanup on every path, including an error inside `watch`
+    let status = match &watched {
+        Ok(Watch::Exited(s)) => Some(*s),
+        Ok(Watch::Stopped(_)) | Err(_) => {
+            stop_group(&mut child, pgid, limits.grace, &mut cleanup_failed)
+        }
+    };
+    if !signal_group(pgid, "KILL") {
+        cleanup_failed = true;
+    }
+    // the reader ends when the pipe closes; a descendant that left the group could keep it open,
+    // so it is detached rather than joined
+    drop(rx);
+    drop(reader);
+    let watched = watched?;
+    out.flush()?;
+    Ok(Outcome {
+        stop: match watched {
+            Watch::Stopped(s) => s,
+            Watch::Exited(_) => Stop::Exited,
+        },
+        exit_code: status.and_then(|s| s.code()),
+        observed: usage.observed,
+        elapsed: started.elapsed(),
+        cleanup_failed,
+    })
+}
+
+enum Watch {
+    Exited(ExitStatus),
+    Stopped(Stop),
+}
+
+/// Handle one line; `Some(stop)` when it requires stopping.
+fn on_line(
+    line: &str,
+    out: &mut std::fs::File,
+    usage: &mut Usage,
+    limits: &Limits,
+) -> std::io::Result<Option<Stop>> {
+    writeln!(out, "{line}")?;
+    if let Some(why) = crate::budget::stream_stop(line) {
+        return Ok(Some(Stop::Overage(why)));
+    }
+    if let Ok(v) = serde_json::from_str::<Value>(line) {
+        usage.add(&v);
+        if usage.observed.billable >= limits.billable_room {
+            return Ok(Some(Stop::TokenCap));
+        }
+        if usage.observed.cache_read >= limits.cache_read_room {
+            return Ok(Some(Stop::CacheReadCap));
+        }
+    }
+    Ok(None)
+}
+
+fn watch(
+    child: &mut Child,
+    rx: &mpsc::Receiver<Event>,
+    out: &mut std::fs::File,
+    usage: &mut Usage,
+    limits: &Limits,
+    started: Instant,
+) -> std::io::Result<Watch> {
     let deadline = started + limits.timeout;
-    let mut stop: Option<Stop> = None;
+    let timed_out = || {
+        if limits.timeout_is_total {
+            Stop::TotalTimeout
+        } else {
+            Stop::RunTimeout
+        }
+    };
     loop {
         let now = Instant::now();
         if now >= deadline {
-            stop = Some(if limits.timeout_is_total {
-                Stop::TotalTimeout
-            } else {
-                Stop::RunTimeout
-            });
-            break;
+            return Ok(Watch::Stopped(timed_out()));
+        }
+        // checked on every iteration: a descendant writing continuously must not hide the exit
+        if let Some(s) = child.try_wait()? {
+            return drained(s, rx, out, usage, limits, deadline);
         }
         match rx.recv_timeout((deadline - now).min(Duration::from_millis(200))) {
-            Ok(line) => {
-                writeln!(out, "{line}")?;
-                if let Some(why) = crate::budget::stream_stop(&line) {
-                    stop = Some(Stop::Overage(why));
-                    break;
-                }
-                if let Ok(v) = serde_json::from_str::<Value>(&line)
-                    && let Some((id, u)) = usage_of(&v)
-                {
-                    let e = per_message.entry(id).or_insert([0; 4]);
-                    for i in 0..4 {
-                        e[i] = e[i].max(u[i]);
-                    }
-                    observed.messages = per_message.len();
-                    observed.billable = per_message
-                        .values()
-                        .map(|u| u[0].saturating_add(u[1]).saturating_add(u[2]))
-                        .fold(0u64, u64::saturating_add);
-                    observed.cache_read = per_message
-                        .values()
-                        .map(|u| u[3])
-                        .fold(0u64, u64::saturating_add);
-                    if observed.billable >= limits.billable_room {
-                        stop = Some(Stop::TokenCap);
-                        break;
-                    }
-                    if observed.cache_read >= limits.cache_read_room {
-                        stop = Some(Stop::CacheReadCap);
-                        break;
-                    }
+            Ok(Event::Line(line)) => {
+                if let Some(stop) = on_line(&line, out, usage, limits)? {
+                    return Ok(Watch::Stopped(stop));
                 }
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                if child.try_wait()?.is_some() {
-                    // drain what the reader still holds, then finish
-                    while let Ok(line) = rx.recv_timeout(Duration::from_millis(200)) {
-                        writeln!(out, "{line}")?;
+            Ok(Event::End) | Ok(Event::Broken) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                // no more stream: the leader should be finishing; otherwise the guard is blind
+                let until = (Instant::now() + DRAIN).min(deadline);
+                loop {
+                    if let Some(s) = child.try_wait()? {
+                        return Ok(Watch::Exited(s));
                     }
-                    break;
-                }
-            }
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                // stdout closed: wait for the leader within the deadline
-                let left = deadline.saturating_duration_since(Instant::now());
-                let until = Instant::now() + left;
-                while Instant::now() < until {
-                    if child.try_wait()?.is_some() {
-                        break;
+                    if Instant::now() >= until {
+                        return Ok(Watch::Stopped(Stop::StreamLost(
+                            "stdout closed or unreadable while the process kept running".into(),
+                        )));
                     }
                     std::thread::sleep(Duration::from_millis(50));
                 }
-                if child.try_wait()?.is_none() {
-                    stop = Some(if limits.timeout_is_total {
-                        Stop::TotalTimeout
-                    } else {
-                        Stop::RunTimeout
-                    });
-                }
-                break;
             }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
     }
-    let status = if stop.is_some() {
-        signal_group(pgid, "TERM");
-        let until = Instant::now() + limits.grace;
-        loop {
-            if let Some(s) = child.try_wait()? {
-                break s;
+}
+
+/// After the leader exited: a bounded drain of what is still buffered or written by descendants
+/// (they are killed right after), every line still checked.
+fn drained(
+    status: ExitStatus,
+    rx: &mpsc::Receiver<Event>,
+    out: &mut std::fs::File,
+    usage: &mut Usage,
+    limits: &Limits,
+    deadline: Instant,
+) -> std::io::Result<Watch> {
+    let until = (Instant::now() + DRAIN).min(deadline);
+    while let Some(left) = until.checked_duration_since(Instant::now()) {
+        match rx.recv_timeout(left) {
+            Ok(Event::Line(line)) => {
+                if let Some(stop) = on_line(&line, out, usage, limits)? {
+                    return Ok(Watch::Stopped(stop));
+                }
             }
-            if Instant::now() >= until {
-                signal_group(pgid, "KILL");
-                break child.wait()?;
-            }
-            std::thread::sleep(Duration::from_millis(50));
+            _ => break,
         }
-    } else {
-        child.wait()?
-    };
-    // no process of the run outlives it
-    signal_group(pgid, "KILL");
-    // the reader ends when the pipe closes; a descendant that left the group could keep it open,
-    // so the reader is detached rather than joined
-    drop(rx);
-    drop(reader);
-    out.flush()?;
-    Ok(Outcome {
-        stop: stop.unwrap_or(Stop::Exited),
-        exit_code: status.code(),
-        observed,
-        elapsed: started.elapsed(),
-    })
+    }
+    Ok(Watch::Exited(status))
 }
