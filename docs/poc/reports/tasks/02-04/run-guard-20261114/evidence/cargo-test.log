@@ -1,4 +1,4 @@
-# commit 714f5660c8f48ae5bc52b94ee33f495928a63df9 · 2026-11-14T10:14:40Z · git status --porcelain (before run):
+# commit 3b6f483dc8b820efccb822fae9726757cb6d7801 · 2026-11-14T10:49:47Z · git status --porcelain (before run):
  M docs/poc/reports/tasks/02-04/run-guard-20261114/evidence/cargo-test.log
 # (empty above = clean tree)
 rustc 1.99.1 (58cf8f9c3 2026-10-13)
@@ -6,10 +6,10 @@ $ cargo fmt --all -- --check
 EXIT=0
 $ cargo clippy -p ieo-supervisor --all-targets --locked -- -D warnings
     Checking ieo-supervisor v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/crates/ieo-supervisor)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.32s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.28s
 EXIT=0
 $ cargo test -p ieo-supervisor --locked
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
      Running unittests src/lib.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/ieo_supervisor-0dfd48f3c397768b)
 
 running 0 tests
@@ -18,37 +18,35 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
      Running tests/run_guard.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/run_guard-7962c352441e2424)
 
-running 17 tests
+running 20 tests
 test limits_for_the_next_run_come_from_the_pre_run_decision ... ok
+test the_stop_grace_must_fit_in_the_time_left ... ok
 test observed_cache_read_reaching_the_room_stops_the_run ... ok
 test a_repeated_message_counts_once_with_its_largest_usage ... ok
 test usage_lines_without_an_id_or_fields_are_counted_separately ... ok
 test observed_tokens_reaching_the_room_stop_the_run ... ok
 test a_normal_run_is_allowed_and_measured ... ok
+test an_unwritable_evidence_path_fails_before_anything_starts ... ok
 test a_guard_stop_leaves_the_run_unmeasured_and_blocks_the_next_call ... ok
 test an_extra_usage_or_limit_signal_stops_the_run ... ok
-test an_unwritable_evidence_path_fails_before_anything_starts ... ok
-kill: sending signal to 657828 failed: No such process
 test lines_after_the_leader_exits_are_still_checked ... ok
+test output_written_on_the_way_out_is_kept ... ok
 test the_total_time_left_ends_the_run ... ok
-test a_stop_with_sigterm_first_lets_the_process_exit_within_the_grace ... ok
-kill: sending signal to 657849 failed: No such process
 test the_per_run_time_limit_ends_the_run_and_its_children ... ok
-kill: sending signal to 657821 failed: No such process
+test a_stop_with_sigterm_first_lets_the_process_exit_within_the_grace ... ok
 test a_process_ignoring_sigterm_is_killed_after_the_grace ... ok
-kill: sending signal to 657837 failed: No such process
 test the_drain_after_exit_is_bounded_and_descendants_are_killed ... ok
 test a_closed_or_unreadable_stream_stops_a_running_process ... ok
-kill: sending signal to 657826 failed: No such process
 test children_left_behind_by_a_normal_exit_are_cleaned_up ... ok
+test a_failed_group_kill_is_reported_and_the_leader_is_still_stopped ... ok
 
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s
 
      Running tests/supervisor.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/supervisor-63d801d4b4569b07)
 
 running 20 tests
-test budget_constants_match_decision_1 ... ok
 test an_overflowing_projection_stops ... ok
+test budget_constants_match_decision_1 ... ok
 test checkpoint_record_has_the_5_1_fields ... ok
 test budget_counts_every_run_and_never_reads_missing_as_zero ... ok
 test overflowing_or_truncated_measurements_are_not_trusted ... ok
