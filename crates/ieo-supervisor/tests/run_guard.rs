@@ -59,7 +59,11 @@ fn rate(overage: &str) -> String {
 /// A fake role process: prints `lines` (one per 50 ms), then runs `tail` (shell).
 fn fake(dir: &Path, lines: &[String], tail: &str) -> Command {
     let script = dir.join("fake-claude.sh");
-    let mut body = String::from("#!/bin/sh\n");
+    // the leader records itself, so a failing test can still kill it (Tmp::drop)
+    let mut body = format!(
+        "#!/bin/sh\necho $$ > {}\n",
+        dir.join("leader.pid").display()
+    );
     for l in lines {
         body.push_str(&format!(
             "printf '%s\\n' '{}'\nsleep 0.05\n",
