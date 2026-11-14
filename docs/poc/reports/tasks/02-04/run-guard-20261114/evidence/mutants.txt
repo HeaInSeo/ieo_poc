@@ -1,0 +1,10 @@
+# 02-04 run guard mutants at commit 982390cb2d5461f3ffef2d50de5781a57ce3d655 · 2026-11-14T09:44:30Z
+R1 no final group kill: killed ['children_left_behind_by_a_normal_exit_are_cleaned_up']
+R2 no SIGKILL after grace: killed ['a_process_ignoring_sigterm_is_killed_after_the_grace']
+R3 ignore extra-usage signals: killed ['an_extra_usage_or_limit_signal_stops_the_run']
+R4 no token cap: killed ['observed_tokens_reaching_the_room_stop_the_run']
+R5 no cache_read cap: killed ['observed_cache_read_reaching_the_room_stops_the_run']
+R6 sum instead of max per message: killed ['a_repeated_message_counts_once_with_its_largest_usage']
+R7 no deadline: killed ['a_process_ignoring_sigterm_is_killed_after_the_grace', 'the_total_time_left_ends_the_run', 'the_per_run_time_limit_ends_the_run_and_its_children']
+R8 total timeout reported as run timeout: killed ['the_total_time_left_ends_the_run']
+dirty after run: none
