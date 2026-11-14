@@ -1,4 +1,4 @@
-# commit 3b6f483dc8b820efccb822fae9726757cb6d7801 · 2026-11-14T10:49:47Z · git status --porcelain (before run):
+# commit a70c2a038c0ba600b8a677658ceb96af799f0820 · 2026-11-14T11:20:18Z · git status --porcelain (before run):
  M docs/poc/reports/tasks/02-04/run-guard-20261114/evidence/cargo-test.log
 # (empty above = clean tree)
 rustc 1.99.1 (58cf8f9c3 2026-10-13)
@@ -9,7 +9,7 @@ $ cargo clippy -p ieo-supervisor --all-targets --locked -- -D warnings
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.28s
 EXIT=0
 $ cargo test -p ieo-supervisor --locked
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
      Running unittests src/lib.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/ieo_supervisor-0dfd48f3c397768b)
 
 running 0 tests
@@ -18,7 +18,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
      Running tests/run_guard.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/run_guard-7962c352441e2424)
 
-running 20 tests
+running 25 tests
 test limits_for_the_next_run_come_from_the_pre_run_decision ... ok
 test the_stop_grace_must_fit_in_the_time_left ... ok
 test observed_cache_read_reaching_the_room_stops_the_run ... ok
@@ -28,19 +28,25 @@ test observed_tokens_reaching_the_room_stop_the_run ... ok
 test a_normal_run_is_allowed_and_measured ... ok
 test an_unwritable_evidence_path_fails_before_anything_starts ... ok
 test a_guard_stop_leaves_the_run_unmeasured_and_blocks_the_next_call ... ok
+kill: sending signal to 915508 failed: No such process
+test an_error_return_keeps_the_cleanup_report ... ok
 test an_extra_usage_or_limit_signal_stops_the_run ... ok
+test an_exited_run_is_charged_with_the_collector_figure_unless_it_is_below_the_observed ... ok
 test lines_after_the_leader_exits_are_still_checked ... ok
 test output_written_on_the_way_out_is_kept ... ok
+test a_stopped_run_is_charged_unmeasured_even_with_a_result_written_on_the_way_out ... ok
+test a_stopped_run_is_unmeasured_even_when_its_late_result_looks_complete ... ok
 test the_total_time_left_ends_the_run ... ok
-test the_per_run_time_limit_ends_the_run_and_its_children ... ok
 test a_stop_with_sigterm_first_lets_the_process_exit_within_the_grace ... ok
+test the_per_run_time_limit_ends_the_run_and_its_children ... ok
 test a_process_ignoring_sigterm_is_killed_after_the_grace ... ok
-test the_drain_after_exit_is_bounded_and_descendants_are_killed ... ok
 test a_closed_or_unreadable_stream_stops_a_running_process ... ok
+test the_drain_after_exit_is_bounded_and_descendants_are_killed ... ok
 test children_left_behind_by_a_normal_exit_are_cleaned_up ... ok
+test the_copy_after_a_stop_is_bounded_even_if_a_descendant_holds_the_pipe ... ok
 test a_failed_group_kill_is_reported_and_the_leader_is_still_stopped ... ok
 
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.93s
 
      Running tests/supervisor.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/supervisor-63d801d4b4569b07)
 
@@ -57,8 +63,8 @@ test budget_boundaries ... ok
 test extra_usage_must_be_off_before_and_during_a_call ... ok
 test cleanup_leaves_the_root_mode_alone ... ok
 test a_cleanup_never_follows_links_and_reopens_hidden_directories ... ok
-test a_cleanup_keeps_only_session_records_and_installs_the_template ... ok
 test c_normal_cli_writes_are_not_tamper ... ok
+test a_cleanup_keeps_only_session_records_and_installs_the_template ... ok
 test one_running_process_per_session ... ok
 test claude_json_directive_keys_are_all_digested ... ok
 test any_link_is_tamper_and_is_never_followed ... ok
