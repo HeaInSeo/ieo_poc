@@ -14,6 +14,7 @@
 
 pub mod args;
 pub mod budget;
+pub mod caller;
 pub mod checkpoint;
 pub mod configdir;
 pub mod env;

@@ -375,17 +375,6 @@ impl Service {
                 }
                 _ => {}
             }
-            if let Some(phase @ ("takeover" | "error")) =
-                cp.as_ref().and_then(|c| c["phase"].as_str())
-            {
-                // a run that never reached its end: children, external requests and the session
-                // record were not observed, so nothing resumes on it silently (§6)
-                return resp(
-                    409,
-                    json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
-                           "reason": format!("the previous run did not finish (checkpoint phase {phase})")}),
-                );
-            }
             if cp
                 .as_ref()
                 .and_then(|c| c["session_id"].as_str())
@@ -407,6 +396,25 @@ impl Service {
                         _ => None, // dropped at once: only probed
                     }
                 });
+            // a live holder of the session answers with its status first (§5-5): its checkpoint
+            // is at `takeover` while it runs (review 475b409 R1)
+            if let Some(pid) = running {
+                return resp(
+                    409,
+                    json!({"code": "ALREADY_RUNNING", "pid": pid, "status": self.status()}),
+                );
+            }
+            if let Some(phase @ ("takeover" | "error")) =
+                cp.as_ref().and_then(|c| c["phase"].as_str())
+            {
+                // a run that never reached its end: children, external requests and the session
+                // record were not observed, so nothing resumes on it silently (§6)
+                return resp(
+                    409,
+                    json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+                           "reason": format!("the previous run did not finish (checkpoint phase {phase})")}),
+                );
+            }
             let record = CoordinatorRecord {
                 generation,
                 assignment_id: &assignment_id,
@@ -567,7 +575,7 @@ impl Service {
         }
         // §5-1: a checkpoint at takeover, after the stop check, before anything runs (a crash mid-run then names this
         // session); again after the run, and on errors
-        self.write_checkpoint(job, &report.digest, None, "takeover")?;
+        self.write_checkpoint(job, &report.digest, None, false, "takeover")?;
         let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
         let mut cmd = Command::new(&cfg.claude);
         cmd.args(&argv).current_dir(cfg.cwd());
@@ -587,11 +595,18 @@ impl Service {
             match run::run_with(cmd, job.limits, &stdout, &dir.join("stderr.txt"), &opts) {
                 Ok(o) => o,
                 Err(e) => {
-                    let _ = self.write_checkpoint(job, &report.digest, Some(&stdout), "error");
+                    let _ =
+                        self.write_checkpoint(job, &report.digest, Some(&stdout), false, "error");
                     return Err(format!("run: {e}"));
                 }
             };
-        self.write_checkpoint(job, &report.digest, Some(&stdout), "after_run")?;
+        self.write_checkpoint(
+            job,
+            &report.digest,
+            Some(&stdout),
+            outcome.stop == Stop::Exited,
+            "after_run",
+        )?;
         let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
             "mode": if job.resume { "resume" } else { "new" },
             "stop": format!("{:?}", outcome.stop),
@@ -620,6 +635,7 @@ impl Service {
         job: &Job,
         settings_digest: &str,
         stdout: Option<&Path>,
+        exited: bool,
         phase: &str,
     ) -> Result<(), String> {
         let cfg = &self.cfg;
@@ -653,7 +669,12 @@ impl Service {
         // the resume base (§11 item 7): this run's own result if it wrote one; otherwise, on a
         // resume, the previous base of the same session carried forward with the attempt it
         // came from (the caller checks it is the run actually resumed); else unknown
-        let own = stdout.map(session_cumulative).unwrap_or(Value::Null);
+        // a result written after a guard stop is not trusted (run::charge), so it is no base
+        // either (review 475b409 R2)
+        let own = stdout
+            .filter(|_| exited)
+            .map(session_cumulative)
+            .unwrap_or(Value::Null);
         let (cum, from) = if !own.is_null() {
             (own, json!(job.attempt))
         } else if job.resume {
@@ -770,16 +791,28 @@ impl Service {
         let (mut billable, mut cache_read) = (0u64, 0u64);
         for a in &starts {
             let id = a["attempt_id"].as_str().unwrap_or_default();
-            let end = ledger
+            // every end line of the attempt must be readable; the largest counts (a forged
+            // smaller line does not lower it — review 475b409 R4)
+            let ends: Vec<Option<(u64, u64)>> = ledger
                 .iter()
-                .find(|v| v["end"].is_object() && v["attempt_id"] == id)
-                .map(|v| &v["end"]);
-            match end.map(|e| {
-                (
-                    e["observed_billable"].as_u64(),
-                    e["observed_cache_read"].as_u64(),
+                .filter(|v| v["end"].is_object() && v["attempt_id"] == id)
+                .map(|v| {
+                    let e = &v["end"];
+                    e["observed_billable"]
+                        .as_u64()
+                        .zip(e["observed_cache_read"].as_u64())
+                })
+                .collect();
+            let end = if ends.is_empty() || ends.iter().any(Option::is_none) {
+                None
+            } else {
+                Some(
+                    ends.iter()
+                        .flatten()
+                        .fold((0u64, 0u64), |(a, b), &(x, y)| (a.max(x), b.max(y))),
                 )
-            }) {
+            };
+            match end.map(|(x, y)| (Some(x), Some(y))) {
                 Some((Some(x), Some(y))) => {
                     billable = billable.saturating_add(x);
                     cache_read = cache_read.saturating_add(y);
@@ -846,6 +879,11 @@ impl Service {
     /// PID 1 only: never call from a process that waits on its own children elsewhere.
     fn reap_orphans(&self) -> usize {
         use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
+        // only as PID 1: anywhere else (e.g. `serve` inside a test process) `waitpid(-1)` would
+        // take the exit status of children other code waits for
+        if std::process::id() != 1 {
+            return 0;
+        }
         let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         if st.running.is_some() {
             return 0;
@@ -983,7 +1021,8 @@ mod tests {
             tamper: None,
             stop: Arc::new(AtomicBool::new(true)),
         };
-        let v = svc.execute_inner(&job).expect("outcome");
+        svc.execute(job);
+        let v = svc.status()["last"].clone();
         assert_eq!(
             (v["spawned"].as_bool(), v["stop"].as_str()),
             (Some(false), Some("Requested"))
@@ -994,6 +1033,13 @@ mod tests {
             "a takeover checkpoint was written"
         );
         assert!(root.join("state/runs/a1/outcome.json").exists());
+        // its end line says nothing ran (0/0), so it does not block the next start
+        let ledger = std::fs::read_to_string(root.join("state/budget/attempts.jsonl")).expect("l");
+        let end: Value = serde_json::from_str(ledger.lines().last().expect("line")).expect("j");
+        assert_eq!(
+            end["end"],
+            json!({"observed_billable": 0, "observed_cache_read": 0})
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 }

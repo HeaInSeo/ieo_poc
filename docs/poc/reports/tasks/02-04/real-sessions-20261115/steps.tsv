@@ -1,0 +1,8 @@
+# attempt	role	op	purpose (RUN_PLAN.md §2)
+D1	development	start	credential check; §10 item 3 (a) cleanup; item 2 supplied CLAUDE.md, repo CLAUDE.md and hook not applied; (c) tool-free run
+G1	guardrail	start	credential check; §10 item 1 rev 6 Guardrail rules: scratch write allowed, other writes denied
+D2	development	reconnect	(c) resume after a tool-free run; allowed tool (Read)
+D3	development	reconnect	(c) resume after a tool run; child agent (Agent, reader)
+D4	development	reconnect	(c) resume after a child run; /compact
+D5	development	reconnect	(c) resume after /compact; §11 item 7 chain D1..D5
+D6	development	reconnect	(b) tamper: a skill planted after the checkpoint → new session, config_tamper_detected

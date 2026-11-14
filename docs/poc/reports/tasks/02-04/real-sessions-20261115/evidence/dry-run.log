@@ -1,0 +1,26 @@
+# 02-04 real-session dry run (fake claude, fake credentials, no model call) · 2026-11-14T16:23:23Z
+# role containers up: ieo-dry-fixture0204-{development,guardrail} on 127.0.0.1:58221/58222 · image docker.io/library/golang:1.26.9-bookworm · network slirp4netns
+# plan: <scratch>/dry/run/plan.json · ledger: <scratch>/dry/run/ledger · credentials: OAuth form (values not printed)
+D1: exit 0 · summary <scratch>/dry/run/summaries/D1.json
+G1: exit 0 · summary <scratch>/dry/run/summaries/G1.json
+D2: exit 0 · summary <scratch>/dry/run/summaries/D2.json
+D3: exit 0 · summary <scratch>/dry/run/summaries/D3.json
+D4: exit 0 · summary <scratch>/dry/run/summaries/D4.json
+D5: exit 0 · summary <scratch>/dry/run/summaries/D5.json
+D6: exit 0 · summary <scratch>/dry/run/summaries/D6.json
+## checks
+PASS 7 records, none asks for a person
+PASS every run measured
+PASS D2..D5 resume D1's session on the previous run's base
+PASS §11 item 7: sum of D1..D5 shares {'input': 17, 'output': 33, 'cache_read': 80, 'cache_creation': 45} = D5 session total
+PASS D6: tamper detected, new session
+PASS D1: planted config-dir entries removed (no credential file among them)
+PASS G1 on the Guardrail role
+PASS environment: OAuth variable, no API key
+records: 7 · spent: {"input": 23, "output": 47, "cache_read": 120, "cache_creation": 65}
+## next call after the plan: refused or held? (should still start: shares not used up)
+7
+## secrets in summaries and container logs: 0 / 0
+development: podman stop 0.3 s, exit 0, stop timeout 15 s
+guardrail: podman stop 0.4 s, exit 0, stop timeout 15 s
+# done

@@ -1,0 +1,7 @@
+{
+  "reader": {
+    "description": "Reads one file and reports how many lines it has.",
+    "prompt": "Read the file you are given with the Read tool and reply with its number of lines only.",
+    "tools": ["Read"]
+  }
+}

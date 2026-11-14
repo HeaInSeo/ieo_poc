@@ -43,7 +43,10 @@ args="$*"
 sid=$(printf '%s\n' "$@" | awk 'prev=="--session-id"||prev=="--resume"{print; exit} {prev=$0}')
 cfg=$(ls -A "$CLAUDE_CONFIG_DIR" 2>/dev/null | tr '\n' ',')
 printf '{"type":"system","subtype":"init","session_id":"%s","args":"%s","config":"%s","prompt_seen":%s}\n' "$sid" "$args" "$cfg" "$(echo "$prompt" | grep -q '"type":"user"' && echo true || echo false)"
-case "$prompt" in *SLEEP*) sleep 60;; esac
+case "$prompt" in
+  *LATE*) trap 'printf "{\"type\":\"result\",\"subtype\":\"error_during_execution\",\"is_error\":true,\"session_id\":\"%s\",\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0},\"modelUsage\":{},\"total_cost_usd\":0.99}\n" "$sid"; exit 0' TERM; while :; do sleep 0.1; done;;
+  *SLEEP*) sleep 60;;
+esac
 printf '{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}\n'
 printf '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","overageStatus":"rejected","isUsingOverage":false}}\n'
 printf '{"type":"result","subtype":"success","is_error":false,"session_id":"%s","usage":{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20},"modelUsage":{"m":{"inputTokens":3,"outputTokens":7,"cacheReadInputTokens":20,"cacheCreationInputTokens":10}},"total_cost_usd":0.01}\n' "$sid"
@@ -792,4 +795,166 @@ fn a_run_error_leaves_an_error_checkpoint_and_stops_further_starts() {
         b["reason"].as_str().is_some_and(|r| r.contains("a1")),
         "{b}"
     );
+}
+
+// --- review 475b409 (carried to the caller PR) ---
+
+fn wait_init(t: &Tmp, attempt: &str) {
+    let t0 = Instant::now();
+    while !std::fs::read_to_string(t.0.join(format!("state/runs/{attempt}/stdout.jsonl")))
+        .unwrap_or_default()
+        .contains("\"init\"")
+    {
+        assert!(t0.elapsed() < Duration::from_secs(10));
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[test]
+fn a_live_session_is_reported_running_before_its_checkpoint_phase_is_judged() {
+    // R1: a holder of the session lock answers ALREADY_RUNNING even with a takeover checkpoint
+    let (t, svc) = setup("r1");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "a1");
+    let p = t.0.join("state/checkpoint.json");
+    let mut c: Value = serde_json::from_slice(&std::fs::read(&p).expect("cp")).expect("j");
+    c["phase"] = json!("takeover");
+    std::fs::write(&p, serde_json::to_vec(&c).expect("j")).expect("w");
+    let held = ieo_supervisor::lock::SessionLock::acquire(&t.0.join("state/locks"), "s1", 4243)
+        .expect("lock");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("a2", "x", json!({"new_session_id": "s2"})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str(), b["pid"].as_u64()),
+        (409, Some("ALREADY_RUNNING"), Some(4243)),
+        "{b}"
+    );
+    drop(held);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("a2", "x", json!({"new_session_id": "s2"})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+}
+
+#[test]
+fn a_result_written_after_a_guard_stop_is_not_a_resume_base() {
+    // R2: the stopped run's late result (zero usage) does not replace the carried base
+    let (t, svc) = setup("r2");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "a1");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("a2", "LATE", json!({"new_session_id": "s9"})),
+    );
+    wait_init(&t, "a2");
+    call(&svc, "POST", "/v0/role/stop", b"");
+    let out = wait(&svc, "a2");
+    assert_eq!(out["stop"], "Requested", "{out}");
+    let stdout = std::fs::read_to_string(t.0.join("state/runs/a2/stdout.jsonl")).expect("s");
+    assert!(
+        stdout.contains("0.99"),
+        "the fake wrote no late result: {stdout}"
+    );
+    let cp: Value =
+        serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
+            .expect("j");
+    assert_eq!(cp["session_cumulative"]["total_cost_usd"], 0.01, "{cp}");
+    assert_eq!(cp["session_cumulative_attempt"], "a1");
+}
+
+#[test]
+fn runs_are_counted_by_attempt_directories_too_and_shares_are_bounded() {
+    // R6: more attempt directories than ledger lines count
+    let (t, svc) = setup("r6");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "a1");
+    for i in 0..7 {
+        std::fs::create_dir_all(t.0.join(format!("state/runs/x{i}"))).expect("d");
+    }
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a2", "hi", json!({"session_id": "s2"})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("BUDGET_EXCEEDED")),
+        "{b}"
+    );
+    assert!(
+        b["reason"].as_str().is_some_and(|r| r.contains("8 of 8")),
+        "{b}"
+    );
+    // R6: the share must be present and within the budget's caps
+    let cfg = |share: Value| {
+        let mut v = json!({"role": "guardrail", "repo": "r", "state": "/s", "etc": "/e",
+            "cred": "/c", "claude": "/x", "budget": "02-04"});
+        if !share.is_null() {
+            v["share"] = share;
+        }
+        Config::from_json(&v)
+    };
+    let ok = json!({"max_runs": 12, "total_seconds": 14_400, "billable_tokens": 1_500_000,
+                    "cache_read_tokens": 15_000_000});
+    assert!(cfg(ok.clone()).is_ok());
+    for (k, bad) in [
+        ("max_runs", 13),
+        ("total_seconds", 14_401),
+        ("billable_tokens", 1_500_001),
+        ("cache_read_tokens", 15_000_001),
+        ("max_runs", 0),
+    ] {
+        let mut s = ok.clone();
+        s[k] = json!(bad);
+        assert!(cfg(s).is_err(), "{k} {bad}");
+    }
+    assert!(cfg(Value::Null).is_err());
+}
+
+#[test]
+fn the_largest_end_line_of_an_attempt_counts() {
+    // R4: a forged smaller end line (before or after the real one) does not lower the count
+    let (t, svc) = setup("r4");
+    call(&svc, "POST", "/v0/role/start", &with("a1", json!({})));
+    wait(&svc, "a1");
+    let lines = ledger_lines(&t);
+    let (start, end) = (lines[0].clone(), lines[1].clone());
+    let forged =
+        json!({"attempt_id": "a1", "end": {"observed_billable": 0, "observed_cache_read": 0}});
+    write_ledger(&t, &[start.clone(), forged.clone(), end.clone(), forged]);
+    // observed 18: a room of 1,000,000 − 17 does not fit the share, 1,000,000 − 18 does
+    refused(&svc, "a2", json!({"billable_room": 1_000_000 - 17}));
+    // an end line without numbers makes the attempt unknown
+    let broken = json!({"attempt_id": "a1", "end": {"unknown": true}});
+    write_ledger(&t, &[start, end, broken]);
+    assert!(refused(&svc, "a2", json!({})).contains("reconcile"));
 }
