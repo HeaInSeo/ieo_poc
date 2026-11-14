@@ -259,6 +259,12 @@ fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
                     "correction of {id}: child transcript entry incomplete"
                 ));
             };
+            // read again on every ledger read: only an absolute path (review 12c9a21 N1)
+            if !std::path::Path::new(p).is_absolute() {
+                return Err(format!(
+                    "correction of {id}: transcript path {p} is not absolute"
+                ));
+            }
             transcripts.insert(a.to_owned(), PathBuf::from(p));
         }
         let (usage, kept) = remeasure(&runs[pos], &runs[..pos], &transcripts)
@@ -947,7 +953,33 @@ pub fn reevaluate(
         .ok_or(format!("no record of {attempt}"))?;
     let earlier = effective(raw[..pos].to_vec())?;
     let r = &raw[pos];
-    let (usage, kept) = remeasure(r, &earlier, transcripts)?;
+    // measured first from the given files: nothing is copied or written for a refusal
+    remeasure(r, &earlier, transcripts)?;
+    // the transcripts go with the ledger (children/<attempt>/), by absolute path: a correction is
+    // measured again on every read (review 12c9a21 N1, N2)
+    let dir = std::path::absolute(plan.ledger_dir.join("children").join(attempt))
+        .map_err(|e| format!("ledger path: {e}"))?;
+    let mut in_ledger = std::collections::BTreeMap::new();
+    for (a, p) in transcripts {
+        let b = std::fs::read(p).map_err(|e| format!("transcript {}: {e}", p.display()))?;
+        let to = dir.join(format!("agent-{a}.jsonl"));
+        match std::fs::read(&to) {
+            Ok(existing) if existing != b => {
+                return Err(format!(
+                    "{} already holds a different transcript of {a}",
+                    to.display()
+                ));
+            }
+            Ok(_) => {}
+            Err(_) => {
+                std::fs::create_dir_all(&dir)
+                    .and_then(|()| std::fs::write(&to, &b))
+                    .map_err(|e| format!("transcript copy: {e}"))?;
+            }
+        }
+        in_ledger.insert(a.clone(), to);
+    }
+    let (usage, kept) = remeasure(r, &earlier, &in_ledger)?;
     let c = json!({"format": CORRECTION_FORMAT, "corrects": attempt, "model_request": false,
         "original_stream_sha256": r["stream"]["sha256"], "child_transcripts": kept,
         "decision": decision, "corrected_at": ieo_evidence::time::now(),

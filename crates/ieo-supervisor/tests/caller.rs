@@ -1269,6 +1269,10 @@ fn a_run_is_corrected_once_from_its_kept_records_and_not_counted_again() {
     tr.insert("c1".to_string(), last_only);
     assert!(caller::reevaluate(&p, "d2", &tr, "decision-x").is_err());
     assert_eq!(caller::raw_records(&p).expect("r").len(), 2);
+    assert!(
+        !t.0.join("ledger/children/d2").exists(),
+        "a refusal copies nothing"
+    );
     // the full transcript does
     tr.insert("c1".to_string(), src);
     let c = caller::reevaluate(&p, "d2", &tr, "decision-x").expect("correct");
@@ -1416,12 +1420,39 @@ fn a_correction_is_measured_again_when_read() {
     });
     assert!(caller::records(&p).expect_err("zeroed").contains("differs"));
     std::fs::write(&path, &good).expect("restore");
-    // the transcript it names changed
-    let orig = std::fs::read_to_string(&kept).expect("k");
-    std::fs::write(&kept, orig.lines().nth(1).expect("r2")).expect("w");
+    // the transcript it names (the copy kept with the ledger, by absolute path) changed
+    let in_ledger = t.0.join("ledger/children/d2/agent-c1.jsonl");
+    assert!(in_ledger.is_file(), "the transcript goes with the ledger");
+    let raw = caller::raw_records(&p).expect("raw");
+    assert_eq!(raw[2]["child_transcripts"][0]["path"], json!(in_ledger));
+    let orig = std::fs::read_to_string(&in_ledger).expect("k");
+    std::fs::write(&in_ledger, orig.lines().nth(1).expect("r2")).expect("w");
     assert!(caller::records(&p).is_err());
-    std::fs::write(&kept, &orig).expect("restore");
+    std::fs::write(&in_ledger, &orig).expect("restore");
     assert!(caller::records(&p).is_ok());
+    // the source it was copied from no longer matters
+    std::fs::remove_file(&kept).expect("rm");
+    assert!(caller::records(&p).is_ok());
+    // a relative path in a correction is refused (it would only work from one directory)
+    rewrite_line(&path, "d2", |v| {
+        if v["format"] == caller::CORRECTION_FORMAT {
+            v["child_transcripts"][0]["path"] = json!("children/d2/agent-c1.jsonl");
+        }
+    });
+    assert!(
+        caller::records(&p)
+            .expect_err("relative")
+            .contains("not absolute")
+    );
+    std::fs::write(&path, &good).expect("restore");
+    // the transcripts it records must be the ones measured
+    rewrite_line(&path, "d2", |v| {
+        if v["format"] == caller::CORRECTION_FORMAT {
+            v["child_transcripts"][0]["sha256"] = json!("0".repeat(64));
+        }
+    });
+    assert!(caller::records(&p).is_err());
+    std::fs::write(&path, &good).expect("restore");
     // a decision left empty
     rewrite_line(&path, "d2", |v| {
         if v["format"] == caller::CORRECTION_FORMAT {
@@ -1430,5 +1461,66 @@ fn a_correction_is_measured_again_when_read() {
     });
     assert!(caller::records(&p).is_err());
     std::fs::write(&path, &good).expect("restore");
-    assert!(caller::reevaluate(&p, "d1", &tr, " ").is_err());
+    assert!(caller::records(&p).is_ok());
+}
+
+#[test]
+fn reevaluation_checks_the_decision_the_kept_digest_and_the_base_session() {
+    let _serial = serial();
+    let t = Tmp::new("reeval-checks");
+    let (_a, p) = unmeasured_child_run(&t);
+    let src =
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl");
+    let mut tr = std::collections::BTreeMap::new();
+    tr.insert("c1".to_string(), src.clone());
+    // N3: a blank decision on the run that could be corrected
+    assert!(
+        caller::reevaluate(&p, "d2", &tr, " ")
+            .expect_err("blank")
+            .contains("decision")
+    );
+    let path = caller::records_path(&p);
+    let good = std::fs::read_to_string(&path).expect("l");
+    // F4: the run recorded a different digest for its child transcript
+    rewrite_line(&path, "d2", |v| {
+        v["children"] = json!([{"agent_id": "c1", "sha256": "0".repeat(64)}])
+    });
+    assert!(
+        caller::reevaluate(&p, "d2", &tr, "x")
+            .expect_err("digest")
+            .contains("differs from the one the run kept")
+    );
+    std::fs::write(&path, &good).expect("restore");
+    // F3: the base belongs to another session
+    rewrite_line(&path, "d1", |v| v["session"]["session_id"] = json!("other"));
+    assert!(
+        caller::reevaluate(&p, "d2", &tr, "x")
+            .expect_err("base")
+            .contains("another session")
+    );
+    std::fs::write(&path, &good).expect("restore");
+    // and with everything in order it holds, from a relative source path too (stored absolute)
+    let cwd = std::env::current_dir().expect("cwd");
+    let rel = pathdiff(&src, &cwd);
+    tr.insert("c1".to_string(), rel);
+    let c = caller::reevaluate(&p, "d2", &tr, "x").expect("correct");
+    assert!(
+        std::path::Path::new(c["child_transcripts"][0]["path"].as_str().expect("p")).is_absolute()
+    );
+    assert!(caller::records(&p).is_ok());
+}
+
+/// `to` relative to `from` (both absolute), for a relative-path argument.
+fn pathdiff(to: &Path, from: &Path) -> PathBuf {
+    let t: Vec<_> = to.components().collect();
+    let f: Vec<_> = from.components().collect();
+    let common = t.iter().zip(&f).take_while(|(a, b)| a == b).count();
+    let mut p = PathBuf::new();
+    for _ in common..f.len() {
+        p.push("..");
+    }
+    for c in &t[common..] {
+        p.push(c);
+    }
+    p
 }

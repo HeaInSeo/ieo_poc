@@ -1185,6 +1185,40 @@ fn with_compaction_a_share_below_its_parts_or_with_an_unconfirmed_child_is_unmea
         "{:?}",
         p.usage.run
     );
+    // N3: each of the other three fields below its parts as well
+    for (field, v) in [
+        ("input_tokens", 50u64),
+        ("cache_read_input_tokens", 40_000),
+        ("cache_creation_input_tokens", 3_000),
+    ] {
+        let mut lines: Vec<serde_json::Value> =
+            std::fs::read_to_string(format!("{D3}/stream.jsonl"))
+                .unwrap()
+                .lines()
+                .map(|l| serde_json::from_str(l).unwrap())
+                .collect();
+        lines.insert(
+            1,
+            serde_json::json!({"type": "system", "subtype": "compact_boundary"}),
+        );
+        for x in lines.iter_mut().filter(|x| x["type"] == "result") {
+            x["usage"][field] = v.into();
+        }
+        let stream: String = lines.iter().map(|x| format!("{x}\n")).collect();
+        let mut t = std::collections::BTreeMap::new();
+        t.insert("agent-1".to_string(), d3_transcript().into_bytes());
+        let p = ieo_evidence::stream::parse_with_children(
+            stream.as_bytes(),
+            SessionMode::Resume,
+            Some(d3_base()),
+            &t,
+        );
+        assert!(
+            matches!(&p.usage.run, Measure::Unmeasured { .. }),
+            "{field}: {:?}",
+            p.usage.run
+        );
+    }
     // a share above parent + children with compaction stays measured (compaction calls)
     let p = d3_with_compaction(Some(&d3_transcript()), Some(100));
     assert_eq!(tokens(&p.usage.run), D3_RUN);
