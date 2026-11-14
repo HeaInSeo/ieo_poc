@@ -28,14 +28,24 @@ impl Tmp {
 }
 impl Drop for Tmp {
     fn drop(&mut self) {
-        // a failing test must not leak the fake's processes
-        if let Ok(rd) = std::fs::read_dir(&self.0) {
+        // only a failing test can leave processes behind: kill the fake's whole group and the
+        // recorded children (pids are not reused while their owner test is still running)
+        if std::thread::panicking()
+            && let Ok(rd) = std::fs::read_dir(&self.0)
+        {
             for e in rd.flatten() {
-                if e.path().extension().is_some_and(|x| x == "pid")
-                    && let Ok(pid) = std::fs::read_to_string(e.path())
+                let path = e.path();
+                if path.extension().is_some_and(|x| x == "pid")
+                    && let Ok(pid) = std::fs::read_to_string(&path)
                 {
+                    let pid = pid.trim().to_string();
+                    let target = if path.file_name().is_some_and(|n| n == "leader.pid") {
+                        format!("-{pid}")
+                    } else {
+                        pid
+                    };
                     let _ = Command::new("kill")
-                        .args(["-s", "KILL", pid.trim()])
+                        .args(["-s", "KILL", "--", &target])
                         .status();
                 }
             }
@@ -532,4 +542,111 @@ fn children_left_behind_by_a_normal_exit_are_cleaned_up() {
     assert_eq!((o.stop.clone(), o.exit_code), (Stop::Exited, Some(0)));
     assert!(o.elapsed < Duration::from_secs(6), "{:?}", o.elapsed);
     assert!(gone(&pid), "a background child outlived a normal exit");
+}
+
+// --- review d2989f7 ---
+
+#[test]
+fn output_written_on_the_way_out_is_kept() {
+    // the stopping line and what follows it (a result) are copied
+    let d = Tmp::new("after-stop");
+    let result =
+        json!({"type": "result", "subtype": "success", "usage": {"output_tokens": 9}}).to_string();
+    let mut l = limits(10_000);
+    l.billable_room = 1_000;
+    // the result is written right behind the stopping line (already queued when the guard stops)
+    let tail = format!(
+        "printf '%s\\n' '{}' '{}'\nsleep 300",
+        assistant("m1", 1, 2_000, 0, 0),
+        result
+    );
+    let o = go(d.p(), fake(d.p(), &[], &tail), l);
+    assert_eq!(o.stop, Stop::TokenCap);
+    let copied = std::fs::read_to_string(d.p().join("stdout.jsonl")).expect("copy");
+    assert!(
+        copied.contains("\"m1\""),
+        "the stopping line was not copied: {copied}"
+    );
+    assert!(
+        copied.contains(&result),
+        "a line after the stop was dropped: {copied}"
+    );
+    // a TERM handler that writes its result during the grace
+    let d = Tmp::new("term-result");
+    let tail = format!(
+        "trap 'printf \"%s\\n\" \"{}\"; exit 0' TERM\nwhile :; do sleep 0.1; done",
+        result.replace('"', "\\\"")
+    );
+    let mut l = limits(500);
+    l.grace = Duration::from_secs(5);
+    let o = go(d.p(), fake(d.p(), &[], &tail), l);
+    assert_eq!(o.stop, Stop::RunTimeout);
+    let copied = std::fs::read_to_string(d.p().join("stdout.jsonl")).expect("copy");
+    assert!(
+        copied.contains("\"result\""),
+        "the result written during the grace was dropped: {copied:?}"
+    );
+}
+
+/// A `kill` that always fails.
+fn broken_kill(dir: &Path) -> String {
+    let k = dir.join("kill");
+    std::fs::write(&k, "#!/bin/sh\nexit 1\n").expect("kill");
+    let _ = Command::new("chmod").args(["+x"]).arg(&k).status();
+    k.to_string_lossy().to_string()
+}
+
+#[test]
+fn a_failed_group_kill_is_reported_and_the_leader_is_still_stopped() {
+    // normal exit with a background child the broken kill cannot reach: reported
+    let d = Tmp::new("badkill");
+    let pid = d.p().join("child.pid");
+    let tail = format!("sleep 300 & echo $! > {}\nexit 0", pid.display());
+    let kill = broken_kill(d.p());
+    let o = run::run_with_kill(
+        fake(d.p(), &[], &tail),
+        limits(10_000),
+        &d.p().join("stdout.jsonl"),
+        &d.p().join("stderr.txt"),
+        &kill,
+    )
+    .expect("run");
+    assert_eq!(o.stop, Stop::Exited);
+    assert!(
+        o.cleanup_failed,
+        "a surviving child was reported as cleaned up"
+    );
+    let child = std::fs::read_to_string(&pid).expect("pid");
+    let _ = Command::new("kill")
+        .args(["-s", "KILL", child.trim()])
+        .status();
+    // a stop with the broken kill: the leader is killed directly, within the watchdog
+    let d = Tmp::new("badkill-stop");
+    let kill = broken_kill(d.p());
+    let (out, err) = (d.p().join("stdout.jsonl"), d.p().join("stderr.txt"));
+    let cmd = fake(d.p(), &[], "trap '' TERM\nwhile :; do sleep 0.1; done");
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut l = limits(300);
+        l.grace = Duration::from_millis(300);
+        let _ = tx.send(run::run_with_kill(cmd, l, &out, &err, &kill));
+    });
+    let o = rx
+        .recv_timeout(Duration::from_secs(15))
+        .expect("the leader was not stopped without group signalling")
+        .expect("run");
+    assert_eq!((o.stop.clone(), o.exit_code), (Stop::RunTimeout, None));
+    assert!(o.cleanup_failed);
+}
+
+#[test]
+fn the_stop_grace_must_fit_in_the_time_left() {
+    let ok = rate("rejected");
+    // 10 s left = the grace: refused; 11 s left: 1 s of run time
+    assert!(Limits::for_next(&BUDGET_X02, &[rec(14_390_000, 1, 0)], ok_obs(&ok)).is_err());
+    let l = Limits::for_next(&BUDGET_X02, &[rec(14_389_000, 1, 0)], ok_obs(&ok)).expect("room");
+    assert_eq!(
+        (l.timeout, l.timeout_is_total),
+        (Duration::from_secs(1), true)
+    );
 }

@@ -4,7 +4,10 @@
 //! wraps it). This module enforces limits *during* the run and cleans up afterwards:
 //!
 //! * **time**: the run gets `min(per-run limit, total time left) − grace`, so that the stop
-//!   (SIGTERM to the whole process group, SIGKILL after the grace) completes within the limit.
+//!   (SIGTERM to the whole process group, SIGKILL after the grace) completes within the limit, up
+//!   to tens of milliseconds of polling and `kill` calls (recorded durations round up to seconds).
+//! * **faithful copy**: lines that arrive after a stop decision — during the grace and for a
+//!   bounded time afterwards — are still copied, so a `result` written on the way out is kept.
 //! * **observed tokens**: stream-json `assistant` lines carry a `usage` object; the guard sums it
 //!   (per message id, the largest value seen; parent and child messages alike) and stops the group
 //!   once observed billable tokens (input + output + cache_creation) or cache_read reach the room
@@ -23,12 +26,13 @@
 //!   message starts: input and cache figures are complete, but `output_tokens` is only the start
 //!   value (02-01 fixture r1-new: 5 in the stream, 612 in `result`). Model calls the CLI makes on
 //!   its own — compaction, side calls — appear in no `assistant` line at all (l3-compact: 0 in the
-//!   stream, 26,400 in `modelUsage`). The observed sum is therefore a **lower bound**; the stop
+//!   stream, 8,035 billable and 26,400 cache_read in `modelUsage`). The observed sum is therefore a **lower bound**; the stop
 //!   comes only after the request that crossed the room, whose tokens are already spent.
 //! * Final usage is known only at the end, from the `result` event; the 02-01 collector
 //!   (`ieo-evidence`) computes the run share from it. A run stopped before its `result` is
 //!   unmeasured, and the next call is blocked ([`crate::budget::next`]).
-//! * The first `rate_limit_event` of a session appears only after the first request; holding a
+//! * The first `rate_limit_event` of a session appears only after the first request (it may come
+//!   before any `assistant` line, l3-compact); holding a
 //!   call before that request is the pre-run observation's job (with the subscription and
 //!   environment check), not this guard's.
 //! * A descendant that leaves the process group (`setsid`) is not reached by group signals; inside
@@ -65,7 +69,8 @@ pub struct Limits {
 
 impl Limits {
     /// Limits for the next run: `budget::next` must say `Start`, and every room must be positive.
-    /// Otherwise the decision that refuses the run is returned.
+    /// Otherwise the decision that refuses the run is returned. The room is the cap minus what is
+    /// spent; the reserve `budget::next` uses (the largest run so far) only decides whether to start.
     pub fn for_next(
         budget: &crate::budget::Budget,
         records: &[Value],
@@ -197,31 +202,97 @@ impl Usage {
     }
 }
 
-/// Signal the whole process group (`kill -s SIG -- -PGID`; the workspace forbids `unsafe`, so no
-/// direct kill(2)). Returns whether the signal was delivered; a group that no longer exists
-/// counts as delivered (nothing is left to signal).
-fn signal_group(pgid: u32, sig: &str) -> bool {
-    match Command::new("kill")
+/// Whether any live (non-zombie) process belongs to process group `pgid` (`/proc/*/stat`).
+fn group_alive(pgid: u32) -> bool {
+    let Ok(rd) = std::fs::read_dir("/proc") else {
+        return true; // cannot tell: assume alive (fail closed)
+    };
+    for e in rd.flatten() {
+        if !e
+            .file_name()
+            .to_string_lossy()
+            .bytes()
+            .all(|b| b.is_ascii_digit())
+        {
+            continue;
+        }
+        let Ok(stat) = std::fs::read_to_string(e.path().join("stat")) else {
+            continue;
+        };
+        // "pid (comm) state ppid pgrp …"; comm may contain spaces or parentheses
+        let Some(rest) = stat.rfind(')').map(|i| &stat[i + 1..]) else {
+            continue;
+        };
+        let f: Vec<&str> = rest.split_whitespace().collect();
+        if f.len() > 2 && f[0] != "Z" && f[2] == pgid.to_string() {
+            return true;
+        }
+    }
+    false
+}
+
+/// Signal the whole process group (`<kill> -s SIG -- -PGID`; the workspace forbids `unsafe`, so
+/// no direct kill(2)). Returns whether the group is reached: the signal was delivered, or no live
+/// process of the group is left (nothing to signal). A `kill` that fails while members remain is
+/// a failure.
+fn signal_group(kill: &str, pgid: u32, sig: &str) -> bool {
+    match Command::new(kill)
         .args(["-s", sig, "--", &format!("-{pgid}")])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
     {
         Ok(s) if s.success() => true,
-        Ok(_) => !Path::new(&format!("/proc/{pgid}")).exists(),
-        Err(_) => false,
+        _ => !group_alive(pgid),
     }
 }
 
-/// Stop the group: SIGTERM, wait up to `grace`, then SIGKILL. Falls back to killing the leader
-/// directly when group signalling fails. Returns the leader's status when it could be waited for.
+/// Copies stdout lines that arrive after a stop decision (no more checks): during the stop grace
+/// and for a bounded time afterwards, so a `result` written on the way out is kept.
+struct Copier<'a> {
+    rx: &'a mpsc::Receiver<Event>,
+    out: &'a mut std::fs::File,
+    ended: bool,
+    error: Option<std::io::Error>,
+}
+
+impl Copier<'_> {
+    /// Copy what arrives within `for_`.
+    fn pump(&mut self, for_: Duration) {
+        let until = Instant::now() + for_;
+        while !self.ended {
+            let Some(left) = until.checked_duration_since(Instant::now()) else {
+                break;
+            };
+            match self.rx.recv_timeout(left) {
+                Ok(Event::Line(line)) => {
+                    if let Err(e) = writeln!(self.out, "{line}")
+                        && self.error.is_none()
+                    {
+                        self.error = Some(e);
+                    }
+                }
+                Ok(Event::End) | Ok(Event::Broken) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    self.ended = true
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => break,
+            }
+        }
+    }
+}
+
+/// Stop the group: SIGTERM, wait up to `grace` (copying output), then SIGKILL. Falls back to
+/// killing the leader directly when group signalling fails. Returns the leader's status when it
+/// could be waited for.
 fn stop_group(
+    kill: &str,
     child: &mut Child,
     pgid: u32,
     grace: Duration,
+    copier: &mut Copier<'_>,
     failed: &mut bool,
 ) -> Option<ExitStatus> {
-    if !signal_group(pgid, "TERM") {
+    if !signal_group(kill, pgid, "TERM") {
         *failed = true;
     }
     let until = Instant::now() + grace;
@@ -232,9 +303,12 @@ fn stop_group(
         if Instant::now() >= until {
             break;
         }
-        std::thread::sleep(Duration::from_millis(50));
+        copier.pump(Duration::from_millis(50));
+        if copier.ended {
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
-    if !signal_group(pgid, "KILL") {
+    if !signal_group(kill, pgid, "KILL") {
         *failed = true;
     }
     let _ = child.kill();
@@ -249,12 +323,24 @@ fn stop_group(
 
 /// Run `cmd` (its own process group) under `limits`, copying stdout to `stdout_path` and stderr
 /// to `stderr_path`. On every return path — including errors — no process of the group is left
-/// running (best effort for descendants that left the group, see the module limits).
+/// running (best effort for descendants that left the group, see the module limits); when that
+/// cannot be confirmed, [`Outcome::cleanup_failed`] is set.
 pub fn run(
+    cmd: Command,
+    limits: Limits,
+    stdout_path: &Path,
+    stderr_path: &Path,
+) -> std::io::Result<Outcome> {
+    run_with_kill(cmd, limits, stdout_path, stderr_path, "kill")
+}
+
+/// [`run`] with the program used to signal the group (tests inject a failing one).
+pub fn run_with_kill(
     mut cmd: Command,
     limits: Limits,
     stdout_path: &Path,
     stderr_path: &Path,
+    kill: &str,
 ) -> std::io::Result<Outcome> {
     // everything that can fail before the process exists happens before spawn
     let mut out = std::fs::File::create(stdout_path)?;
@@ -266,12 +352,25 @@ pub fn run(
         .stderr(err);
     let mut child = cmd.spawn()?;
     let pgid = child.id();
+    let (tx, rx) = mpsc::channel::<Event>();
     let Some(stdout) = child.stdout.take() else {
         let mut failed = false;
-        stop_group(&mut child, pgid, limits.grace, &mut failed);
+        let mut copier = Copier {
+            rx: &rx,
+            out: &mut out,
+            ended: true,
+            error: None,
+        };
+        stop_group(
+            kill,
+            &mut child,
+            pgid,
+            limits.grace,
+            &mut copier,
+            &mut failed,
+        );
         return Err(std::io::Error::other("no stdout pipe"));
     };
-    let (tx, rx) = mpsc::channel::<Event>();
     let reader = std::thread::spawn(move || {
         let mut r = BufReader::new(stdout);
         let mut buf = Vec::new();
@@ -300,21 +399,40 @@ pub fn run(
     let mut cleanup_failed = false;
     let mut usage = Usage::default();
     let watched = watch(&mut child, &rx, &mut out, &mut usage, &limits, started);
+    let mut copier = Copier {
+        rx: &rx,
+        out: &mut out,
+        ended: false,
+        error: None,
+    };
     // cleanup on every path, including an error inside `watch`
     let status = match &watched {
         Ok(Watch::Exited(s)) => Some(*s),
-        Ok(Watch::Stopped(_)) | Err(_) => {
-            stop_group(&mut child, pgid, limits.grace, &mut cleanup_failed)
-        }
+        Ok(Watch::Stopped(_)) | Err(_) => stop_group(
+            kill,
+            &mut child,
+            pgid,
+            limits.grace,
+            &mut copier,
+            &mut cleanup_failed,
+        ),
     };
-    if !signal_group(pgid, "KILL") {
+    if !signal_group(kill, pgid, "KILL") {
         cleanup_failed = true;
     }
+    if matches!(watched, Ok(Watch::Stopped(_))) {
+        // lines written on the way out (e.g. `result` from a TERM handler) are kept
+        copier.pump(DRAIN);
+    }
+    let copy_error = copier.error.take();
     // the reader ends when the pipe closes; a descendant that left the group could keep it open,
     // so it is detached rather than joined
     drop(rx);
     drop(reader);
     let watched = watched?;
+    if let Some(e) = copy_error {
+        return Err(e);
+    }
     out.flush()?;
     Ok(Outcome {
         stop: match watched {
