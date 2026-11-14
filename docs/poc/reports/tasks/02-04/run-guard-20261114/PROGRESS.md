@@ -3,7 +3,7 @@
 | 항목 | 기록 |
 | --- | --- |
 | 구분 | 주계획 02-04의 중간 산출물이다. [사용자 결정 2026-11-14 §3](../../../../User_Decisions_2026-11-14_pr30.md): 실제 모델 호출 전에 예산 집행 연결을 모델 없이 시험한다. 완료 수 11/73 변동 없음 |
-| 산출물 | `crates/ieo-supervisor/src/run.rs`(`run::run`, `Limits::for_next`), `tests/run_guard.rs` 17건 |
+| 산출물 | `crates/ieo-supervisor/src/run.rs`(`run::run`, `Limits::for_next`), `tests/run_guard.rs` 20건 |
 | 검토 | 3103933 changes requested(High 3·Medium 4·Low 3) → 교정 1 → d2989f7 changes requested(Medium 2·Low 1) → 교정 2(§3) |
 | 모델 호출 | 0회(가짜 `claude` 셸 스크립트만 사용) |
 
@@ -21,7 +21,7 @@
 | 사용량 누락·계측 실패 때 다음 호출 차단 | 회차 몫의 권위 있는 값은 02-01 계측기(`ieo-evidence`)가 `result` 사건으로 계산한다. guard가 멈춰 `result`가 없으면 계측기는 그 회차를 미계측으로 기록한다. 그러면 `budget::next`와 `Limits::for_next`가 다음 호출을 막는다. 실행 중 관측 합계로 대신하지 않는다. `Limits::for_next`는 `budget::next`가 `Start`일 때만 한도를 준다 | `a_guard_stop_leaves_the_run_unmeasured_…`(guard 정지 → 실제 계측기 `stream::parse` → 미계측 → 다음 호출 차단, 대조: 01-04 실제 stream은 계측됨 → 허용), `limits_for_the_next_run_come_from_the_pre_run_decision` |
 | 정상 범위 실행 허용(양성 대조) | 상한 안의 실행은 끝까지 돌고 stdout이 그대로 복사된다 | `a_normal_run_is_allowed_and_measured` |
 
-변이 19개를 모두 이름 있는 시험이 검출했다([mutants.txt](evidence/mutants.txt)). 시험의 감시 장치가 멈춤을 실패로 바꾼다. 반복 실행 20회에서 실패 0이었다.
+변이 23개를 모두 이름 있는 시험이 검출했다([mutants.txt](evidence/mutants.txt)). 시험의 감시 장치가 멈춤을 실패로 바꾼다. 반복 실행 20회에서 실패 0이었다.
 
 ## 2. 한계(관측 후 정지이며 공급자 측 제한이 아니다)
 
@@ -54,8 +54,8 @@
 
 | 지적 | 처분 |
 | --- | --- |
-| 1 Medium: 정지 뒤 줄(`result` 포함)이 버려짐 | 정지 결정 뒤에도 유예 동안과 그 뒤 최대 2초 동안 줄을 복사한다(검사는 하지 않음). 정지시킨 줄과 그 뒤 `result`, TERM 처리기가 쓴 `result`가 남는지 시험한다 |
+| 1 Medium: 정지 뒤 줄(`result` 포함)이 버려짐 | 정지 결정 뒤에도 줄을 복사한다(검사는 하지 않음): 유예 동안 읽기 스레드가 받아 둔 줄과 그 뒤 최대 2초 동안 온 줄. 정지시킨 줄과 그 뒤 `result`, TERM 처리기가 쓴 `result`가 남는지 시험한다 |
 | 2 Medium: `kill` 실패를 성공으로 셈 | `kill`이 실패하면 `/proc/*/stat`에서 그 그룹의 살아 있는 프로세스를 찾는다. 남아 있으면 실패로 보고한다. `kill` 프로그램을 주입할 수 있게 했다(`run_with_kill`). 항상 실패하는 `kill`로 시험한다: 살아남은 자식은 `cleanup_failed`로 보고하고, 대표 프로세스는 직접 죽인다 |
 | 3 Low: 실패한 시험이 프로세스를 남김 | 시험이 실패할 때만, 가짜 대표 프로세스의 그룹 전체와 기록된 자식을 죽인다 |
-| 4 정보: 시험 공백 | 변이 R20~R24를 추가했다(E1·E2·E4·E5 해당). E3(닫힌 stream 대기가 마감을 2초 넘김)·E6(남은 몫 0 검사, 실제로는 동등)은 그대로 둔다 |
+| 4 정보: 시험 공백 | 변이 R20·R21·R22·R24를 추가했다(E1·E2·E4·E5 해당). 유예 중에 따로 복사하던 경로는 정지 뒤 복사와 겹쳐(채널이 읽은 줄을 보관) 없앴다. 그래서 그 변이(R23)도 없다. E3(닫힌 stream 대기가 마감을 2초 넘김)·E6(남은 몫 0 검사, 실제로는 동등)은 그대로 둔다 |
 | 5·6 정보: 한계 문장의 정확도, 시간 정밀도 | 모듈 문서와 §2를 고쳤다 |
