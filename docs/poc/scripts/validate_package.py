@@ -49,12 +49,12 @@ def validate(root):
     # Amendments apply in order (A1: profile 4->5, A2: 5->6). Each profile revision differs from the
     # previous one exactly in its amendment's changed_acceptance; a task uses the latest revision that
     # changed it, a sprint the latest revision any amendment gave it (v1.3.3-A2).
-    amends=[json.loads((root/f'Amendment_v1.3.3-{a}.json').read_text()) for a in ('A1','A2','A3')]
+    amends=[json.loads((root/f'Amendment_v1.3.3-{a}.json').read_text()) for a in ('A1','A2','A3','A4')]
     profiles={(q['profile_id'],q['revision']):q for q in spec['inspection_profiles']}
     assert sorted(profiles)==[('poc-acceptance-v1.3.3',r) for r in (4,5,6)]
     task_rev={};revs={}
     for am in amends:
-        # A3 adds extra tasks only: no profile revision and no changed acceptance
+        # A3/A4 add extra tasks only: no profile revision and no changed acceptance
         if not am['profile_revisions']:
             assert not am['changed_acceptance'] and not am['sprint_revisions'] and am['baselines_unchanged']=={'main_tasks':73,'main_experiments':31,'followup_tasks':12,'followup_candidates':5};continue
         (pr,)=am['profile_revisions'];r=pr['revision'];prev=profiles[('poc-acceptance-v1.3.3',r-1)];cur=profiles[('poc-acceptance-v1.3.3',r)]

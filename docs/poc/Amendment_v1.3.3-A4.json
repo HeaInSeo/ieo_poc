@@ -1,0 +1,81 @@
+{
+  "id": "v1.3.3-A4",
+  "date": "2026-11-14",
+  "plan_version": "v1.3.3",
+  "decision_ref": "User_Decisions_2026-11-14_grpc.md",
+  "baselines_unchanged": {
+    "main_tasks": 73,
+    "main_experiments": 31,
+    "followup_tasks": 12,
+    "followup_candidates": 5
+  },
+  "profile_revisions": [],
+  "sprint_revisions": [],
+  "changed_acceptance": [],
+  "extra_tasks": [
+    {
+      "task_id": "X-03",
+      "title": "gRPC 내부 API 계약과 분리 영향 확인",
+      "kind": "설계",
+      "prerequisites": [
+        "02-03"
+      ],
+      "acceptance": "코디네이터와 실행 관리 서비스 사이 내부 API의 gRPC 계약(proto와 설명)을 정한다. 서비스·메시지 정의와 버전 호환 규칙(필드 번호 재사용 금지, 호환되지 않는 변경은 새 패키지), 인증과 역할별 권한(HTTP와 같은 자격·범위), HTTP·gRPC 상태 코드 대응과 기존 오류 code의 상세 사유, 작업별 재시도 가능 여부와 멱등 처리(연결 실패만으로 재실행하지 않고 재조회로 실제 반영을 확인), 요청 제한 시간과 취소 처리(커밋 전 취소는 롤백, 커밋 뒤 끊김은 재조회)를 명시한다. 기존 HTTP/JSON 계약은 유지하고 업무 규칙을 다시 정의하지 않는다. 미리 분리할 코드와 그 영향을 확인해 기록한다."
+    },
+    {
+      "task_id": "X-04",
+      "title": "gRPC 경로 구현과 HTTP·gRPC 공통 회귀",
+      "kind": "구현",
+      "prerequisites": [
+        "X-03"
+      ],
+      "acceptance": "X-03 계약대로 gRPC 경로를 추가한다. 업무 규칙은 기존 코디네이터 처리(배정·판정·권한·DB)를 재사용하고 HTTP와 같은 규칙을 다시 구현하지 않는다. 기존 HTTP 시험은 그대로 통과한다. 같은 업무 요청에 대해 HTTP와 gRPC가 같은 판정과 DB 상태를 내는 공통 회귀 시험을 둔다: 인증·역할 권한, 중복 배정 방지와 멱등 처리, 실패 시 트랜잭션 롤백, 옛 세대 결과 보존과 현재 판정 제외, 연결 중단 뒤 재전송의 중복 반영 방지(전송 성공 여부와 서버 반영 여부가 다른 경우 포함)."
+    },
+    {
+      "task_id": "X-05",
+      "title": "기본 kind gRPC 서비스 발견·분산·장애 복구 시험",
+      "kind": "검증",
+      "prerequisites": [
+        "X-03"
+      ],
+      "acceptance": "Cilium을 설치하지 않은 kind 기본 네트워크의 멀티 노드 구성에서 시험용 gRPC 서버·클라이언트로, 특정 CNI 확장 기능 없이 gRPC의 서비스 발견·요청 분산·장애 복구를 제공함을 보인다. 기본 경로는 Headless Service와 클라이언트 측 분산을 우선 검토하고 사용하는 Rust gRPC 라이브러리의 지원(여러 Pod 주소 발견, 주소 목록 갱신, 연결 간 RPC 분산, 연결 실패 감지와 재연결)을 실제로 확인한다. 부족하면 독립 gRPC L7 프록시 하나를 선택하고 근거를 기록한다. 필수 시험: 복제본 증가, Pod 삭제·교체, 롤링 업데이트, 긴 스트림 중단, 요청 재전송. 서버 응답에 Pod 식별자와 요청 ID를 남긴다. 클라이언트·채널을 재사용하는 조건에서 분산을 보고, 새 RPC 분산과 기존 스트림 복구를 따로 판정한다. 관측 시간·요청 수·허용 편차·복구 제한 시간·실패 기준을 실행 전에 근거와 함께 커밋하고 결과를 본 뒤 바꾸지 않는다. 기존 개발 클러스터와 운영 DB를 쓰지 않는다."
+    },
+    {
+      "task_id": "X-06",
+      "title": "제품 경로 kind 재검증(실제 코디네이터 gRPC)",
+      "kind": "검증",
+      "prerequisites": [
+        "X-04",
+        "X-05"
+      ],
+      "acceptance": "실제 코디네이터의 gRPC 경로를 kind 시험 환경에서 실행해 X-04 공통 회귀 항목(인증·권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 재전송 중복 반영 방지)의 판정과 DB 상태를 확인한다. 시험용 서버의 결과와 구분해 보고한다. 04-03·04-04의 수용 기준은 바꾸지 않는다."
+    },
+    {
+      "task_id": "X-07",
+      "title": "Cilium L7 분산 경로 추가 시험(선택)",
+      "kind": "검증",
+      "prerequisites": [
+        "X-05"
+      ],
+      "acceptance": "호환되는 시험 환경이 있으면 별도 kind 구성에서 Cilium의 L7 분산 경로를 X-05와 같은 기능·정확성 기준으로 시험한다. 설치 여부가 아니라 활성화한 기능·설정과 실제 요청 분포로 판정한다. 불가능하면 이유와 필요한 조건을 기록하고 기본 kind 결과와 분리해 보고한다. 이 작업의 미실행은 다른 작업의 차단 조건이 아니다."
+    }
+  ],
+  "scope_limit": "추가 작업은 73·12 완료 수·진행률·수용 프로파일·명세 revision에 영향 없음. 검수 완료 작업의 수용 기준 소급 변경 없음. Claude CLI 실행 방식과 GitHub·Notion 외부 API 연결은 대상 아님. 모델 예산 확대·자동 재시도 추가 없음. 기존 개발 클러스터·운영 DB 변경 없음. kind 결과를 물리 서버 장애·실제 서버 간 단절·운영 처리량 검증으로 표현하지 않음",
+  "note": "progress/ 아래 파일은 생성 화면이므로 대조에서 제외한다. 이 목록의 sha256은 A1~A3의 같은 파일 항목보다 우선한다.",
+  "files": [
+    {
+      "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md",
+      "original_sha256": "23f6b3245f9894670ddbd0dab5318a3af80ab4808d0c45c7acfa16a9ff079962",
+      "sha256": "8309e898926d88208853659c42a7be0242f681e3d918672d73ef173ac26e48d1",
+      "change": "amended",
+      "reason": "A4 §7 추가 작업 X-03~X-07(기존 73행·X-01·X-02 불변)"
+    },
+    {
+      "path": "scripts/validate_package.py",
+      "original_sha256": "bd43577b73f090c9f89c6685660e0f2063d546521661f8dc79f816b8ecc2448c",
+      "sha256": "85242cd9492ef4d834340090c6cd5c6512597fefdc42b8c5c3fd676fd38e9f50",
+      "change": "amended",
+      "reason": "A4 순차 적용(추가 작업만, 프로파일 변경 없음)"
+    }
+  ]
+}
