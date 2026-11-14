@@ -45,14 +45,14 @@
     {
       "path": "Console_Coordinator_Sprints_v0.json",
       "original_sha256": "e12e07ee5d027371b4af6a58b197cff382737751caafc55699a0d15fd2b0a763",
-      "sha256": "434b77f095ca982a16555443b09751482ef664e8ba37de1fe66eb3a12025176b",
+      "sha256": "ae5c1e7f230b0101ccfa759ccd1050868d218cced28653a7b84c48a51bfe4e85",
       "change": "amended",
       "reason": "A5 프로파일 rev 7(02-08·04-11·07-05), 해당 스프린트 revision과 digest, amendments 항목"
     },
     {
       "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md",
       "original_sha256": "23f6b3245f9894670ddbd0dab5318a3af80ab4808d0c45c7acfa16a9ff079962",
-      "sha256": "fee5a8d3f35013c7a34768d7491f813062fe164245a60bdb2121e23dc0f15d0a",
+      "sha256": "0c462034266bfb222d877927e5b969f4712d359576bf336970b100e13a78ff60",
       "change": "amended",
       "reason": "A5 02-08·04-11·07-05 수용 기준"
     },
