@@ -3,7 +3,7 @@
 | 항목 | 기록 |
 | --- | --- |
 | 구분 | 주계획 02-04의 중간 산출물이다. [사용자 결정 2026-11-14 §3](../../../../User_Decisions_2026-11-14_pr30.md): 실제 모델 호출 전에 예산 집행 연결을 모델 없이 시험한다. 완료 수 11/73 변동 없음 |
-| 산출물 | `crates/ieo-supervisor/src/run.rs`(`run::run`, `Limits::for_next`), `tests/run_guard.rs` 24건 |
+| 산출물 | `crates/ieo-supervisor/src/run.rs`(`run::run`, `Limits::for_next`), `tests/run_guard.rs` 25건 |
 | 검토 | 3103933 changes requested(High 3·Medium 4·Low 3) → 교정 1 → d2989f7 changes requested(Medium 2·Low 1) → 교정 2 → 5136d66 changes requested(Medium 1·Low 3) → 교정 3(§5, 마지막 교정) |
 | 모델 호출 | 0회(가짜 `claude` 셸 스크립트만 사용) |
 
@@ -21,7 +21,7 @@
 | 사용량 누락·계측 실패 때 다음 호출 차단 | 회차 몫은 02-01 계측기(`ieo-evidence`)가 `result` 사건으로 계산한다. 예산에 넣는 값은 `run::charge`가 정한다. guard가 **멈춘** 회차는 종료하며 `result`를 썼더라도 언제나 미계측이다. 중단된 프로세스는 쓴 것보다 적게 보고할 수 있다(CLI는 사용량 0의 `error_during_execution` 결과를 쓴다). 스스로 끝난 회차도 계측기 값이 guard의 관측 하한보다 작으면 미계측이다. 미계측이면 `budget::next`와 `Limits::for_next`가 다음 호출을 막는다. 실행 중 관측 합계로 대신하지 않는다. `Limits::for_next`는 `budget::next`가 `Start`일 때만 한도를 준다 | `a_guard_stop_leaves_the_run_unmeasured_…`, `a_stopped_run_is_charged_unmeasured_even_with_a_result_…`(종료하며 쓴 사용량 0 결과도 미계측 → 다음 호출 차단), `an_exited_run_is_charged_with_the_collector_figure_…`(실제 01-04 stream은 그대로 계측, 관측보다 작으면 미계측), `limits_for_the_next_run_come_from_the_pre_run_decision`, `the_stop_grace_must_fit_in_the_time_left` |
 | 정상 범위 실행 허용(양성 대조) | 상한 안의 실행은 끝까지 돌고 stdout이 줄 단위로 복사된다(바이트는 손실 변환, 줄 끝 `\r` 제거) | `a_normal_run_is_allowed_and_measured` |
 
-변이 23개를 모두 이름 있는 시험이 검출했다([mutants.txt](evidence/mutants.txt)). 시험의 감시 장치가 멈춤을 실패로 바꾼다. 반복 실행 20회에서 실패 0이었다.
+변이 27개를 모두 이름 있는 시험이 한 번의 실행에서 검출했다([mutants.txt](evidence/mutants.txt)). 시험의 감시 장치가 멈춤을 실패로 바꾼다. 반복 실행 20회에서 실패 0이었다.
 
 ## 2. 한계(관측 후 정지이며 공급자 측 제한이 아니다)
 
@@ -64,7 +64,7 @@
 
 | 지적 | 처분 |
 | --- | --- |
-| 1 Medium: 멈춘 회차가 종료하며 쓴 `result`로 관측보다 적게 계측되어 다음 호출이 허용됨 | `run::charge`: guard가 멈춘 회차는 언제나 미계측이다. 스스로 끝난 회차도 계측기 값이 관측 하한보다 작으면 미계측이다. 보고용으로 관측 하한과 계측기 값을 남긴다. 사용량 0의 오류 결과를 쓴 시험(P1)이 다음 호출 차단을 확인한다. 문서(§1 넷째 행, §2, 모듈 문서)를 고쳤다 |
+| 1 Medium: 멈춘 회차가 종료하며 쓴 `result`로 관측보다 적게 계측되어 다음 호출이 허용됨 | `run::charge`: guard가 멈춘 회차는 언제나 미계측이다. 스스로 끝난 회차도 계측기 값이 관측 하한보다 작으면 미계측이다. 보고용으로 관측 하한과 계측기 값을 남긴다. 사용량 0의 오류 결과를 쓴 시험(P1)이 다음 호출 차단을 확인한다. 관측 하한 이상으로 보이는 완전한 늦은 `result`(실제 01-04 결과)도 미계측으로 넣는지 따로 시험한다(R26). 문서(§1 넷째 행, §2, 모듈 문서)를 고쳤다 |
 | 2 Low: PROGRESS의 낡은 문장 | `kill` 실패 경로 시험, §1 표의 새 시험, 줄 단위 복사로 고쳤다 |
 | 3 Low: 오류 반환에서 정리 보고가 사라짐 | 오류 메시지에 정리 실패를 덧붙인다(`/dev/full`·항상 실패하는 `kill` 시험) |
 | 4 Low: 정지 뒤 복사 2초 상한 시험 없음 | 그룹을 떠난(`setsid`) 후손이 파이프를 잡는 시험과 변이 R25를 더했다. 그 밖의 생존 변이(X1·X3·X4·X6·X9·X10·X12)는 동등하거나 영향이 작아 그대로 둔다 |
