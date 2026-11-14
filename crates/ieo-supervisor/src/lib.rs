@@ -7,6 +7,8 @@
 //! * [`checkpoint`]: the §5-1 record and the reconnect decision (§5-2/5/6, §6; resume key = session_id only, §10 item 5)
 //! * [`budget`]: model-call budget guard (user decision 2026-11-13 ①) checked between runs, with the no-overage precondition and an in-stream stop signal
 //!
+//! * [`run`]: in-run enforcement (time, observed tokens, extra-usage signals) and process-group cleanup
+//!
 //! Pods, PID 1 and the adapter wiring around a real `claude` process are separate steps of 02-04.
 
 pub mod args;
@@ -15,3 +17,4 @@ pub mod checkpoint;
 pub mod configdir;
 pub mod env;
 pub mod lock;
+pub mod run;

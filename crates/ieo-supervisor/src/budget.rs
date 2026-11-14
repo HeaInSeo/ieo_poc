@@ -14,7 +14,8 @@
 //! (the largest run so far) does not exceed the cap. This is a projection, not a guarantee:
 //! the first run has no history and is bounded only by its timeout, and any run can exceed
 //! the reserve; [`Spent`] then shows the overrun, which is reported, and the next call stops.
-//! The adapter's in-stream stop on a cap crossing is a later 02-04 step.
+//! The in-run stop on observed usage is [`crate::run`]; it observes a lower bound and stops
+//! after the request that crossed the room (see its limits).
 //!
 //! **Extra billing.** Only subscription usage is allowed (additional charge USD 0). The CLI's
 //! `total_cost_usd` is a conversion estimate, not a bill, and is never capped at 0. The CLI
