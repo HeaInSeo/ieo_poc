@@ -1,0 +1,2 @@
+development: podman stop 0.3 s, exit 0
+guardrail: podman stop 0.4 s, exit 0

@@ -1,0 +1,10 @@
+runs 7 seconds 45 billable 33948 cache_read 121189 unmeasured [] unclassified []
+  "D1" "measured" stop_required false corrected false
+  "G1" "measured" stop_required false corrected false
+  "D2" "measured" stop_required false corrected false
+  "D3" "measured" stop_required false corrected true
+  "D4" "measured" stop_required false corrected false
+  "D5" "measured" stop_required false corrected false
+  "D6" "measured" stop_required false corrected false
+development: window 600s billable_room 968638 cache_read_room 9887878 total false
+guardrail: window 600s billable_room 497414 cache_read_room 4990933 total false
