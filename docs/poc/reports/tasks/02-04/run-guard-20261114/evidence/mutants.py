@@ -24,7 +24,6 @@ M = [
  ("R20 a failed group kill counted as delivered", "        _ => !group_alive(pgid),", "        _ => true,"),
  ("R21 no direct kill of the leader", "    let _ = child.kill();\n    match child.wait() {", "    match child.wait() {"),
  ("R22 output after a stop not copied", "        copier.pump(DRAIN);", "        let _ = DRAIN;"),
- ("R23 output during the grace not copied", "        copier.pump(Duration::from_millis(50));", "        std::thread::sleep(Duration::from_millis(50));"),
  ("R24 a window equal to the grace allowed", "        if window <= GRACE {", "        if window < GRACE {"),
 ]
 only = sys.argv[1:]

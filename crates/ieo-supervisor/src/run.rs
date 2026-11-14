@@ -247,8 +247,9 @@ fn signal_group(kill: &str, pgid: u32, sig: &str) -> bool {
     }
 }
 
-/// Copies stdout lines that arrive after a stop decision (no more checks): during the stop grace
-/// and for a bounded time afterwards, so a `result` written on the way out is kept.
+/// Copies stdout lines that arrived after a stop decision (no more checks): everything the reader
+/// queued during the stop grace, plus a bounded time afterwards, so a `result` written on the way
+/// out is kept.
 struct Copier<'a> {
     rx: &'a mpsc::Receiver<Event>,
     out: &'a mut std::fs::File,
@@ -281,7 +282,7 @@ impl Copier<'_> {
     }
 }
 
-/// Stop the group: SIGTERM, wait up to `grace` (copying output), then SIGKILL. Falls back to
+/// Stop the group: SIGTERM, wait up to `grace`, then SIGKILL. Falls back to
 /// killing the leader directly when group signalling fails. Returns the leader's status when it
 /// could be waited for.
 fn stop_group(
@@ -289,7 +290,6 @@ fn stop_group(
     child: &mut Child,
     pgid: u32,
     grace: Duration,
-    copier: &mut Copier<'_>,
     failed: &mut bool,
 ) -> Option<ExitStatus> {
     if !signal_group(kill, pgid, "TERM") {
@@ -303,10 +303,8 @@ fn stop_group(
         if Instant::now() >= until {
             break;
         }
-        copier.pump(Duration::from_millis(50));
-        if copier.ended {
-            std::thread::sleep(Duration::from_millis(50));
-        }
+        // output keeps arriving in the channel; it is copied after the stop
+        std::thread::sleep(Duration::from_millis(50));
     }
     if !signal_group(kill, pgid, "KILL") {
         *failed = true;
@@ -355,20 +353,7 @@ pub fn run_with_kill(
     let (tx, rx) = mpsc::channel::<Event>();
     let Some(stdout) = child.stdout.take() else {
         let mut failed = false;
-        let mut copier = Copier {
-            rx: &rx,
-            out: &mut out,
-            ended: true,
-            error: None,
-        };
-        stop_group(
-            kill,
-            &mut child,
-            pgid,
-            limits.grace,
-            &mut copier,
-            &mut failed,
-        );
+        stop_group(kill, &mut child, pgid, limits.grace, &mut failed);
         return Err(std::io::Error::other("no stdout pipe"));
     };
     let reader = std::thread::spawn(move || {
@@ -408,14 +393,9 @@ pub fn run_with_kill(
     // cleanup on every path, including an error inside `watch`
     let status = match &watched {
         Ok(Watch::Exited(s)) => Some(*s),
-        Ok(Watch::Stopped(_)) | Err(_) => stop_group(
-            kill,
-            &mut child,
-            pgid,
-            limits.grace,
-            &mut copier,
-            &mut cleanup_failed,
-        ),
+        Ok(Watch::Stopped(_)) | Err(_) => {
+            stop_group(kill, &mut child, pgid, limits.grace, &mut cleanup_failed)
+        }
     };
     if !signal_group(kill, pgid, "KILL") {
         cleanup_failed = true;
