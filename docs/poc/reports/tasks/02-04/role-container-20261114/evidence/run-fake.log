@@ -1,0 +1,48 @@
+# 02-04 role containers, fake claude (no model calls) · 2026-11-14T15:51:31Z · image docker.io/library/golang:1.26.9-bookworm
+## U3 layout
+development: pid1=/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervi uid=20001 labels=development
+  mounts: /opt/ieo(ro) /state(rw) /etc/ieo/role(ro) /run/ieo/cred(ro) 
+guardrail: pid1=/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervi uid=20002 labels=guardrail
+  mounts: /run/ieo/cred(ro) /opt/ieo(ro) /state(rw) /etc/ieo/role(ro) 
+  shared host paths between roles: 0 (the read-only program dir /opt/ieo excluded)
+## adapter auth
+no token: 401
+## reconnect with no checkpoint: never a silent new session
+409 NOT_OBSERVED
+## (a) cleanup before the first start: markers planted in the config dir
+202{"attempt_id": "d1", "session_id": "s-dev-1", "mode": "new", "stop": "Exited", "exit_code": 0, "stopped_by_guard": false, "cleanup_failed": false, "tamper": null}
+init: {"type":"system","subtype":"init","session_id":"s-dev-1","uid":"20001","cwd":"/state/work/sori","config":"settings.json,","prompt_seen":true}
+## (c) reconnect without changes resumes the same session
+202{"attempt_id": "d2", "session_id": "s-dev-1", "mode": "resume", "stop": "Exited", "exit_code": 0, "stopped_by_guard": false, "cleanup_failed": false, "tamper": null}
+## persistent volume: container restart, then reconnect resumes from the stored checkpoint
+after restart: pid1=/opt/ieo/ieo-supervisor serve --config / checkpoint session=s-dev-1
+202{"attempt_id": "d3", "session_id": "s-dev-1", "mode": "resume", "stop": "Exited", "exit_code": 0, "stopped_by_guard": false, "cleanup_failed": false, "tamper": null}
+## (b) tamper: a skill planted after the checkpoint
+202{"attempt_id": "d4", "session_id": "s-dev-2", "mode": "new", "stop": "Exited", "exit_code": 0, "stopped_by_guard": false, "cleanup_failed": false, "tamper": {"checkpoint_digest": "1661779da5702828b2b8c381a72c2367ce226a982252b1d41a350e7f0be7ce64", "config_tamper_detected": true, "new_session_id": "s-dev-2", "observed_digest": "b7aeb194a72df113186ce61bdfd12cd01e35bfc1760177c37ca8f9de961c539e", "old_session_id": "s-dev-1"}}
+## single run per session: a reconnect while running answers with status
+202409 ALREADY_RUNNING
+## stop
+202{"attempt_id": "d5", "session_id": "s-dev-2", "mode": "resume", "stop": "Requested", "exit_code": null, "stopped_by_guard": true, "cleanup_failed": false, "tamper": null}
+processes left in the container besides PID 1 (incl. zombies): 0
+## guardrail role: its own volume, uid and arguments
+202{"attempt_id": "g1", "session_id": "s-gr-1", "mode": "new", "stop": "Exited", "exit_code": 0, "stopped_by_guard": false, "cleanup_failed": false, "tamper": null}
+init: {"type":"system","subtype":"init","session_id":"s-gr-1","uid":"20002","cwd":"/state/guardrail-cwd","config":"settings.json,","prompt_seen":true}
+allowedTools ['Read(//state/review/**)', 'Read(//state/inputs/**)', 'Read(//state/guardrail-scratch/**)', 'Edit(//state/guardrail-scratch/**)']
+Write( in argv: False
+env: ['HOME', 'PATH', 'LANG', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_OAUTH_TOKEN']
+## credential values in the logs: 0 occurrences
+## budget backstop: attempts counted on the role volume
+development: 5 started, 5 ended, observed billable 72
+guardrail: 1 started, 1 ended, observed billable 18
+per-run window above the cap: 409 BUDGET_EXCEEDED
+## SIGTERM to PID 1 during a run: the run is stopped through the guard within its grace
+202development (running): podman stop took 0.5 s, exit code 0
+d7 outcome: {'stop': 'Requested', 'stopped_by_guard': True, 'cleanup_failed': False}
+checkpoint: s-dev-7 after_run
+## SIGTERM to PID 1 during the slowest stop: the leader ignores TERM and a setsid descendant holds stdout (grace 6 s)
+202development (TERM ignored): podman stop took 8.4 s, exit code 0
+d9 outcome: {'stop': 'Requested', 'stopped_by_guard': True, 'cleanup_failed': False, 'elapsed_ms': 9225}
+checkpoint: s-dev-9 after_run
+## graceful stop: SIGTERM to PID 1 (idle)
+guardrail: podman stop took 0.4 s, exit code 0
+# done

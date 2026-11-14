@@ -298,7 +298,7 @@ fn limits_for_the_next_run_come_from_the_pre_run_decision() {
             l.grace
         ),
         (
-            Duration::from_secs(1_790),
+            Duration::from_secs(1_794),
             false,
             1_500_000,
             15_000_000,
@@ -318,13 +318,13 @@ fn limits_for_the_next_run_come_from_the_pre_run_decision() {
             l.billable_room,
             l.cache_read_room
         ),
-        (Duration::from_secs(1_390), true, 2_000_000, 20_000_000)
+        (Duration::from_secs(1_394), true, 2_000_000, 20_000_000)
     );
     // exactly the per-run limit left is not "total"
     let l = Limits::for_next(&BUDGET_X02, &[rec(10_800_000, 1, 0)], ok_obs(&ok)).expect("room");
     assert_eq!(
         (l.timeout, l.timeout_is_total),
-        (Duration::from_secs(3_590), false)
+        (Duration::from_secs(3_594), false)
     );
     // refused whenever the pre-run decision refuses, and without room
     let unmeasured = json!({"model_request": true, "attempt_id": "a", "command_id": "c", "duration_ms": 1,
@@ -642,9 +642,9 @@ fn a_failed_group_kill_is_reported_and_the_leader_is_still_stopped() {
 #[test]
 fn the_stop_grace_must_fit_in_the_time_left() {
     let ok = rate("rejected");
-    // 10 s left = the grace: refused; 11 s left: 1 s of run time
-    assert!(Limits::for_next(&BUDGET_X02, &[rec(14_390_000, 1, 0)], ok_obs(&ok)).is_err());
-    let l = Limits::for_next(&BUDGET_X02, &[rec(14_389_000, 1, 0)], ok_obs(&ok)).expect("room");
+    // 6 s left = the grace: refused; 7 s left: 1 s of run time
+    assert!(Limits::for_next(&BUDGET_X02, &[rec(14_394_000, 1, 0)], ok_obs(&ok)).is_err());
+    let l = Limits::for_next(&BUDGET_X02, &[rec(14_393_000, 1, 0)], ok_obs(&ok)).expect("room");
     assert_eq!(
         (l.timeout, l.timeout_is_total),
         (Duration::from_secs(1), true)
@@ -786,4 +786,49 @@ fn a_stopped_run_is_unmeasured_even_when_its_late_result_looks_complete() {
     let c = collected(&d.p().join("stdout.jsonl"), o.elapsed.as_millis() as u64);
     assert_eq!(c["usage"]["run"]["state"], "measured", "{c}");
     assert_eq!(run::charge(&o, &c["usage"]["run"])["state"], "unmeasured");
+}
+
+// --- review 88a4535 (PR #47) ---
+
+/// A `kill` that accepts only the `-SIG -- -PGID` form (procps-ng 4.0.2 in the role image
+/// rejects `-s SIG -- -PGID`); it logs each call and passes it on.
+fn strict_kill(dir: &Path) -> String {
+    let k = dir.join("kill");
+    let log = dir.join("kill.log");
+    std::fs::write(
+        &k,
+        format!(
+            "#!/bin/sh\necho \"$*\" >> {}\ncase \"$1\" in -[A-Z]*) ;; *) exit 2;; esac\n[ \"$2\" = -- ] || exit 2\ncase \"$3\" in -[0-9]*) ;; *) exit 2;; esac\nexec /bin/kill \"$@\"\n",
+            log.display()
+        ),
+    )
+    .expect("kill");
+    let _ = Command::new("chmod").args(["+x"]).arg(&k).status();
+    k.to_string_lossy().to_string()
+}
+
+#[test]
+fn the_group_is_signalled_in_the_form_the_role_image_accepts() {
+    let d = Tmp::new("killform");
+    let pid = d.p().join("child.pid");
+    let tail = format!("sleep 300 & echo $! > {}\nsleep 300", pid.display());
+    let kill = strict_kill(d.p());
+    let o = run::run_with_kill(
+        fake(d.p(), &[], &tail),
+        limits(500),
+        &d.p().join("stdout.jsonl"),
+        &d.p().join("stderr.txt"),
+        &kill,
+    )
+    .expect("run");
+    assert_eq!(o.stop, Stop::RunTimeout);
+    assert!(!o.cleanup_failed, "the strict kill refused the group form");
+    assert!(gone(&pid));
+    let log = std::fs::read_to_string(d.p().join("kill.log")).expect("log");
+    assert!(
+        log.lines()
+            .next()
+            .is_some_and(|l| l.starts_with("-TERM -- -")),
+        "{log}"
+    );
 }

@@ -52,10 +52,12 @@ use std::time::{Duration, Instant};
 
 /// How long the guard keeps reading after the leader exited (bounded; descendants are killed
 /// afterwards).
-const DRAIN: Duration = Duration::from_secs(2);
+pub const DRAIN: Duration = Duration::from_secs(2);
 
-/// SIGTERM → SIGKILL grace used by [`Limits::for_next`].
-pub const GRACE: Duration = Duration::from_secs(10);
+/// SIGTERM → SIGKILL grace used by [`Limits::for_next`]. Grace + [`DRAIN`] + margin must fit the
+/// container runtime's stop timeout (podman default 10 s), so a stop of the role container lets
+/// the run end and its outcome be written.
+pub const GRACE: Duration = Duration::from_secs(6);
 
 /// What the guard allows for one run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,6 +125,8 @@ pub enum Stop {
     Overage(String),
     /// The stream ended or could not be read while the process kept running.
     StreamLost(String),
+    /// Stopped on request (adapter `stop`).
+    Requested,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -234,13 +238,14 @@ fn group_alive(pgid: u32) -> bool {
     false
 }
 
-/// Signal the whole process group (`<kill> -s SIG -- -PGID`; the workspace forbids `unsafe`, so
+/// Signal the whole process group (`<kill> -SIG -- -PGID`: the form both util-linux and procps-ng 4
+/// accept — procps-ng 4.0.2 rejects `-s SIG -- -PGID`; the workspace forbids `unsafe`, so
 /// no direct kill(2)). Returns whether the group is reached: the signal was delivered, or no live
 /// process of the group is left (nothing to signal). A `kill` that fails while members remain is
 /// a failure.
 fn signal_group(kill: &str, pgid: u32, sig: &str) -> bool {
     match Command::new(kill)
-        .args(["-s", sig, "--", &format!("-{pgid}")])
+        .args([format!("-{sig}"), "--".to_string(), format!("-{pgid}")])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -337,22 +342,75 @@ pub fn run(
 
 /// [`run`] with the program used to signal the group (tests inject a failing one).
 pub fn run_with_kill(
-    mut cmd: Command,
+    cmd: Command,
     limits: Limits,
     stdout_path: &Path,
     stderr_path: &Path,
     kill: &str,
 ) -> std::io::Result<Outcome> {
+    run_with(
+        cmd,
+        limits,
+        stdout_path,
+        stderr_path,
+        &Options {
+            kill: kill.to_string(),
+            ..Options::default()
+        },
+    )
+}
+
+/// Extra inputs of a run.
+#[derive(Debug, Clone)]
+pub struct Options {
+    /// Program used to signal the group.
+    pub kill: String,
+    /// Bytes written to the process's stdin, which is then closed (the prompt for
+    /// `--input-format stream-json`); `None` = no stdin.
+    pub stdin: Option<Vec<u8>>,
+    /// Set from outside to stop the run (adapter `stop`); checked on every loop iteration.
+    pub stop: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            kill: "kill".into(),
+            stdin: None,
+            stop: None,
+        }
+    }
+}
+
+/// [`run`] with [`Options`].
+pub fn run_with(
+    mut cmd: Command,
+    limits: Limits,
+    stdout_path: &Path,
+    stderr_path: &Path,
+    opts: &Options,
+) -> std::io::Result<Outcome> {
+    let kill = opts.kill.as_str();
     // everything that can fail before the process exists happens before spawn
     let mut out = std::fs::File::create(stdout_path)?;
     let err = std::fs::File::create(stderr_path)?;
     let started = Instant::now();
     cmd.process_group(0)
-        .stdin(Stdio::null())
+        .stdin(if opts.stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(err);
     let mut child = cmd.spawn()?;
     let pgid = child.id();
+    if let (Some(bytes), Some(mut stdin)) = (opts.stdin.clone(), child.stdin.take()) {
+        // written from a thread so a process that does not read cannot block the guard
+        std::thread::spawn(move || {
+            let _ = stdin.write_all(&bytes);
+        });
+    }
     let (tx, rx) = mpsc::channel::<Event>();
     let Some(stdout) = child.stdout.take() else {
         let mut failed = false;
@@ -386,7 +444,15 @@ pub fn run_with_kill(
     });
     let mut cleanup_failed = false;
     let mut usage = Usage::default();
-    let watched = watch(&mut child, &rx, &mut out, &mut usage, &limits, started);
+    let watched = watch(
+        &mut child,
+        &rx,
+        &mut out,
+        &mut usage,
+        &limits,
+        started,
+        opts.stop.as_deref(),
+    );
     let mut copier = Copier {
         rx: &rx,
         out: &mut out,
@@ -474,6 +540,7 @@ fn watch(
     usage: &mut Usage,
     limits: &Limits,
     started: Instant,
+    stop: Option<&std::sync::atomic::AtomicBool>,
 ) -> std::io::Result<Watch> {
     let deadline = started + limits.timeout;
     let timed_out = || {
@@ -487,6 +554,9 @@ fn watch(
         let now = Instant::now();
         if now >= deadline {
             return Ok(Watch::Stopped(timed_out()));
+        }
+        if stop.is_some_and(|f| f.load(std::sync::atomic::Ordering::SeqCst)) {
+            return Ok(Watch::Stopped(Stop::Requested));
         }
         // checked on every iteration: a descendant writing continuously must not hide the exit
         if let Some(s) = child.try_wait()? {
