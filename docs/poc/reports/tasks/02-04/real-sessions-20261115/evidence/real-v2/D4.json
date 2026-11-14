@@ -1,0 +1,181 @@
+{
+ "attempt_id": "D4",
+ "role": "development",
+ "command_id": "development-reconnect",
+ "session": {
+  "mode": "resume",
+  "resume_base_attempt": "D3",
+  "session_id": "58f8976d-3ee3-465f-baac-6102e3321779"
+ },
+ "duration_ms": 10124,
+ "stop_required": false,
+ "stop_reason": null,
+ "outcome": {
+  "stop": "Exited",
+  "stopped_by_guard": false,
+  "exit_code": 0,
+  "cleanup_failed": false,
+  "tamper": null,
+  "config_cleanup": {
+   "credentials_removed": [],
+   "digest": "1661779da5702828b2b8c381a72c2367ce226a982252b1d41a350e7f0be7ce64",
+   "removed": 12
+  },
+  "env_names": [
+   "HOME",
+   "PATH",
+   "LANG",
+   "CLAUDE_CONFIG_DIR",
+   "CLAUDE_CODE_OAUTH_TOKEN"
+  ]
+ },
+ "init": {
+  "session_id": "58f8976d-3ee3-465f-baac-6102e3321779",
+  "tools": [
+   "Task",
+   "Bash",
+   "CronCreate",
+   "CronDelete",
+   "CronList",
+   "DesignSync",
+   "Edit",
+   "EnterWorktree",
+   "ExitWorktree",
+   "ListAgents",
+   "Monitor",
+   "NotebookEdit",
+   "PushNotification",
+   "Read",
+   "RemoteTrigger",
+   "ReportFindings",
+   "ScheduleWakeup",
+   "SendMessage",
+   "Skill",
+   "TaskStop",
+   "ToolSearch",
+   "WebFetch",
+   "WebSearch",
+   "Workflow",
+   "Write"
+  ],
+  "mcp_servers": [],
+  "agents": [
+   "claude",
+   "Explore",
+   "general-purpose",
+   "Plan",
+   "reader",
+   "statusline-setup"
+  ],
+  "skills": [
+   "deep-research",
+   "design",
+   "design-sync",
+   "dataviz",
+   "update-config",
+   "verify",
+   "debug",
+   "code-review",
+   "simplify",
+   "batch",
+   "fewer-permission-prompts",
+   "doctor",
+   "loop",
+   "schedule",
+   "claude-api",
+   "workflow-authoring",
+   "run",
+   "run-skill-generator",
+   "plugin-authoring"
+  ],
+  "plugins": [
+   {
+    "name": "cc-plugin-agents-md",
+    "path": "builtin",
+    "source": "cc-plugin-agents-md@builtin"
+   },
+   {
+    "name": "cc-plugin-telemetry",
+    "path": "builtin",
+    "source": "cc-plugin-telemetry@builtin"
+   },
+   {
+    "name": "cc-plugin-privacy",
+    "path": "builtin",
+    "source": "cc-plugin-privacy@builtin"
+   },
+   {
+    "name": "cc-plugin-plugin-authoring",
+    "path": "builtin",
+    "source": "cc-plugin-plugin-authoring@builtin"
+   }
+  ],
+  "memory_paths": null,
+  "apiKeySource": "none",
+  "model": "claude-sonnet-5-5",
+  "permissionMode": "dontAsk",
+  "cwd": "/state/work/fixture0204"
+ },
+ "init_slash_commands": 53,
+ "tool_uses": [],
+ "tool_errors": [],
+ "result": {
+  "subtype": "success",
+  "is_error": false,
+  "session_id": "58f8976d-3ee3-465f-baac-6102e3321779",
+  "text": ""
+ },
+ "compact_boundaries": 1,
+ "rate_limit": [
+  {
+   "status": "allowed",
+   "overageStatus": "rejected",
+   "isUsingOverage": false
+  }
+ ],
+ "usage_run": {
+  "source": "재개: result.modelUsage − 기준 회차 02-04/D3/development-reconnect 누적",
+  "state": "measured",
+  "tokens": {
+   "cache_creation": 1142,
+   "cache_read": 11393,
+   "input": 6688,
+   "output": 1155
+  }
+ },
+ "usage_session": {
+  "source": "result.modelUsage",
+  "state": "measured",
+  "tokens": {
+   "cache_creation": 12677,
+   "cache_read": 88194,
+   "input": 6706,
+   "output": 1490
+  }
+ },
+ "stream": {
+  "bytes": 10337,
+  "sha256": "392b2194ef79dcc1dd5ca208843e920192fcde90d55286f1ef678ee23b6527c6"
+ },
+ "children": {
+  "status": "confirmed_none",
+  "observed_in_stream": {
+   "source": "record usage.children (the collector's reading of the run's stream: Agent tool_use and its result)",
+   "children": []
+  },
+  "kept_transcripts": {
+   "source": "record children (kept by the role service and fetched by the caller)",
+   "transcripts": []
+  }
+ },
+ "provenance": {
+  "generator": "summarize.py v2",
+  "generator_sha256": "24cd2de31b27a2ffba901d3f4c5b39e1dad4e181d6ccee32ff13d98d9a7ad579",
+  "record_line": 6,
+  "record_line_sha256": "6429518caa3e75289d69008dc24a1ecc0d4b3cbd8807c437c7b519ac958a51e1",
+  "correction_line": null,
+  "correction_line_sha256": null,
+  "stream_read": true,
+  "stream_matches_record": true
+ }
+}
