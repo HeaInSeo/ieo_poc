@@ -1,6 +1,6 @@
 # 주계획·후속 작업 상태
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0018` · 원장 SHA-256 `f6c9bcbbaea9cc67275dff6fb30d26ddee727c77e0470c3821ab3b711a7ab27e`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0019` · 원장 SHA-256 `d4c6063041f3f072d042db6d8e83d804bf65cdc194ec16224f162d497fdf9df0`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -105,5 +105,10 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | X-01 · Notion 작업 가져오기·초안 등록 | 구현 | 검수 완료 | crates/ieo-notion(읽기 전용: 연결 스냅샷·REST API) + 코디네이터 POST /v0/imports/notion(OpenAPI 0.7.0). 실제 Notion 작업 OP-OCI-RAC-OC08-20261018을 대화 연결로 읽은 비공개 스냅샷(서버에 Notion 자격 없음)으로 영속 DB에 시험 ID POCX-SORI-OC08-T01 draft 등록(201), 같은 입력 재조회(200·행 불변), 모의 변경으로 revision 2·revision 1 보존, 초안 배정·executable 승격 거부(422), Notion 읽기 실패 시 DB 불변. 실행 중 배정의 revision 고정(상한은 더 새로운 executable·검토 통과 revision 기준). 시험 165건·변이 17/17. 대상 repo HeaInSeo/sori poc/POCX-SORI-OC08-T01 = 기준 2fa7f5e(추가 커밋 0, PR 없음). DB 등록은 개발 완료가 아님. PR #27 b8b619a reject(P2 R1~R3) → 38b671b reject(P2 S1·S2) → 7a48a4f reject(P2 T1) → 74bd796 approve(X-01 검토 4/4·교정 3/3) → 병합 74b00fd · main CI success(run 43425920936). 모델 호출 0 · 후속 교정 C1·C2(사용자 결정 2026-11-13 이슈 A·B, 73·12 미산입): C1 Notion 원문 무전사 수집(변경 없음 확인), C2 서버 실행 통제 — 신뢰된 가져오기 기록(service 전용 notion:import)의 큐 차단·필수 정보로 executable 등록·배정을 판정, 사용자 승인 예외(user 전용, 시험 ID·repo·페이지·내용 digest에 묶임). PR #30 9a421b7·7afd4d1·e908a8c reject → aa38041 approve(검토 4/4·교정 3/3, P3 I1~I3 이월) → 최신화 병합 7111a73(tree 동일) → 병합 c5a3d3a. 영속 DB 재적용(c2-live-r3), 결정 ③ 예외 r4 기록. 모델 호출 0 · 후속 PR #34(I1~I3)·#35(J1~J3: 최신 가져오기를 revision 우선으로, 시계 역행 열린 실패 제거)·#36(K1~K2: 두 시험 ID 아래 이전 페이지는 닫힌 실패)·#37(L1~L3: page_id 정규형만 수용) — 각 첫 검토 approve, 병합 803d3f6·50f407e·0086b0d·7e9f5ea, main CI run 43450158305·43466926083·43469160953·43471640906 success. 시험 208건·변이 24/25(C4a 동등). 영속 코디네이터 main 7e9f5ea 재적용(c2-live-r4): 비정규 page_id 0·두 시험 ID 페이지 0, 대시 표기 page_id 400. 모델 호출 0 / verified | 2026-11-14T02:25:00+09:00 | [보고](../reports/extra/X-01/notion-import-20261113/REPORT.md) | 없음(검수 완료). 이어지는 실행은 X-02(extra_tasks X-02의 next_action) |
 | X-02 · Notion 시험 작업의 실제 개발 세션 연결 | 검증 | 조건 대기 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 02-04 수용 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음) |
+| X-03 · gRPC 내부 API 계약(서비스·메시지·버전 호환·인증·상태 대응·재시도·멱등·deadline·취소)과 분리 영향 확인 | 설계 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 02-04 실제 시험과 겹치지 않게 별도 PR로 계약 초안 작성(Plan_gRPC_Internal_API_v0.md §4) |
+| X-04 · gRPC 경로 구현(작업 표 분리·tonic 어댑터·metadata 인증)과 HTTP·gRPC 공통 회귀 | 구현 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | X-03 검수 뒤 착수. 02-05 전에 끝내는 것이 목표(02-05의 선행 아님)(Plan_gRPC_Internal_API_v0.md §6) |
+| X-05 · 기본 kind(Cilium 없음, 멀티 노드) gRPC 서비스 발견·분산·장애 복구 시험(시험용 서버·클라이언트) | 검증 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 라이브러리 지원 확인(Headless Service+클라이언트 측 분산, 안 되면 L7 프록시 하나) → 기준 사전 커밋 → 시험(Plan_gRPC_Internal_API_v0.md §5·§7) |
+| X-06 · 제품 경로 kind 재검증: 실제 코디네이터 gRPC 경로의 판정·DB 상태·중복 처리 | 검증 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | X-04·X-05 뒤 |
+| X-07 · Cilium L7 분산 경로 추가 시험(별도 kind 구성) | 검증 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 호환 환경이 있으면 X-05 뒤 순차 실행, 불가하면 이유·필요 조건 기록 |
 
 [현황](STATUS.md) · [실험 결과](RESULTS.md)

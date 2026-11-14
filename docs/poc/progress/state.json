@@ -1,9 +1,9 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0018",
-  "snapshot_created_at": "2026-11-14T18:28:53+09:00",
-  "last_actual_work_observed_at": "2026-11-14T18:28:53+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0019",
+  "snapshot_created_at": "2026-11-14T19:59:13+09:00",
+  "last_actual_work_observed_at": "2026-11-14T19:59:13+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
   "phase": "02-03 검수 완료 · X-01 검수 완료 + 후속 교정 C1·C2(PR #30)와 후속 PR #34~#37 병합(73·12 미산입) · 02-04 진행(모델 호출 없는 supervisor 핵심 PR #31·#32 병합, 수용 전)",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
@@ -1938,7 +1938,8 @@
     "v1.3.3-A1(2026-11-12 사용자 결정): 01-03 단계별 동결, 01-04 판정표 A1-GATE-01-04, 9개 명세·프로파일 rev 5. 작업 수 73/31·12/5 불변. 01-03 검수 완료는 모든 실험값 동결이 아니다.",
     "2026-11-12 사용자 후속 지시(User_Decisions_2026-11-12_followup.md): --write 처분(PR #9), L08 착지(PR #10), P26 6+6 유지·부족분 기록·01-04 비차단, 수단 가용성과 실제 차단 성공의 증거 구분.",
     "2026-11-13 사용자 결정(User_Decisions_2026-11-13_x02.md): ① 02-04·X-02 모델 예산(추가 청구 USD 0, 환산 비용 상한과 분리, 미계측 0 처리·자동 재시도 금지), ② 역할 자격 재사용, ③ OC08 별도 PoC 시험 실행 예외, ④ Sori PR 보류, ⑤ Notion 기존 MCP 경로; 보완 이슈 A(원문 수집)·B(서버 실행 통제). DF-02는 선행이 아님.",
-    "2026-11-14 사용자 결정(User_Decisions_2026-11-14_pr30.md): PR #30 병합 처리 이번 건 한정 사후 추인(근거 4개, 절차 이탈 기록 유지, 포괄적 예외 아님). 최종 검토~병합 동안 자기 다른 PR을 병합해 base를 옮기지 않는다. 기존 결정 ①~⑤ 유지. 실제 호출 전 예산 집행 연결(시간 상한 종료·하위 프로세스 정리, 관측 사용량 상한 중단, 비허용 한도·추가 사용량 신호 중단, 계측 실패 시 다음 호출 차단, 양성 대조)을 모델 없이 시험. X-02 전 page_id·URL ID 일치 검사. PR #29는 선행 아님."
+    "2026-11-14 사용자 결정(User_Decisions_2026-11-14_pr30.md): PR #30 병합 처리 이번 건 한정 사후 추인(근거 4개, 절차 이탈 기록 유지, 포괄적 예외 아님). 최종 검토~병합 동안 자기 다른 PR을 병합해 base를 옮기지 않는다. 기존 결정 ①~⑤ 유지. 실제 호출 전 예산 집행 연결(시간 상한 종료·하위 프로세스 정리, 관측 사용량 상한 중단, 비허용 한도·추가 사용량 신호 중단, 계측 실패 시 다음 호출 차단, 양성 대조)을 모델 없이 시험. X-02 전 page_id·URL ID 일치 검사. PR #29는 선행 아님.",
+    "2026-11-14 사용자 결정(User_Decisions_2026-11-14_grpc.md): 코디네이터↔실행 관리 서비스 내부 API를 gRPC 기준으로 추가(HTTP/JSON 유지, 업무 규칙 재사용), CNI 확장 없이 Headless Service+클라이언트 측 분산 기본 경로, 기본 kind 필수 시험, Cilium은 선택 추가 검증. 현재 작업(02-04 등)은 계속. 추가 범위는 X-03~X-07로 추적, 완료 수·분모 불변. 계획: Plan_gRPC_Internal_API_v0.md"
   ],
   "events": [
     {
@@ -2276,14 +2277,25 @@
         "User_Decisions_2026-11-14_pr30.md",
         "reports/extra/X-01/followup-c1-c2-20261113/REPORT.md"
       ]
+    },
+    {
+      "event_id": "GRPC-PLAN-20261114",
+      "event_revision": 1,
+      "task_id": "X-03",
+      "observed_at": "2026-11-14T19:59:13+09:00",
+      "state": "사용자 결정으로 gRPC 내부 API 방향과 검증 요구를 채택하고 계획에 연결: 추가 작업 X-03(계약)·X-04(구현·공통 회귀)·X-05(기본 kind)·X-06(제품 경로 kind)·X-07(Cilium 선택). 02-04는 기존 기준대로 계속. 구현 전 계획 단계, 라이브러리 지원 미확인",
+      "evidence": [
+        "User_Decisions_2026-11-14_grpc.md",
+        "Plan_gRPC_Internal_API_v0.md"
+      ]
     }
   ],
   "resume": {
     "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 C1·C2와 후속 PR #34~#37 병합(7e9f5ea), 02-04 진행 기록 1(PR #31·#32)",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main aee23da84a83c18fd450c1bb753b3a9b46e911c9 (이 보고 PR 병합 전)",
-    "plan_and_spec": "v1.3.3-A1·A2·A3 · 명세 8개 rev 5·POC-02 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR(report/pr30-ratified-20261114). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 7e9f5ea 빌드 — aee23da와의 차이는 보고 문서뿐) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
+    "branch_sha": "main ccf7291b8732b1597c0f9450866f71d7e3b74116 (이 보고 PR 병합 전)",
+    "plan_and_spec": "v1.3.3-A1·A2·A3·A4 · 명세 8개 rev 5·POC-02 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
+    "running": "계획 PR(docs/grpc-plan-20261114). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090, main 7e9f5ea 빌드 — 이후 main 변경은 문서와 ieo-supervisor뿐) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2307,7 +2319,7 @@
       "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "02-04 예산 집행 연결(모델 없는 시험) PR → X-02 준비 page_id·URL 검사 PR → 02-04 실제 세션 시험. PR은 하나씩, 최종 검토~병합 동안 다른 PR 병합 금지",
+    "next_action": "이 계획 PR → PR #40(02-04 실행 중 예산 집행, 병합 ccf7291) 보고 PR → X-02 준비 page_id·URL 검사 PR → 02-04 실제 세션 시험 → X-03 계약 → X-04 → 02-05. X-05는 X-03 뒤 자원이 허락할 때(02-04 실제 시험과 동시 실행 금지). PR은 하나씩 · 다음 정규 보고에 gRPC 반영 위치·실행 순서 포함(User_Decisions_2026-11-14_grpc.md §1)",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
@@ -2389,6 +2401,92 @@
       "evidence": [],
       "next_action": "02-04 수용 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음)",
       "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, executable 등록·의미 검토. 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), 가져온 page_id와 URL 안 페이지 ID 일치 검사·불일치 거부 시험 추가(사용자 결정 2026-11-14 §5)"
+    },
+    {
+      "task_id": "X-03",
+      "title": "gRPC 내부 API 계약(서비스·메시지·버전 호환·인증·상태 대응·재시도·멱등·deadline·취소)과 분리 영향 확인",
+      "track": "extra",
+      "kind": "설계",
+      "prerequisites": [
+        "02-03"
+      ],
+      "status": "미착수",
+      "last_observed_at": null,
+      "latest_report": null,
+      "result_state": "미실행",
+      "verification_level": "unverified",
+      "evidence": [],
+      "next_action": "02-04 실제 시험과 겹치지 않게 별도 PR로 계약 초안 작성(Plan_gRPC_Internal_API_v0.md §4)",
+      "unresolved": "업무 규칙은 기존 api::handle 재사용 전제(§3). 02-05 전에 끝내는 것이 목표(02-05의 선행 아님)"
+    },
+    {
+      "task_id": "X-04",
+      "title": "gRPC 경로 구현(작업 표 분리·tonic 어댑터·metadata 인증)과 HTTP·gRPC 공통 회귀",
+      "track": "extra",
+      "kind": "구현",
+      "prerequisites": [
+        "X-03"
+      ],
+      "status": "미착수",
+      "last_observed_at": null,
+      "latest_report": null,
+      "result_state": "미실행",
+      "verification_level": "unverified",
+      "evidence": [],
+      "next_action": "X-03 검수 뒤 착수. 02-05 전에 끝내는 것이 목표(02-05의 선행 아님)(Plan_gRPC_Internal_API_v0.md §6)",
+      "unresolved": "공통 회귀: 인증·역할 권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 연결 중단 뒤 재전송 중복 반영 방지(전송 성공과 실제 반영의 불일치 포함) · 02-05의 선행·수용 기준은 바꾸지 않음: X-04가 준비되지 않으면 02-05는 HTTP로 진행 · supervisor 쪽 gRPC 클라이언트(02-05가 HTTP로 먼저 진행했으면 그 전환 포함)도 X-04 범위"
+    },
+    {
+      "task_id": "X-05",
+      "title": "기본 kind(Cilium 없음, 멀티 노드) gRPC 서비스 발견·분산·장애 복구 시험(시험용 서버·클라이언트)",
+      "track": "extra",
+      "kind": "검증",
+      "prerequisites": [
+        "X-03"
+      ],
+      "status": "미착수",
+      "last_observed_at": null,
+      "latest_report": null,
+      "result_state": "미실행",
+      "verification_level": "unverified",
+      "evidence": [],
+      "next_action": "라이브러리 지원 확인(Headless Service+클라이언트 측 분산, 안 되면 L7 프록시 하나) → 기준 사전 커밋 → 시험(Plan_gRPC_Internal_API_v0.md §5·§7)",
+      "unresolved": "필수 시험: 복제본 증가, Pod 삭제·교체, 롤링 업데이트, 긴 스트림 중단, 요청 재전송. 실제 Claude 호출 없음. 기존 개발 클러스터·운영 DB 미사용"
+    },
+    {
+      "task_id": "X-06",
+      "title": "제품 경로 kind 재검증: 실제 코디네이터 gRPC 경로의 판정·DB 상태·중복 처리",
+      "track": "extra",
+      "kind": "검증",
+      "prerequisites": [
+        "X-04",
+        "X-05"
+      ],
+      "status": "미착수",
+      "last_observed_at": null,
+      "latest_report": null,
+      "result_state": "미실행",
+      "verification_level": "unverified",
+      "evidence": [],
+      "next_action": "X-04·X-05 뒤",
+      "unresolved": "시험용 서버 결과와 실제 코디네이터 결과를 구분. 04-03·04-04의 수용 기준은 바꾸지 않음"
+    },
+    {
+      "task_id": "X-07",
+      "title": "Cilium L7 분산 경로 추가 시험(별도 kind 구성)",
+      "track": "extra",
+      "kind": "검증",
+      "prerequisites": [
+        "X-05"
+      ],
+      "status": "미착수",
+      "last_observed_at": null,
+      "latest_report": null,
+      "result_state": "미실행",
+      "verification_level": "unverified",
+      "evidence": [],
+      "next_action": "호환 환경이 있으면 X-05 뒤 순차 실행, 불가하면 이유·필요 조건 기록",
+      "unresolved": "선택 시험. 미실행이 다른 작업을 막지 않음. 설치 여부가 아니라 활성 기능·설정과 실제 요청 분포로 판정"
     }
   ]
 }
