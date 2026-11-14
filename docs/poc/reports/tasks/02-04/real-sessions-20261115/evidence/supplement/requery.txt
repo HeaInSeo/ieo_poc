@@ -35,3 +35,10 @@ lines 101 ; compact_boundary entries 1 at line(s) [60]
 compact summary entries 1 ; usage fields on boundary/summary entries: 0
 assistant entries with usage after the boundary: 1 [{'input_tokens': 2, 'output_tokens': 7, 'cache_creation_input_tokens': 6455, 'cache_read_input_tokens': 11393}]
 -> the first usage after the boundary equals D5's share (2/7/6,455/11,393); no entry records the compaction call's usage
+## binaries preserved 2026-11-14T23:51:50Z (current re-query; private directory <preserved> = /opt/rust/ieo_poc_runs/preserved-02-04-D3-20261115)
+# the 23:13:11Z preservation copy had failed (unset variable); the build outputs were still in the session scratch directory and are now copied with their own manifests (SHA256SUMS.v2 unchanged)
+c61c63802b80c4e8605dec434f3dae87174357fa9766cb5449ce9763670de642  binaries-ca08c76/ieo-role-call
+652fc14f8e542b49a01f3146443adc4d15a802f95f6cd5692d4b3f2ddb3f42f4  binaries-ca08c76/ieo-supervisor
+dde8db5160588cfa436c40e45481930e1e23784f46a4e03f6a95c0a5bb328037  binaries-d41e70f/ieo-role-call
+db2162c29542f9432e042a01ae44c8bf6690d85e3782507d79556977eb8e745e  binaries-d41e70f/ieo-supervisor
+# ca08c76 build outputs: mtime 2026-11-15 02:36:16 KST (= 17:36:16Z, the build at 17:36:17Z in the ops-log extract)

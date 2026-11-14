@@ -1,6 +1,6 @@
 # 중단·재개 기록
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0026` · 원장 SHA-256 `7d1a66cc707d52870c77cbecfb06514b4fc02c701287ab5615159752d61b3098`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0026` · 원장 SHA-256 `ddf2dd1292ca3cc9a5d4d2361661a599dd67c390b534dee9f45a28e550b7188a`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 

@@ -5,7 +5,7 @@ PR #52([RESULTS.md](RESULTS.md))의 결과를 기준으로 한 보완이다. 근
 - **모델 호출**: 0회. 재실행 없음. 예비 회차는 개발 2회·Guardrail 3회 그대로이고, 예산·역할별 몫·추가 결제 금지는 바꾸지 않았다.
 - **증거 구분**:
   - **실제**: 실제 회차의 기록.
-  - **당시 기록**: 실행 시각의 작업 세션 출력 발췌. [17:36Z~17:40Z](evidence/supplement/ops-log-20261114T1736Z.txt)는 D1~D3 바이너리 빌드와 실제 컨테이너 준비, [23:12Z~23:14Z](evidence/supplement/ops-log-20261114T2312Z.txt)는 D3 정정·재시작과 D4~D6 호출이다. 시각은 도구 호출의 완료 시각이다.
+  - **당시 기록**: 실행 시각의 작업 세션 출력 발췌. 발췌의 명령 줄은 도구 호출의 명령에 그 호출이 실행된 작업 디렉터리(`cd …ieo_poc-0204 &&`)를 앞에 붙인 것이다. 그 디렉터리는 같은 기록의 요청 줄(인용한 줄의 바로 다음 줄)에 있다. [17:36Z~17:40Z](evidence/supplement/ops-log-20261114T1736Z.txt)는 D1~D3 바이너리 빌드와 실제 컨테이너 준비, [23:12Z~23:14Z](evidence/supplement/ops-log-20261114T2312Z.txt)는 D3 정정·재시작과 D4~D6 호출이다. 시각은 도구 호출의 완료 시각이다.
   - **현재 재조회**: 이 보완을 쓰는 시점의 조회([evidence/supplement/requery.txt](evidence/supplement/requery.txt)).
   - **저장 기록**: 보존 기록 재생.
   - **모의**: 가짜 Claude.
@@ -60,7 +60,7 @@ PR #52([RESULTS.md](RESULTS.md))의 결과를 기준으로 한 보완이다. 근
 | --- | --- | --- | --- | --- |
 | 승인·병합된 소스 | PR #51 head 71e408a(검토 [71e408a](../child-usage-20261115/reviews/review-pr51-71e408a.md) 승인, CI 3/3) → 병합 d41e70f, main CI 43651860463 성공 | 23:12:21Z 빌드 직전 작업 트리 `git log` = d41e70f | `git diff d41e70f <현재 main> -- crates Cargo.lock …` 없음 | — |
 | 실행 바이너리(D4~D6) | `ieo-supervisor` db2162c2…, `ieo-role-call` dde8db51…(전체 해시는 증거 파일) | 23:12:21Z d41e70f 빌드 출력의 해시. 23:13:11Z 교체 전·후 `<W>/bin` 해시와 컨테이너 PID 1의 `/opt/ieo/ieo-supervisor` 해시 db2162c2 | `<W>/bin`의 해시가 같다. 파일 시각 08:13:08 KST, 컨테이너 시작 08:13:09 KST | **재빌드로 같은 해시가 나오는지는 확인하지 못했다.** 새 작업 트리·새 대상 디렉터리에서 d41e70f를 빌드하면 af684e6f…이다. 디버그 빌드에 경로가 들어가기 때문이다. 바이너리와 커밋의 연결 근거는 당시 빌드 기록이다 |
-| 실행 바이너리(D1·G1·R1·D2·D3) | `ieo-supervisor` 652fc14f…, `ieo-role-call` c61c6380… | 17:36:17Z 빌드 출력의 해시. 빌드한 작업 트리의 코드(crates·Cargo.lock·Cargo.toml)는 당시 origin/main(ca08c76)과 차이가 없었다. 17:40:41Z run-real.sh가 이 바이너리를 `<W>/bin`에 복사했다(그 직전 `git log` = ca08c76). 23:13:11Z 교체 전 `<W>/bin` 해시가 652fc14f… | — | **교체 전 바이너리는 보존되지 않았다.** 23:13:11Z 교체 명령에서 보존 복사(`cp … $A/../preserved…/ieo-supervisor-ca08c76 2>/dev/null`)는 변수 `$A`가 설정되지 않아 실패했고, 오류 출력을 버려 그때 알아차리지 못했다. 이 바이너리 파일은 남아 있지 않다. 해시는 당시 기록에만 있다. 재빌드 재현도 확인하지 못했다(위와 같은 이유) |
+| 실행 바이너리(D1·G1·R1·D2·D3) | `ieo-supervisor` 652fc14f…, `ieo-role-call` c61c6380… | 17:36:17Z 빌드 출력의 해시. 빌드한 작업 트리의 코드(crates·Cargo.lock·Cargo.toml)는 당시 origin/main(ca08c76)과 차이가 없었다. 17:40:41Z run-real.sh가 이 바이너리를 `<W>/bin`에 복사했다(그 직전 `git log` = ca08c76). 23:13:11Z 교체 전 `<W>/bin` 해시가 652fc14f… | — | **23:13:11Z 교체 때의 보존 복사는 실패했다.** 명령의 `cp … $A/../preserved…/ieo-supervisor-ca08c76 2>/dev/null`은 변수 `$A`가 설정되지 않아 실패했고, 오류 출력을 버려 그때 알아차리지 못했다. 그러나 17:36Z 빌드 출력이 작업 세션의 임시 디렉터리에 남아 있었다(검토 5f4fc7f N1). **현재 재조회**: 그 파일(수정 시각 17:36:16Z, 해시 652fc14f…·c61c6380…)을 23:51Z에 저장소 밖 보존 디렉터리로 별도 목록과 함께 복사했다(D4~D6의 db2162c2…·dde8db51…도 함께, [requery.txt](evidence/supplement/requery.txt) 마지막 절). 재빌드 재현은 확인하지 못했다(위와 같은 이유) |
 | 이미지 | `golang@sha256:d9c68c2c…`(이미지 id 6880d90c…) | 17:40:41Z run-real.sh 출력 “role containers up … image docker.io/library/golang@sha256:d9c68c2c…” | 두 컨테이너의 `ImageName`이 그 digest이고 이미지 id가 같다. 생성 시각 2026-11-15 02:40:40 KST | — |
 | 재시작 가드 판정 | `guards: ok`: 진행 중 표식 없음, 사람이 볼 기록 없음(D3 정정 반영), 실행 중 회차 없음, 모르는 마지막·체크포인트 회차 없음 | 23:12:59Z(두 역할 상태와 함께) | — | 가드 스크립트는 당시 명령 그대로 증거 파일에 있다 |
 | 재시작 전후 체크포인트 | 개발: 세션 58f8976d, `after_run`, 기준 D3 → 재시작 뒤 같음. Guardrail: 65d24d5b, `after_run`, G1 → 같음 | 23:12:59Z(전), 23:13:11Z(후) | 지금 개발 체크포인트는 D6 뒤(c84c7b5c, 기준 D6)라 당시 상태는 당시 기록으로만 확인한다 | — |
