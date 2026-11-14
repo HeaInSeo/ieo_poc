@@ -357,7 +357,7 @@ fn a_stop_with_sigterm_first_lets_the_process_exit_within_the_grace() {
     let d = Tmp::new("term-first");
     let marker = d.p().join("got-term");
     let tail = format!(
-        "trap 'echo term > {}; exit 0' TERM\nwhile :; do sleep 0.1; done",
+        "trap 'echo term > {}; sleep 0.5; exit 0' TERM\nwhile :; do sleep 0.1; done",
         marker.display()
     );
     let mut l = limits(500);
@@ -516,4 +516,16 @@ fn a_guard_stop_leaves_the_run_unmeasured_and_blocks_the_next_call() {
     let r = collected(&d.p().join("stdout.jsonl"), o.elapsed.as_millis() as u64);
     assert_eq!(r["usage"]["run"]["state"], "measured", "{r}");
     assert!(Limits::for_next(&BUDGET_0204, &[r], ok_obs(&real)).is_ok());
+}
+
+#[test]
+fn children_left_behind_by_a_normal_exit_are_cleaned_up() {
+    let d = Tmp::new("orphan");
+    let pid = d.p().join("child.pid");
+    // the child keeps stdout open and writes nothing: the exit must still be noticed at once
+    let tail = format!("sleep 300 & echo $! > {}\nexit 0", pid.display());
+    let o = go(d.p(), fake(d.p(), &[], &tail), limits(30_000));
+    assert_eq!((o.stop.clone(), o.exit_code), (Stop::Exited, Some(0)));
+    assert!(o.elapsed < Duration::from_secs(6), "{:?}", o.elapsed);
+    assert!(gone(&pid), "a background child outlived a normal exit");
 }
