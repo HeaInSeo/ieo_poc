@@ -759,3 +759,31 @@ fn the_copy_after_a_stop_is_bounded_even_if_a_descendant_holds_the_pipe() {
         let _ = Command::new("kill").args(["-s", "KILL", p.trim()]).status();
     }
 }
+
+#[test]
+fn a_stopped_run_is_unmeasured_even_when_its_late_result_looks_complete() {
+    // the real 01-04 stream, but its result is written only by the TERM handler after a stop:
+    // the figure is not below the observed bound, and it is still not trusted
+    let real = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/01-P1-development/stdout.jsonl"
+    ))
+    .expect("stored 01-04 stream");
+    let mut lines: Vec<String> = real.lines().map(str::to_string).collect();
+    let result = lines.pop().expect("result line");
+    assert!(result.contains("\"type\":\"result\""));
+    let d = Tmp::new("late-result");
+    let rfile = d.p().join("result.json");
+    std::fs::write(&rfile, format!("{result}\n")).expect("result file");
+    let tail = format!(
+        "trap 'cat {}; exit 0' TERM\nwhile :; do sleep 0.1; done",
+        rfile.display()
+    );
+    let mut l = limits(800);
+    l.grace = Duration::from_secs(5);
+    let o = go(d.p(), fake(d.p(), &lines, &tail), l);
+    assert_eq!(o.stop, Stop::RunTimeout);
+    let c = collected(&d.p().join("stdout.jsonl"), o.elapsed.as_millis() as u64);
+    assert_eq!(c["usage"]["run"]["state"], "measured", "{c}");
+    assert_eq!(run::charge(&o, &c["usage"]["run"])["state"], "unmeasured");
+}
