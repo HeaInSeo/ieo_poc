@@ -1,0 +1,18 @@
+# caller mutations (review c4620d2 M3) · cargo test -p ieo-supervisor --test caller per mutation · source restored after each
+# first pass (11):
+env SURVIVED test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured;
+charge-exited KILLED test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measu
+max-runs KILLED test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measu
+observed-0 SURVIVED test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured;
+running KILLED error: test failed, to rerun pass `-p ieo-supervisor --test 
+time-cut KILLED test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measu
+inflight KILLED test result: FAILED. 12 passed; 2 failed; 0 ignored; 0 measu
+last-known KILLED test result: FAILED. 12 passed; 2 failed; 0 ignored; 0 measu
+result KILLED test result: FAILED. 12 passed; 2 failed; 0 ignored; 0 measu
+clock KILLED test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measu
+stdout-err KILLED test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measu
+restored
+# notes: 'running' hung on the full 1,800 s window (the hook said running on every poll); the test binary was ended and the hook now answers running only once.
+# 'env' and 'observed-0' survived only because the mutation was partial (false && A || B; one of two fields). Redone properly:
+env (whole condition) KILLED test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measu
+observed-0 (both) KILLED test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measu

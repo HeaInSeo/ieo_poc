@@ -623,20 +623,35 @@ fn drained(
 /// * A run that **exited** on its own is charged with the collector's figure, unless that figure
 ///   is below what the guard observed (then unmeasured: the two disagree).
 pub fn charge(outcome: &Outcome, collected_run: &Value) -> Value {
+    charge_reported(
+        outcome.stop == Stop::Exited,
+        &format!("{:?}", outcome.stop),
+        &outcome.observed,
+        collected_run,
+    )
+}
+
+/// [`charge`] from an outcome reported by the role service (`exited` = the stop was `Exited`,
+/// `stop` its label): the same rules, for a caller outside the container.
+pub fn charge_reported(
+    exited: bool,
+    stop: &str,
+    observed_by_guard: &Observed,
+    collected_run: &Value,
+) -> Value {
     let observed = serde_json::json!({
-        "billable_lower_bound": outcome.observed.billable,
-        "cache_read_lower_bound": outcome.observed.cache_read,
-        "messages": outcome.observed.messages,
-        "incomplete_lines": outcome.observed.incomplete_lines,
+        "billable_lower_bound": observed_by_guard.billable,
+        "cache_read_lower_bound": observed_by_guard.cache_read,
+        "messages": observed_by_guard.messages,
+        "incomplete_lines": observed_by_guard.incomplete_lines,
     });
     let unmeasured = |reason: String| {
         serde_json::json!({"state": "unmeasured", "reason": reason,
                            "guard_observed": observed, "collector_reported": collected_run})
     };
-    if outcome.stop != Stop::Exited {
+    if !exited {
         return unmeasured(format!(
-            "stopped by the run guard ({:?}); a result written after the stop is not trusted",
-            outcome.stop
+            "stopped by the run guard ({stop}); a result written after the stop is not trusted"
         ));
     }
     if collected_run["state"] == "measured" {
@@ -648,7 +663,7 @@ pub fn charge(outcome: &Outcome, collected_run: &Value) -> Value {
             .map(|((i, o), c)| i.saturating_add(o).saturating_add(c));
         match (billable, n("cache_read")) {
             (Some(b), Some(cr))
-                if b >= outcome.observed.billable && cr >= outcome.observed.cache_read => {}
+                if b >= observed_by_guard.billable && cr >= observed_by_guard.cache_read => {}
             _ => {
                 return unmeasured(
                     "collector figure below the guard's observed lower bound (or incomplete)"

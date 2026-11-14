@@ -1,0 +1,1 @@
+Use the Read tool to read README.md in the current directory and reply with its first line only.
