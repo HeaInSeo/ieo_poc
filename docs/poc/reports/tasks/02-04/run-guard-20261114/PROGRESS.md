@@ -3,7 +3,7 @@
 | 항목 | 기록 |
 | --- | --- |
 | 구분 | 주계획 02-04의 중간 산출물이다. [사용자 결정 2026-11-14 §3](../../../../User_Decisions_2026-11-14_pr30.md): 실제 모델 호출 전에 예산 집행 연결을 모델 없이 시험한다. 완료 수 11/73 변동 없음 |
-| 산출물 | `crates/ieo-supervisor/src/run.rs`(`run::run`, `Limits::for_next`), `tests/run_guard.rs` 16건 |
+| 산출물 | `crates/ieo-supervisor/src/run.rs`(`run::run`, `Limits::for_next`), `tests/run_guard.rs` 17건 |
 | 검토 | 3103933 changes requested(High 3·Medium 4·Low 3) → 교정 1(§3) |
 | 모델 호출 | 0회(가짜 `claude` 셸 스크립트만 사용) |
 
@@ -21,7 +21,7 @@
 | 사용량 누락·계측 실패 때 다음 호출 차단 | 회차 몫의 권위 있는 값은 02-01 계측기(`ieo-evidence`)가 `result` 사건으로 계산한다. guard가 멈춰 `result`가 없으면 계측기는 그 회차를 미계측으로 기록한다. 그러면 `budget::next`와 `Limits::for_next`가 다음 호출을 막는다. 실행 중 관측 합계로 대신하지 않는다. `Limits::for_next`는 `budget::next`가 `Start`일 때만 한도를 준다 | `a_guard_stop_leaves_the_run_unmeasured_…`(guard 정지 → 실제 계측기 `stream::parse` → 미계측 → 다음 호출 차단, 대조: 01-04 실제 stream은 계측됨 → 허용), `limits_for_the_next_run_come_from_the_pre_run_decision` |
 | 정상 범위 실행 허용(양성 대조) | 상한 안의 실행은 끝까지 돌고 stdout이 그대로 복사된다 | `a_normal_run_is_allowed_and_measured` |
 
-변이 19개의 결과는 [mutants.txt](evidence/mutants.txt)에 있다. 시험의 감시 장치가 멈춤을 실패로 바꾼다.
+변이 19개를 모두 이름 있는 시험이 검출했다([mutants.txt](evidence/mutants.txt)). 시험의 감시 장치가 멈춤을 실패로 바꾼다. 반복 실행 20회에서 실패 0이었다.
 
 ## 2. 한계(관측 후 정지이며 공급자 측 제한이 아니다)
 
