@@ -1,9 +1,9 @@
-# 02-04 role containers, fake claude (no model calls) · 2026-11-14T15:37:39Z · image docker.io/library/golang:1.26.9-bookworm
+# 02-04 role containers, fake claude (no model calls) · 2026-11-14T15:51:31Z · image docker.io/library/golang:1.26.9-bookworm
 ## U3 layout
 development: pid1=/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervi uid=20001 labels=development
-  mounts: /state(rw) /etc/ieo/role(ro) /run/ieo/cred(ro) /opt/ieo(ro) 
+  mounts: /opt/ieo(ro) /state(rw) /etc/ieo/role(ro) /run/ieo/cred(ro) 
 guardrail: pid1=/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervi uid=20002 labels=guardrail
-  mounts: /state(rw) /etc/ieo/role(ro) /run/ieo/cred(ro) /opt/ieo(ro) 
+  mounts: /run/ieo/cred(ro) /opt/ieo(ro) /state(rw) /etc/ieo/role(ro) 
   shared host paths between roles: 0 (the read-only program dir /opt/ieo excluded)
 ## adapter auth
 no token: 401
@@ -32,13 +32,17 @@ Write( in argv: False
 env: ['HOME', 'PATH', 'LANG', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_OAUTH_TOKEN']
 ## credential values in the logs: 0 occurrences
 ## budget backstop: attempts counted on the role volume
-development: 5 attempts recorded
-guardrail: 1 attempts recorded
+development: 5 started, 5 ended, observed billable 72
+guardrail: 1 started, 1 ended, observed billable 18
 per-run window above the cap: 409 BUDGET_EXCEEDED
 ## SIGTERM to PID 1 during a run: the run is stopped through the guard within its grace
 202development (running): podman stop took 0.5 s, exit code 0
 d7 outcome: {'stop': 'Requested', 'stopped_by_guard': True, 'cleanup_failed': False}
 checkpoint: s-dev-7 after_run
+## SIGTERM to PID 1 during the slowest stop: the leader ignores TERM and a setsid descendant holds stdout (grace 6 s)
+202development (TERM ignored): podman stop took 8.4 s, exit code 0
+d9 outcome: {'stop': 'Requested', 'stopped_by_guard': True, 'cleanup_failed': False, 'elapsed_ms': 9225}
+checkpoint: s-dev-9 after_run
 ## graceful stop: SIGTERM to PID 1 (idle)
 guardrail: podman stop took 0.4 s, exit code 0
 # done

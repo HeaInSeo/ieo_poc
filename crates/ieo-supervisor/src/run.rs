@@ -52,10 +52,12 @@ use std::time::{Duration, Instant};
 
 /// How long the guard keeps reading after the leader exited (bounded; descendants are killed
 /// afterwards).
-const DRAIN: Duration = Duration::from_secs(2);
+pub const DRAIN: Duration = Duration::from_secs(2);
 
-/// SIGTERM → SIGKILL grace used by [`Limits::for_next`].
-pub const GRACE: Duration = Duration::from_secs(10);
+/// SIGTERM → SIGKILL grace used by [`Limits::for_next`]. Grace + [`DRAIN`] + margin must fit the
+/// container runtime's stop timeout (podman default 10 s), so a stop of the role container lets
+/// the run end and its outcome be written.
+pub const GRACE: Duration = Duration::from_secs(6);
 
 /// What the guard allows for one run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

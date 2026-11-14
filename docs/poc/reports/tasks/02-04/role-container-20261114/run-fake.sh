@@ -13,18 +13,24 @@ prompt=$(head -c 4096)
 sid=$(printf '%s\n' "$@" | awk 'prev=="--session-id"||prev=="--resume"{print; exit} {prev=$0}')
 cfg=$(ls -A "$CLAUDE_CONFIG_DIR" 2>/dev/null | tr '\n' ',')
 printf '{"type":"system","subtype":"init","session_id":"%s","uid":"%s","cwd":"%s","config":"%s","prompt_seen":%s}\n' "$sid" "$(id -u)" "$(pwd)" "$cfg" "$(echo "$prompt" | grep -q '"type":"user"' && echo true || echo false)"
-case "$prompt" in *SLEEP*) sleep 60;; esac
+case "$prompt" in
+  *TRAPSETSID*) trap '' TERM; setsid sleep 60 & while :; do sleep 0.2; done;;
+  *SLEEP*) sleep 60;;
+esac
 printf '{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}\n'
 printf '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","overageStatus":"rejected","isUsingOverage":false}}\n'
 printf '{"type":"result","subtype":"success","is_error":false,"session_id":"%s","modelUsage":{"m":{"inputTokens":3,"outputTokens":7,"cacheReadInputTokens":20,"cacheCreationInputTokens":10}},"total_cost_usd":0.01}\n' "$sid"
 FAKE
 chmod 755 "$W/bin/"*
 TOKEN=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# per-role shares of the 02-04 budget (sum = the approval: 12 runs, 14,400 s, 1.5 M, 15 M)
+declare -A SHARE=([development]='{"max_runs":8,"total_seconds":9600,"billable_tokens":1000000,"cache_read_tokens":10000000}'
+                  [guardrail]='{"max_runs":4,"total_seconds":4800,"billable_tokens":500000,"cache_read_tokens":5000000}')
 setup_role() { # role uid port
   local r=$1 uid=$2
   mkdir -p "$W/$r/state" "$W/$r/etc/template" "$W/$r/cred"
   echo '{"autoMemoryEnabled": false}' > "$W/$r/etc/template/settings.json"
-  printf '{"role":"%s","repo":"%s","state":"/state","etc":"/etc/ieo/role","cred":"/run/ieo/cred","claude":"/opt/ieo/fake-claude","budget":"02-04"}\n' "$r" "$REPO" > "$W/$r/etc/supervisor.json"
+  printf '{"role":"%s","repo":"%s","state":"/state","etc":"/etc/ieo/role","cred":"/run/ieo/cred","claude":"/opt/ieo/fake-claude","budget":"02-04","share":%s}\n' "$r" "$REPO" "${SHARE[$r]}" > "$W/$r/etc/supervisor.json"
   echo "fake-$r-credential" > "$W/$r/cred/oauth_token"
   printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1 > "$W/$r/cred/adapter.sha256"
   chmod 0400 "$W/$r/cred/"*; chmod 0500 "$W/$r/cred"
@@ -45,7 +51,7 @@ api() { # port method path [body]
   curl -s -w '\n%{http_code}' -X "$2" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' ${4:+--data-binary "$4"} "http://127.0.0.1:$1$3"
 }
 body() { # attempt prompt extra-json
-  python3 -c 'import json,sys; v={"attempt_id":sys.argv[1],"prompt":sys.argv[2],"coordinator":{"generation":0,"assignment_id":"A1","sprint_id":"POCX","sprint_revision":3,"spec_digest":"dg","image_digest":"golang:1.26.9-bookworm","profile_id":"dev","profile_revision":1},"limits":{"timeout_ms":30000,"billable_room":1000000,"cache_read_room":1000000,"grace_ms":2000}}; v.update(json.loads(sys.argv[3])); print(json.dumps(v))' "$1" "$2" "$3"
+  python3 -c 'import json,sys; v={"attempt_id":sys.argv[1],"prompt":sys.argv[2],"coordinator":{"generation":0,"assignment_id":"A1","sprint_id":"POCX","sprint_revision":3,"spec_digest":"dg","image_digest":"golang:1.26.9-bookworm","profile_id":"dev","profile_revision":1},"limits":{"timeout_ms":30000,"billable_room":100000,"cache_read_room":100000,"grace_ms":2000}}; v.update(json.loads(sys.argv[3])); print(json.dumps(v))' "$1" "$2" "$3"
 }
 wait_done() { # port attempt
   for i in $(seq 1 150); do
@@ -104,14 +110,22 @@ wait_done $G g1; echo "init: $(init_of $G g1)"
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:$G/v0/role/runs/g1/outcome | python3 -c 'import json,sys; o=json.loads(json.load(sys.stdin)["content"]); a=o["argv"]; i=a.index("--allowedTools"); print("allowedTools", a[i+1:i+5]); print("Write( in argv:", any("Write(" in x for x in a)); print("env:", o["env_names"])'
 echo "## credential values in the logs: $(podman logs ieo-ct-$REPO-development 2>&1 | grep -c 'fake-development-credential' || true) occurrences"
 echo "## budget backstop: attempts counted on the role volume"
-for r in development guardrail; do echo "$r: $(podman unshare cat "$W/$r/state/budget/attempts.jsonl" | wc -l) attempts recorded"; done
-echo "per-run window above the cap: $(api $D POST /v0/role/start "$(body d8 x '{"session_id":"s-dev-8","limits":{"timeout_ms":1795000,"billable_room":1000,"cache_read_room":1000,"grace_ms":8000}}')" | python3 -c 'import sys,json; t=sys.stdin.read().rsplit("\n",1); print(t[1], json.loads(t[0])["code"])')"
+for r in development guardrail; do echo "$r: $(podman unshare cat "$W/$r/state/budget/attempts.jsonl" | python3 -c 'import json,sys; l=[json.loads(x) for x in sys.stdin if x.strip()]; e=[x for x in l if "end" in x]; print(len(l)-len(e), "started,", len(e), "ended, observed billable", sum(x["end"].get("observed_billable",0) for x in e))')"; done
+echo "per-run window above the cap: $(api $D POST /v0/role/start "$(body d8 x '{"session_id":"s-dev-8","limits":{"timeout_ms":1794001,"billable_room":1000,"cache_read_room":1000,"grace_ms":6000}}')" | python3 -c 'import sys,json; t=sys.stdin.read().rsplit("\n",1); print(t[1], json.loads(t[0])["code"])')"
 echo "## SIGTERM to PID 1 during a run: the run is stopped through the guard within its grace"
 api $D POST /v0/role/start "$(body d7 SLEEP '{"session_id":"s-dev-7"}')" | tail -1
 sleep 1
 t0=$(date +%s.%N); podman stop -t 10 ieo-ct-$REPO-development >/dev/null; t1=$(date +%s.%N)
 echo "development (running): podman stop took $(python3 -c "print(round($t1-$t0,1))") s, exit code $(podman inspect ieo-ct-$REPO-development --format '{{.State.ExitCode}}')"
 podman unshare cat "$W/development/state/runs/d7/outcome.json" | python3 -c 'import json,sys; o=json.load(sys.stdin); print("d7 outcome:", {k:o.get(k) for k in ["stop","stopped_by_guard","cleanup_failed"]})'
+podman unshare cat "$W/development/state/checkpoint.json" | python3 -c 'import json,sys; c=json.load(sys.stdin); print("checkpoint:", c["session_id"], c["phase"])'
+echo "## SIGTERM to PID 1 during the slowest stop: the leader ignores TERM and a setsid descendant holds stdout (grace 6 s)"
+podman start ieo-ct-$REPO-development >/dev/null; for i in $(seq 1 50); do curl -s -o /dev/null -H "Authorization: Bearer $TOKEN" http://127.0.0.1:$D/v0/role/status && break; sleep 0.2; done
+api $D POST /v0/role/start "$(body d9 TRAPSETSID '{"session_id":"s-dev-9","limits":{"timeout_ms":30000,"billable_room":100000,"cache_read_room":100000,"grace_ms":6000}}')" | tail -1
+sleep 1
+t0=$(date +%s.%N); podman stop -t 10 ieo-ct-$REPO-development >/dev/null; t1=$(date +%s.%N)
+echo "development (TERM ignored): podman stop took $(python3 -c "print(round($t1-$t0,1))") s, exit code $(podman inspect ieo-ct-$REPO-development --format '{{.State.ExitCode}}')"
+podman unshare cat "$W/development/state/runs/d9/outcome.json" | python3 -c 'import json,sys; o=json.load(sys.stdin); print("d9 outcome:", {k:o.get(k) for k in ["stop","stopped_by_guard","cleanup_failed","elapsed_ms"]})'
 podman unshare cat "$W/development/state/checkpoint.json" | python3 -c 'import json,sys; c=json.load(sys.stdin); print("checkpoint:", c["session_id"], c["phase"])'
 echo "## graceful stop: SIGTERM to PID 1 (idle)"
 for r in guardrail; do

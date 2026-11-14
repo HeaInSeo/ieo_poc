@@ -41,6 +41,19 @@ pub struct Config {
     /// The approved budget this role's runs belong to (user decision 2026-11-13 ①): the service
     /// refuses runs beyond its caps on its own (a backstop; exact accounting is the caller's).
     pub budget: crate::budget::Budget,
+    /// This role's share of the budget (config `share`): each field at most the budget's cap.
+    /// The shares of the roles of one budget must sum to at most the approval; the role
+    /// configuration (`/etc/ieo/role`, read-only) is where that is fixed, so the backstop alone
+    /// never grants more than the approval (review 6975d5f N2).
+    pub share: Share,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Share {
+    pub max_runs: u64,
+    pub total_seconds: u64,
+    pub billable_tokens: u64,
+    pub cache_read_tokens: u64,
 }
 
 impl Config {
@@ -59,7 +72,7 @@ impl Config {
             "guardrail" => Role::Guardrail,
             r => return Err(format!("unknown role {r}")),
         };
-        Ok(Config {
+        Config {
             role,
             repo: s("repo")?,
             state: s("state")?.into(),
@@ -74,7 +87,32 @@ impl Config {
                     return Err("config.budget must name an approved budget (02-04 or X-02)".into());
                 }
             },
-        })
+            share: Share {
+                max_runs: 0,
+                total_seconds: 0,
+                billable_tokens: 0,
+                cache_read_tokens: 0,
+            },
+        }
+        .with_share(&v["share"])
+    }
+
+    fn with_share(mut self, v: &Value) -> Result<Config, String> {
+        let b = self.budget;
+        let f = |k: &str, cap: u64| match v[k].as_u64() {
+            Some(x) if x > 0 && x <= cap => Ok(x),
+            _ => Err(format!(
+                "config.share.{k} must be a number in 1..={cap} (budget {})",
+                b.name
+            )),
+        };
+        self.share = Share {
+            max_runs: f("max_runs", b.max_runs)?,
+            total_seconds: f("total_seconds", b.total_seconds)?,
+            billable_tokens: f("billable_tokens", b.billable_tokens)?,
+            cache_read_tokens: f("cache_read_tokens", b.cache_read_tokens)?,
+        };
+        Ok(self)
     }
     fn config_dir(&self) -> PathBuf {
         self.state.join("claude")
@@ -337,6 +375,17 @@ impl Service {
                 }
                 _ => {}
             }
+            if let Some(phase @ ("takeover" | "error")) =
+                cp.as_ref().and_then(|c| c["phase"].as_str())
+            {
+                // a run that never reached its end: children, external requests and the session
+                // record were not observed, so nothing resumes on it silently (§6)
+                return resp(
+                    409,
+                    json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+                           "reason": format!("the previous run did not finish (checkpoint phase {phase})")}),
+                );
+            }
             if cp
                 .as_ref()
                 .and_then(|c| c["session_id"].as_str())
@@ -462,6 +511,22 @@ impl Service {
 
     fn execute(&self, job: Job) {
         let result = self.execute_inner(&job);
+        // the attempt's end, for the backstop's token count: observed lower bounds when the
+        // guard ran to an outcome; none after an error (usage unknown → reconcile)
+        if let Ok(v) = &result {
+            let o = &v["observed"];
+            let end = match (
+                o["billable_lower_bound"].as_u64(),
+                o["cache_read_lower_bound"].as_u64(),
+            ) {
+                (Some(b), Some(c)) => json!({"observed_billable": b, "observed_cache_read": c}),
+                _ if v["spawned"] == false => {
+                    json!({"observed_billable": 0, "observed_cache_read": 0})
+                }
+                _ => json!({"unknown": true}),
+            };
+            let _ = self.append_ledger(&json!({"attempt_id": job.attempt, "end": end}));
+        }
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         st.last = Some(match result {
             Ok(v) => v,
@@ -488,9 +553,6 @@ impl Service {
             .map_err(|e| format!("session lock: {e:?}"))?;
         let report = crate::configdir::clean(&cfg.config_dir(), &cfg.etc.join("template"))
             .map_err(|e| format!("config cleanup: {e}"))?;
-        // §5-1: a checkpoint at takeover, before anything runs (a crash mid-run then names this
-        // session); again after the run, and on errors
-        self.write_checkpoint(job, &report.digest, None, "takeover")?;
         if job.stop.load(std::sync::atomic::Ordering::SeqCst) {
             // stopped before anything was spawned: no process, no model call
             let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
@@ -503,6 +565,9 @@ impl Service {
             );
             return Ok(v);
         }
+        // §5-1: a checkpoint at takeover, after the stop check, before anything runs (a crash mid-run then names this
+        // session); again after the run, and on errors
+        self.write_checkpoint(job, &report.digest, None, "takeover")?;
         let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
         let mut cmd = Command::new(&cfg.claude);
         cmd.args(&argv).current_dir(cfg.cwd());
@@ -581,10 +646,33 @@ impl Service {
                 .unwrap_or_default(),
             active_children: vec![],
             pending_external_requests: vec![],
-            session_cumulative: stdout.map(session_cumulative).unwrap_or(Value::Null),
+            session_cumulative: Value::Null,
         });
         let mut cp = cp;
         cp["phase"] = json!(phase);
+        // the resume base (§11 item 7): this run's own result if it wrote one; otherwise, on a
+        // resume, the previous base of the same session carried forward with the attempt it
+        // came from (the caller checks it is the run actually resumed); else unknown
+        let own = stdout.map(session_cumulative).unwrap_or(Value::Null);
+        let (cum, from) = if !own.is_null() {
+            (own, json!(job.attempt))
+        } else if job.resume {
+            std::fs::read(cfg.checkpoint_path())
+                .ok()
+                .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+                .filter(|p| p["session_id"] == job.session_id.as_str())
+                .map(|p| {
+                    (
+                        p["session_cumulative"].clone(),
+                        p["session_cumulative_attempt"].clone(),
+                    )
+                })
+                .unwrap_or((Value::Null, Value::Null))
+        } else {
+            (Value::Null, Value::Null)
+        };
+        cp["session_cumulative"] = cum;
+        cp["session_cumulative_attempt"] = from;
         let path = cfg.checkpoint_path();
         let tmp = path.with_extension("json.tmp");
         let write = || -> std::io::Result<()> {
@@ -601,28 +689,61 @@ impl Service {
 
 /// Largest stop grace a caller may ask for: the stop must finish within the container
 /// runtime's stop timeout (podman default 10 s).
-pub const MAX_GRACE: Duration = Duration::from_secs(8);
+pub const MAX_GRACE: Duration = run::GRACE;
 
 impl Service {
-    /// Attempts this role has started (every one counts, failed or stopped).
-    fn attempts(&self) -> Vec<Value> {
-        std::fs::read_to_string(self.cfg.attempts_path())
-            .unwrap_or_default()
+    /// The attempt ledger, read fail-closed: a line that is not a JSON object with a string
+    /// `attempt_id` makes the whole ledger unusable (the backstop then refuses). A missing ledger
+    /// while attempt directories exist is unusable too.
+    fn ledger(&self) -> Result<Vec<Value>, String> {
+        let lines = match std::fs::read_to_string(self.cfg.attempts_path()) {
+            Ok(t) => t,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let runs = std::fs::read_dir(self.cfg.runs())
+                    .map(|d| d.count())
+                    .unwrap_or(0);
+                if runs > 0 {
+                    return Err(format!(
+                        "attempt ledger missing while {runs} attempt directories exist"
+                    ));
+                }
+                String::new()
+            }
+            Err(e) => return Err(format!("attempt ledger unreadable: {e}")),
+        };
+        lines
             .lines()
-            .filter_map(|l| serde_json::from_str(l).ok())
+            .filter(|l| !l.trim().is_empty())
+            .enumerate()
+            .map(|(i, l)| match serde_json::from_str::<Value>(l) {
+                Ok(v) if v["attempt_id"].is_string() => Ok(v),
+                _ => Err(format!("attempt ledger line {} unreadable", i + 1)),
+            })
             .collect()
     }
 
-    /// The service's own ceiling, independent of the caller: run count, per-run time, total time
-    /// (by granted timeouts — conservative) and token rooms within the approved budget's caps.
+    /// The service's own ceiling within this role's share, independent of the caller:
+    /// * runs: attempts started (ledger `start` lines, or attempt directories if more);
+    /// * time: the windows granted (timeout + grace), not the time used — conservative; a
+    ///   start line without a numeric `window_ms` counts as a full per-run window;
+    /// * tokens: the guard's observed lower bounds of finished attempts plus the requested room
+    ///   must fit the share. An attempt without a recorded end (supervisor died mid-run, or the
+    ///   run failed) has unknown usage: nothing further starts until a person reconciles.
+    ///
+    /// Exact accounting (collector figures, unmeasured runs) is the caller's (`budget::next`).
     fn budget_backstop(&self, l: &Limits) -> Result<(), String> {
         let b = &self.cfg.budget;
-        let done = self.attempts();
-        if done.len() as u64 >= b.max_runs {
+        let sh = &self.cfg.share;
+        let ledger = self.ledger()?;
+        let starts: Vec<&Value> = ledger.iter().filter(|v| v["end"].is_null()).collect();
+        let dirs = std::fs::read_dir(self.cfg.runs())
+            .map(|d| d.count())
+            .unwrap_or(0);
+        let runs = (starts.len()).max(dirs) as u64;
+        if runs >= sh.max_runs {
             return Err(format!(
-                "{} of {} runs already started",
-                done.len(),
-                b.max_runs
+                "{runs} of {} runs of this role's share already started",
+                sh.max_runs
             ));
         }
         let window = l.timeout + l.grace;
@@ -633,22 +754,56 @@ impl Service {
                 b.per_run_seconds
             ));
         }
-        let granted: u64 = done.iter().filter_map(|a| a["window_ms"].as_u64()).sum();
-        if granted + window.as_millis() as u64 > b.total_seconds * 1000 {
+        let full = b.per_run_seconds * 1000;
+        let granted: u64 = starts
+            .iter()
+            .map(|a| a["window_ms"].as_u64().unwrap_or(full))
+            .sum();
+        if granted + window.as_millis() as u64 > sh.total_seconds * 1000 {
             return Err(format!(
-                "granted time {} ms + {} ms above the total {} s",
+                "granted time {} ms + {} ms above this role's share {} s",
                 granted,
                 window.as_millis(),
-                b.total_seconds
+                sh.total_seconds
             ));
         }
-        if l.billable_room > b.billable_tokens || l.cache_read_room > b.cache_read_tokens {
-            return Err("token room above the budget caps".into());
+        let (mut billable, mut cache_read) = (0u64, 0u64);
+        for a in &starts {
+            let id = a["attempt_id"].as_str().unwrap_or_default();
+            let end = ledger
+                .iter()
+                .find(|v| v["end"].is_object() && v["attempt_id"] == id)
+                .map(|v| &v["end"]);
+            match end.map(|e| {
+                (
+                    e["observed_billable"].as_u64(),
+                    e["observed_cache_read"].as_u64(),
+                )
+            }) {
+                Some((Some(x), Some(y))) => {
+                    billable = billable.saturating_add(x);
+                    cache_read = cache_read.saturating_add(y);
+                }
+                _ => {
+                    return Err(format!(
+                        "attempt {id} has no recorded end with observed usage; reconcile first"
+                    ));
+                }
+            }
+        }
+        if billable.saturating_add(l.billable_room) > sh.billable_tokens
+            || cache_read.saturating_add(l.cache_read_room) > sh.cache_read_tokens
+        {
+            return Err(format!(
+                "observed {billable} billable / {cache_read} cache_read plus the requested room \
+                 above this role's share {} / {}",
+                sh.billable_tokens, sh.cache_read_tokens
+            ));
         }
         Ok(())
     }
 
-    fn record_attempt(&self, attempt: &str, l: &Limits) -> std::io::Result<()> {
+    fn append_ledger(&self, line: &Value) -> std::io::Result<()> {
         use std::io::Write;
         let p = self.cfg.attempts_path();
         std::fs::create_dir_all(p.parent().unwrap_or(&self.cfg.state))?;
@@ -656,13 +811,15 @@ impl Service {
             .create(true)
             .append(true)
             .open(&p)?;
-        writeln!(
-            f,
-            "{}",
-            json!({"attempt_id": attempt, "budget": self.cfg.budget.name,
-            "window_ms": (l.timeout + l.grace).as_millis() as u64})
-        )?;
+        writeln!(f, "{line}")?;
         f.sync_all()
+    }
+
+    fn record_attempt(&self, attempt: &str, l: &Limits) -> std::io::Result<()> {
+        self.append_ledger(
+            &json!({"attempt_id": attempt, "budget": self.cfg.budget.name,
+            "window_ms": (l.timeout + l.grace).as_millis() as u64}),
+        )
     }
 }
 
@@ -738,8 +895,11 @@ pub fn serve(cfg: Config, listen: &str) -> Result<(), String> {
         if term.load(std::sync::atomic::Ordering::SeqCst) {
             if svc.stop_running() {
                 let t0 = std::time::Instant::now();
-                // the run guard stops within its grace (≤ MAX_GRACE); a little margin on top
-                while svc.is_running() && t0.elapsed() < MAX_GRACE + Duration::from_secs(1) {
+                // the run guard stops within its grace (≤ MAX_GRACE) plus its drain; the
+                // container stop timeout must be at least 10 s (podman default)
+                while svc.is_running()
+                    && t0.elapsed() < MAX_GRACE + run::DRAIN + Duration::from_secs(1)
+                {
                     std::thread::sleep(Duration::from_millis(100));
                 }
             }
@@ -776,5 +936,64 @@ pub fn serve(cfg: Config, listen: &str) -> Result<(), String> {
         let r = svc.handle(&method, &url, bearer.as_deref(), &body);
         let bytes = serde_json::to_vec(&r.body).unwrap_or_default();
         let _ = req.respond(tiny_http::Response::from_data(bytes).with_status_code(r.status));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A stop requested before the worker spawns: nothing is started, no takeover checkpoint is
+    /// written over the previous one, and the outcome says so (review 6975d5f N6).
+    #[test]
+    fn a_stop_before_the_spawn_starts_nothing() {
+        let root = std::env::temp_dir().join(format!("ieo-serve-unit-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("etc/template")).expect("etc");
+        std::fs::write(
+            root.join("etc/template/settings.json"),
+            r#"{"autoMemoryEnabled": false}"#,
+        )
+        .expect("t");
+        // a program that would leave a trace if it ever ran
+        let trace = root.join("ran");
+        let prog = root.join("prog");
+        std::fs::write(&prog, format!("#!/bin/sh\ntouch {}\n", trace.display())).expect("p");
+        let _ = Command::new("chmod").arg("+x").arg(&prog).status();
+        let cfg = Config::from_json(&json!({"role": "guardrail", "repo": "r",
+            "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
+            "claude": prog, "budget": "02-04",
+            "share": {"max_runs": 1, "total_seconds": 100, "billable_tokens": 1, "cache_read_tokens": 1}}))
+        .expect("cfg");
+        let svc = Service::new(cfg);
+        let job = Job {
+            attempt: "a1".into(),
+            session_id: "s1".into(),
+            resume: false,
+            prompt: "x".into(),
+            limits: Limits {
+                timeout: Duration::from_secs(5),
+                timeout_is_total: false,
+                billable_room: 1,
+                cache_read_room: 1,
+                grace: Duration::from_secs(1),
+            },
+            credential: "c".into(),
+            coord: json!({}),
+            tamper: None,
+            stop: Arc::new(AtomicBool::new(true)),
+        };
+        let v = svc.execute_inner(&job).expect("outcome");
+        assert_eq!(
+            (v["spawned"].as_bool(), v["stop"].as_str()),
+            (Some(false), Some("Requested"))
+        );
+        assert!(!trace.exists(), "the program ran");
+        assert!(
+            !svc.cfg.checkpoint_path().exists(),
+            "a takeover checkpoint was written"
+        );
+        assert!(root.join("state/runs/a1/outcome.json").exists());
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

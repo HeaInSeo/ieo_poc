@@ -298,7 +298,7 @@ fn limits_for_the_next_run_come_from_the_pre_run_decision() {
             l.grace
         ),
         (
-            Duration::from_secs(1_790),
+            Duration::from_secs(1_794),
             false,
             1_500_000,
             15_000_000,
@@ -318,13 +318,13 @@ fn limits_for_the_next_run_come_from_the_pre_run_decision() {
             l.billable_room,
             l.cache_read_room
         ),
-        (Duration::from_secs(1_390), true, 2_000_000, 20_000_000)
+        (Duration::from_secs(1_394), true, 2_000_000, 20_000_000)
     );
     // exactly the per-run limit left is not "total"
     let l = Limits::for_next(&BUDGET_X02, &[rec(10_800_000, 1, 0)], ok_obs(&ok)).expect("room");
     assert_eq!(
         (l.timeout, l.timeout_is_total),
-        (Duration::from_secs(3_590), false)
+        (Duration::from_secs(3_594), false)
     );
     // refused whenever the pre-run decision refuses, and without room
     let unmeasured = json!({"model_request": true, "attempt_id": "a", "command_id": "c", "duration_ms": 1,
@@ -642,9 +642,9 @@ fn a_failed_group_kill_is_reported_and_the_leader_is_still_stopped() {
 #[test]
 fn the_stop_grace_must_fit_in_the_time_left() {
     let ok = rate("rejected");
-    // 10 s left = the grace: refused; 11 s left: 1 s of run time
-    assert!(Limits::for_next(&BUDGET_X02, &[rec(14_390_000, 1, 0)], ok_obs(&ok)).is_err());
-    let l = Limits::for_next(&BUDGET_X02, &[rec(14_389_000, 1, 0)], ok_obs(&ok)).expect("room");
+    // 6 s left = the grace: refused; 7 s left: 1 s of run time
+    assert!(Limits::for_next(&BUDGET_X02, &[rec(14_394_000, 1, 0)], ok_obs(&ok)).is_err());
+    let l = Limits::for_next(&BUDGET_X02, &[rec(14_393_000, 1, 0)], ok_obs(&ok)).expect("room");
     assert_eq!(
         (l.timeout, l.timeout_is_total),
         (Duration::from_secs(1), true)
