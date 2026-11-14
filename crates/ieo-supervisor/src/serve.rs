@@ -38,6 +38,9 @@ pub struct Config {
     pub claude: PathBuf,
     /// Program used to signal process groups.
     pub kill: String,
+    /// The approved budget this role's runs belong to (user decision 2026-11-13 ①): the service
+    /// refuses runs beyond its caps on its own (a backstop; exact accounting is the caller's).
+    pub budget: crate::budget::Budget,
 }
 
 impl Config {
@@ -64,6 +67,13 @@ impl Config {
             cred: s("cred")?.into(),
             claude: s("claude")?.into(),
             kill: v["kill"].as_str().unwrap_or("kill").to_string(),
+            budget: match v["budget"].as_str() {
+                Some("02-04") => crate::budget::BUDGET_0204,
+                Some("X-02") => crate::budget::BUDGET_X02,
+                _ => {
+                    return Err("config.budget must name an approved budget (02-04 or X-02)".into());
+                }
+            },
         })
     }
     fn config_dir(&self) -> PathBuf {
@@ -80,6 +90,10 @@ impl Config {
     }
     fn checkpoint_path(&self) -> PathBuf {
         self.state.join("checkpoint.json")
+    }
+    /// Attempts started under this role's budget (append-only, on the persistent volume).
+    fn attempts_path(&self) -> PathBuf {
+        self.state.join("budget").join("attempts.jsonl")
     }
     /// The role's working directory, mapped from the contract's `/state/...` path.
     fn cwd(&self) -> PathBuf {
@@ -139,9 +153,11 @@ fn limits_from(v: &Value) -> Result<Limits, String> {
     })
 }
 
+/// Ids used as file names and CLI arguments: 1–64 of `[A-Za-z0-9_-]`, starting with a letter or
+/// digit (never `-`, so never read as an option; never `.` or `/`).
 fn safe_id(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 64
+    s.len() <= 64
+        && s.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
         && s.chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
@@ -194,11 +210,7 @@ impl Service {
         body: &[u8],
     ) -> Response {
         if !self.authorized(bearer) {
-            return err(
-                401,
-                "UNAUTHENTICATED",
-                "missing or wrong adapter credential",
-            );
+            return err(401, "UNAUTHORIZED", "missing or wrong adapter credential");
         }
         let segs: Vec<&str> = path.trim_matches('/').split('/').collect();
         match (method, segs.as_slice()) {
@@ -251,6 +263,14 @@ impl Service {
             Ok(l) => l,
             Err(e) => return err(400, "SCHEMA_VIOLATION", &e),
         };
+        // the stop must fit the container runtime's stop timeout (podman default 10 s)
+        if limits.grace > MAX_GRACE {
+            return err(
+                400,
+                "SCHEMA_VIOLATION",
+                &format!("limits.grace_ms above {} ms", MAX_GRACE.as_millis()),
+            );
+        }
         let c = &req["coordinator"];
         let coord = (
             c["generation"].as_u64(),
@@ -276,18 +296,58 @@ impl Service {
             return err(400, "SCHEMA_VIOLATION", "coordinator record incomplete");
         };
         if self.cfg.runs().join(&attempt).exists() {
-            return err(409, "EVENT_CONTENT_CONFLICT", "attempt_id already used");
+            return err(409, "ID_CONTENT_CONFLICT", "attempt_id already used");
+        }
+        // a run in this role (also one still starting, before its checkpoint exists) answers
+        // with the status first; checked again under the state lock below
+        if self.is_running() {
+            return resp(
+                409,
+                json!({"code": "ALREADY_RUNNING", "status": self.status()}),
+            );
         }
         // decide what runs
-        let cp = std::fs::read(self.cfg.checkpoint_path())
+        let cp_raw = std::fs::read(self.cfg.checkpoint_path());
+        let cp = cp_raw
+            .as_ref()
             .ok()
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+            .and_then(|b| serde_json::from_slice::<Value>(b).ok());
         let (session_id, resume, tamper) = if op == "start" {
             let Some(sid) = s("session_id").filter(|x| safe_id(x)) else {
                 return err(400, "SCHEMA_VIOLATION", "session_id required");
             };
             (sid, false, None)
         } else {
+            // a reconnect without a usable checkpoint is never silently replaced by a new session
+            // (§5-4): absent → NOT_OBSERVED, unreadable/corrupt/unsafe → external reconciliation
+            match (&cp_raw, &cp) {
+                (Err(e), _) if e.kind() == std::io::ErrorKind::NotFound => {
+                    return err(
+                        409,
+                        "NOT_OBSERVED",
+                        "no checkpoint to reconnect to; start a new session explicitly",
+                    );
+                }
+                (Err(_), _) | (Ok(_), None) => {
+                    return resp(
+                        409,
+                        json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+                               "reason": "the checkpoint cannot be read"}),
+                    );
+                }
+                _ => {}
+            }
+            if cp
+                .as_ref()
+                .and_then(|c| c["session_id"].as_str())
+                .is_some_and(|sid| !safe_id(sid))
+            {
+                return resp(
+                    409,
+                    json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+                           "reason": "the checkpoint session_id is not a safe id"}),
+                );
+            }
             // a running session answers with its status, never a second process (§5-5)
             let running = cp
                 .as_ref()
@@ -360,10 +420,19 @@ impl Service {
         };
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         if st.running.is_some() {
+            drop(st);
             return resp(
                 409,
-                json!({"code": "ALREADY_RUNNING", "running": st.running}),
+                json!({"code": "ALREADY_RUNNING", "status": self.status()}),
             );
+        }
+        // budget backstop (F4): the caller computes exact limits; the service still refuses
+        // anything beyond the approved caps, and counts every attempt it starts
+        if let Err(why) = self.budget_backstop(&limits) {
+            return resp(409, json!({"code": "BUDGET_EXCEEDED", "reason": why}));
+        }
+        if let Err(e) = self.record_attempt(&attempt, &limits) {
+            return err(500, "INTERNAL", &format!("attempt ledger: {e}"));
         }
         let stop = Arc::new(AtomicBool::new(false));
         let info = json!({"attempt_id": attempt, "session_id": session_id, "mode":
@@ -419,6 +488,21 @@ impl Service {
             .map_err(|e| format!("session lock: {e:?}"))?;
         let report = crate::configdir::clean(&cfg.config_dir(), &cfg.etc.join("template"))
             .map_err(|e| format!("config cleanup: {e}"))?;
+        // §5-1: a checkpoint at takeover, before anything runs (a crash mid-run then names this
+        // session); again after the run, and on errors
+        self.write_checkpoint(job, &report.digest, None, "takeover")?;
+        if job.stop.load(std::sync::atomic::Ordering::SeqCst) {
+            // stopped before anything was spawned: no process, no model call
+            let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
+                "mode": if job.resume { "resume" } else { "new" },
+                "stop": "Requested", "stopped_by_guard": false, "spawned": false,
+                "tamper": job.tamper});
+            let _ = std::fs::write(
+                dir.join("outcome.json"),
+                serde_json::to_vec_pretty(&v).unwrap_or_default(),
+            );
+            return Ok(v);
+        }
         let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
         let mut cmd = Command::new(&cfg.claude);
         cmd.args(&argv).current_dir(cfg.cwd());
@@ -435,36 +519,14 @@ impl Service {
         };
         let stdout = dir.join("stdout.jsonl");
         let outcome: Outcome =
-            run::run_with(cmd, job.limits, &stdout, &dir.join("stderr.txt"), &opts)
-                .map_err(|e| format!("run: {e}"))?;
-        let c = &job.coord;
-        let n = |k: &str| c[k].as_u64().unwrap_or_default();
-        let t = |k: &str| c[k].as_str().unwrap_or_default().to_string();
-        let cp = checkpoint::record(&Checkpoint {
-            session_id: &job.session_id,
-            generation: n("generation"),
-            assignment_id: &t("assignment_id"),
-            target_sha: &t("target_sha"),
-            sprint_id: &t("sprint_id"),
-            sprint_revision: n("sprint_revision"),
-            spec_digest: &t("spec_digest"),
-            image_digest: &t("image_digest"),
-            profile_id: &t("profile_id"),
-            profile_revision: n("profile_revision"),
-            settings_digest: &report.digest,
-            worktree_head: "none",
-            diff_sha256: "none",
-            last_event_offset: std::fs::read_to_string(&stdout)
-                .map(|s| s.lines().count() as u64)
-                .unwrap_or_default(),
-            active_children: vec![],
-            pending_external_requests: vec![],
-            session_cumulative: session_cumulative(&stdout),
-        });
-        let tmp = cfg.checkpoint_path().with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(&cp).unwrap_or_default())
-            .and_then(|()| std::fs::rename(&tmp, cfg.checkpoint_path()))
-            .map_err(|e| format!("checkpoint: {e}"))?;
+            match run::run_with(cmd, job.limits, &stdout, &dir.join("stderr.txt"), &opts) {
+                Ok(o) => o,
+                Err(e) => {
+                    let _ = self.write_checkpoint(job, &report.digest, Some(&stdout), "error");
+                    return Err(format!("run: {e}"));
+                }
+            };
+        self.write_checkpoint(job, &report.digest, Some(&stdout), "after_run")?;
         let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
             "mode": if job.resume { "resume" } else { "new" },
             "stop": format!("{:?}", outcome.stop),
@@ -484,6 +546,123 @@ impl Service {
             serde_json::to_vec_pretty(&v).unwrap_or_default(),
         );
         Ok(v)
+    }
+
+    /// Write the §5-1 checkpoint durably (temp file, fsync, rename, directory fsync). `phase`
+    /// records when it was written (`takeover`, `after_run`, `error`).
+    fn write_checkpoint(
+        &self,
+        job: &Job,
+        settings_digest: &str,
+        stdout: Option<&Path>,
+        phase: &str,
+    ) -> Result<(), String> {
+        let cfg = &self.cfg;
+        let c = &job.coord;
+        let n = |k: &str| c[k].as_u64().unwrap_or_default();
+        let t = |k: &str| c[k].as_str().unwrap_or_default().to_string();
+        let cp = checkpoint::record(&Checkpoint {
+            session_id: &job.session_id,
+            generation: n("generation"),
+            assignment_id: &t("assignment_id"),
+            target_sha: &t("target_sha"),
+            sprint_id: &t("sprint_id"),
+            sprint_revision: n("sprint_revision"),
+            spec_digest: &t("spec_digest"),
+            image_digest: &t("image_digest"),
+            profile_id: &t("profile_id"),
+            profile_revision: n("profile_revision"),
+            settings_digest,
+            worktree_head: "none",
+            diff_sha256: "none",
+            last_event_offset: stdout
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .map(|s| s.lines().count() as u64)
+                .unwrap_or_default(),
+            active_children: vec![],
+            pending_external_requests: vec![],
+            session_cumulative: stdout.map(session_cumulative).unwrap_or(Value::Null),
+        });
+        let mut cp = cp;
+        cp["phase"] = json!(phase);
+        let path = cfg.checkpoint_path();
+        let tmp = path.with_extension("json.tmp");
+        let write = || -> std::io::Result<()> {
+            use std::io::Write;
+            let mut f = std::fs::File::create(&tmp)?;
+            f.write_all(&serde_json::to_vec_pretty(&cp).unwrap_or_default())?;
+            f.sync_all()?;
+            std::fs::rename(&tmp, &path)?;
+            std::fs::File::open(&cfg.state)?.sync_all()
+        };
+        write().map_err(|e| format!("checkpoint: {e}"))
+    }
+}
+
+/// Largest stop grace a caller may ask for: the stop must finish within the container
+/// runtime's stop timeout (podman default 10 s).
+pub const MAX_GRACE: Duration = Duration::from_secs(8);
+
+impl Service {
+    /// Attempts this role has started (every one counts, failed or stopped).
+    fn attempts(&self) -> Vec<Value> {
+        std::fs::read_to_string(self.cfg.attempts_path())
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| serde_json::from_str(l).ok())
+            .collect()
+    }
+
+    /// The service's own ceiling, independent of the caller: run count, per-run time, total time
+    /// (by granted timeouts — conservative) and token rooms within the approved budget's caps.
+    fn budget_backstop(&self, l: &Limits) -> Result<(), String> {
+        let b = &self.cfg.budget;
+        let done = self.attempts();
+        if done.len() as u64 >= b.max_runs {
+            return Err(format!(
+                "{} of {} runs already started",
+                done.len(),
+                b.max_runs
+            ));
+        }
+        let window = l.timeout + l.grace;
+        if window > Duration::from_secs(b.per_run_seconds) {
+            return Err(format!(
+                "timeout + grace {} s above the per-run limit {} s",
+                window.as_secs(),
+                b.per_run_seconds
+            ));
+        }
+        let granted: u64 = done.iter().filter_map(|a| a["window_ms"].as_u64()).sum();
+        if granted + window.as_millis() as u64 > b.total_seconds * 1000 {
+            return Err(format!(
+                "granted time {} ms + {} ms above the total {} s",
+                granted,
+                window.as_millis(),
+                b.total_seconds
+            ));
+        }
+        if l.billable_room > b.billable_tokens || l.cache_read_room > b.cache_read_tokens {
+            return Err("token room above the budget caps".into());
+        }
+        Ok(())
+    }
+
+    fn record_attempt(&self, attempt: &str, l: &Limits) -> std::io::Result<()> {
+        use std::io::Write;
+        let p = self.cfg.attempts_path();
+        std::fs::create_dir_all(p.parent().unwrap_or(&self.cfg.state))?;
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&p)?;
+        writeln!(
+            f,
+            "{}",
+            json!({"attempt_id": attempt, "budget": self.cfg.budget.name,
+            "window_ms": (l.timeout + l.grace).as_millis() as u64})
+        )?;
+        f.sync_all()
     }
 }
 
@@ -507,7 +686,8 @@ impl Service {
     /// PID 1 duty: reap orphans (processes reparented to PID 1, e.g. a run's descendants after
     /// the group kill). Only while no run is active and under the state lock that also gates new
     /// runs, so it never takes the exit status of a run's own child. Returns how many were reaped.
-    pub fn reap_orphans(&self) -> usize {
+    /// PID 1 only: never call from a process that waits on its own children elsewhere.
+    fn reap_orphans(&self) -> usize {
         use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
         let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         if st.running.is_some() {
@@ -558,7 +738,8 @@ pub fn serve(cfg: Config, listen: &str) -> Result<(), String> {
         if term.load(std::sync::atomic::Ordering::SeqCst) {
             if svc.stop_running() {
                 let t0 = std::time::Instant::now();
-                while svc.is_running() && t0.elapsed() < Duration::from_secs(30) {
+                // the run guard stops within its grace (≤ MAX_GRACE); a little margin on top
+                while svc.is_running() && t0.elapsed() < MAX_GRACE + Duration::from_secs(1) {
                     std::thread::sleep(Duration::from_millis(100));
                 }
             }

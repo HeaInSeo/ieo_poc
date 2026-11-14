@@ -1,4 +1,4 @@
-# 02-04 role containers, fake claude (no model calls) · 2026-11-14T12:42:44Z · image docker.io/library/golang:1.26.9-bookworm
+# 02-04 role containers, fake claude (no model calls) · 2026-11-14T15:37:39Z · image docker.io/library/golang:1.26.9-bookworm
 ## U3 layout
 development: pid1=/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervi uid=20001 labels=development
   mounts: /state(rw) /etc/ieo/role(ro) /run/ieo/cred(ro) /opt/ieo(ro) 
@@ -7,6 +7,8 @@ guardrail: pid1=/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervi uid
   shared host paths between roles: 0 (the read-only program dir /opt/ieo excluded)
 ## adapter auth
 no token: 401
+## reconnect with no checkpoint: never a silent new session
+409 NOT_OBSERVED
 ## (a) cleanup before the first start: markers planted in the config dir
 202{"attempt_id": "d1", "session_id": "s-dev-1", "mode": "new", "stop": "Exited", "exit_code": 0, "stopped_by_guard": false, "cleanup_failed": false, "tamper": null}
 init: {"type":"system","subtype":"init","session_id":"s-dev-1","uid":"20001","cwd":"/state/work/sori","config":"settings.json,","prompt_seen":true}
@@ -29,7 +31,14 @@ allowedTools ['Read(//state/review/**)', 'Read(//state/inputs/**)', 'Read(//stat
 Write( in argv: False
 env: ['HOME', 'PATH', 'LANG', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_OAUTH_TOKEN']
 ## credential values in the logs: 0 occurrences
-## graceful stop: SIGTERM to PID 1
-development: podman stop took 0.4 s, exit code 0
-guardrail: podman stop took 0.5 s, exit code 0
+## budget backstop: attempts counted on the role volume
+development: 5 attempts recorded
+guardrail: 1 attempts recorded
+per-run window above the cap: 409 BUDGET_EXCEEDED
+## SIGTERM to PID 1 during a run: the run is stopped through the guard within its grace
+202development (running): podman stop took 0.5 s, exit code 0
+d7 outcome: {'stop': 'Requested', 'stopped_by_guard': True, 'cleanup_failed': False}
+checkpoint: s-dev-7 after_run
+## graceful stop: SIGTERM to PID 1 (idle)
+guardrail: podman stop took 0.4 s, exit code 0
 # done

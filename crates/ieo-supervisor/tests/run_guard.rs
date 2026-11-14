@@ -787,3 +787,48 @@ fn a_stopped_run_is_unmeasured_even_when_its_late_result_looks_complete() {
     assert_eq!(c["usage"]["run"]["state"], "measured", "{c}");
     assert_eq!(run::charge(&o, &c["usage"]["run"])["state"], "unmeasured");
 }
+
+// --- review 88a4535 (PR #47) ---
+
+/// A `kill` that accepts only the `-SIG -- -PGID` form (procps-ng 4.0.2 in the role image
+/// rejects `-s SIG -- -PGID`); it logs each call and passes it on.
+fn strict_kill(dir: &Path) -> String {
+    let k = dir.join("kill");
+    let log = dir.join("kill.log");
+    std::fs::write(
+        &k,
+        format!(
+            "#!/bin/sh\necho \"$*\" >> {}\ncase \"$1\" in -[A-Z]*) ;; *) exit 2;; esac\n[ \"$2\" = -- ] || exit 2\ncase \"$3\" in -[0-9]*) ;; *) exit 2;; esac\nexec /bin/kill \"$@\"\n",
+            log.display()
+        ),
+    )
+    .expect("kill");
+    let _ = Command::new("chmod").args(["+x"]).arg(&k).status();
+    k.to_string_lossy().to_string()
+}
+
+#[test]
+fn the_group_is_signalled_in_the_form_the_role_image_accepts() {
+    let d = Tmp::new("killform");
+    let pid = d.p().join("child.pid");
+    let tail = format!("sleep 300 & echo $! > {}\nsleep 300", pid.display());
+    let kill = strict_kill(d.p());
+    let o = run::run_with_kill(
+        fake(d.p(), &[], &tail),
+        limits(500),
+        &d.p().join("stdout.jsonl"),
+        &d.p().join("stderr.txt"),
+        &kill,
+    )
+    .expect("run");
+    assert_eq!(o.stop, Stop::RunTimeout);
+    assert!(!o.cleanup_failed, "the strict kill refused the group form");
+    assert!(gone(&pid));
+    let log = std::fs::read_to_string(d.p().join("kill.log")).expect("log");
+    assert!(
+        log.lines()
+            .next()
+            .is_some_and(|l| l.starts_with("-TERM -- -")),
+        "{log}"
+    );
+}

@@ -5,7 +5,7 @@ set -euo pipefail
 BIN=$1; W=$2
 IMG=docker.io/library/golang:1.26.9-bookworm
 REPO=sori
-rm -rf "$W"; mkdir -p "$W/bin"
+podman unshare rm -rf "$W"; mkdir -p "$W/bin"  # role volumes are owned by the role UIDs
 cp "$BIN" "$W/bin/ieo-supervisor"
 cat > "$W/bin/fake-claude" <<'FAKE'
 #!/bin/sh
@@ -24,7 +24,7 @@ setup_role() { # role uid port
   local r=$1 uid=$2
   mkdir -p "$W/$r/state" "$W/$r/etc/template" "$W/$r/cred"
   echo '{"autoMemoryEnabled": false}' > "$W/$r/etc/template/settings.json"
-  printf '{"role":"%s","repo":"%s","state":"/state","etc":"/etc/ieo/role","cred":"/run/ieo/cred","claude":"/opt/ieo/fake-claude"}\n' "$r" "$REPO" > "$W/$r/etc/supervisor.json"
+  printf '{"role":"%s","repo":"%s","state":"/state","etc":"/etc/ieo/role","cred":"/run/ieo/cred","claude":"/opt/ieo/fake-claude","budget":"02-04"}\n' "$r" "$REPO" > "$W/$r/etc/supervisor.json"
   echo "fake-$r-credential" > "$W/$r/cred/oauth_token"
   printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1 > "$W/$r/cred/adapter.sha256"
   chmod 0400 "$W/$r/cred/"*; chmod 0500 "$W/$r/cred"
@@ -71,6 +71,8 @@ done
 echo "  shared host paths between roles: $(comm -12 <(podman inspect ieo-ct-$REPO-development --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}' | sort) <(podman inspect ieo-ct-$REPO-guardrail --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}' | sort) | grep -v '/bin$' | wc -l) (the read-only program dir /opt/ieo excluded)"
 echo "## adapter auth"
 echo "no token: $(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$D/v0/role/status)"
+echo "## reconnect with no checkpoint: never a silent new session"
+api $D POST /v0/role/reconnect "$(body d0 hello '{"new_session_id":"s-dev-0"}')" | python3 -c 'import sys,json; t=sys.stdin.read().rsplit("\n",1); print(t[1], json.loads(t[0])["code"])'
 echo "## (a) cleanup before the first start: markers planted in the config dir"
 podman unshare sh -c "mkdir -p '$W/development/state/claude/skills/x' && echo MARKER > '$W/development/state/claude/CLAUDE.md' && echo MARKER > '$W/development/state/claude/skills/x/SKILL.md' && echo '{}' > '$W/development/state/claude/.credentials.json' && chown -R 20001:20001 '$W/development/state/claude'"
 api $D POST /v0/role/start "$(body d1 hello '{"session_id":"s-dev-1"}')" | tail -1
@@ -101,8 +103,18 @@ api $G POST /v0/role/start "$(body g1 review '{"session_id":"s-gr-1"}')" | tail 
 wait_done $G g1; echo "init: $(init_of $G g1)"
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:$G/v0/role/runs/g1/outcome | python3 -c 'import json,sys; o=json.loads(json.load(sys.stdin)["content"]); a=o["argv"]; i=a.index("--allowedTools"); print("allowedTools", a[i+1:i+5]); print("Write( in argv:", any("Write(" in x for x in a)); print("env:", o["env_names"])'
 echo "## credential values in the logs: $(podman logs ieo-ct-$REPO-development 2>&1 | grep -c 'fake-development-credential' || true) occurrences"
-echo "## graceful stop: SIGTERM to PID 1"
-for r in development guardrail; do
+echo "## budget backstop: attempts counted on the role volume"
+for r in development guardrail; do echo "$r: $(podman unshare cat "$W/$r/state/budget/attempts.jsonl" | wc -l) attempts recorded"; done
+echo "per-run window above the cap: $(api $D POST /v0/role/start "$(body d8 x '{"session_id":"s-dev-8","limits":{"timeout_ms":1795000,"billable_room":1000,"cache_read_room":1000,"grace_ms":8000}}')" | python3 -c 'import sys,json; t=sys.stdin.read().rsplit("\n",1); print(t[1], json.loads(t[0])["code"])')"
+echo "## SIGTERM to PID 1 during a run: the run is stopped through the guard within its grace"
+api $D POST /v0/role/start "$(body d7 SLEEP '{"session_id":"s-dev-7"}')" | tail -1
+sleep 1
+t0=$(date +%s.%N); podman stop -t 10 ieo-ct-$REPO-development >/dev/null; t1=$(date +%s.%N)
+echo "development (running): podman stop took $(python3 -c "print(round($t1-$t0,1))") s, exit code $(podman inspect ieo-ct-$REPO-development --format '{{.State.ExitCode}}')"
+podman unshare cat "$W/development/state/runs/d7/outcome.json" | python3 -c 'import json,sys; o=json.load(sys.stdin); print("d7 outcome:", {k:o.get(k) for k in ["stop","stopped_by_guard","cleanup_failed"]})'
+podman unshare cat "$W/development/state/checkpoint.json" | python3 -c 'import json,sys; c=json.load(sys.stdin); print("checkpoint:", c["session_id"], c["phase"])'
+echo "## graceful stop: SIGTERM to PID 1 (idle)"
+for r in guardrail; do
   t0=$(date +%s.%N); podman stop -t 10 ieo-ct-$REPO-$r >/dev/null; t1=$(date +%s.%N)
   echo "$r: podman stop took $(python3 -c "print(round($t1-$t0,1))") s, exit code $(podman inspect ieo-ct-$REPO-$r --format '{{.State.ExitCode}}')"
 done

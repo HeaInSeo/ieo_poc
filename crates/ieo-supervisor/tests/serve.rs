@@ -77,7 +77,7 @@ fn setup(name: &str) -> (Tmp, Arc<Service>) {
     .expect("adapter");
     let cfg = Config::from_json(&json!({"role": "development", "repo": "sori",
         "state": root.join("state"), "etc": etc, "cred": cred,
-        "claude": fake_claude(root)}))
+        "claude": fake_claude(root), "budget": "02-04"}))
     .expect("config");
     (t, Arc::new(Service::new(cfg)))
 }
@@ -126,6 +126,10 @@ fn init_line(svc: &Arc<Service>, attempt: &str) -> Value {
 fn the_adapter_credential_is_required() {
     let (t, svc) = setup("auth");
     assert_eq!(svc.handle("GET", "/v0/role/status", None, b"").status, 401);
+    assert_eq!(
+        svc.handle("GET", "/v0/role/status", None, b"").body["code"],
+        "UNAUTHORIZED"
+    );
     assert_eq!(
         svc.handle("GET", "/v0/role/status", Some("wrong"), b"")
             .status,
@@ -293,7 +297,15 @@ fn one_running_process_per_session_and_stop() {
         assert!(t0.elapsed() < Duration::from_secs(10));
         std::thread::sleep(Duration::from_millis(20));
     }
-    std::thread::sleep(Duration::from_millis(300));
+    // wait until the fake has started (its init line), so the stop below reaches a process
+    let t0 = Instant::now();
+    while !std::fs::read_to_string(_t.0.join("state/runs/a1/stdout.jsonl"))
+        .unwrap_or_default()
+        .contains("\"init\"")
+    {
+        assert!(t0.elapsed() < Duration::from_secs(10));
+        std::thread::sleep(Duration::from_millis(20));
+    }
     // a second reconnect while running does not start anything and answers with status (§5-5)
     let (st, b) = call(
         &svc,
@@ -304,12 +316,39 @@ fn one_running_process_per_session_and_stop() {
     assert_eq!(st, 409, "{b}");
     assert_eq!(b["code"], "ALREADY_RUNNING");
     assert!(!_t.0.join("state/runs/a2").exists());
+    // the takeover checkpoint is on disk while the run is going (§5-1)
+    let cp: Value = serde_json::from_slice(
+        &std::fs::read(_t.0.join("state/checkpoint.json")).expect("checkpoint"),
+    )
+    .expect("json");
+    assert_eq!(
+        (cp["phase"].as_str(), cp["session_id"].as_str()),
+        (Some("takeover"), Some("s1"))
+    );
+    // a start while running answers with the status too
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a3", "more", json!({"session_id": "s3"})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("ALREADY_RUNNING")),
+        "{b}"
+    );
+    assert_eq!(b["status"]["running"]["attempt_id"], "a1", "{b}");
     // stop ends the run through the guard
     let (st, _) = call(&svc, "POST", "/v0/role/stop", b"");
     assert_eq!(st, 202);
     let out = wait(&svc, "a1");
     assert_eq!(out["stop"], "Requested", "{out}");
     assert_eq!(out["stopped_by_guard"], true);
+    let cp: Value = serde_json::from_slice(
+        &std::fs::read(_t.0.join("state/checkpoint.json")).expect("checkpoint"),
+    )
+    .expect("json");
+    assert_eq!(cp["phase"], "after_run");
 }
 
 #[test]
@@ -363,4 +402,224 @@ fn reconnect_refuses_stale_or_mismatched_records_and_missing_credentials() {
         (503, Some("CREDENTIAL_UNAVAILABLE"))
     );
     assert!(!t.0.join("state/runs/a3").exists());
+}
+
+// --- review 88a4535 ---
+
+fn code(r: (u16, Value)) -> (u16, Option<String>) {
+    (r.0, r.1["code"].as_str().map(str::to_string))
+}
+
+#[test]
+fn a_reconnect_needs_a_readable_checkpoint() {
+    let (t, svc) = setup("nocp");
+    let body = req("a1", "x", json!({"new_session_id": "s1"}));
+    // F1: nothing to reconnect to → never a silent new session
+    assert_eq!(
+        code(call(&svc, "POST", "/v0/role/reconnect", &body)),
+        (409, Some("NOT_OBSERVED".into()))
+    );
+    std::fs::create_dir_all(t.0.join("state")).expect("state");
+    std::fs::write(t.0.join("state/checkpoint.json"), "{not json").expect("corrupt");
+    assert_eq!(
+        code(call(&svc, "POST", "/v0/role/reconnect", &body)),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED".into()))
+    );
+    // F2: a checkpoint session id that is not a safe id is never used as a path or argument
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a2", "hi", json!({"session_id": "s2"})),
+    );
+    wait(&svc, "a2");
+    let p = t.0.join("state/checkpoint.json");
+    let mut cp: Value = serde_json::from_slice(&std::fs::read(&p).expect("cp")).expect("json");
+    for bad in ["--dangerously-skip-permissions", "../x", "", "a/b"] {
+        cp["session_id"] = json!(bad);
+        std::fs::write(&p, serde_json::to_vec(&cp).expect("j")).expect("w");
+        assert_eq!(
+            code(call(
+                &svc,
+                "POST",
+                "/v0/role/reconnect",
+                &req("a3", "x", json!({"new_session_id": "s3"}))
+            )),
+            (409, Some("EXTERNAL_RECONCILIATION_REQUIRED".into())),
+            "{bad}"
+        );
+    }
+    assert!(!t.0.join("state/runs/a1").exists() && !t.0.join("state/runs/a3").exists());
+}
+
+#[test]
+fn ids_must_be_safe() {
+    let (t, svc) = setup("ids");
+    for (attempt, sid) in [
+        ("-a", "s1"),
+        ("a..", "s1"),
+        ("a1", "-s"),
+        ("a1", "s/1"),
+        ("a1", "_s"),
+    ] {
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req(attempt, "x", json!({"session_id": sid})),
+        );
+        assert_eq!(
+            (st, b["code"].as_str()),
+            (400, Some("SCHEMA_VIOLATION")),
+            "{attempt} {sid}"
+        );
+    }
+    let long = "a".repeat(65);
+    let (st, _) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req(&long, "x", json!({"session_id": "s1"})),
+    );
+    assert_eq!(st, 400);
+    assert!(
+        !t.0.join("state/runs").exists()
+            || std::fs::read_dir(t.0.join("state/runs"))
+                .expect("d")
+                .next()
+                .is_none()
+    );
+}
+
+#[test]
+fn a_session_held_by_another_process_is_reported_not_restarted() {
+    let (t, svc) = setup("lockprobe");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "a1");
+    // another holder of s1 (e.g. a process left from before a supervisor restart)
+    let _held = ieo_supervisor::lock::SessionLock::acquire(&t.0.join("state/locks"), "s1", 4242)
+        .expect("lock");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("a2", "x", json!({"new_session_id": "s2"})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("ALREADY_RUNNING")),
+        "{b}"
+    );
+    assert_eq!(b["pid"], 4242);
+    assert!(b["status"].is_object(), "{b}");
+    assert!(!t.0.join("state/runs/a2").exists());
+}
+
+#[test]
+fn an_empty_credential_is_unavailable() {
+    let (t, svc) = setup("emptycred");
+    std::fs::write(t.0.join("cred/oauth_token"), " \n").expect("empty");
+    assert_eq!(
+        code(call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req("a1", "x", json!({"session_id": "s1"}))
+        )),
+        (503, Some("CREDENTIAL_UNAVAILABLE".into()))
+    );
+    assert!(!t.0.join("state/runs/a1").exists());
+}
+
+#[test]
+fn the_service_enforces_its_own_budget_ceiling() {
+    let (t, svc) = setup("budget");
+    let with = |a: &str, limits: Value| {
+        let mut v: Value =
+            serde_json::from_slice(&req(a, "x", json!({"session_id": format!("s{a}")})))
+                .expect("j");
+        for (k, x) in limits.as_object().expect("o") {
+            v["limits"][k] = x.clone();
+        }
+        serde_json::to_vec(&v).expect("j")
+    };
+    // grace beyond the container stop timeout: schema
+    assert_eq!(
+        code(call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &with("a1", json!({"grace_ms": 9_000}))
+        )),
+        (400, Some("SCHEMA_VIOLATION".into()))
+    );
+    // per-run window above 1,800 s; token rooms above the caps
+    for l in [
+        json!({"timeout_ms": 1_795_000, "grace_ms": 8_000}),
+        json!({"billable_room": 1_500_001}),
+        json!({"cache_read_room": 15_000_001}),
+    ] {
+        assert_eq!(
+            code(call(&svc, "POST", "/v0/role/start", &with("a1", l.clone()))),
+            (409, Some("BUDGET_EXCEEDED".into())),
+            "{l}"
+        );
+    }
+    assert!(!t.0.join("state/runs/a1").exists());
+    // an accepted start is counted with its granted window
+    call(&svc, "POST", "/v0/role/start", &with("a1", json!({})));
+    wait(&svc, "a1");
+    let ledger = t.0.join("state/budget/attempts.jsonl");
+    let lines: Vec<Value> = std::fs::read_to_string(&ledger)
+        .expect("ledger")
+        .lines()
+        .map(|l| serde_json::from_str(l).expect("line"))
+        .collect();
+    assert_eq!(lines.len(), 1);
+    assert_eq!(
+        (
+            lines[0]["attempt_id"].as_str(),
+            lines[0]["window_ms"].as_u64()
+        ),
+        (Some("a1"), Some(21_000))
+    );
+    // total granted time: 14,400 s minus what is granted leaves less than the next window
+    let fill =
+        json!({"attempt_id": "x", "budget": "02-04", "window_ms": 14_400_000 - 21_000 - 20_000})
+            .to_string();
+    std::fs::write(
+        &ledger,
+        format!("{}\n{fill}\n", serde_json::to_string(&lines[0]).expect("j")),
+    )
+    .expect("w");
+    assert_eq!(
+        code(call(&svc, "POST", "/v0/role/start", &with("a2", json!({})))),
+        (409, Some("BUDGET_EXCEEDED".into()))
+    );
+    // run count: 12 started attempts end the budget, whatever their outcome
+    let twelve: String = (0..12)
+        .map(|i| {
+            format!(
+                "{}\n",
+                json!({"attempt_id": format!("r{i}"), "window_ms": 1})
+            )
+        })
+        .collect();
+    std::fs::write(&ledger, twelve).expect("w");
+    let (st, b) = call(&svc, "POST", "/v0/role/start", &with("a3", json!({})));
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("BUDGET_EXCEEDED")),
+        "{b}"
+    );
+    assert!(
+        b["reason"].as_str().is_some_and(|r| r.contains("12 of 12")),
+        "{b}"
+    );
+    assert!(!t.0.join("state/runs/a2").exists() && !t.0.join("state/runs/a3").exists());
 }
