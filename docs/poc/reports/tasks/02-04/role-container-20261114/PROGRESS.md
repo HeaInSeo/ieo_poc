@@ -3,7 +3,7 @@
 | 항목 | 기록 |
 | --- | --- |
 | 구분 | 주계획 02-04의 중간 산출물이다. 완료 수 11/73 변동 없음 |
-| 산출물 | `crates/ieo-supervisor/src/serve.rs`(역할 서비스), `src/bin/ieo-supervisor.rs`(`serve --config --listen`), `run::run_with`(stdin 프롬프트·외부 정지), 시험 `tests/serve.rs` 11건·`tests/run_guard.rs` 그룹 신호 형식 1건, 컨테이너 시험 스크립트 [run-fake.sh](run-fake.sh)와 [실행 기록](evidence/run-fake.log) |
+| 산출물 | `crates/ieo-supervisor/src/serve.rs`(역할 서비스), `src/bin/ieo-supervisor.rs`(`serve --config --listen`), `run::run_with`(stdin 프롬프트·외부 정지), 시험 `tests/serve.rs` 11건·`tests/run_guard.rs` 그룹 신호 형식 1건, 컨테이너 시험 스크립트 [run-fake.sh](run-fake.sh)와 [실행 기록](evidence/run-fake.log), 작업 공간 시험 [cargo-test.log](evidence/cargo-test.log)(248건 통과) |
 | 모델 호출 | 0회. Claude 대신 가짜 셸 스크립트를 쓴다 |
 | 재개 지점 | 2026-11-14 사용자 지시 “작업을 이어서 진행”: main d3e28df, 열린 PR은 #29(별도 DF-02)뿐, 실행 중 Claude·supervisor 없음, 이전 실제 호출 0회 |
 
