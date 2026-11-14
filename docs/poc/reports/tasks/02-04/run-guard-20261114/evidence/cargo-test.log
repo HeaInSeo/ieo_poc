@@ -1,0 +1,69 @@
+# commit 0cb7132ef0ec3a6d5c91b4c8ce23265a02fd913b · 2026-11-14T09:46:16Z · git status --porcelain (before run):
+?? docs/poc/reports/tasks/02-04/run-guard-20261114/evidence/cargo-test.log
+# (empty above = clean tree)
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+$ cargo fmt --all -- --check
+EXIT=0
+$ cargo clippy -p ieo-supervisor --all-targets --locked -- -D warnings
+    Checking ieo-supervisor v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/crates/ieo-supervisor)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.28s
+EXIT=0
+$ cargo test -p ieo-supervisor --locked
+   Compiling ieo-supervisor v0.1.0 (/opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/crates/ieo-supervisor)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.50s
+     Running unittests src/lib.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/ieo_supervisor-5b71cc387e1e53e7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/run_guard.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/run_guard-3e6c4a37a59dd0e6)
+
+running 11 tests
+test a_run_without_measurement_blocks_the_next_call ... ok
+test limits_for_the_next_run_come_from_the_budget ... ok
+test observed_cache_read_reaching_the_room_stops_the_run ... ok
+test a_repeated_message_counts_once_with_its_largest_usage ... ok
+test observed_tokens_reaching_the_room_stop_the_run ... ok
+test a_normal_run_is_allowed_and_measured ... ok
+test an_extra_usage_or_limit_signal_stops_the_run ... ok
+test children_left_behind_by_a_normal_exit_are_cleaned_up ... ok
+test the_total_time_left_ends_the_run ... ok
+test the_per_run_time_limit_ends_the_run_and_its_children ... ok
+test a_process_ignoring_sigterm_is_killed_after_the_grace ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+
+     Running tests/supervisor.rs (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-c12/debug/deps/supervisor-329290e52bc5fb84)
+
+running 20 tests
+test an_overflowing_projection_stops ... ok
+test budget_constants_match_decision_1 ... ok
+test checkpoint_record_has_the_5_1_fields ... ok
+test budget_counts_every_run_and_never_reads_missing_as_zero ... ok
+test overflowing_or_truncated_measurements_are_not_trusted ... ok
+test role_arguments_use_edit_paths_and_session_id_only ... ok
+test reconnect_decisions ... ok
+test environment_is_cleared_to_the_allow_list ... ok
+test budget_boundaries ... ok
+test extra_usage_must_be_off_before_and_during_a_call ... ok
+test a_cleanup_never_follows_links_and_reopens_hidden_directories ... ok
+test cleanup_leaves_the_root_mode_alone ... ok
+test a_cleanup_keeps_only_session_records_and_installs_the_template ... ok
+test c_normal_cli_writes_are_not_tamper ... ok
+test one_running_process_per_session ... ok
+test claude_json_directive_keys_are_all_digested ... ok
+test any_link_is_tamper_and_is_never_followed ... ok
+test a_non_regular_claude_json_is_never_opened ... ok
+test special_files_are_never_opened ... ok
+test b_tamper_after_a_checkpoint_is_detected_and_not_resumed ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+   Doc-tests ieo_supervisor
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+EXIT=0
