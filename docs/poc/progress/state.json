@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0022",
-  "snapshot_created_at": "2026-11-14T21:22:50+09:00",
-  "last_actual_work_observed_at": "2026-11-14T21:22:50+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0023",
+  "snapshot_created_at": "2026-11-15T01:04:03+09:00",
+  "last_actual_work_observed_at": "2026-11-15T01:04:03+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 진행(supervisor 핵심 PR #31·#32, 실행 중 예산 집행 PR #40 병합, 실제 세션 시험 전) · gRPC 계획 개정 A4(X-03~X-07, PR #41)",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 진행(supervisor 핵심 PR #31·#32, 실행 중 예산 집행 PR #40, 역할 컨테이너 supervisor 서비스 PR #47 병합, 실제 세션 시험 전) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -286,9 +286,9 @@
       "group": "핵심",
       "kind": "구현",
       "status": "진행",
-      "last_observed_at": "2026-11-14T20:42:22+09:00",
-      "latest_report": "reports/tasks/02-04/run-guard-20261114/PROGRESS.md",
-      "result_state": "진행 기록 1(수용 아님): crates/ieo-supervisor — 역할 인자(Edit(//…)만, session_id 재개), 허용 목록 환경, CLAUDE_CONFIG_DIR 지시성 digest·변조 탐지·정리(링크·특수 파일·읽기 오류 닫힌 실패), flock 세션 잠금, §5-1 체크포인트·재연결 결정, 결정 ① 예산 가드(미계측·넘침 중지, 추가 과금 없음 조건 미확인 시 보류). 시험 20건. PR #31 bc55edf approve(검토 3/4·교정 2/3) → 병합 0f446d6, PR #32 aeab3d9 approve(검토 2/4·교정 1/3) → 병합 3426c77, main CI run 43441103331(0f446d6)·43442655596(3426c77) success. 모델 호출 0(02-04 예산 사용 0) · 진행 기록 2(수용 아님): 실행 중 예산 집행 run::run(회차·전체 시간 마감과 그룹 정리, 관측 사용량·추가 사용량 신호 정지, 정지 뒤 출력 복사, kill 실패 보고)과 run::charge(guard가 멈춘 회차는 언제나 미계측), Limits::for_next(budget::next 감쌈). 모델 없는 시험 25건·변이 27/27. 한계: 관측 후 정지이며 공급자 측 제한 아님, 관측 사용량은 하한, 최종값은 result에서만. PR #40 3103933·d2989f7·5136d66 changes requested → 23fee80 approve(검토 4/4·교정 3/3) → 병합 ccf7291, main CI run 43590448077 success. 모델 호출 0",
+      "last_observed_at": "2026-11-15T01:04:03+09:00",
+      "latest_report": "reports/tasks/02-04/role-container-20261114/PROGRESS.md",
+      "result_state": "진행 기록 1(수용 아님): crates/ieo-supervisor — 역할 인자(Edit(//…)만, session_id 재개), 허용 목록 환경, CLAUDE_CONFIG_DIR 지시성 digest·변조 탐지·정리(링크·특수 파일·읽기 오류 닫힌 실패), flock 세션 잠금, §5-1 체크포인트·재연결 결정, 결정 ① 예산 가드(미계측·넘침 중지, 추가 과금 없음 조건 미확인 시 보류). 시험 20건. PR #31 bc55edf approve(검토 3/4·교정 2/3) → 병합 0f446d6, PR #32 aeab3d9 approve(검토 2/4·교정 1/3) → 병합 3426c77, main CI run 43441103331(0f446d6)·43442655596(3426c77) success. 모델 호출 0(02-04 예산 사용 0) · 진행 기록 2(수용 아님): 실행 중 예산 집행 run::run(회차·전체 시간 마감과 그룹 정리, 관측 사용량·추가 사용량 신호 정지, 정지 뒤 출력 복사, kill 실패 보고)과 run::charge(guard가 멈춘 회차는 언제나 미계측), Limits::for_next(budget::next 감쌈). 모델 없는 시험 25건·변이 27/27. 한계: 관측 후 정지이며 공급자 측 제한 아님, 관측 사용량은 하한, 최종값은 result에서만. PR #40 3103933·d2989f7·5136d66 changes requested → 23fee80 approve(검토 4/4·교정 3/3) → 병합 ccf7291, main CI run 43590448077 success. 모델 호출 0 · 진행 기록 3(수용 아님): 역할 컨테이너의 supervisor 서비스(PID 1) — 어댑터 start/reconnect/stop/status(Bearer 해시 인증), 매 실행 전 CLAUDE_CONFIG_DIR 정리, 체크포인트 3단계(takeover·after_run·error, fsync)와 끝나지 않은 회차 재개 거부, 세션당 단일 실행, SIGTERM 처리·고아 거두기, 역할별 예산 몫(개발 8회·9,600초·1M·10M, Guardrail 4회·4,800초·0.5M·5M, 합 = 승인)과 닫힌 회차 기록, stop grace 6초. 가짜 Claude 컨테이너 시험(U3 배치·(a) 정리·(c) 재개·볼륨 복원·(b) 변조·단일 실행·stop·Guardrail 인자·실행 중 SIGTERM·가장 느린 정지 8.4초) 통과, 작업 공간 시험 252건. PR #47 88a4535·6975d5f changes requested → 475b409 approve(검토 3/4·교정 2/3) → 병합 2d13d16, main CI run 43613181714 success. 모델 호출 0",
       "verification_level": "unverified",
       "evidence": [
         "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md",
@@ -301,10 +301,17 @@
         "reports/tasks/02-04/run-guard-20261114/evidence/cargo-test.log",
         "reports/tasks/02-04/run-guard-20261114/reviews/review-pr40-23fee80.md",
         "https://github.com/HeaInSeo/ieo_poc/pull/40",
-        "reports/tasks/02-04/run-guard-20261114/reviews/review-pr42-2d8b488.md"
+        "reports/tasks/02-04/run-guard-20261114/reviews/review-pr42-2d8b488.md",
+        "reports/tasks/02-04/role-container-20261114/PROGRESS.md",
+        "reports/tasks/02-04/role-container-20261114/evidence/run-fake.log",
+        "reports/tasks/02-04/role-container-20261114/evidence/cargo-test.log",
+        "reports/tasks/02-04/role-container-20261114/reviews/review-pr47-88a4535.md",
+        "reports/tasks/02-04/role-container-20261114/reviews/review-pr47-6975d5f.md",
+        "reports/tasks/02-04/role-container-20261114/reviews/review-pr47-475b409.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/47"
       ],
-      "next_action": "역할 자격 유효성(값 출력 없음, 이번 실행 신호와 대조) → supervisor 바이너리·역할 컨테이너·PID 1·어댑터 연결(run::run·charge 사용, 기록에 charge 값 기록) → 결정 ① 02-04 예산 안 실제 세션 시험(§10 항목 1~5, §11 항목 7)",
-      "unresolved": "PR #40 최종 검토 23fee80 이월(P3·정보, 어댑터 단계): cleanup_failed 또는 run 오류는 정지·보고로 처리(또는 charge가 미계측), 어댑터가 charge 값을 budget::spent가 읽는 기록에 쓰는지 종단 시험, charge 변이 Y1(cache_read 비교)·Y4(누락 필드 0)·Y7(미계측 통과) 고정 시험, PROGRESS §2 마지막 항목에 charge 미계측 명시, 수집 값이 객체가 아니면 명시적 미계측. reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md §2·§3(실제 세션 시험 전부 미실행, 기동과 잠금 해제 직렬화, 디버그 로그 끔) — 토큰 상한의 회차 중 정지는 reports/tasks/02-04/run-guard-20261114/PROGRESS.md의 run::run으로 구현됨(관측 하한 기준), 남은 것은 어댑터 연결. 이전 이월: 착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달 · 02-01→02-02 이월 판정 규칙(담당 02-04, 시점: 02-04가 계측기 판정을 supervisor 판정 입력으로 연결하기 전): 2df3c35 P3-2 결과 subtype≠success이고 is_error가 false/없음(현재 succeeded — 02-02 validation V-33 관측), P3-3 nonzero_exit/no_result 기대가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 일치 불가, P3-6 마감 직전 자연 종료 경쟁. 규칙을 정한 뒤 새 평가 세트 버전으로 시험(02-02 validation은 사용 완료) · 02-03 이월(02-04 수용 전): supervisor가 elapsed_seconds·total_tokens 집행(02-01 계측기 연결), 실제 GitHub 증거 수집기를 ieo-coord 증거 입력에 연결(PR 작성자 신원 직접 확인 F4·PR 수준 검토 상태 N5의 규칙은 02-05 착수 전 결정) · X-01 이월(02-04 기동 검사): 바인딩 sprint_id와 기존 Notion 가져오기 시험 ID 충돌 확인(X-01 최종 검토 U3)"
+      "next_action": "호출자 PR(02-01 기록으로 budget::next·Limits::for_next, 역할 몫으로 여유 축소, 실행 전 구독 자격·환경 대조, stdout 계측·run::charge 기록, 정리 실패·오류는 정지·보고, 원본 stream은 저장소 밖, 검토 475b409 R1~R6, 실제 회차 계획 검토) → 역할별 첫 실제 호출에서 자격 유효성 확인(값 출력 없음) → 결정 ① 02-04 예산 안 실제 세션 시험(§10 항목 1~3, §11 항목 7)",
+      "unresolved": "실제 호출 선행 조건(검토 6975d5f N2, reports/tasks/02-04/role-container-20261114/PROGRESS.md §1): 예산을 집행하는 호출자가 종단 시험을 통과하기 전에는 역할 컨테이너에 실제 자격을 넣지 않고, 실제 토큰으로 start/reconnect를 손으로 부르지 않는다. PR #47 최종 검토 475b409 이월(차단 아님, 호출자 PR): R1 takeover 단계 거부보다 잠금 탐지를 먼저(실행 중이면 ALREADY_RUNNING), R2 guard가 멈춘 재개 회차의 늦은 result가 재개 기준을 바꿈(Exited일 때만 자기 결과 사용), R3 오류·PID 1 중단 뒤 회차 기록 수동 대조 절차 문서화, R4 끝 줄은 마지막·최대값 사용, R5 실제 역할 컨테이너 정지 제한 약 15초, R6 시험(회차 디렉터리 수·0/0 끝 줄·몫 범위). PROGRESS §1 한계: active_children·pending_external_requests 추적 없음, worktree_head none, §7 확장 코드·없는 상태 항목, 개발 역할이 같은 UID로 회차 기록을 고칠 수 있음(§2.1), stop grace 10→6초 변경(진행 기록 2의 값은 고치지 않음). PR #40 최종 검토 23fee80 이월(P3·정보, 어댑터 단계): cleanup_failed 또는 run 오류는 정지·보고로 처리(또는 charge가 미계측), 어댑터가 charge 값을 budget::spent가 읽는 기록에 쓰는지 종단 시험, charge 변이 Y1(cache_read 비교)·Y4(누락 필드 0)·Y7(미계측 통과) 고정 시험, PROGRESS §2 마지막 항목에 charge 미계측 명시, 수집 값이 객체가 아니면 명시적 미계측. reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md §2·§3(실제 세션 시험 전부 미실행, 기동과 잠금 해제 직렬화, 디버그 로그 끔) — 토큰 상한의 회차 중 정지는 reports/tasks/02-04/run-guard-20261114/PROGRESS.md의 run::run으로 구현됨(관측 하한 기준), 남은 것은 어댑터 연결. 이전 이월: 착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달 · 02-01→02-02 이월 판정 규칙(담당 02-04, 시점: 02-04가 계측기 판정을 supervisor 판정 입력으로 연결하기 전): 2df3c35 P3-2 결과 subtype≠success이고 is_error가 false/없음(현재 succeeded — 02-02 validation V-33 관측), P3-3 nonzero_exit/no_result 기대가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 일치 불가, P3-6 마감 직전 자연 종료 경쟁. 규칙을 정한 뒤 새 평가 세트 버전으로 시험(02-02 validation은 사용 완료) · 02-03 이월(02-04 수용 전): supervisor가 elapsed_seconds·total_tokens 집행(02-01 계측기 연결), 실제 GitHub 증거 수집기를 ieo-coord 증거 입력에 연결(PR 작성자 신원 직접 확인 F4·PR 수준 검토 상태 N5의 규칙은 02-05 착수 전 결정) · X-01 이월(02-04 기동 검사): 바인딩 sprint_id와 기존 Notion 가져오기 시험 ID 충돌 확인(X-01 최종 검토 U3)"
     },
     {
       "task_id": "02-05",
@@ -2345,14 +2352,29 @@
         "Amendment_v1.3.3-A5.md",
         "Console_Coordinator_PoC_Validation_Plan.md"
       ]
+    },
+    {
+      "event_id": "02-04-ROLE-CONTAINER-20261115",
+      "event_revision": 1,
+      "task_id": "02-04",
+      "observed_at": "2026-11-15T01:04:03+09:00",
+      "state": "02-04 진행 기록 3: 역할 컨테이너 supervisor 서비스(PID 1)를 가짜 Claude로 검증. PR #47 475b409 approve → 병합 2d13d16(main CI 43613181714 success). 역할별 예산 몫·닫힌 회차 기록, 실제 호출 선행 조건(호출자 종단 시험) 기록. 보관: PR #45 444970e, #46 9e81a83·18bb40f, #47 88a4535·6975d5f·475b409 검토. 정규 보고(재개 지점, gRPC·A5 반영 위치와 순서). 모델 호출 0, 02-04·X-02 예산 사용 0",
+      "evidence": [
+        "reports/tasks/02-04/role-container-20261114/PROGRESS.md",
+        "reports/tasks/02-04/role-container-20261114/reviews/review-pr47-475b409.md",
+        "reports/extra/p28-plan-20261114/reviews/review-pr46-9e81a83.md",
+        "reports/extra/p28-plan-20261114/reviews/review-pr46-18bb40f.md",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr45-444970e.md",
+        "reports/workspace/regular-report-20261115/REPORT.md"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 병합, 02-04 진행 기록 2, gRPC 계획 A4, X-02 준비 page_id·URL 검사(PR #43·#44 병합 778ee47, 영속 재적용)",
+    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 병합, 02-04 진행 기록 3(PR #47 병합 2d13d16), gRPC 계획 A4, P28 개정 A5, X-02 준비 page_id·URL 검사",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main 856f779e90d8c17945417e1d7454d090416ddfbf (이 계획 PR 병합 전)",
+    "branch_sha": "main 2d13d16425394e4052fd1c189006dba11682ca48 (이 보고 PR 병합 전)",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "계획 PR(plan/p28-event-driven-handover). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
+    "running": "보고 PR(report/0204-role-container-20261115). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드 — 이후 main 변경은 문서와 ieo-supervisor뿐) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 역할 컨테이너 없음(가짜 시험 컨테이너는 정리됨), 실제 Claude 실행 없음",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2374,10 +2396,12 @@
       "reports/extra/X-01/notion-import-20261113/REPORT.md",
       "reports/extra/X-01/followup-c1-c2-20261113/REPORT.md",
       "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md",
-      "reports/tasks/02-04/run-guard-20261114/PROGRESS.md"
+      "reports/tasks/02-04/run-guard-20261114/PROGRESS.md",
+      "reports/tasks/02-04/role-container-20261114/PROGRESS.md",
+      "reports/workspace/regular-report-20261115/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "이 계획 PR → 02-04 실제 세션 시험(역할 자격 확인, supervisor 바이너리·역할 컨테이너·어댑터, 02-04 예산) → X-03 → X-04 → 02-05 … 02-08(A5 기준) → 04-11·04-12 → 07-05. X-05는 X-03 뒤 자원이 허락할 때. PR은 하나씩 · 다음 정규 보고에 A5 반영 문서·수용 기준·실행 순서 포함",
+    "next_action": "이 보고 PR → 02-04 호출자 PR(예산 집행·기록, 검토 475b409 R1~R6, 실제 회차 계획) → 역할별 첫 실제 호출(자격 확인) → 02-04 예산 안 실제 세션 시험 → X-03 → X-04 → 02-05 … 02-08(A5 기준) → 04-11·04-12 → 07-05. X-05는 X-03 뒤 자원이 허락할 때(02-04 실제 시험과 동시 실행 금지). PR은 하나씩",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
@@ -2461,7 +2485,8 @@
         "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr43-5457cb3.md",
         "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr44-65d56ce.md",
         "https://github.com/HeaInSeo/ieo_poc/pull/43",
-        "https://github.com/HeaInSeo/ieo_poc/pull/44"
+        "https://github.com/HeaInSeo/ieo_poc/pull/44",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr45-444970e.md"
       ],
       "next_action": "02-04 수용 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음)",
       "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, executable 등록·의미 검토. 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), 가져온 page_id와 URL 안 페이지 ID 일치 검사는 완료(User_Decisions_2026-11-14_pr30.md §5 · PR #43 병합 42b435e·#44 병합 778ee47, 영속 코디네이터 재적용 x02-url-live: 불일치 400·행 불변). 남은 관찰: URL 호스트 허용 목록은 별도 결정, 연결·URL 경로 고정 시험(검토 65d56ce P3) · 착수 전 보고 항목(User_Decisions_2026-11-14_pr30.md §5 넷째): 예외 기록의 브랜치·기준 SHA·병합/배포 금지 범위 중 서버가 강제하는 부분(시험 ID·repo·페이지·내용 digest 결합)과 운영 규칙으로 지키는 부분(scope 필드는 기록만)을 구분해 보고"
