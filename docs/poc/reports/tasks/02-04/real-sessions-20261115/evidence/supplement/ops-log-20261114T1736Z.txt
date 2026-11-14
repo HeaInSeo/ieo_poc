@@ -1,0 +1,25 @@
+# Contemporaneous operations log, 2026-11-14T17:36Z..17:40Z (UTC): build of the binaries that ran D1, G1, R1, D2
+# and D3 (main ca08c76), and the real role-container setup (image by digest). Extracted verbatim (command and
+# output) from the private Claude Code work-session log (not published; sha256 at extraction d4f7f1420b369b61a4255de744be80e796a39c77db8839b7325ff68693e90319, lines cited).
+# Times are the completion times of the tool calls. The scratch path is shown as <scratch>; no credential.
+
+===== completed 2026-11-14T17:36:17.842Z · tool call …YmEVhLVb · log line 18816
+# description: Build binaries from main, then free disk
+$ cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-0204 && git diff --stat origin/main -- crates Cargo.lock Cargo.toml | tail -1; S=<scratch>; export PATH=$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=$S/target-main; cargo build --locked -q -p ieo-supervisor --bins 2>&1 | tail -2; mkdir -p $S/bin-ca08c76 && cp $S/target-main/debug/ieo-supervisor $S/target-main/debug/ieo-role-call $S/bin-ca08c76/ && sha256sum $S/bin-ca08c76/* | sed "s|$S|<scratch>|"; podman unshare rm -rf $S/dry $S/ct-fake; rm -rf $S/target-main; df -h / | tail -1
+--- output
+c61c63802b80c4e8605dec434f3dae87174357fa9766cb5449ce9763670de642  <scratch>/bin-ca08c76/ieo-role-call
+652fc14f8e542b49a01f3146443adc4d15a802f95f6cd5692d4b3f2ddb3f42f4  <scratch>/bin-ca08c76/ieo-supervisor
+/dev/mapper/rl-root   67G   57G  9.9G  86% /
+
+===== completed 2026-11-14T17:40:41.160Z · tool call …nCkyHoao · log line 18853
+# description: Set up real role containers (no model call)
+$ cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-0204 && git checkout -q --detach origin/main && git log --oneline -1 | cat; S=<scratch>; W=/opt/rust/ieo_poc_runs/02-04-20261115; mkdir -p /opt/rust/ieo_poc_runs && chmod 700 /opt/rust/ieo_poc_runs; ls -la /opt/rust/ieo_poc_runs; ss -ltn | grep -cE ":5821[12] "; bash docs/poc/reports/tasks/02-04/real-sessions-20261115/run-real.sh $S/bin-ca08c76/ieo-supervisor $W 2>&1 | tail -5
+--- output
+ca08c76 Merge pull request #49 from HeaInSeo/task/02-04-role-caller
+total 0
+drwx------. 2 heain heain   6 11월 15 02:40 .
+drwxr-xr-x. 9 heain heain 131 11월 15 02:40 ..
+0
+# role containers up: ieo-rt-fixture0204-{development,guardrail} on 127.0.0.1:58211/58212 · image docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c · network slirp4netns
+# plan: /opt/rust/ieo_poc_runs/02-04-20261115/plan.json · ledger: /opt/rust/ieo_poc_runs/02-04-20261115/ledger · credentials: OAuth form (values not printed)
+

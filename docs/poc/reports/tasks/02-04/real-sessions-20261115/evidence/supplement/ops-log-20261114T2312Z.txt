@@ -1,0 +1,145 @@
+# Contemporaneous operations log, 2026-11-14T23:12Z..23:14Z (UTC): D3 correction, budget reconciliation,
+# restart guard, binary swap and restart, D4, D5 and D6 calls (times are tool-call completion times). Extracted
+# verbatim (command and output) from the private Claude Code work-session log (not published; sha256 at extraction
+# fd56e87aaaa6d84acd5c43ef5cd7ae34f78e0686e76d2967008e9a37769440be, lines cited).
+# The scratch directory path is shown as <scratch>. No credential or session body is in these outputs.
+
+===== completed 2026-11-14T23:12:21.774Z · tool call …ftEK22WN · log line 19626
+# description: Build from main and apply D3 correction to real ledger
+$ cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-0204 && git fetch -q && git checkout -q --detach origin/main && git log --oneline -1 | cat; S=<scratch>; export PATH=$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=$S/target-main; cargo build --locked -q -p ieo-supervisor --bins && mkdir -p $S/bin-d41e70f && cp $S/target-main/debug/ieo-supervisor $S/target-main/debug/ieo-role-call $S/bin-d41e70f/ && sha256sum $S/bin-d41e70f/* | sed "s|$S|<scratch>|"; W=/opt/rust/ieo_poc_runs/02-04-20261115; A=/opt/rust/ieo_poc_runs/preserved-02-04-D3-20261115; (cd $A && sha256sum -c SHA256SUMS.v2 | grep -c OK); cp $W/ledger/records.jsonl $A/caller-ledger/records-before-D3-correction.jsonl; T=$(ls $A/claude-projects/*/*/subagents/agent-a13188dc0170f8901.jsonl); $S/bin-d41e70f/ieo-role-call reevaluate --plan $W/plan.json --attempt D3 --decision docs/poc/User_Decisions_2026-11-15_d3.md --child-transcript a13188dc0170f8901=$T; echo "exit $?"
+--- output
+d41e70f Merge pull request #51 from HeaInSeo/fix/0204-child-usage
+dde8db5160588cfa436c40e45481930e1e23784f46a4e03f6a95c0a5bb328037  <scratch>/bin-d41e70f/ieo-role-call
+db2162c29542f9432e042a01ae44c8bf6690d85e3782507d79556977eb8e745e  <scratch>/bin-d41e70f/ieo-supervisor
+21
+{"after":{"source":"재개: result.modelUsage − 기준 회차 02-04/D2/development-reconnect 누적","state":"measured","tokens":{"cache_creation":2613,"cache_read":35662,"input":10,"output":224}},"attribution":"consistent","before":{"reason":"재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제 재개 대상이 아닐 수 있음","state":"unmeasured"},"corrected":"D3","decision":"docs/poc/User_Decisions_2026-11-15_d3.md"}
+exit 0
+
+===== completed 2026-11-14T23:12:45.645Z · tool call …HHYhPMVS · log line 19645
+# description: Reconcile budget with the merged caller code
+$ S=<scratch>; mkdir -p $S/budgetcheck/src && cat > $S/budgetcheck/Cargo.toml <<'EOF'
+[package]
+name = "budgetcheck"
+version = "0.0.0"
+edition = "2024"
+[dependencies]
+ieo-supervisor = { path = "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0204/crates/ieo-supervisor" }
+serde_json = "1"
+[workspace]
+EOF
+cat > $S/budgetcheck/src/main.rs <<'EOF'
+// read-only: effective records (corrections re-measured), budget spent, limits per role
+fn main() {
+    let a: Vec<String> = std::env::args().collect();
+    let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
+    let plan = ieo_supervisor::caller::Plan::from_json(&v).unwrap();
+    let recs = ieo_supervisor::caller::records(&plan).expect("effective records");
+    let s = ieo_supervisor::budget::spent(&recs);
+    println!("runs {} seconds {} billable {} cache_read {} unmeasured {:?} unclassified {:?}", s.runs, s.seconds, s.billable_tokens, s.cache_read_tokens, s.unmeasured_runs, s.unclassified_records);
+    for r in &recs { println!("  {} {} stop_required {} corrected {}", r["attempt_id"], r["usage"]["run"]["state"], r["stop_required"], !r["corrected_by"].is_null()); }
+    for role in ["development", "guardrail"] {
+        match ieo_supervisor::caller::limits_for(&plan, role, &recs) {
+            Ok(l) => println!("{role}: window {:?} billable_room {} cache_read_room {} total {}", l.timeout + l.grace, l.billable_room, l.cache_read_room, l.timeout_is_total),
+            Err(e) => println!("{role}: {e}"),
+        }
+    }
+}
+EOF
+cd $S/budgetcheck && export PATH=$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=$S/target-main; cargo build --offline -q 2>&1 | grep -E "^error" -A5 | head; cd /tmp && $S/target-main/debug/budgetcheck /opt/rust/ieo_poc_runs/02-04-20261115/plan.json
+--- output
+runs 4 seconds 26 billable 14474 cache_read 85868 unmeasured [] unclassified []
+  "D1" "measured" stop_required false corrected false
+  "G1" "measured" stop_required false corrected false
+  "D2" "measured" stop_required false corrected false
+  "D3" "measured" stop_required false corrected true
+development: window 600s billable_room 988112 cache_read_room 9923199 total false
+guardrail: window 600s billable_room 497414 cache_read_room 4990933 total false
+Shell cwd was reset to /opt/rust/src/github.com/HeaInSeo/ieo_poc
+
+===== completed 2026-11-14T23:12:59.648Z · tool call …Hkf5xYfo · log line 19651
+# description: Run restart guards before swapping binaries
+$ W=/opt/rust/ieo_poc_runs/02-04-20261115; S=<scratch>; P=/opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python; ok=1; [ -e $W/ledger/inflight.json ] && { echo "in-flight marker present"; ok=0; }; for port in 58211 58212; do curl -sf -H @$W/adapter.header http://127.0.0.1:$port/v0/role/status > $S/st-$port.json || { echo "status $port unavailable"; ok=0; }; done; $P - $W $S <<'EOF' || ok=0
+import json,sys
+w,s=sys.argv[1:]
+lines=[json.loads(l) for l in open(w+'/ledger/records.jsonl')]
+corr={l['corrects'] for l in lines if l.get('format')=='ieo-role-run-correction/v0'}
+runs=[l for l in lines if l.get('format')!='ieo-role-run-correction/v0']
+known={r['attempt_id'] for r in runs}
+why=[f"{r['attempt_id']} asks for a person" for r in runs if r.get('stop_required') and r['attempt_id'] not in corr]
+for p in ('58211','58212'):
+    st=json.load(open(f'{s}/st-{p}.json'))
+    if st.get('running'): why.append(f'{p} running')
+    la=(st.get('last') or {}).get('attempt_id'); cpa=(st.get('checkpoint') or {}).get('session_cumulative_attempt')
+    if la and la not in known: why.append(f'{p} last {la} unknown')
+    if cpa and cpa not in known: why.append(f'{p} checkpoint attempt {cpa} unknown')
+    print(p, st['role'], 'last', la, 'checkpoint', (st.get('checkpoint') or {}).get('session_id'), (st.get('checkpoint') or {}).get('phase'), cpa)
+print('guards:', 'ok' if not why else why); sys.exit(1 if why else 0)
+EOF
+echo "guard ok=$ok"
+--- output
+58211 development last D3 checkpoint 58f8976d-3ee3-465f-baac-6102e3321779 after_run D3
+58212 guardrail last G1 checkpoint 65d24d5b-ad2c-4add-8dcc-d9405fabd732 after_run G1
+guards: ok
+guard ok=1
+
+===== completed 2026-11-14T23:13:11.790Z · tool call …82YPijEU · log line 19660
+# description: Swap binaries and restart role containers
+$ W=/opt/rust/ieo_poc_runs/02-04-20261115; S=<scratch>; sha256sum $W/bin/* | sed "s|$W|<W>|"; cp $W/bin/ieo-supervisor $A/../preserved-02-04-D3-20261115/ieo-supervisor-ca08c76 2>/dev/null; cp $S/bin-d41e70f/ieo-supervisor $W/bin/ieo-supervisor.new && cp $S/bin-d41e70f/ieo-role-call $W/bin/ieo-role-call.new && mv $W/bin/ieo-supervisor.new $W/bin/ieo-supervisor && mv $W/bin/ieo-role-call.new $W/bin/ieo-role-call && chmod 755 $W/bin/*; sha256sum $W/bin/* | sed "s|$W|<W>|"; for r in development guardrail; do t0=$(date +%s.%N); podman restart -t 15 ieo-rt-fixture0204-$r >/dev/null; t1=$(date +%s.%N); echo "$r restart $(/opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -c "print(round($t1-$t0,1))") s"; done; for p in 58211 58212; do for i in $(seq 1 50); do curl -sf -o /dev/null -H @$W/adapter.header http://127.0.0.1:$p/v0/role/status && break; sleep 0.2; done; curl -sf -H @$W/adapter.header http://127.0.0.1:$p/v0/role/status | /opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -c 'import json,sys; s=json.load(sys.stdin); c=s["checkpoint"]; print(s["role"], "running", s["running"], "last", s["last"], "checkpoint", c["session_id"], c["phase"], c.get("session_cumulative_attempt"))'; done; for r in development guardrail; do echo "$r pid1: $(podman exec ieo-rt-fixture0204-$r cat /proc/1/cmdline | tr '\0' ' ' | cut -c1-40) binary $(podman exec ieo-rt-fixture0204-$r sha256sum /opt/ieo/ieo-supervisor | cut -c1-16)"; done
+--- output
+c61c63802b80c4e8605dec434f3dae87174357fa9766cb5449ce9763670de642  <W>/bin/ieo-role-call
+652fc14f8e542b49a01f3146443adc4d15a802f95f6cd5692d4b3f2ddb3f42f4  <W>/bin/ieo-supervisor
+dde8db5160588cfa436c40e45481930e1e23784f46a4e03f6a95c0a5bb328037  <W>/bin/ieo-role-call
+db2162c29542f9432e042a01ae44c8bf6690d85e3782507d79556977eb8e745e  <W>/bin/ieo-supervisor
+development restart 0.6 s
+guardrail restart 0.7 s
+development running None last None checkpoint 58f8976d-3ee3-465f-baac-6102e3321779 after_run D3
+guardrail running None last None checkpoint 65d24d5b-ad2c-4add-8dcc-d9405fabd732 after_run G1
+development pid1: /opt/ieo/ieo-supervisor serve --config / binary db2162c29542f943
+guardrail pid1: /opt/ieo/ieo-supervisor serve --config / binary db2162c29542f943
+
+===== completed 2026-11-14T23:13:34.018Z · tool call …YJPhNcSC · log line 19665
+# description: Run D4 (/compact resume) and check criteria
+$ cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-0204 && git log --oneline -1 | cat; W=/opt/rust/ieo_poc_runs/02-04-20261115; bash docs/poc/reports/tasks/02-04/real-sessions-20261115/call.sh $W D4 2>&1 | tail -1 | cut -c1-300; /opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -c "
+import json; d=json.load(open('$W/summaries/D4.json'))
+print('session', d['session']); print('tamper', d['outcome']['tamper']); print('result', d['result']); print('compact', d['compact_boundaries']); print('rate', d['rate_limit']); print('usage', d['usage_run']); print('children', d['children'])"
+--- output
+d41e70f Merge pull request #51 from HeaInSeo/fix/0204-child-usage
+exit 0 · result success is_error False usage measured stop_required False · summary /opt/rust/ieo_poc_runs/02-04-20261115/summaries/D4.json
+session {'mode': 'resume', 'resume_base_attempt': 'D3', 'session_id': '58f8976d-3ee3-465f-baac-6102e3321779'}
+tamper None
+result {'subtype': 'success', 'is_error': False, 'session_id': '58f8976d-3ee3-465f-baac-6102e3321779', 'text': ''}
+compact 1
+rate [{'status': 'allowed', 'overageStatus': 'rejected', 'isUsingOverage': False}]
+usage {'source': '재개: result.modelUsage − 기준 회차 02-04/D3/development-reconnect 누적', 'state': 'measured', 'tokens': {'cache_creation': 1142, 'cache_read': 11393, 'input': 6688, 'output': 1155}}
+children []
+
+===== completed 2026-11-14T23:13:46.332Z · tool call …P6zx2r3p · log line 19677
+# description: Run D5 and check criteria
+$ cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-0204 && W=/opt/rust/ieo_poc_runs/02-04-20261115; bash docs/poc/reports/tasks/02-04/real-sessions-20261115/call.sh $W D5 2>&1 | tail -1 | cut -c1-300; /opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -c "
+import json; d=json.load(open('$W/summaries/D5.json'))
+print('session', d['session']); print('tamper', d['outcome']['tamper']); print('result', d['result']); print('rate', d['rate_limit']); print('usage', d['usage_run'])"
+--- output
+exit 0 · result success is_error False usage measured stop_required False · summary /opt/rust/ieo_poc_runs/02-04-20261115/summaries/D5.json
+session {'mode': 'resume', 'resume_base_attempt': 'D4', 'session_id': '58f8976d-3ee3-465f-baac-6102e3321779'}
+tamper None
+result {'subtype': 'success', 'is_error': False, 'session_id': '58f8976d-3ee3-465f-baac-6102e3321779', 'text': 'RESUMED'}
+rate [{'status': 'allowed', 'overageStatus': 'rejected', 'isUsingOverage': False}]
+usage {'source': '재개: result.modelUsage − 기준 회차 02-04/D4/development-reconnect 누적', 'state': 'measured', 'tokens': {'cache_creation': 6455, 'cache_read': 11393, 'input': 2, 'output': 7}}
+
+===== completed 2026-11-14T23:14:04.102Z · tool call …CsXhb4mC · log line 19691
+# description: Run D6 (tamper) and check criteria
+$ cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-0204 && W=/opt/rust/ieo_poc_runs/02-04-20261115; bash docs/poc/reports/tasks/02-04/real-sessions-20261115/call.sh $W D6 2>&1 | tail -1 | cut -c1-300; /opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python -c "
+import json; d=json.load(open('$W/summaries/D6.json'))
+print('session', d['session']); print('tamper', d['outcome']['tamper']); print('cleanup', d['outcome']['config_cleanup']); print('result', d['result']); print('rate', d['rate_limit']); print('usage', d['usage_run']); print('skills has tamper', any('tamper0204' in s for s in (d['init']['skills'] or [])))"; sed -n '/# files/,$p' $W/summaries/D6.volume.txt | tail -2
+--- output
+exit 0 · result success is_error False usage measured stop_required False · summary /opt/rust/ieo_poc_runs/02-04-20261115/summaries/D6.json
+session {'mode': 'new', 'resume_base_attempt': None, 'session_id': 'c84c7b5c-fb50-4323-8fda-26033ea2433b'}
+tamper {'checkpoint_digest': '1661779da5702828b2b8c381a72c2367ce226a982252b1d41a350e7f0be7ce64', 'config_tamper_detected': True, 'new_session_id': 'c84c7b5c-fb50-4323-8fda-26033ea2433b', 'observed_digest': '98e3b2f64d06dc34931204fbac99c0a163e20faf3b47ed2201f3e491c508325c', 'old_session_id': '58f8976d-3ee3-465f-baac-6102e3321779'}
+cleanup {'credentials_removed': [], 'digest': '1661779da5702828b2b8c381a72c2367ce226a982252b1d41a350e7f0be7ce64', 'removed': 10}
+result {'subtype': 'success', 'is_error': False, 'session_id': 'c84c7b5c-fb50-4323-8fda-26033ea2433b', 'text': 'FRESH'}
+rate [{'status': 'allowed', 'overageStatus': 'rejected', 'isUsingOverage': False}]
+usage {'source': '새 세션: result.modelUsage', 'state': 'measured', 'tokens': {'cache_creation': 4017, 'cache_read': 12535, 'input': 2, 'output': 6}}
+skills has tamper False
+inputs/0204-RT/g1-denied.txt absent
+claude/skills/tamper0204/SKILL.md absent
+

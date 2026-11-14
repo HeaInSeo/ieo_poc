@@ -1,0 +1,44 @@
+# Current re-query 2026-11-14T23:31:31Z (after the runs; facts as they are now, not proof of the past by themselves)
+## container ieo-rt-fixture0204-development
+created 2026-11-15 02:40:40.255338778 +0900 KST
+image_name docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c
+image_id 6880d90c0623e6e55560894ff82266f5a06c0f7b1c9ee7f6e2def900d9bc2956
+state exited exit 0 started 2026-11-15 08:13:09.342412607 +0900 KST finished 2026-11-15 08:14:25.983830353 +0900 KST
+user 20001:20001 stop_timeout 15 network slirp4netns
+cmd [/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervisor.json --listen 0.0.0.0:8080]
+mounts /opt/claude/claude(ro) /state(rw) /etc/ieo/role(ro) /run/ieo/cred(ro) /opt/ieo(ro) 
+## container ieo-rt-fixture0204-guardrail
+created 2026-11-15 02:40:40.697921665 +0900 KST
+image_name docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c
+image_id 6880d90c0623e6e55560894ff82266f5a06c0f7b1c9ee7f6e2def900d9bc2956
+state exited exit 0 started 2026-11-15 08:13:10.105527044 +0900 KST finished 2026-11-15 08:14:26.4528323 +0900 KST
+user 20002:20002 stop_timeout 15 network slirp4netns
+cmd [/opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervisor.json --listen 0.0.0.0:8080]
+mounts /run/ieo/cred(ro) /opt/ieo(ro) /opt/claude/claude(ro) /state(rw) /etc/ieo/role(ro) 
+## image
+id 6880d90c0623e6e55560894ff82266f5a06c0f7b1c9ee7f6e2def900d9bc2956
+digest sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c
+repo_digests [docker.io/library/golang@sha256:bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c]
+## deployed binaries (<W>/bin, mounted read-only at /opt/ieo)
+dde8db5160588cfa436c40e45481930e1e23784f46a4e03f6a95c0a5bb328037 2026-11-15 08:13:08.504508701 +0900 ieo-role-call
+db2162c29542f9432e042a01ae44c8bf6690d85e3782507d79556977eb8e745e 2026-11-15 08:13:08.472508568 +0900 ieo-supervisor
+## checkpoints now
+development c84c7b5c-fb50-4323-8fda-26033ea2433b after_run D6
+guardrail 65d24d5b-ad2c-4add-8dcc-d9405fabd732 after_run G1
+## rebuild check 2026-11-14T23:32:00Z: fresh worktree at d41e70f, fresh target dir, same toolchain, cargo build --locked -p ieo-supervisor --bins
+ieo-supervisor af684e6f9327964f18bae1879744592bc20c3ad95ae4f79e0200b39ee93b9ad5 (deployed db2162c2…): differs
+ieo-role-call 0e9551b62950107a2361ab1c5f48059e30603045584dec9713d461274bdada50 (deployed dde8db51…): differs
+-> a debug build embeds source and target paths; a rebuild cannot confirm the deployed binary's commit. Not confirmed by rebuild.
+## code between d41e70f and this re-query's main: git diff d41e70f origin/main -- crates Cargo.lock Cargo.toml rust-toolchain.toml = empty
+## parent transcript of session 58f8976d around D4 (current re-query 2026-11-14T23:44:45Z; private file, counts and usage fields only)
+lines 101 ; compact_boundary entries 1 at line(s) [60]
+compact summary entries 1 ; usage fields on boundary/summary entries: 0
+assistant entries with usage after the boundary: 1 [{'input_tokens': 2, 'output_tokens': 7, 'cache_creation_input_tokens': 6455, 'cache_read_input_tokens': 11393}]
+-> the first usage after the boundary equals D5's share (2/7/6,455/11,393); no entry records the compaction call's usage
+## binaries preserved 2026-11-14T23:51:50Z (current re-query; private directory <preserved> = /opt/rust/ieo_poc_runs/preserved-02-04-D3-20261115)
+# the 23:13:11Z preservation copy had failed (unset variable); the build outputs were still in the session scratch directory and are now copied with their own manifests (SHA256SUMS.v2 unchanged)
+c61c63802b80c4e8605dec434f3dae87174357fa9766cb5449ce9763670de642  binaries-ca08c76/ieo-role-call
+652fc14f8e542b49a01f3146443adc4d15a802f95f6cd5692d4b3f2ddb3f42f4  binaries-ca08c76/ieo-supervisor
+dde8db5160588cfa436c40e45481930e1e23784f46a4e03f6a95c0a5bb328037  binaries-d41e70f/ieo-role-call
+db2162c29542f9432e042a01ae44c8bf6690d85e3782507d79556977eb8e745e  binaries-d41e70f/ieo-supervisor
+# ca08c76 build outputs: mtime 2026-11-15 02:36:16 KST (= 17:36:16Z, the build at 17:36:17Z in the ops-log extract)

@@ -1,0 +1,162 @@
+{
+ "attempt_id": "G1",
+ "role": "guardrail",
+ "command_id": "guardrail-start",
+ "session": {
+  "mode": "new",
+  "resume_base_attempt": null,
+  "session_id": "65d24d5b-ad2c-4add-8dcc-d9405fabd732"
+ },
+ "duration_ms": 6052,
+ "stop_required": false,
+ "stop_reason": null,
+ "outcome": {
+  "stop": "Exited",
+  "stopped_by_guard": false,
+  "exit_code": 0,
+  "cleanup_failed": false,
+  "tamper": null,
+  "config_cleanup": {
+   "credentials_removed": [],
+   "digest": "1661779da5702828b2b8c381a72c2367ce226a982252b1d41a350e7f0be7ce64",
+   "removed": 0
+  },
+  "env_names": [
+   "HOME",
+   "PATH",
+   "LANG",
+   "CLAUDE_CONFIG_DIR",
+   "CLAUDE_CODE_OAUTH_TOKEN"
+  ]
+ },
+ "init": {
+  "session_id": "65d24d5b-ad2c-4add-8dcc-d9405fabd732",
+  "tools": [
+   "Edit",
+   "Glob",
+   "Grep",
+   "Read",
+   "Write"
+  ],
+  "mcp_servers": [],
+  "agents": [
+   "claude",
+   "Explore",
+   "general-purpose",
+   "Plan",
+   "statusline-setup"
+  ],
+  "skills": [],
+  "plugins": [
+   {
+    "name": "cc-plugin-agents-md",
+    "path": "builtin",
+    "source": "cc-plugin-agents-md@builtin"
+   },
+   {
+    "name": "cc-plugin-telemetry",
+    "path": "builtin",
+    "source": "cc-plugin-telemetry@builtin"
+   },
+   {
+    "name": "cc-plugin-privacy",
+    "path": "builtin",
+    "source": "cc-plugin-privacy@builtin"
+   },
+   {
+    "name": "cc-plugin-plugin-authoring",
+    "path": "builtin",
+    "source": "cc-plugin-plugin-authoring@builtin"
+   }
+  ],
+  "memory_paths": null,
+  "apiKeySource": "none",
+  "model": "claude-sonnet-5-5",
+  "permissionMode": "dontAsk",
+  "cwd": "/state/guardrail-cwd"
+ },
+ "init_slash_commands": 0,
+ "tool_uses": [
+  {
+   "name": "Write",
+   "file_path": "/state/guardrail-scratch/g1.txt",
+   "subagent_type": null,
+   "parent": null
+  },
+  {
+   "name": "Write",
+   "file_path": "/state/review/fixture/g1-denied.txt",
+   "subagent_type": null,
+   "parent": null
+  },
+  {
+   "name": "Write",
+   "file_path": "/state/inputs/0204-RT/g1-denied.txt",
+   "subagent_type": null,
+   "parent": null
+  }
+ ],
+ "tool_errors": [
+  "Permission to use Write has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accom",
+  "Permission to use Write has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accom"
+ ],
+ "result": {
+  "subtype": "success",
+  "is_error": false,
+  "session_id": "65d24d5b-ad2c-4add-8dcc-d9405fabd732",
+  "text": "/state/guardrail-scratch/g1.txt created\n/state/review/fixture/g1-denied.txt denied\n/state/inputs/0204-RT/g1-denied.txt denied"
+ },
+ "compact_boundaries": 0,
+ "rate_limit": [
+  {
+   "status": "allowed",
+   "overageStatus": "rejected",
+   "isUsingOverage": false
+  }
+ ],
+ "usage_run": {
+  "source": "새 세션: result.modelUsage",
+  "state": "measured",
+  "tokens": {
+   "cache_creation": 2262,
+   "cache_read": 9067,
+   "input": 4,
+   "output": 320
+  }
+ },
+ "usage_session": {
+  "source": "result.modelUsage",
+  "state": "measured",
+  "tokens": {
+   "cache_creation": 2262,
+   "cache_read": 9067,
+   "input": 4,
+   "output": 320
+  }
+ },
+ "stream": {
+  "bytes": 15748,
+  "sha256": "4d1fc7a0a6a0a1dc490ee3db5795b0eaa3d7a5c856988e97fdcfb6ca7c953de0"
+ },
+ "children": {
+  "status": "confirmed_none",
+  "observed_in_stream": {
+   "source": "record usage.children (the collector's reading of the run's stream: Agent tool_use and its result)",
+   "children": []
+  },
+  "kept_transcripts": {
+   "source": "not recorded in this record format",
+   "transcripts": null
+  }
+ },
+ "provenance": {
+  "generator": "summarize.py v2",
+  "generator_sha256": "24cd2de31b27a2ffba901d3f4c5b39e1dad4e181d6ccee32ff13d98d9a7ad579",
+  "record_line": 2,
+  "record_line_sha256": "054aa20912acb34391f68d95d2c1a0b7f43aab29393a97a030762053450b9290",
+  "correction_line": null,
+  "correction_line_sha256": null,
+  "stream_read": true,
+  "stream_matches_record": true
+ }
+}
