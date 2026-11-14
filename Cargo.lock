@@ -554,6 +554,7 @@ name = "ieo-notion"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "ieo-spec",
  "serde_json",
  "sha2",
  "tiny_http",

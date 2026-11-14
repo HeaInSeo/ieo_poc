@@ -3829,6 +3829,8 @@ fn an_import_whose_url_names_another_page_is_refused() {
         "https://app.notion.com/p/0123456789abcdef0123456789abcdef",
         "https://www.notion.so/Synthetic-Task-0123456789abcdef0123456789abcdef?pvs=4",
         "https://www.notion.so/01234567-89ab-cdef-0123-456789abcdef#section",
+        "https://www.notion.so/my-workspace/Task-0123456789abcdef0123456789abcdef",
+        "https://www.notion.so/0123456789ABCDEF0123456789ABCDEF",
     ]
     .iter()
     .enumerate()
@@ -3837,31 +3839,5 @@ fn an_import_whose_url_names_another_page_is_refused() {
         b["source"]["url"] = json!(url);
         let (st, r) = e.post("importer", "/v0/imports/notion", &b);
         assert!(st == 201 || (i > 0 && st == 200), "{url}: {st} {r}");
-    }
-}
-
-#[test]
-fn url_page_ids_are_read_strictly() {
-    use ieo_coord::api::url_page_id;
-    let id = "0123456789abcdef0123456789abcdef";
-    for (url, want) in [
-        (format!("https://app.notion.com/p/{id}"), Some(id)),
-        (format!("https://www.notion.so/Cafe-{id}"), Some(id)),
-        (
-            format!(
-                "https://www.notion.so/{}",
-                "01234567-89ab-cdef-0123-456789abcdef"
-            ),
-            Some(id),
-        ),
-        (
-            format!("https://www.notion.so/{}", id.to_uppercase()),
-            Some(id),
-        ),
-        (format!("https://www.notion.so/{id}/"), Some(id)),
-        ("https://app.notion.com/p/short".to_string(), None),
-        (format!("https://app.notion.com/{id}/x"), None),
-    ] {
-        assert_eq!(url_page_id(&url).as_deref(), want, "{url}");
     }
 }

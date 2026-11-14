@@ -679,21 +679,9 @@ fn convert(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     ok(status, result)
 }
 
-/// The Notion page id a URL names: the last path segment (query and fragment removed), dashes
-/// removed, must end in 32 hex characters; those, in lower case, are the id. `None` otherwise.
+/// The Notion page id a URL names (shared strict rule, `ieo_spec::notion_url`).
 pub fn url_page_id(url: &str) -> Option<String> {
-    let path = url.split(['?', '#']).next()?;
-    let seg: String = path
-        .trim_end_matches('/')
-        .rsplit('/')
-        .next()?
-        .chars()
-        .filter(|c| *c != '-')
-        .collect();
-    let tail = seg.get(seg.len().checked_sub(32)?..)?;
-    tail.chars()
-        .all(|c| c.is_ascii_hexdigit())
-        .then(|| tail.to_ascii_lowercase())
+    ieo_spec::notion_url::page_id(url)
 }
 
 fn is_hex64(s: &str) -> bool {

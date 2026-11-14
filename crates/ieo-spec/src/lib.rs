@@ -9,6 +9,7 @@
 pub mod check;
 pub mod convert;
 pub mod digest;
+pub mod notion_url;
 pub mod rejection;
 pub mod schema;
 

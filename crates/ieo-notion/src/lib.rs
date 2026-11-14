@@ -54,21 +54,10 @@ pub fn unescape(s: &str) -> String {
     out
 }
 
-/// The page id a Notion URL names, strictly: the last path segment without dashes must end in 32
-/// hex characters (lower-cased). Same rule as the coordinator's import check.
+/// The page id a Notion URL names (shared strict rule, `ieo_spec::notion_url`; the coordinator
+/// applies the same rule).
 pub fn url_page_id(url: &str) -> Option<String> {
-    let path = url.split(['?', '#']).next()?;
-    let seg: String = path
-        .trim_end_matches('/')
-        .rsplit('/')
-        .next()?
-        .chars()
-        .filter(|c| *c != '-')
-        .collect();
-    let tail = seg.get(seg.len().checked_sub(32)?..)?;
-    tail.chars()
-        .all(|c| c.is_ascii_hexdigit())
-        .then(|| tail.to_ascii_lowercase())
+    ieo_spec::notion_url::page_id(url)
 }
 
 /// Page id (32 hex) from a Notion URL or a dashed UUID.
@@ -114,7 +103,7 @@ pub fn from_connector_fetch(v: &Value) -> Result<NotionPage, String> {
         .map(str::to_string)
         .or_else(|| v["url"].as_str().map(str::to_string))
         .ok_or("no page url")?;
-    let page_id = page_id_from(&url).ok_or("no page id in url")?;
+    let page_id = url_page_id(&url).ok_or("the page url names no page id")?;
     let last_edited_time = v["page_last_edited_at"]
         .as_str()
         .ok_or("no page_last_edited_at")?
@@ -337,6 +326,10 @@ pub fn human_input(e: &Extracted) -> Option<Value> {
 
 /// Body for `POST /v0/imports/notion`, or why it cannot be built (no repo → no binding).
 pub fn import_request(p: &NotionPage, test_id: &str, observed_at: &str) -> Result<Value, String> {
+    // every path (connector, snapshot, REST) checks before sending what the coordinator checks
+    if url_page_id(&p.url).as_deref() != Some(p.page_id.as_str()) {
+        return Err("the page url does not name the page id; nothing is sent".into());
+    }
     let e = extract(p);
     let input = human_input(&e).ok_or_else(|| {
         "the page names no target repo (`저장소 식별자` owner/name); nothing is registered"

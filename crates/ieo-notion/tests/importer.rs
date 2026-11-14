@@ -264,3 +264,16 @@ fn notion_failures_are_errors_and_never_leak_the_token() {
         "{err}"
     );
 }
+
+#[test]
+fn nothing_is_sent_for_a_page_whose_url_names_another_page() {
+    let mut p = page("현재", "실행재개", "");
+    assert!(import_request(&p, "T-1", "x").is_ok());
+    p.url = "https://app.notion.com/p/fedcba9876543210fedcba9876543210".into();
+    assert!(import_request(&p, "T-1", "x").is_err());
+    p.url = "https://app.notion.com/p/no-id-here".into();
+    assert!(import_request(&p, "T-1", "x").is_err());
+    // the same page in another Notion URL form is fine
+    p.url = format!("https://www.notion.so/my-workspace/Task-{PAGE}?pvs=4");
+    assert!(import_request(&p, "T-1", "x").is_ok());
+}
