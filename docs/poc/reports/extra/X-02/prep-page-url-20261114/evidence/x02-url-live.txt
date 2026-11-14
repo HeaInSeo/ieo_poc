@@ -1,0 +1,20 @@
+# X-02 prep (PR #43/#44 page id vs URL) re-applied · main 778ee47 · 2026-11-14T12:06:44Z
+backup: ieo-20261114T120644Z-pre-x02url.dump 39230 bytes
+## before
+3 revisions, 3 imports, 4 exceptions, 10 history, 0 assignments
+health: {"policy_digest":"e19a54ad636efea9df1534e7b28446853fa1d05cedff4ba40d1b4e2ff96e8e41","schema_version":"ieo-coord-v0","sco
+## read-only DB check (exact invocation and SQL)
+$ podman exec -i ieo-poc-db psql -U ieo -d ieo -At -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN READ ONLY;
+SELECT now() AS db_now,
+       (SELECT count(*) FROM notion_imports) AS imports,
+       (SELECT count(*) FROM notion_imports WHERE page_id !~ '^[0-9a-f]{32}$') AS non_canonical_page_ids,
+       (SELECT count(*) FROM (SELECT page_id FROM notion_imports GROUP BY page_id HAVING count(DISTINCT test_id) > 1) x) AS pages_under_two_test_ids,
+       (SELECT count(DISTINCT page_id) FROM notion_imports) AS distinct_pages;
+COMMIT;
+SQL
+# columns: db_now|imports|non_canonical_page_ids|pages_under_two_test_ids|distinct_pages
+2026-11-14 12:06:47.782866+00|3|0|0|1
+## a URL naming another page is refused by the redeployed server; no rows change
+[('SCHEMA_VIOLATION', 'source.url')] -> HTTP 400
+3 revisions, 3 imports, 4 exceptions, 10 history, 0 assignments
