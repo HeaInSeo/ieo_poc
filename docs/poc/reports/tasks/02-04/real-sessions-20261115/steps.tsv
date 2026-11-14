@@ -1,6 +1,7 @@
 # attempt	role	op	purpose (RUN_PLAN.md §2)
 D1	development	start	credential check; §10 item 3 (a) cleanup; item 2 supplied CLAUDE.md, repo CLAUDE.md and hook not applied; (c) tool-free run
 G1	guardrail	start	credential check; §10 item 1 rev 6 Guardrail rules: scratch write allowed, other writes denied
+R1	development	restart	no model call: container restart, checkpoint restored from the role volume (2026-11-14 pr30 §4)
 D2	development	reconnect	(c) resume after a tool-free run; allowed tool (Read)
 D3	development	reconnect	(c) resume after a tool run; child agent (Agent, reader)
 D4	development	reconnect	(c) resume after a child run; /compact

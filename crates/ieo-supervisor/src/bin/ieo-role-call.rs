@@ -3,7 +3,9 @@
 //!
 //! One budgeted call to a role service (see `ieo_supervisor::caller`). Prints a summary
 //! without secrets. Exit 0: recorded, nothing to look at; 2: nothing started (refused or held);
-//! 3: recorded with `stop_required` (a person decides before the next call); 1: usage error.
+//! 3: recorded with `stop_required`; 1: an error (bad arguments, or a failure the caller could
+//! not record — its in-flight marker then blocks every further call). **Anything but 0 or 2
+//! means stop**: a person decides before the next call.
 
 use ieo_supervisor::caller::{self, Call, Called, Plan};
 use serde_json::{Value, json};
@@ -53,6 +55,7 @@ fn run() -> Result<i32, String> {
             let summary = json!({"started": true, "attempt_id": r["attempt_id"],
                 "role": r["role"], "session": r["session"], "outcome": r["outcome"]["stop"],
                 "duration_ms": r["duration_ms"], "usage_run": r["usage"]["run"],
+                "result": r["outcome"]["result"],
                 "stop_required": r["stop_required"], "stop_reason": r["stop_reason"],
                 "records": caller::records_path(&plan)});
             println!("{summary}");

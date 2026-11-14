@@ -3,8 +3,11 @@
 # run-real.sh, ieo-role-call, call.sh and summarize.py as the real runs, no model call.
 # Usage: dry-run.sh <ieo-supervisor binary> <scratch workdir>
 set -uo pipefail
-BIN=$1; W=$2
+BIN=$1; W=$(realpath -m "$2")
 HERE=$(cd "$(dirname "$0")" && pwd)
+# only a scratch workdir it made itself (review c4620d2 L4)
+if [ -e "$W" ] && [ ! -e "$W/fake/claude" ]; then echo "$W is not a dry-run workdir: refusing to delete it"; exit 1; fi
+for r in development guardrail; do podman rm -f "ieo-dry-fixture0204-$r" >/dev/null 2>&1 || true; done
 PY=/opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python
 podman unshare rm -rf "$W"; mkdir -p "$W/fake/secrets"
 for r in development guardrail; do echo "sk-ant-oat01-fake-$r-not-a-credential" > "$W/fake/secrets/$r.token"; chmod 600 "$W/fake/secrets/$r.token"; done
@@ -32,8 +35,8 @@ echo "# 02-04 real-session dry run (fake claude, fake credentials, no model call
 CLAUDE_BIN="$W/fake/claude" SECRETS_DIR="$W/fake/secrets" NAME_PREFIX=ieo-dry PORT_DEV=58221 PORT_GR=58222 \
   FIRST_OBSERVATION="$W/fake/first.jsonl" FIRST_OBSERVATION_UNIX=$(($(date +%s) - 60)) \
   bash "$HERE/run-real.sh" "$BIN" "$W/run" || exit 1
-for a in D1 G1 D2 D3 D4 D5 D6; do
-  printf '%s: ' "$a"; bash "$HERE/call.sh" "$W/run" "$a" | tail -1
+for a in D1 G1 R1 D2 D3 D4 D5 D6; do
+  printf "%s: " "$a"; NAME_PREFIX=ieo-dry bash "$HERE/call.sh" "$W/run" "$a" | tail -1
 done
 echo "## checks"
 "$PY" - "$W/run" <<'PYEOF'
@@ -59,8 +62,12 @@ ok(by["G1"]["role"] == "guardrail" and by["G1"]["session"]["mode"] == "new", "G1
 ok(all("CLAUDE_CODE_OAUTH_TOKEN" in r["outcome"]["env_names"] and not any(n.startswith("ANTHROPIC_") for n in r["outcome"]["env_names"]) for r in recs), "environment: OAuth variable, no API key")
 print("records:", len(recs), "· spent:", json.dumps({k: sum(t(r)[k] for r in recs) for k in keys}))
 PYEOF
-echo "## next call after the plan: refused or held? (should still start: shares not used up)"
-grep -c . "$W/run/ledger/records.jsonl"
+echo "## a call while one is in flight, and setup over a used workdir, are refused"
+echo '{"attempt_id":"X"}' > "$W/run/ledger/inflight.json"
+out=$("$W/run/bin/ieo-role-call" --plan "$W/run/plan.json" --task 02-04 --role development --op start --attempt X1 --session "$(cat /proc/sys/kernel/random/uuid)" --prompt-file "$HERE/prompts/D5.txt" --coordinator-file "$W/run/coordinator.json"); rc=$?
+echo "in flight: exit $rc $(grep -o 'in flight[^"]*' <<<"$out" | head -1)"
+CLAUDE_BIN="$W/fake/claude" SECRETS_DIR="$W/fake/secrets" NAME_PREFIX=ieo-dry PORT_DEV=58221 PORT_GR=58222 \
+  bash "$HERE/run-real.sh" "$BIN" "$W/run" 2>&1 | tail -1
 echo "## secrets in summaries and container logs: $(cat "$W/run/summaries/"*.json | grep -c 'sk-ant-oat01-fake' || true) / $( (podman logs ieo-dry-fixture0204-development; podman logs ieo-dry-fixture0204-guardrail) 2>&1 | grep -c 'sk-ant-oat01-fake' || true)"
 for r in development guardrail; do
   t0=$(date +%s.%N); podman stop ieo-dry-fixture0204-$r >/dev/null; t1=$(date +%s.%N)

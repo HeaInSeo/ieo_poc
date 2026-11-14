@@ -232,9 +232,39 @@ fn append(plan: &Plan, rec: &Value) -> Result<(), String> {
         .append(true)
         .open(plan.records_path())
         .map_err(|e| e.to_string())?;
-    writeln!(f, "{rec}")
+    // one write of the whole line under an exclusive lock (review c4620d2 L2)
+    let line = format!("{rec}\n");
+    f.lock()
+        .and_then(|()| f.write_all(line.as_bytes()))
         .and_then(|()| f.sync_all())
         .map_err(|e| format!("record append: {e}"))
+}
+
+fn inflight_path(plan: &Plan) -> PathBuf {
+    plan.ledger_dir.join("inflight.json")
+}
+
+/// Marks a call as started before the start request is sent: until the call's record is
+/// appended, every further call is refused (a caller that dies mid-run leaves it behind, and a
+/// person reconciles it — review c4620d2 H1).
+fn mark_inflight(plan: &Plan, c: &Call) -> Result<(), String> {
+    use std::io::Write;
+    std::fs::create_dir_all(&plan.ledger_dir).map_err(|e| e.to_string())?;
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(inflight_path(plan))
+        .map_err(|e| format!("in-flight marker: {e}"))?;
+    let v = json!({"attempt_id": c.attempt_id, "role": c.role, "op": c.op,
+                   "started_at": ieo_evidence::time::now()});
+    f.write_all(format!("{v}\n").as_bytes())
+        .and_then(|()| f.sync_all())
+        .and_then(|()| std::fs::File::open(&plan.ledger_dir)?.sync_all())
+        .map_err(|e| format!("in-flight marker: {e}"))
+}
+
+fn clear_inflight(plan: &Plan) -> Result<(), String> {
+    std::fs::remove_file(inflight_path(plan)).map_err(|e| format!("in-flight marker: {e}"))
 }
 
 /// The no-overage observation for the next run: the newest record's stream, or for the first
@@ -254,7 +284,12 @@ fn observation(plan: &Plan, recs: &[Value]) -> Result<Option<(String, u64)>, Str
     };
     let text = std::fs::read_to_string(&path)
         .map_err(|e| format!("observation stream {}: {}", path.display(), e.kind()))?;
-    Ok(Some((text, unix_now().saturating_sub(at))))
+    let now = unix_now();
+    if now < at {
+        // a clock before the observation would make a stale observation look fresh (L1)
+        return Err(format!("clock ({now}) is before the observation ({at})"));
+    }
+    Ok(Some((text, now - at)))
 }
 
 /// Limits for this call: the budget decision, then the role's share.
@@ -330,12 +365,45 @@ pub fn call(
     adapter: &dyn Adapter,
     poll: Duration,
 ) -> Result<Called, String> {
+    call_with(plan, c, adapter, poll, Duration::from_secs(60))
+}
+
+/// [`call`] with the wait margin after the run's window (and again after a stop).
+///
+/// Any exit other than "recorded, nothing to look at" or "not started" means stop: an `Err`
+/// before the start request starts nothing; after it, the run is recorded as unmeasured with
+/// `stop_required`, and if even that record cannot be written the in-flight marker stays and
+/// blocks every further call.
+pub fn call_with(
+    plan: &Plan,
+    c: &Call,
+    adapter: &dyn Adapter,
+    poll: Duration,
+    margin: Duration,
+) -> Result<Called, String> {
     let target = plan
         .roles
         .get(&c.role)
         .ok_or(format!("role {} not in the plan", c.role))?;
     if c.op != "start" && c.op != "reconnect" {
         return Err(format!("op {} is not start or reconnect", c.op));
+    }
+    // one caller at a time over the ledger
+    std::fs::create_dir_all(&plan.ledger_dir).map_err(|e| e.to_string())?;
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(plan.ledger_dir.join("caller.lock"))
+        .map_err(|e| format!("caller lock: {e}"))?;
+    if lock.try_lock().is_err() {
+        return Ok(Called::NotStarted("another caller holds the ledger".into()));
+    }
+    if let Ok(t) = std::fs::read_to_string(inflight_path(plan)) {
+        return Ok(Called::NotStarted(format!(
+            "a call is in flight without a record ({}): a person reconciles it",
+            t.trim()
+        )));
     }
     let recs = records(plan)?;
     if let Some(r) = recs.iter().find(|r| r["stop_required"] == true) {
@@ -344,10 +412,8 @@ pub fn call(
             r["attempt_id"], r["stop_reason"]
         )));
     }
-    if recs
-        .iter()
-        .any(|r| r["attempt_id"] == c.attempt_id.as_str())
-    {
+    let known = |a: &str| recs.iter().any(|r| r["attempt_id"] == a);
+    if known(&c.attempt_id) {
         return Ok(Called::NotStarted(format!(
             "attempt {} already recorded",
             c.attempt_id
@@ -357,7 +423,8 @@ pub fn call(
         Ok(l) => l,
         Err(why) => return Ok(Called::NotStarted(why)),
     };
-    // the checkpoint before the run: the resume base candidate
+    // the service's state before the run: nothing running, its last attempt known to the
+    // caller, and the checkpoint (the resume base candidate)
     let (st, before) = adapter.send(target, "GET", "/v0/role/status", None)?;
     if st != 200 {
         return Ok(Called::NotStarted(format!(
@@ -369,6 +436,11 @@ pub fn call(
         return Ok(Called::NotStarted(
             "the role is running another attempt".into(),
         ));
+    }
+    if let Some(a) = before["last"]["attempt_id"].as_str().filter(|a| !known(a)) {
+        return Ok(Called::NotStarted(format!(
+            "the service's last attempt {a} has no caller record: a person reconciles it"
+        )));
     }
     let mut body = json!({"attempt_id": c.attempt_id, "prompt": c.prompt,
         "coordinator": c.coordinator,
@@ -382,24 +454,27 @@ pub fn call(
     } else {
         "new_session_id"
     }] = json!(c.session_id);
-    let started_at = ieo_evidence::time::now();
-    let started_unix = unix_now();
     let base_rec = json!({"format": RECORD_FORMAT, "task_id": c.task_id, "budget": plan.budget.name,
         "attempt_id": c.attempt_id, "command_id": format!("{}-{}", c.role, c.op), "role": c.role,
-        "model_request": true, "started_at": started_at, "started_unix": started_unix,
-        "limits": body["limits"]});
+        "model_request": true, "started_at": ieo_evidence::time::now(),
+        "started_unix": unix_now(), "limits": body["limits"]});
     let fail = |reason: String| -> Result<Called, String> {
-        // a run that may have started but whose end is unknown: unmeasured, a person decides
+        // a run that may have started but whose end or usage is unknown: unmeasured, no
+        // duration, a person decides
         let mut r = base_rec.clone();
         r["usage"] = json!({"run": {"state": "unmeasured", "reason": reason}});
         r["stop_required"] = json!(true);
         r["stop_reason"] = json!(reason);
         append(plan, &r)?;
+        clear_inflight(plan)?;
         Ok(Called::Recorded(r))
     };
+    mark_inflight(plan, c)?;
     match adapter.send(target, "POST", &format!("/v0/role/{}", c.op), Some(&body)) {
         Ok((202, _)) => {}
         Ok((st, b)) => {
+            // refused: nothing started
+            clear_inflight(plan)?;
             return Ok(Called::NotStarted(format!(
                 "{} {st} {}: {}",
                 c.op, b["code"], b["reason"]
@@ -407,139 +482,208 @@ pub fn call(
         }
         Err(e) => return fail(format!("{} sent but its answer was lost ({e})", c.op)),
     }
-    // wait for the end: the window plus a margin, then a stop, then give up
-    let deadline =
-        std::time::Instant::now() + limits.timeout + limits.grace + Duration::from_secs(60);
-    let mut stop_sent = false;
-    let last = loop {
-        match adapter.send(target, "GET", "/v0/role/status", None) {
-            Ok((200, s))
-                if s["running"].is_null() && s["last"]["attempt_id"] == c.attempt_id.as_str() =>
-            {
-                break s["last"].clone();
-            }
-            _ => {}
-        }
-        if std::time::Instant::now() > deadline {
-            if stop_sent {
-                return fail("the run did not end after a stop; its usage is unknown".into());
-            }
-            let _ = adapter.send(target, "POST", "/v0/role/stop", None);
-            stop_sent = true;
-        }
-        std::thread::sleep(poll);
-        if stop_sent && std::time::Instant::now() > deadline + Duration::from_secs(30) {
-            return fail("the run did not end after a stop; its usage is unknown".into());
-        }
-    };
-    if let Some(e) = last["error"].as_str() {
-        return fail(format!("run error: {e}"));
-    }
-    let (st, out) = adapter.send(
+    let ctx = After {
+        plan,
+        c,
         target,
-        "GET",
-        &format!("/v0/role/runs/{}/stdout", c.attempt_id),
-        None,
-    )?;
-    let stream = out["content"].as_str().unwrap_or_default().to_string();
-    if st != 200 {
-        return fail(format!("stdout not available ({st})"));
-    }
-    let streams = plan.ledger_dir.join("streams");
-    std::fs::create_dir_all(&streams).map_err(|e| e.to_string())?;
-    let stream_path = streams.join(format!("{}.jsonl", c.attempt_id));
-    std::fs::write(&stream_path, &stream).map_err(|e| format!("stream save: {e}"))?;
-    let mode = if last["mode"] == "resume" {
-        SessionMode::Resume
-    } else {
-        SessionMode::New
+        adapter,
+        limits: &limits,
+        before: &before,
+        recs: &recs,
+        poll,
+        margin,
     };
-    let session_id = last["session_id"].as_str().unwrap_or_default().to_string();
-    // the base: the caller's own newest record of this session, and only when the service
-    // resumed from exactly that run (§11 item 7: the run actually resumed)
-    let base = (mode == SessionMode::Resume)
-        .then(|| {
-            let newest = recs
-                .iter()
-                .rev()
-                .find(|r| r["session"]["session_id"] == session_id.as_str())?;
-            let cp_from = before["checkpoint"]["session_cumulative_attempt"].as_str()?;
-            (before["checkpoint"]["session_id"] == session_id.as_str()
-                && newest["attempt_id"] == cp_from)
-                .then_some(())?;
-            let session: Measure =
-                serde_json::from_value(newest["usage"]["session"].clone()).ok()?;
-            Some(ResumeBase {
-                task_id: newest["task_id"].as_str().unwrap_or_default().into(),
-                attempt_id: cp_from.into(),
-                command_id: newest["command_id"].as_str().unwrap_or_default().into(),
-                session_id: Some(session_id.clone()),
-                session,
-                cost_usd_reported: newest["usage"]["cost_usd_reported"].as_f64(),
+    match ctx.finish(base_rec.clone()) {
+        Ok(r) => {
+            append(plan, &r)?;
+            clear_inflight(plan)?;
+            Ok(Called::Recorded(r))
+        }
+        Err(reason) => fail(reason),
+    }
+}
+
+struct After<'a> {
+    plan: &'a Plan,
+    c: &'a Call,
+    target: &'a RoleTarget,
+    adapter: &'a dyn Adapter,
+    limits: &'a Limits,
+    before: &'a Value,
+    recs: &'a [Value],
+    poll: Duration,
+    margin: Duration,
+}
+
+impl After<'_> {
+    /// Everything after an accepted start, up to the finished record (not yet appended). An
+    /// error here is recorded by the caller as an unmeasured run that asks for a person.
+    fn finish(&self, base_rec: Value) -> Result<Value, String> {
+        let (plan, c, target, adapter) = (self.plan, self.c, self.target, self.adapter);
+        // wait for the end: the window plus a margin, then a stop, then the margin again
+        let deadline =
+            std::time::Instant::now() + self.limits.timeout + self.limits.grace + self.margin;
+        let mut stop_sent = false;
+        let last = loop {
+            match adapter.send(target, "GET", "/v0/role/status", None) {
+                Ok((200, s))
+                    if s["running"].is_null()
+                        && s["last"]["attempt_id"] == c.attempt_id.as_str() =>
+                {
+                    break s["last"].clone();
+                }
+                _ => {}
+            }
+            let now = std::time::Instant::now();
+            if now > deadline && !stop_sent {
+                let _ = adapter.send(target, "POST", "/v0/role/stop", None);
+                stop_sent = true;
+            }
+            if stop_sent && now > deadline + self.margin {
+                return Err("the run did not end after a stop; its usage is unknown".into());
+            }
+            std::thread::sleep(self.poll);
+        };
+        if let Some(e) = last["error"].as_str() {
+            return Err(format!("run error: {e}"));
+        }
+        let (st, out) = adapter
+            .send(
+                target,
+                "GET",
+                &format!("/v0/role/runs/{}/stdout", c.attempt_id),
+                None,
+            )
+            .map_err(|e| format!("stdout fetch: {e}"))?;
+        if st != 200 {
+            return Err(format!("stdout not available ({st})"));
+        }
+        // the service reads the file lossily as UTF-8: the saved text and its digest are of
+        // that text (review c4620d2 L8)
+        let stream = out["content"].as_str().unwrap_or_default().to_string();
+        let streams = plan.ledger_dir.join("streams");
+        let stream_path = streams.join(format!("{}.jsonl", c.attempt_id));
+        std::fs::create_dir_all(&streams)
+            .and_then(|()| std::fs::write(&stream_path, &stream))
+            .map_err(|e| format!("stream save: {e}"))?;
+        let mode = if last["mode"] == "resume" {
+            SessionMode::Resume
+        } else {
+            SessionMode::New
+        };
+        let session_id = last["session_id"].as_str().unwrap_or_default().to_string();
+        let before = self.before;
+        // the base: the caller's own newest record of this session, and only when the service
+        // resumed from exactly that run (§11 item 7: the run actually resumed)
+        let base = (mode == SessionMode::Resume)
+            .then(|| {
+                let newest = self
+                    .recs
+                    .iter()
+                    .rev()
+                    .find(|r| r["session"]["session_id"] == session_id.as_str())?;
+                let cp_from = before["checkpoint"]["session_cumulative_attempt"].as_str()?;
+                (before["checkpoint"]["session_id"] == session_id.as_str()
+                    && newest["attempt_id"] == cp_from)
+                    .then_some(())?;
+                let session: Measure =
+                    serde_json::from_value(newest["usage"]["session"].clone()).ok()?;
+                Some(ResumeBase {
+                    task_id: newest["task_id"].as_str().unwrap_or_default().into(),
+                    attempt_id: cp_from.into(),
+                    command_id: newest["command_id"].as_str().unwrap_or_default().into(),
+                    session_id: Some(session_id.clone()),
+                    session,
+                    cost_usd_reported: newest["usage"]["cost_usd_reported"].as_f64(),
+                })
             })
-        })
-        .flatten();
-    let base_attempt = base.as_ref().map(|b| b.attempt_id.clone());
-    let parsed = ieo_evidence::stream::parse(stream.as_bytes(), mode, base);
-    let collected_run = serde_json::to_value(&parsed.usage.run).map_err(|e| e.to_string())?;
-    let o = &last["observed"];
-    let observed = Observed {
-        billable: o["billable_lower_bound"].as_u64().unwrap_or(u64::MAX),
-        cache_read: o["cache_read_lower_bound"].as_u64().unwrap_or(u64::MAX),
-        messages: o["messages"].as_u64().unwrap_or_default() as usize,
-        incomplete_lines: o["incomplete_lines"].as_u64().unwrap_or_default() as usize,
-    };
-    let stop = last["stop"].as_str().unwrap_or("unknown");
-    let charged = run::charge_reported(stop == "Exited", stop, &observed, &collected_run);
-    let mut usage = serde_json::to_value(&parsed.usage).map_err(|e| e.to_string())?;
-    usage["collector_run"] = usage["run"].take();
-    usage["run"] = charged;
-    // reasons a person must look before the next call
-    let mut reasons = Vec::new();
-    if last["cleanup_failed"] == true {
-        reasons.push("process-group cleanup failed".to_string());
-    }
-    let env: Vec<&str> = last["env_names"]
-        .as_array()
-        .map(|a| a.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default();
-    if !env.contains(&"CLAUDE_CODE_OAUTH_TOKEN") || env.iter().any(|n| n.starts_with("ANTHROPIC_"))
-    {
-        reasons.push(format!("environment not subscription-only: {env:?}"));
-    }
-    match budget::rate_limit_events(&stream) {
-        Ok(evs) => {
-            for e in &evs {
-                if let Err(why) = budget::overage_check(e) {
-                    reasons.push(format!("this run's signal: {why}"));
+            .flatten();
+        let base_attempt = base.as_ref().map(|b| b.attempt_id.clone());
+        let parsed = ieo_evidence::stream::parse(stream.as_bytes(), mode, base);
+        let collected_run = serde_json::to_value(&parsed.usage.run).map_err(|e| e.to_string())?;
+        let o = &last["observed"];
+        // a missing guard observation is never 0: it makes any collector figure "below" it
+        let observed = Observed {
+            billable: o["billable_lower_bound"].as_u64().unwrap_or(u64::MAX),
+            cache_read: o["cache_read_lower_bound"].as_u64().unwrap_or(u64::MAX),
+            messages: o["messages"].as_u64().unwrap_or_default() as usize,
+            incomplete_lines: o["incomplete_lines"].as_u64().unwrap_or_default() as usize,
+        };
+        let stop = last["stop"].as_str().unwrap_or("unknown");
+        let charged = run::charge_reported(stop == "Exited", stop, &observed, &collected_run);
+        let mut usage = serde_json::to_value(&parsed.usage).map_err(|e| e.to_string())?;
+        usage["collector_run"] = usage["run"].take();
+        usage["run"] = charged;
+        // reasons a person must look before the next call
+        let mut reasons = Vec::new();
+        if last["cleanup_failed"] == true {
+            reasons.push("process-group cleanup failed".to_string());
+        }
+        // the role environment as the run reported it (fixed by env::build's allow-list)
+        let env: Vec<&str> = last["env_names"]
+            .as_array()
+            .map(|a| a.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default();
+        if !env.contains(&"CLAUDE_CODE_OAUTH_TOKEN")
+            || env.iter().any(|n| n.starts_with("ANTHROPIC_"))
+        {
+            reasons.push(format!("environment not subscription-only: {env:?}"));
+        }
+        // the run's result: an authentication or other failure must not read as success
+        let result = stream
+            .lines()
+            .rev()
+            .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+            .find(|v| v["type"] == "result");
+        match &result {
+            Some(r) if r["subtype"] == "success" && r["is_error"] == false => {}
+            Some(r) => reasons.push(format!(
+                "result {} (is_error {})",
+                r["subtype"], r["is_error"]
+            )),
+            None => reasons.push("no result event".into()),
+        }
+        let mut notes = Vec::new();
+        match budget::rate_limit_events(&stream) {
+            Ok(evs) if evs.is_empty() => notes.push(
+                "no rate_limit_event in this run: the next call is held until one is observed"
+                    .to_string(),
+            ),
+            Ok(evs) => {
+                for e in &evs {
+                    if let Err(why) = budget::overage_check(e) {
+                        reasons.push(format!("this run's signal: {why}"));
+                    }
                 }
             }
+            Err(e) => reasons.push(format!("this run's signal: {e}")),
         }
-        Err(e) => reasons.push(format!("this run's signal: {e}")),
+        let mut r = base_rec;
+        r["ended_at"] = json!(ieo_evidence::time::now());
+        r["ended_unix"] = json!(unix_now());
+        if let Some(ms) = last["elapsed_ms"].as_u64() {
+            r["duration_ms"] = json!(ms);
+        }
+        r["session"] = json!({"mode": last["mode"], "session_id": session_id,
+                              "resume_base_attempt": base_attempt});
+        r["outcome"] = json!({"stop": stop, "stopped_by_guard": last["stopped_by_guard"],
+            "exit_code": last["exit_code"], "cleanup_failed": last["cleanup_failed"],
+            "observed": last["observed"], "tamper": last["tamper"],
+            "config_cleanup": last["config_cleanup"], "env_names": last["env_names"],
+            "result": result.map(|r| json!({"subtype": r["subtype"], "is_error": r["is_error"]}))});
+        r["result_event"] = serde_json::to_value(&parsed.result).unwrap_or(Value::Null);
+        r["usage"] = usage;
+        r["stream"] = json!({"path": stream_path, "bytes": stream.len(),
+                             "sha256": hex::encode(Sha256::digest(stream.as_bytes()))});
+        r["stop_required"] = json!(!reasons.is_empty());
+        if !reasons.is_empty() {
+            r["stop_reason"] = json!(reasons.join("; "));
+        }
+        if !notes.is_empty() {
+            r["notes"] = json!(notes);
+        }
+        Ok(r)
     }
-    let ended_unix = unix_now();
-    let mut r = base_rec;
-    r["ended_at"] = json!(ieo_evidence::time::now());
-    r["ended_unix"] = json!(ended_unix);
-    if let Some(ms) = last["elapsed_ms"].as_u64() {
-        r["duration_ms"] = json!(ms);
-    }
-    r["session"] = json!({"mode": last["mode"], "session_id": session_id,
-                          "resume_base_attempt": base_attempt});
-    r["outcome"] = json!({"stop": stop, "stopped_by_guard": last["stopped_by_guard"],
-        "exit_code": last["exit_code"], "cleanup_failed": last["cleanup_failed"],
-        "observed": last["observed"], "tamper": last["tamper"],
-        "config_cleanup": last["config_cleanup"], "env_names": last["env_names"]});
-    r["result_event"] = serde_json::to_value(&parsed.result).unwrap_or(Value::Null);
-    r["usage"] = usage;
-    r["stream"] = json!({"path": stream_path, "bytes": stream.len(),
-                         "sha256": hex::encode(Sha256::digest(stream.as_bytes()))});
-    r["stop_required"] = json!(!reasons.is_empty());
-    if !reasons.is_empty() {
-        r["stop_reason"] = json!(reasons.join("; "));
-    }
-    append(plan, &r)?;
-    Ok(Called::Recorded(r))
 }
 
 /// Ledger file of a plan, for reports.

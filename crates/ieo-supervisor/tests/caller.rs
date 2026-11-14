@@ -51,6 +51,7 @@ fn fake_claude(dir: &Path) -> PathBuf {
         format!(
             r#"#!/bin/sh
 prompt=$(head -c 4096)
+err=false; case "$prompt" in *AUTHFAIL*) err=true;; esac
 sid=$(printf '%s\n' "$@" | awk 'prev=="--session-id"||prev=="--resume"{{print; exit}} {{prev=$0}}')
 f="{cum}-$sid"
 set -- $(cat "$f" 2>/dev/null || echo 0 0 0 0)
@@ -63,7 +64,7 @@ case "$prompt" in
 esac
 case "$prompt" in *CHILD*) sleep 300 & echo $! > "{dir}/child.pid";; esac
 case "$prompt" in *SLEEP*) sleep 60;; esac
-printf '{{"type":"result","subtype":"success","is_error":false,"session_id":"%s","usage":{{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}},"modelUsage":{{"m":{{"inputTokens":%s,"outputTokens":%s,"cacheReadInputTokens":%s,"cacheCreationInputTokens":%s}}}},"total_cost_usd":0.01}}\n' "$sid" "$i" "$o" "$r" "$c"
+printf '{{"type":"result","subtype":"success","is_error":%s,"session_id":"%s","usage":{{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}},"modelUsage":{{"m":{{"inputTokens":%s,"outputTokens":%s,"cacheReadInputTokens":%s,"cacheCreationInputTokens":%s}}}},"total_cost_usd":0.01}}\n' "$err" "$sid" "$i" "$o" "$r" "$c"
 "#,
             cum = cum.display(),
             dir = dir.display()
@@ -508,13 +509,43 @@ fn the_caller_talks_to_the_service_over_http() {
         )
         .expect("cfg")
     };
-    let port = std::net::TcpListener::bind("127.0.0.1:0")
-        .and_then(|l| l.local_addr())
-        .expect("port")
-        .port();
-    std::thread::spawn(move || {
-        let _ = ieo_supervisor::serve::serve(svc_cfg, &format!("127.0.0.1:{port}"));
-    });
+    // a free port: serve's own bind error is reported, and another port is tried
+    let mut cfg = Some(svc_cfg);
+    let mut port = 0;
+    for _ in 0..5 {
+        port = std::net::TcpListener::bind("127.0.0.1:0")
+            .and_then(|l| l.local_addr())
+            .expect("port")
+            .port();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let c = cfg.take().expect("cfg");
+        let keep = c.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(ieo_supervisor::serve::serve(
+                c,
+                &format!("127.0.0.1:{port}"),
+            ));
+        });
+        let t0 = std::time::Instant::now();
+        let up = loop {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                break true;
+            }
+            if let Ok(r) = rx.try_recv() {
+                eprintln!("serve on {port} ended: {r:?}");
+                break false;
+            }
+            assert!(
+                t0.elapsed() < Duration::from_secs(10),
+                "serve did not listen on {port}"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        if up {
+            break;
+        }
+        cfg = Some(keep);
+    }
     let url = format!("http://127.0.0.1:{port}");
     let p = plan(&t.0, &[("development", &url)], Some(&rate("rejected")));
     let t0 = std::time::Instant::now();
@@ -552,4 +583,393 @@ fn the_caller_talks_to_the_service_over_http() {
         .expect("c"),
     );
     assert!(why.contains("401"), "{why}");
+}
+
+// --- review c4620d2 ---
+
+type HookFn = dyn Fn(&str, &str, Result<(u16, Value), String>) -> Result<(u16, Value), String>;
+
+/// Wraps the in-process transport and rewrites (or breaks) answers.
+struct Hook<'a> {
+    inner: &'a InProc,
+    f: Box<HookFn>,
+}
+impl Adapter for Hook<'_> {
+    fn send(
+        &self,
+        role: &RoleTarget,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+    ) -> Result<(u16, Value), String> {
+        (self.f)(method, path, self.inner.send(role, method, path, body))
+    }
+}
+
+fn hook<'a>(
+    inner: &'a InProc,
+    f: impl Fn(&str, &str, Result<(u16, Value), String>) -> Result<(u16, Value), String> + 'static,
+) -> Hook<'a> {
+    Hook {
+        inner,
+        f: Box::new(f),
+    }
+}
+
+/// Rewrites the finished attempt in status answers.
+fn last_rewritten(inner: &InProc, f: impl Fn(&mut Value) + 'static) -> Hook<'_> {
+    hook(inner, move |m, p, r| {
+        let mut r = r?;
+        if m == "GET"
+            && p == "/v0/role/status"
+            && r.1["running"].is_null()
+            && r.1["last"].is_object()
+        {
+            f(&mut r.1["last"]);
+        }
+        Ok(r)
+    })
+}
+
+#[test]
+fn the_environment_the_stop_and_the_guard_observation_decide_the_charge() {
+    let t = Tmp::new("authority");
+    let (a, p) = both(&t);
+    // an API-key variable in the run's environment: a person looks
+    let h = last_rewritten(&a, |l| {
+        if let Some(v) = l["env_names"].as_array_mut() {
+            v.push(json!("ANTHROPIC_API_KEY"));
+        }
+    });
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["stop_required"], true);
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|s| s.contains("environment")),
+        "{r}"
+    );
+    // a guard-stopped run is unmeasured even when the collector measured it
+    let t = Tmp::new("authority2");
+    let (a, p) = both(&t);
+    let h = last_rewritten(&a, |l| l["stop"] = json!("RunTimeout"));
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(
+        (
+            r["usage"]["collector_run"]["state"].as_str(),
+            r["usage"]["run"]["state"].as_str()
+        ),
+        (Some("measured"), Some("unmeasured")),
+        "{}",
+        r["usage"]
+    );
+    // a missing guard observation is not zero
+    let t = Tmp::new("authority3");
+    let (a, p) = both(&t);
+    let h = last_rewritten(&a, |l| l["observed"] = Value::Null);
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{}", r["usage"]);
+}
+
+#[test]
+fn a_failed_result_asks_for_a_person() {
+    // M1: e.g. an authentication failure on the first call of a role
+    let t = Tmp::new("authfail");
+    let (a, p) = both(&t);
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "AUTHFAIL"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["stop_required"], true);
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|s| s.contains("is_error true")),
+        "{r}"
+    );
+    assert_eq!(r["outcome"]["result"]["is_error"], true);
+}
+
+#[test]
+fn the_role_share_bounds_runs_and_time() {
+    let t = Tmp::new("share");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service(&t.0, "development", None));
+    let a = InProc(m);
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    std::fs::write(t.0.join("first.jsonl"), rate("rejected")).expect("obs");
+    let v = json!({"budget": "02-04", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first.jsonl"), "observed_unix": now() - 60},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token"),
+            "share": {"max_runs": 1, "total_seconds": 700, "billable_tokens": 1000, "cache_read_tokens": 1000}}}});
+    let p = Plan::from_json(&v).expect("plan");
+    let l = caller::limits_for(&p, "development", &[]).expect("limits");
+    assert_eq!(
+        (l.timeout + l.grace, l.timeout_is_total, l.billable_room),
+        (Duration::from_secs(700), true, 1000)
+    );
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d2", "s2", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("1 of 1 runs"), "{why}");
+}
+
+#[test]
+fn a_running_role_or_an_unknown_last_attempt_starts_nothing() {
+    let t = Tmp::new("before");
+    let (a, p) = both(&t);
+    // only the first status answer says "running" (a missing check must not hang the test)
+    let first = std::sync::atomic::AtomicBool::new(true);
+    let h = hook(&a, move |m, p, r| {
+        let mut r = r?;
+        if m == "GET"
+            && p == "/v0/role/status"
+            && first.swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            r.1["running"] = json!({"attempt_id": "elsewhere"});
+        }
+        Ok(r)
+    });
+    assert!(
+        not_started(
+            caller::call(
+                &p,
+                &call_of("development", "start", "d1", "s1", "hi"),
+                &h,
+                POLL
+            )
+            .expect("c")
+        )
+        .contains("running")
+    );
+    // the service ran an attempt this ledger does not know
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let mut v = json!({"budget": "02-04", "ledger_dir": t.0.join("other-ledger"), "roles": {
+        "development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token"), "share": share("development")}}});
+    v["first_observation"] =
+        json!({"stream": t.0.join("first-observation.jsonl"), "observed_unix": now() - 60});
+    let other = Plan::from_json(&v).expect("plan");
+    let why = not_started(
+        caller::call(
+            &other,
+            &call_of("development", "reconnect", "d2", "s2", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("d1 has no caller record"), "{why}");
+}
+
+#[test]
+fn every_failure_after_the_start_is_recorded_and_blocks() {
+    // H1: the start's answer lost (the run did start)
+    let t = Tmp::new("lost-post");
+    let (a, p) = both(&t);
+    let h = hook(&a, |m, _p, r| {
+        if m == "POST" {
+            r.and(Err("connection reset".into()))
+        } else {
+            r
+        }
+    });
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(
+        (
+            r["stop_required"].as_bool(),
+            r["usage"]["run"]["state"].as_str()
+        ),
+        (Some(true), Some("unmeasured")),
+        "{r}"
+    );
+    assert!(r["duration_ms"].is_null());
+    assert!(
+        !caller::records_path(&p)
+            .with_file_name("inflight.json")
+            .exists()
+    );
+    assert!(
+        not_started(
+            caller::call(
+                &p,
+                &call_of("guardrail", "start", "g1", "sg", "x"),
+                &a,
+                POLL
+            )
+            .expect("c")
+        )
+        .contains("asks for a person")
+    );
+    // the stdout fetch fails
+    let t = Tmp::new("lost-stdout");
+    let (a, p) = both(&t);
+    let h = hook(&a, |_m, path, r| {
+        if path.ends_with("/stdout") {
+            Err("timeout".into())
+        } else {
+            r
+        }
+    });
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|s| s.contains("stdout fetch")),
+        "{r}"
+    );
+    // the status polls fail until the deadline: a stop, then the run is given up as unknown
+    let t = Tmp::new("lost-status");
+    let (a, _) = both(&t);
+    let mut v = json!({"budget": "02-04", "ledger_dir": t.0.join("ledger"), "roles": {
+        "development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token"),
+                        "share": share("development"), "max_window_seconds": 7}}});
+    v["first_observation"] =
+        json!({"stream": t.0.join("first-observation.jsonl"), "observed_unix": now() - 60});
+    let p = Plan::from_json(&v).expect("plan");
+    let polls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let n = polls.clone();
+    let h = hook(&a, move |m, path, r| {
+        if m == "GET"
+            && path == "/v0/role/status"
+            && n.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0
+        {
+            return Err("unreachable".into());
+        }
+        r
+    });
+    let t0 = std::time::Instant::now();
+    let r = recorded(
+        caller::call_with(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &h,
+            POLL,
+            Duration::from_millis(300),
+        )
+        .expect("c"),
+    );
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|s| s.contains("did not end")),
+        "{r}"
+    );
+    assert!(t0.elapsed() < Duration::from_secs(15));
+}
+
+#[test]
+fn a_call_left_in_flight_blocks_until_reconciled() {
+    // H1: a caller that died after its start request leaves the marker behind
+    let t = Tmp::new("inflight");
+    let (a, p) = both(&t);
+    std::fs::create_dir_all(t.0.join("ledger")).expect("d");
+    std::fs::write(
+        t.0.join("ledger/inflight.json"),
+        "{\"attempt_id\":\"d0\"}\n",
+    )
+    .expect("w");
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("in flight") && why.contains("d0"), "{why}");
+    assert!(!t.0.join("development/state/runs/d1").exists());
+}
+
+#[test]
+fn an_observation_from_the_future_holds_the_call() {
+    // L1: a clock behind the observation would make it look fresh
+    let t = Tmp::new("clock");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service(&t.0, "development", None));
+    let a = InProc(m);
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    std::fs::write(t.0.join("first.jsonl"), rate("rejected")).expect("obs");
+    let v = json!({"budget": "02-04", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first.jsonl"), "observed_unix": now() + 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token"), "share": share("development")}}});
+    let p = Plan::from_json(&v).expect("plan");
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("clock"), "{why}");
 }

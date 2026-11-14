@@ -3,7 +3,7 @@
 | 항목 | 기록 |
 | --- | --- |
 | 구분 | 주계획 02-04의 중간 산출물. 완료 수 11/73 변동 없음 |
-| 산출물 | `crates/ieo-supervisor/src/caller.rs`(호출자), `src/bin/ieo-role-call.rs`, `run::charge_reported`, 역할 서비스 수정(검토 475b409 R1·R2·R4, PID 1 전용 거두기), 시험 `tests/caller.rs` 7건·`tests/serve.rs` 4건 추가·단위 시험 보강, 실제 회차 계획 [RUN_PLAN.md](RUN_PLAN.md)와 도구([run-real.sh](run-real.sh), [call.sh](call.sh), [steps.tsv](steps.tsv), [summarize.py](summarize.py), [prompts/](prompts/), [role/](role/), [fixture/](fixture/)), 컨테이너 예행 [dry-run.sh](dry-run.sh)와 [기록](evidence/dry-run.log), 작업 공간 시험 [cargo-test.log](evidence/cargo-test.log) |
+| 산출물 | `crates/ieo-supervisor/src/caller.rs`(호출자), `src/bin/ieo-role-call.rs`, `run::charge_reported`, 역할 서비스 수정(검토 475b409 R1·R2·R4, PID 1 전용 거두기), 시험 `tests/caller.rs` 14건·`tests/serve.rs` 4건 추가·단위 시험 보강, 실제 회차 계획 [RUN_PLAN.md](RUN_PLAN.md)와 도구([run-real.sh](run-real.sh), [call.sh](call.sh), [steps.tsv](steps.tsv), [summarize.py](summarize.py), [prompts/](prompts/), [role/](role/), [fixture/](fixture/)), 컨테이너 예행 [dry-run.sh](dry-run.sh)와 [기록](evidence/dry-run.log), 작업 공간 시험 [cargo-test.log](evidence/cargo-test.log) |
 | 모델 호출 | 0회(02-04 예산 사용 0). 실제 회차는 이 PR의 검토·병합 뒤 RUN_PLAN 순서로 한다 |
 
 ## 1. 호출자(`ieo-role-call`, 컨테이너 밖)
@@ -74,3 +74,25 @@
 - 진행 기록 3 §3의 나머지: 코디네이터 컨테이너, 역할 전용 이미지.
 - 개발 역할의 허용 목록은 03-02 몫이다. 시험은 읽기 전용 settings로 한다(RUN_PLAN §1).
 - PR #48 검토 3479675의 보고 문구 항목(F1 회당 시간 열, F2 회차 수 추정 표시, F3 정지 제한, F4 X-02 위치)은 다음 정기 보고에 반영한다. 회차 수는 RUN_PLAN이 정한다(7회, 예비 5회).
+
+## 5. 검토 c4620d2(변경 요청) 수정 1
+
+| # | 처리 |
+| --- | --- |
+| H1 (기록 없이 끝나는 실제 회차) | 시작 요청 직전에 `inflight.json`을 쓰고 회차 기록을 덧붙인 뒤에만 지운다. 남아 있으면 모든 호출을 거부한다. 시작 요청 뒤의 모든 오류(응답 분실, 상태 조회 실패, stdout 조회·저장 실패)는 미계측·`stop_required` 기록이 된다. 서비스의 마지막 회차가 호출자 기록에 없으면 시작하지 않는다. 호출자는 하나만 돈다(`caller.lock`). 종료 코드 0·2 밖은 모두 중단이다(바이너리 설명, RUN_PLAN §2). 시험: 응답 분실·stdout 실패·상태 조회 실패, 남은 표식, 모르는 마지막 회차, 컨테이너 예행의 표식 거부 |
+| H2 (준비 재실행이 증거를 지움) | run-real.sh는 새 작업 디렉터리에서만 돈다. 역할 볼륨·기록·같은 이름의 컨테이너가 있으면 아무것도 지우지 않고 멈춘다. 예행에서 거부를 확인했다 |
+| M1 (실패 결과가 성공처럼 보임) | 결과가 `success`·`is_error` false가 아니거나 결과가 없으면 `stop_required`다. 바이너리와 call.sh가 결과 subtype·`is_error`를 출력한다. 시험 있음 |
+| M2 (세 출처의 시점) | RUN_PLAN §3에 출처별 시점(호출 전·준비·실행 중·실행 뒤)과 “관측 뒤 정지이며 공급자 차단이 아님”을 적었다. call.sh가 매 호출 전 자격 형식을 다시 확인한다. 이번 실행에 `rate_limit_event`가 없으면 기록 `notes`에 남긴다 |
+| M3 (시험 공백) | 환경 검사, guard 정지의 미계측, 관측값 없음의 미계측, 역할 회차 몫, 몫 시간 절단, 실행 중 역할, 전송 실패 시험을 추가했다. 변이 결과는 evidence/mutants.txt에 있다 |
+| M4 (실제·모의 구분) | R1(개발 컨테이너 재시작, 모델 호출 없음)으로 체크포인트 복원을 실제 환경에서 확인한다. 실행 중 회차 정지와 §10 항목 4·5는 모의로만 확인했다고 RUN_PLAN에 적었다. 실제 Claude 정지는 설계상 미계측이 되어 예산을 멈추므로 사용자 결정 뒤에만 한다 |
+| L1 시계 | 시계가 관측 시각보다 이르면 보류한다. 시험 있음 |
+| L2 기록 쓰기 | 한 줄을 한 번에, 배타 잠금 아래 쓰고 fsync한다 |
+| L3·L4 경로 | run-real.sh는 `realpath -m`으로 경로를 푼다. dry-run.sh는 자기가 만든 작업 디렉터리(`fake/claude`가 있는 곳)만 지운다 |
+| L5 | 의미 없던 예행 항목을 표식 거부·재준비 거부 확인으로 바꿨다 |
+| L6 | 이미지를 digest로 고정했다 |
+| L7 | 어댑터 토큰을 헤더 파일(`curl -H @file`)로 넘겨 argv에 나오지 않게 했다 |
+| L8 | stream이 UTF-8 텍스트라는 점을 RUN_PLAN §3과 코드 주석에 적었다 |
+| L9 | `unknown` 끝 줄의 대조 절차를 RUN_PLAN §4에 적었다 |
+| L10 | run-real.sh에 `--init`을 쓰지 않는 이유(PID 1이 거둠)를 적었다 |
+
+**더 고친 것**: 호출자 HTTP 시험이 한 번 “Connection Failed”로 실패했다(서버가 10초 안에 듣지 않음). 시험이 `serve`의 바인드 오류를 보고하고 다른 포트로 다시 시도하게 했다. 이후 8회 연속 통과했다.

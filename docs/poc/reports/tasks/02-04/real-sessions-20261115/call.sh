@@ -7,6 +7,21 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 PY=/opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python
 line=$(grep -P "^$A\t" "$HERE/steps.tsv") || { echo "no step $A"; exit 1; }
 role=$(cut -f2 <<<"$line"); op=$(cut -f3 <<<"$line")
+if [ "$op" = restart ]; then
+  # a container restart between runs (no model call): the checkpoint must be restored from the
+  # role volume (2026-11-14 pr30 §4 checkpoint restoration)
+  c="${NAME_PREFIX:-ieo-rt}-fixture0204-$role"; port=$(podman port "$c" 8080 | head -1 | cut -d: -f2)
+  before=$(curl -s -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" | "$PY" -c 'import json,sys; c=json.load(sys.stdin)["checkpoint"]; print(c["session_id"], c["phase"], c.get("session_cumulative_attempt"))')
+  t0=$(date +%s.%N); podman restart -t 15 "$c" >/dev/null; t1=$(date +%s.%N)
+  for _ in $(seq 1 50); do curl -s -o /dev/null -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" && break; sleep 0.2; done
+  after=$(curl -s -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" | "$PY" -c 'import json,sys; s=json.load(sys.stdin); c=s["checkpoint"]; print(c["session_id"], c["phase"], c.get("session_cumulative_attempt"), "last", s["last"])')
+  mkdir -p "$W/summaries"
+  printf '{"step": "%s", "restart_seconds": %s, "pid1": "%s", "before": "%s", "after": "%s"}\n' "$A" \
+    "$("$PY" -c "print(round($t1-$t0,1))")" "$(podman exec "$c" cat /proc/1/cmdline | tr '\0' ' ' | cut -c1-40)" "$before" "$after" > "$W/summaries/$A.json"
+  cat "$W/summaries/$A.json"; exit 0
+fi
+# the credential form again before each call (prefix only, never the value)
+podman unshare head -c 10 "$W/$role/cred/oauth_token" | grep -q '^sk-ant-oat' || { echo "$role: credential is not the OAuth token form"; exit 1; }
 if [ ! -e "$W/coordinator.json" ]; then
   "$PY" - "$W" <<'PYEOF'
 import hashlib, json, sys
@@ -35,5 +50,6 @@ rc=$?
     p="$W/$role/state/$f"; if podman unshare test -e "$p"; then echo "$f exists: $(podman unshare head -c 40 "$p" | tr '\n' ' ')"; else echo "$f absent"; fi
   done; } >> "$W/summaries/$A.volume.txt"
 "$PY" "$HERE/summarize.py" "$W/ledger/records.jsonl" "$A" > "$W/summaries/$A.json" 2>&1 || true
-echo "exit $rc · summary $W/summaries/$A.json"
+# exit: 0 recorded and nothing to look at; 2 not started; anything else (3, 1, …): stop
+echo "exit $rc · result $("$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["result"]["subtype"], "is_error", d["result"]["is_error"], "stop_required", d["stop_required"])' "$W/summaries/$A.json" 2>/dev/null || echo unknown) · summary $W/summaries/$A.json"
 exit $rc

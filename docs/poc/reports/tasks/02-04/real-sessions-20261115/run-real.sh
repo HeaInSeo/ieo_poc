@@ -15,13 +15,21 @@ SECRETS_DIR=${SECRETS_DIR:-/opt/rust/ieo_poc_secrets}
 NAME_PREFIX=${NAME_PREFIX:-ieo-rt}
 PORT_DEV=${PORT_DEV:-58211}; PORT_GR=${PORT_GR:-58212}
 NETWORK=${NETWORK:-slirp4netns}   # 01-04 used slirp4netns for the API
-IMG=docker.io/library/golang:1.26.9-bookworm
+# by digest (the coordinator record names it; review c4620d2 L6)
+IMG=docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c
 REPO=fixture0204
 HERE=$(cd "$(dirname "$0")" && pwd)
 PY=/opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python
+W=$(realpath -m "$W")   # review c4620d2 L3
 case "$W" in /opt/rust/src/*) echo "workdir must be outside the repositories"; exit 1;; esac
-[ -e "$W/ledger/records.jsonl" ] && { echo "a ledger already exists in $W: refusing to reset it"; exit 1; }
-podman unshare rm -rf "$W/development" "$W/guardrail" "$W/bin"
+# never reset anything a run may have left (review c4620d2 H2): a fresh workdir and no
+# container of these names, running or not
+if [ -e "$W/development" ] || [ -e "$W/guardrail" ] || [ -e "$W/ledger" ]; then
+  echo "$W already holds role volumes or a ledger: refusing to reset them (use a new workdir)"; exit 1
+fi
+for r in development guardrail; do
+  podman container exists "$NAME_PREFIX-$REPO-$r" && { echo "container $NAME_PREFIX-$REPO-$r exists: refusing to replace it"; exit 1; }
+done
 mkdir -p "$W/bin" "$W/ledger"; chmod 700 "$W"
 cp "$BIN" "$W/bin/ieo-supervisor"; cp "$(dirname "$BIN")/ieo-role-call" "$W/bin/ieo-role-call"; chmod 755 "$W/bin/"*
 # credential form only (subscription OAuth token, never an API key); the value is never printed
@@ -29,6 +37,8 @@ for r in development guardrail; do
   head -c 10 "$SECRETS_DIR/$r.token" | grep -q '^sk-ant-oat' || { echo "$r: credential is not the OAuth token form"; exit 1; }
 done
 head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$W/adapter.token"; chmod 600 "$W/adapter.token"
+# the header for curl as a file, so the adapter token is not in any argv (review c4620d2 L7)
+( umask 077; printf 'Authorization: Bearer %s\n' "$(cat "$W/adapter.token")" > "$W/adapter.header" )
 # per-role shares of the 02-04 budget (sum = the approval: 12 runs, 14,400 s, 1.5 M, 15 M)
 declare -A SHARE=([development]='{"max_runs":8,"total_seconds":9600,"billable_tokens":1000000,"cache_read_tokens":10000000}'
                   [guardrail]='{"max_runs":4,"total_seconds":4800,"billable_tokens":500000,"cache_read_tokens":5000000}')
@@ -68,7 +78,7 @@ cp "$HERE/fixture/README.md" "$g/review/fixture/README.md"
 for r in development guardrail; do podman unshare chown -R "${UIDS[$r]}:${UIDS[$r]}" "$W/$r/state" "$W/$r/cred"; done
 run_role() { # role port
   local r=$1 port=$2 name="$NAME_PREFIX-$REPO-$1"
-  podman rm -f "$name" >/dev/null 2>&1 || true
+  # no --init: the supervisor must be PID 1, which reaps orphans (review c4620d2 L10)
   podman run -d --name "$name" --user "${UIDS[$r]}:${UIDS[$r]}" --network "$NETWORK" \
     --security-opt no-new-privileges --cap-drop ALL --stop-timeout 15 \
     --label "ieo.repo=$REPO" --label "ieo.role=$r" \
@@ -76,7 +86,7 @@ run_role() { # role port
     -v "$W/bin:/opt/ieo:ro,z" -v "$CLAUDE_BIN:/opt/claude/claude:ro,z" -p "127.0.0.1:$port:8080" \
     "$IMG" /opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervisor.json --listen 0.0.0.0:8080 >/dev/null
   for _ in $(seq 1 50); do
-    curl -s -o /dev/null -H "Authorization: Bearer $(cat "$W/adapter.token")" "http://127.0.0.1:$port/v0/role/status" && return
+    curl -s -o /dev/null -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" && return
     sleep 0.2
   done
   echo "role $r did not come up"; podman logs "$name" 2>&1 | tail -5; exit 1
