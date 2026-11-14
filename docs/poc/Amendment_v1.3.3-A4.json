@@ -1,0 +1,54 @@
+{
+  "id": "v1.3.3-A4",
+  "date": "2026-11-13",
+  "plan_version": "v1.3.3",
+  "decision_ref": "Dogfooding_Quality_Improvement_DF-02.md",
+  "status": "proposal_not_execution_approval",
+  "baseline_commit": "82c7db9921db58dffc6d43686c456d3ee3edf886",
+  "baselines_unchanged": {
+    "main_tasks": 73,
+    "main_experiments": 31,
+    "followup_tasks": 12,
+    "followup_candidates": 5
+  },
+  "profile_revisions": [],
+  "sprint_revisions": [],
+  "changed_acceptance": [],
+  "scope_limit": "DF-02 후속 계획 문서화만. 실행 등록·모델 예산·제품 코드·API·CI·진행 원장·Notion·DB·PR27 브랜치 변경 없음",
+  "merge_order": "PR27 병합 후 main 82c7db9921db58dffc6d43686c456d3ee3edf886 통합. A1/A2/A3/A4 적용 순서·해시·명세·CI·통합 변경 검토 확인 뒤 기존 병합 절차 적용",
+  "files": [
+    {
+      "path": "Console_Coordinator_PoC_Validation_Plan.md",
+      "original_sha256": "96b6950273d7f1b4f0e7ea7da1253eb67230c2b4f12a29fa047ba7f38273fa1d",
+      "previous_sha256": "4d483cf80f506b7fa542a24340686f4bd92ad2c5f401f861a205b8b5e6ff34b5",
+      "sha256": "8685ceb9a985e82fa3197254fb56450c9bbe758ef13f0813e81d12ea6b0362c6",
+      "change": "amended",
+      "reason": "DF-01을 유지하고 DF-02 품질 개선 후속 계획 링크 추가"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md",
+      "original_sha256": "23f6b3245f9894670ddbd0dab5318a3af80ab4808d0c45c7acfa16a9ff079962",
+      "previous_sha256": "7ae17496d4c154cfa3c9d794912d0278760595dbe5a427ed27f911fde33bb109",
+      "sha256": "35710c3cf11cf3f022eb6de62f90eaea9b6a978109e06c0b5cc7b36c390672c7",
+      "change": "amended",
+      "reason": "스프린트 06 뒤 별도 추가 작업 계획 안내; 73행·수용 기준·선행 불변"
+    },
+    {
+      "path": "DEV_AGENT_HANDOFF.md",
+      "original_sha256": "45e4bc8be294a939a0302b1d8cb3ad0d88ad9151e6e15e9d8d768fac485f6720",
+      "previous_sha256": "f028b0912c0026bf43278606662331783d924b0965205a731571c2851a003cf0",
+      "sha256": "b4fbcf70acc834981c9c44db838890e7b45f1f35ae9838899be1f7ea9d7b42b4",
+      "change": "amended",
+      "reason": "DF-01 검수 뒤 DF-02 명세화·추가 작업 등록 인계"
+    },
+    {
+      "path": "scripts/validate_package.py",
+      "original_sha256": "bd43577b73f090c9f89c6685660e0f2063d546521661f8dc79f816b8ecc2448c",
+      "previous_sha256": "9b836342e192baa44c621c1469989cdafe311679ec6f1e30cdd40582d739b370",
+      "sha256": "66790b488563329f28aed4a82bd0462f5765040906337573db1900dfb68abb63",
+      "change": "amended",
+      "reason": "프로파일·수용 기준 변경 없는 A4 문서 개정 검산; 패키지 해시 대조 보존"
+    }
+  ],
+  "initial_baseline_commit": "2c86f3da0c74c9d94140a0198a201fff566c6618"
+}
