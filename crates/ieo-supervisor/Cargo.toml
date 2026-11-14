@@ -14,9 +14,8 @@ tiny_http = "0.12"
 sha2 = "0.11.1"
 signal-hook = "0.3"
 nix = { version = "0.29", features = ["process"] }
-
-[dev-dependencies]
 ieo-evidence = { path = "../ieo-evidence" }
+ureq = { version = "2", default-features = false, features = ["json"] }
 
 [lints]
 workspace = true

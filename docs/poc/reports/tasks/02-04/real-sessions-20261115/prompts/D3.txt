@@ -1,0 +1,1 @@
+Use the Agent tool with subagent_type "reader" to count the lines of README.md in the current directory. Reply with the number it reports only.
