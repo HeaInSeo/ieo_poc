@@ -2417,7 +2417,7 @@
       "verification_level": "unverified",
       "evidence": [],
       "next_action": "02-04 실제 시험과 겹치지 않게 별도 PR로 계약 초안 작성(Plan_gRPC_Internal_API_v0.md §4)",
-      "unresolved": "업무 규칙은 기존 api::handle 재사용 전제(§3). 02-05 전에 완료"
+      "unresolved": "업무 규칙은 기존 api::handle 재사용 전제(§3). 02-05 전에 끝내는 것이 목표(02-05의 선행 아님)"
     },
     {
       "task_id": "X-04",
@@ -2433,8 +2433,8 @@
       "result_state": "미실행",
       "verification_level": "unverified",
       "evidence": [],
-      "next_action": "X-03 검수 뒤 착수. 02-05 전에 완료(Plan_gRPC_Internal_API_v0.md §6)",
-      "unresolved": "공통 회귀: 인증·역할 권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 연결 중단 뒤 재전송 중복 반영 방지(전송 성공과 실제 반영의 불일치 포함) · 02-05의 선행·수용 기준은 바꾸지 않음: X-04가 준비되지 않으면 02-05는 HTTP로 진행"
+      "next_action": "X-03 검수 뒤 착수. 02-05 전에 끝내는 것이 목표(02-05의 선행 아님)(Plan_gRPC_Internal_API_v0.md §6)",
+      "unresolved": "공통 회귀: 인증·역할 권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 연결 중단 뒤 재전송 중복 반영 방지(전송 성공과 실제 반영의 불일치 포함) · 02-05의 선행·수용 기준은 바꾸지 않음: X-04가 준비되지 않으면 02-05는 HTTP로 진행 · supervisor 쪽 gRPC 클라이언트(02-05가 HTTP로 먼저 진행했으면 그 전환 포함)도 X-04 범위"
     },
     {
       "task_id": "X-05",

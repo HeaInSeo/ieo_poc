@@ -12,14 +12,17 @@
 - **대상**: 코디네이터와 실행 관리 서비스(역할 Pod의 supervisor) 사이의 내부 API. 지금은 HTTP/JSON(`contracts/ieo-api-v0.openapi.yaml`, `crates/ieo-coord`)이다.
 - **대상 아님**: Claude CLI 실행 방식(supervisor가 같은 컨테이너에서 프로세스로 실행), GitHub·Notion 외부 API 연결.
 - **유지**: 기존 HTTP/JSON 계약과 시험. gRPC는 경로를 **추가**한다.
-- **gRPC 표면(초안, X-03에서 확정)**: supervisor가 코디네이터에 하는 호출(배정 조회·인수, 체크포인트·세대·순번 보고, 증거·결과 제출, 세션 상태)과 그에 필요한 기존 작업(배정·증거·판정 조회). 사람·등록자용 작업(명세 등록·의미 검토·Notion 가져오기·예외 승인)은 HTTP/JSON에 둔다.
+- **gRPC 표면(초안, X-03에서 확정)**: supervisor가 코디네이터에 하는 호출만 둔다.
+  - **기존 작업 중 재사용**: 에이전트 보고 제출(`POST /v0/agent/reports`), 재현 요청(`POST /v0/agent/repro-requests`, `GET …/{id}`), 스프린트 상태·사건 조회(`GET /v0/sprints/{id}/state`, `…/events`). 단, 지금 에이전트 자격은 `/v0/sprints*`를 쓸 수 없다(403 `AGENT_READ_DENIED`). supervisor가 이 조회를 쓸 수 있는지는 supervisor 주체의 종류·범위를 정할 때(02-05·X-03) 함께 정한다.
+  - **새로 만들 작업(02-05 범위, 지금 없음)**: 자기 배정 조회·인수, 체크포인트·세대·순번 보고, 세션 상태. 지금 코디네이터에는 배정·증거·판정을 조회하는 작업이 없다. 배정(`coordinator:assign`)·증거 입력(`evidence:ingest`)·판정(`judge:verify`)은 supervisor가 아닌 주체의 쓰기 작업이다.
+  - 사람·등록자·배정자용 작업(명세 등록·의미 검토·Notion 가져오기·예외 승인·배정·판정·outbox)은 HTTP/JSON에만 둔다.
 - **새 작업의 HTTP 형태**: 02-05에서 새로 생기는 작업도 작업 표에 한 번만 정의한다. 두 전송이 같은 표로 보내므로 업무 규칙은 하나다. HTTP/JSON 형태를 함께 둘지는 X-03에서 작업마다 정한다. 기본은 함께 두는 것이다(기존 HTTP 시험 체계로 규칙을 검증할 수 있게).
 
 ## 2. 기존 구현으로 충족하는 부분과 추가가 필요한 부분
 
 | 요구 | 기존 구현(재사용) | 추가 필요 |
 | --- | --- | --- |
-| 업무 규칙(등록·배정·판정·증거·outbox·Notion 가져오기·예외) | `ieo_coord::api::handle`이 전송과 무관한 요청(`Req`: method·path·query·Idempotency-Key·본문)을 받아 `Resp`(상태·JSON)를 돌려준다. 요청마다 트랜잭션이 하나이고, 2xx가 아니면 롤백한다 | gRPC 어댑터가 같은 `handle`(또는 같은 작업 표)로 보낸다. 규칙을 다시 구현하지 않는다 |
+| 업무 규칙 | `ieo_coord::api::handle`이 전송과 무관한 요청(`Req`: method·path·query·Idempotency-Key·본문)을 받아 `Resp`(상태·JSON)를 돌려준다. 요청마다 트랜잭션이 하나이고, 2xx가 아니면 롤백한다 | gRPC 어댑터는 §1의 gRPC 표면에 든 작업만 같은 `handle`(또는 같은 작업 표)로 보낸다. 규칙을 다시 구현하지 않는다. 나머지 작업은 HTTP/JSON에만 있다 |
 | 인증·역할 권한 | **기반만 있다.** `auth::Credentials`: Bearer 토큰 digest, 주체 종류(user/service/agent), 범위, repo 범위 | gRPC metadata `authorization: Bearer …`를 같은 `Credentials`로 해석한다. **supervisor 주체 종류·범위는 아직 없다.** 02-05·X-03에서 정한다 |
 | 멱등·중복 배정 방지 | Idempotency-Key 재조회, (repo, role) 소유권 머리 CAS, (assignment_id, generation) 재조회, 추가 전용 이력 | gRPC 요청 필드에 같은 키를 둔다. 재조회 응답을 그대로 돌려준다 |
 | 롤백 | 요청 단위 트랜잭션 | 같음(같은 `handle`) |
@@ -38,7 +41,7 @@
   1. `handle` 안의 경로 일치(method + path 조각)를 **작업 표**(`Operation` 열거)로 뽑는다. HTTP와 gRPC가 같은 표로 보내게 하여 두 경로가 갈라지지 않게 한다. 기존 HTTP 시험이 그대로 통과해야 한다.
   2. 상태 코드는 지금 HTTP 숫자(`u16`)다. 내부 표현은 그대로 두고 gRPC 어댑터에 대응표만 둔다. 업무 규칙 쪽을 바꾸지 않는다.
 - **런타임**: 지금은 동기(tiny_http, postgres 동기 클라이언트, 작업자 스레드마다 DB 연결 하나)다. Rust gRPC 서버(후보 tonic)는 비동기(tokio)다. 동기 `handle`을 `spawn_blocking` 또는 별도 작업자 풀에서 부르면 규칙은 그대로 쓸 수 있다. 같은 바이너리에 둘지 별도 바이너리로 둘지는 X-04 설계에서 정한다.
-- **02-04 영향**: supervisor가 코디네이터에 체크포인트 digest·순번을 보고하는 부분이 생기면, 호출을 `CoordinatorClient` 같은 경계 뒤에 둔다. 02-04는 기존 HTTP로 진행하고, gRPC 전환은 X-04·02-05에서 한다. 02-04의 수용 기준은 바꾸지 않는다.
+- **02-04 영향**: supervisor가 코디네이터에 체크포인트 digest·순번을 보고하는 부분이 생기면, 호출을 `CoordinatorClient` 같은 경계 뒤에 둔다. 02-04는 기존 HTTP로 진행한다. supervisor 클라이언트의 gRPC 전환은 X-04가 맡는다: X-04가 02-05보다 먼저 끝나면 02-05가 처음부터 gRPC 클라이언트를 쓰고, 늦으면 02-05는 HTTP로 진행하고 X-04가 그 클라이언트를 gRPC로 바꾼다. 02-04·02-05의 수용 기준은 바꾸지 않는다.
 
 ## 4. 계약에 명시할 것(X-03)
 
@@ -70,7 +73,7 @@
 | ID | 작업 | 종류 | 선행 | 배치 이유 |
 | --- | --- | --- | --- | --- |
 | X-03 | gRPC 내부 API 계약(§4)과 분리 영향 확인(§3) | 설계 | 02-03(HTTP 계약·구현) | 코디네이터↔supervisor 통신이 처음 실제로 쓰이는 02-05보다 먼저 계약이 있어야 한다 |
-| X-04 | gRPC 경로 구현: 작업 표 분리, tonic 서버 어댑터, metadata 인증, 상태 대응, deadline·취소, (필요 시) 스트림. HTTP·gRPC 공통 회귀(사용자 결정 §5) | 구현·검증 | X-03 | 02-05가 supervisor 쪽 gRPC 클라이언트를 쓰기 전에 끝내는 것이 목표다. **02-05의 선행·수용 기준은 바꾸지 않는다.** X-04가 준비되지 않았으면 02-05는 HTTP로 진행하고, gRPC 전환은 X-04 뒤에 한다 |
+| X-04 | gRPC 경로 구현: 작업 표 분리, tonic 서버 어댑터, metadata 인증, 상태 대응, deadline·취소, (필요 시) 스트림, supervisor 쪽 gRPC 클라이언트(전환 포함). HTTP·gRPC 공통 회귀(사용자 결정 §5) | 구현·검증 | X-03 | 02-05가 supervisor 쪽 gRPC 클라이언트를 쓰기 전에 끝내는 것이 목표다. **02-05의 선행·수용 기준은 바꾸지 않는다.** X-04가 준비되지 않았으면 02-05는 HTTP로 진행하고, gRPC 전환은 X-04 뒤에 한다 |
 | X-05 | 기본 kind(Cilium 없음, 멀티 노드) gRPC 분산·복구 시험: 시험용 서버·클라이언트 | 검증 | X-03(§5 설계) | 02-x 구현과 독립. 08-02 클러스터 준비와는 별도 시험 환경. 실제 Claude 호출 없음 |
 | X-06 | 제품 경로 kind 재검증: 실제 코디네이터 gRPC 경로의 판정·DB 상태·중복 처리 | 검증 | X-04, X-05 | 04-03·04-04(실제 연결·원자성·중복)의 gRPC 쪽 근거로 쓴다(그 작업들의 기준은 바꾸지 않음) |
 | X-07 | Cilium L7 분산 경로 추가 시험(별도 kind) | 검증(선택) | X-05 | 미실행이어도 다른 작업을 막지 않는다 |
