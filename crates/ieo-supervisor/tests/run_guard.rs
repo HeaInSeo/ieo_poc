@@ -650,3 +650,112 @@ fn the_stop_grace_must_fit_in_the_time_left() {
         (Duration::from_secs(1), true)
     );
 }
+
+// --- review 5136d66 ---
+
+#[test]
+fn a_stopped_run_is_charged_unmeasured_even_with_a_result_written_on_the_way_out() {
+    let ok = rate("rejected");
+    // P1: 5,001 observed, stopped by time; the TERM handler writes an error result with zero usage
+    let d = Tmp::new("charge-stop");
+    let zero = json!({"type": "result", "subtype": "error_during_execution", "is_error": true,
+                      "usage": {"input_tokens": 0, "output_tokens": 0, "cache_creation_input_tokens": 0,
+                                "cache_read_input_tokens": 0}, "modelUsage": {}})
+    .to_string();
+    let tail = format!(
+        "trap 'printf \"%s\\n\" \"{}\"; exit 1' TERM\nwhile :; do sleep 0.1; done",
+        zero.replace('"', "\\\"")
+    );
+    let mut l = limits(800);
+    l.grace = Duration::from_secs(5);
+    let o = go(
+        d.p(),
+        fake(d.p(), &[assistant("m1", 1, 5_000, 0, 0)], &tail),
+        l,
+    );
+    assert_eq!(o.stop, Stop::RunTimeout);
+    assert_eq!(o.observed.billable, 5_001);
+    let collected = collected(&d.p().join("stdout.jsonl"), o.elapsed.as_millis() as u64);
+    let charged = run::charge(&o, &collected["usage"]["run"]);
+    assert_eq!(charged["state"], "unmeasured", "{charged}");
+    assert_eq!(charged["guard_observed"]["billable_lower_bound"], 5_001);
+    let mut record = collected.clone();
+    record["usage"]["run"] = charged;
+    assert!(matches!(
+        budget::next(&BUDGET_0204, &[record], ok_obs(&ok)),
+        Decision::Stop { .. }
+    ));
+}
+
+#[test]
+fn an_exited_run_is_charged_with_the_collector_figure_unless_it_is_below_the_observed() {
+    let real = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../docs/poc/reports/tasks/01-04/first-probes-20261112/evidence/attempts/01-P1-development/stdout.jsonl"
+    ))
+    .expect("stored 01-04 stream");
+    let lines: Vec<String> = real.lines().map(str::to_string).collect();
+    // the real stream: measured, charged as is
+    let d = Tmp::new("charge-ok");
+    let o = go(d.p(), fake(d.p(), &lines, "exit 0"), limits(10_000));
+    let c = collected(&d.p().join("stdout.jsonl"), 1_000);
+    assert_eq!(run::charge(&o, &c["usage"]["run"]), c["usage"]["run"]);
+    // an extra observed message the result does not account for: unmeasured
+    let d = Tmp::new("charge-below");
+    let mut more = vec![assistant("extra", 1, 50_000, 0, 0)];
+    more.extend(lines);
+    let o = go(d.p(), fake(d.p(), &more, "exit 0"), limits(10_000));
+    let c = collected(&d.p().join("stdout.jsonl"), 1_000);
+    assert_eq!(c["usage"]["run"]["state"], "measured");
+    assert_eq!(run::charge(&o, &c["usage"]["run"])["state"], "unmeasured");
+}
+
+#[test]
+fn an_error_return_keeps_the_cleanup_report() {
+    let d = Tmp::new("err-cleanup");
+    let pid = d.p().join("child.pid");
+    let kill = broken_kill(d.p());
+    let tail = format!(
+        "sleep 300 & echo $! > {}\nprintf 'x\\n'\nsleep 300",
+        pid.display()
+    );
+    let cmd = fake(d.p(), &[], &tail);
+    let (err, devfull) = (d.p().join("stderr.txt"), PathBuf::from("/dev/full"));
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut l = limits(5_000);
+        l.grace = Duration::from_millis(300);
+        let _ = tx.send(run::run_with_kill(cmd, l, &devfull, &err, &kill));
+    });
+    let r = rx.recv_timeout(Duration::from_secs(20)).expect("returned");
+    let e = r.expect_err("writing to /dev/full fails");
+    assert!(e.to_string().contains("cleanup failed"), "{e}");
+    // the broken kill left the group behind (that is the point): clean it up with the real one
+    if let Ok(p) = std::fs::read_to_string(d.p().join("leader.pid")) {
+        let _ = Command::new("kill")
+            .args(["-s", "KILL", "--", &format!("-{}", p.trim())])
+            .status();
+    }
+    if let Ok(p) = std::fs::read_to_string(&pid) {
+        let _ = Command::new("kill").args(["-s", "KILL", p.trim()]).status();
+    }
+}
+
+#[test]
+fn the_copy_after_a_stop_is_bounded_even_if_a_descendant_holds_the_pipe() {
+    let d = Tmp::new("setsid");
+    let holder = d.p().join("holder.pid");
+    // a descendant that leaves the group (setsid) keeps stdout open
+    let tail = format!(
+        "setsid sh -c 'echo $$ > {}; exec sleep 300' &\nsleep 300",
+        holder.display()
+    );
+    let mut l = limits(500);
+    l.grace = Duration::from_millis(500);
+    let o = go(d.p(), fake(d.p(), &[], &tail), l);
+    assert_eq!(o.stop, Stop::RunTimeout);
+    assert!(o.elapsed < Duration::from_secs(5), "{:?}", o.elapsed);
+    if let Ok(p) = std::fs::read_to_string(&holder) {
+        let _ = Command::new("kill").args(["-s", "KILL", p.trim()]).status();
+    }
+}

@@ -6,8 +6,10 @@
 //! * **time**: the run gets `min(per-run limit, total time left) − grace`, so that the stop
 //!   (SIGTERM to the whole process group, SIGKILL after the grace) completes within the limit, up
 //!   to tens of milliseconds of polling and `kill` calls (recorded durations round up to seconds).
-//! * **faithful copy**: lines that arrive after a stop decision — during the grace and for a
-//!   bounded time afterwards — are still copied, so a `result` written on the way out is kept.
+//! * **copy after a stop**: lines that arrive after a stop decision — during the grace and for a
+//!   bounded 2 s afterwards — are still copied (per line: bytes decoded lossily, a trailing `\r`
+//!   removed), so a `result` written on the way out is kept for the report; it is not trusted for
+//!   charging ([`charge`]).
 //! * **observed tokens**: stream-json `assistant` lines carry a `usage` object; the guard sums it
 //!   (per message id, the largest value seen; parent and child messages alike) and stops the group
 //!   once observed billable tokens (input + output + cache_creation) or cache_read reach the room
@@ -29,8 +31,9 @@
 //!   stream, 8,035 billable and 26,400 cache_read in `modelUsage`). The observed sum is therefore a **lower bound**; the stop
 //!   comes only after the request that crossed the room, whose tokens are already spent.
 //! * Final usage is known only at the end, from the `result` event; the 02-01 collector
-//!   (`ieo-evidence`) computes the run share from it. A run stopped before its `result` is
-//!   unmeasured, and the next call is blocked ([`crate::budget::next`]).
+//!   (`ieo-evidence`) computes the run share from it. A run the guard **stopped** is charged as
+//!   unmeasured even when it wrote a `result` on the way out ([`charge`]): an interrupted process
+//!   may report less than it used. The next call is then blocked ([`crate::budget::next`]).
 //! * The first `rate_limit_event` of a session appears only after the first request (it may come
 //!   before any `assistant` line, l3-compact); holding a
 //!   call before that request is the pre-run observation's job (with the subscription and
@@ -409,11 +412,21 @@ pub fn run_with_kill(
     // so it is detached rather than joined
     drop(rx);
     drop(reader);
-    let watched = watched?;
+    let with_cleanup = |e: std::io::Error| {
+        if cleanup_failed {
+            std::io::Error::new(
+                e.kind(),
+                format!("{e}; cleanup failed: processes of the run may remain"),
+            )
+        } else {
+            e
+        }
+    };
+    let watched = watched.map_err(with_cleanup)?;
     if let Some(e) = copy_error {
-        return Err(e);
+        return Err(with_cleanup(e));
     }
-    out.flush()?;
+    out.flush().map_err(with_cleanup)?;
     Ok(Outcome {
         stop: match watched {
             Watch::Stopped(s) => s,
@@ -527,4 +540,52 @@ fn drained(
         }
     }
     Ok(Watch::Exited(status))
+}
+
+/// The usage a run is charged to the budget with (the `usage.run` value of its record), from the
+/// guard's [`Outcome`] and the 02-01 collector's `usage.run` for the copied stream.
+///
+/// * A run the guard **stopped** is always charged as **unmeasured**, whatever `result` it wrote on
+///   the way out: a process interrupted mid-request may report less than it used (the CLI writes
+///   `error_during_execution` results with zero usage), so such a figure is never trusted. The
+///   collector's figure and the guard's observed lower bound are kept for the report. An
+///   unmeasured run stops the budget until a person decides ([`crate::budget::next`]).
+/// * A run that **exited** on its own is charged with the collector's figure, unless that figure
+///   is below what the guard observed (then unmeasured: the two disagree).
+pub fn charge(outcome: &Outcome, collected_run: &Value) -> Value {
+    let observed = serde_json::json!({
+        "billable_lower_bound": outcome.observed.billable,
+        "cache_read_lower_bound": outcome.observed.cache_read,
+        "messages": outcome.observed.messages,
+        "incomplete_lines": outcome.observed.incomplete_lines,
+    });
+    let unmeasured = |reason: String| {
+        serde_json::json!({"state": "unmeasured", "reason": reason,
+                           "guard_observed": observed, "collector_reported": collected_run})
+    };
+    if outcome.stop != Stop::Exited {
+        return unmeasured(format!(
+            "stopped by the run guard ({:?}); a result written after the stop is not trusted",
+            outcome.stop
+        ));
+    }
+    if collected_run["state"] == "measured" {
+        let t = &collected_run["tokens"];
+        let n = |k: &str| t[k].as_u64();
+        let billable = n("input")
+            .zip(n("output"))
+            .zip(n("cache_creation"))
+            .map(|((i, o), c)| i.saturating_add(o).saturating_add(c));
+        match (billable, n("cache_read")) {
+            (Some(b), Some(cr))
+                if b >= outcome.observed.billable && cr >= outcome.observed.cache_read => {}
+            _ => {
+                return unmeasured(
+                    "collector figure below the guard's observed lower bound (or incomplete)"
+                        .into(),
+                );
+            }
+        }
+    }
+    collected_run.clone()
 }

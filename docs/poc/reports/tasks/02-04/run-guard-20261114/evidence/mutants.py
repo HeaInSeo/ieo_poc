@@ -25,6 +25,10 @@ M = [
  ("R21 no direct kill of the leader", "    let _ = child.kill();\n    match child.wait() {", "    match child.wait() {"),
  ("R22 output after a stop not copied", "        copier.pump(DRAIN);", "        let _ = DRAIN;"),
  ("R24 a window equal to the grace allowed", "        if window <= GRACE {", "        if window < GRACE {"),
+ ("R25 copy after a stop until the pipe closes (unbounded)", "        copier.pump(DRAIN);", "        copier.pump(Duration::from_secs(3600));"),
+ ("R26 a stopped run charged with the result it wrote", "    if outcome.stop != Stop::Exited {\n        return unmeasured(", "    if false {\n        return unmeasured("),
+ ("R27 a collector figure below the observed accepted", "                if b >= outcome.observed.billable && cr >= outcome.observed.cache_read => {}", "                if true => {}"),
+ ("R28 cleanup failure dropped from error returns", "        if cleanup_failed {\n            std::io::Error::new(", "        if false {\n            std::io::Error::new("),
 ]
 only = sys.argv[1:]
 p = pathlib.Path(F); src = p.read_text()
