@@ -212,38 +212,67 @@ pub const CORRECTION_FORMAT: &str = "ieo-role-run-correction/v0";
 /// The records of the budget as they count: [`raw_records`] with each correction applied to the
 /// run it corrects (the original line stays in the file; the corrected run carries
 /// `corrected_by` and the original values under `before_correction`). Corrections are not runs.
-/// Fail-closed: a correction naming an unknown run, a second correction of one run, or a
-/// correction whose stream digest differs from the run's is an error.
+///
+/// A correction is not trusted for what it says: it is measured again from the kept stream and
+/// child transcripts it names ([`remeasure`], the same rules as [`reevaluate`]), and its usage
+/// must equal that result (review 608b367 F1). Fail-closed: a correction naming an unknown or
+/// later run, a second correction of one run, a missing or changed file, or any difference
+/// makes the ledger unusable.
 pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
     effective(raw_records(plan)?)
 }
 
 fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
-    let (corrections, mut runs): (Vec<Value>, Vec<Value>) = raw
-        .into_iter()
-        .partition(|r| r["format"] == CORRECTION_FORMAT);
+    let mut runs: Vec<Value> = Vec::new();
     let mut done = std::collections::BTreeSet::new();
-    for c in corrections {
+    for line in raw {
+        if line["format"] != CORRECTION_FORMAT {
+            runs.push(line);
+            continue;
+        }
+        let c = line;
         let id = c["corrects"]
             .as_str()
-            .ok_or("correction without `corrects`")?;
-        if !done.insert(id.to_owned()) {
+            .ok_or("correction without `corrects`")?
+            .to_owned();
+        if !done.insert(id.clone()) {
             return Err(format!("run {id} has more than one correction"));
         }
-        let r = runs
-            .iter_mut()
-            .find(|r| r["attempt_id"] == id)
-            .ok_or(format!("correction of an unknown run {id}"))?;
-        if r["stream"]["sha256"] != c["original_stream_sha256"] || !c["after"]["usage"].is_object()
+        let pos = runs
+            .iter()
+            .position(|r| r["attempt_id"] == id.as_str())
+            .ok_or(format!("correction of an unknown or later run {id}"))?;
+        if runs[pos]["stream"]["sha256"] != c["original_stream_sha256"]
+            || c["after"]["stop_required"] != false
+            || c["decision"].as_str().is_none_or(str::is_empty)
         {
+            return Err(format!("correction of {id} does not match the run"));
+        }
+        let mut transcripts = std::collections::BTreeMap::new();
+        for t in c["child_transcripts"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+        {
+            let (Some(a), Some(p)) = (t["agent_id"].as_str(), t["path"].as_str()) else {
+                return Err(format!(
+                    "correction of {id}: child transcript entry incomplete"
+                ));
+            };
+            transcripts.insert(a.to_owned(), PathBuf::from(p));
+        }
+        let (usage, kept) = remeasure(&runs[pos], &runs[..pos], &transcripts)
+            .map_err(|e| format!("correction of {id} does not hold: {e}"))?;
+        if usage["run"] != c["after"]["usage"]["run"] || json!(kept) != c["child_transcripts"] {
             return Err(format!(
-                "correction of {id} does not match the run's stream or has no usage"
+                "correction of {id} differs from its measurement again"
             ));
         }
+        let r = &mut runs[pos];
         r["before_correction"] = json!({"usage": r["usage"].take(),
             "stop_required": r["stop_required"], "stop_reason": r["stop_reason"]});
-        r["usage"] = c["after"]["usage"].clone();
-        r["stop_required"] = c["after"]["stop_required"].clone();
+        r["usage"] = usage;
+        r["stop_required"] = json!(false);
         r["stop_reason"] = Value::Null;
         r["corrected_by"] = json!({"decision": c["decision"], "corrected_at": c["corrected_at"]});
     }
@@ -794,31 +823,21 @@ impl After<'_> {
     }
 }
 
-/// Re-evaluate a recorded run from its kept stream and child transcripts (no model call), for a
-/// user decision (02-04 D3). Appends a correction only when the run is now measured and its
-/// share matches parent + children; the run is not counted again and its stream must be the one
-/// recorded. Returns the correction.
-pub fn reevaluate(
-    plan: &Plan,
-    attempt: &str,
+/// Measure a recorded run again from its kept stream and the given child transcripts (no model
+/// call). Only for a run stopped for unmeasured usage alone; the stream must be the recorded
+/// one, a transcript the run recorded must have the recorded digest, the base must be the
+/// recorded base of the same session, and the result must be measured and consistent. Returns
+/// the usage (as a record carries it) and the transcripts used (path, size, digest).
+fn remeasure(
+    r: &Value,
+    earlier: &[Value],
     transcripts: &std::collections::BTreeMap<String, PathBuf>,
-    decision: &str,
-) -> Result<Value, String> {
-    let raw = raw_records(plan)?;
-    if raw
-        .iter()
-        .any(|r| r["format"] == CORRECTION_FORMAT && r["corrects"] == attempt)
-    {
-        return Err(format!("{attempt} is already corrected"));
-    }
-    let pos = raw
-        .iter()
-        .position(|r| r["attempt_id"] == attempt && r["format"] == RECORD_FORMAT)
-        .ok_or(format!("no record of {attempt}"))?;
-    let r = &raw[pos];
+) -> Result<(Value, Vec<Value>), String> {
+    let attempt = r["attempt_id"].as_str().unwrap_or("?");
     // only a run stopped for its usage alone (nothing else to look at)
     let reason = r["stop_reason"].as_str().unwrap_or_default();
-    if r["usage"]["run"]["state"] != "unmeasured"
+    if r["format"] != RECORD_FORMAT
+        || r["usage"]["run"]["state"] != "unmeasured"
         || !reason.starts_with("usage unmeasured")
         || reason.contains("; ")
     {
@@ -835,12 +854,21 @@ pub fn reevaluate(
     let mut kept = Vec::new();
     for (a, p) in transcripts {
         let b = std::fs::read(p).map_err(|e| format!("transcript {}: {e}", p.display()))?;
-        kept.push(json!({"agent_id": a, "path": p, "bytes": b.len(),
-            "sha256": hex::encode(Sha256::digest(&b))}));
+        let sha = hex::encode(Sha256::digest(&b));
+        // a transcript the run itself kept must be that one (review 608b367 F4)
+        if let Some(rec) = r["children"]
+            .as_array()
+            .and_then(|cs| cs.iter().find(|x| x["agent_id"] == a.as_str()))
+            .filter(|x| x["sha256"].is_string())
+            && rec["sha256"] != sha.as_str()
+        {
+            return Err(format!(
+                "transcript of {a} differs from the one the run kept"
+            ));
+        }
+        kept.push(json!({"agent_id": a, "path": p, "bytes": b.len(), "sha256": sha}));
         bytes.insert(a.clone(), b);
     }
-    // the base the run was recorded with (the run actually resumed)
-    let earlier = effective(raw[..pos].to_vec())?;
     let mode = if r["session"]["mode"] == "resume" {
         SessionMode::Resume
     } else {
@@ -853,11 +881,15 @@ pub fn reevaluate(
                 .iter()
                 .find(|x| x["attempt_id"] == b)
                 .ok_or(format!("base {b} not recorded"))?;
+            // the base's own session must be the run's (review 608b367 F3)
+            if br["session"]["session_id"] != r["session"]["session_id"] {
+                return Err(format!("base {b} is another session"));
+            }
             Some(ResumeBase {
                 task_id: br["task_id"].as_str().unwrap_or_default().into(),
                 attempt_id: b.into(),
                 command_id: br["command_id"].as_str().unwrap_or_default().into(),
-                session_id: r["session"]["session_id"].as_str().map(str::to_owned),
+                session_id: br["session"]["session_id"].as_str().map(str::to_owned),
                 session: serde_json::from_value(br["usage"]["session"].clone())
                     .map_err(|e| format!("base session: {e}"))?,
                 cost_usd_reported: br["usage"]["cost_usd_reported"].as_f64(),
@@ -887,6 +919,35 @@ pub fn reevaluate(
     let mut usage = serde_json::to_value(&parsed.usage).map_err(|e| e.to_string())?;
     usage["collector_run"] = usage["run"].take();
     usage["run"] = charged;
+    Ok((usage, kept))
+}
+
+/// Re-evaluate a recorded run from its kept stream and child transcripts (no model call), for a
+/// user decision (02-04 D3). Appends a correction only when [`remeasure`] holds; the run is not
+/// counted again and the original line stays. Returns the correction.
+pub fn reevaluate(
+    plan: &Plan,
+    attempt: &str,
+    transcripts: &std::collections::BTreeMap<String, PathBuf>,
+    decision: &str,
+) -> Result<Value, String> {
+    if decision.trim().is_empty() {
+        return Err("a correction needs the decision it follows".into());
+    }
+    let raw = raw_records(plan)?;
+    if raw
+        .iter()
+        .any(|r| r["format"] == CORRECTION_FORMAT && r["corrects"] == attempt)
+    {
+        return Err(format!("{attempt} is already corrected"));
+    }
+    let pos = raw
+        .iter()
+        .position(|r| r["attempt_id"] == attempt && r["format"] == RECORD_FORMAT)
+        .ok_or(format!("no record of {attempt}"))?;
+    let earlier = effective(raw[..pos].to_vec())?;
+    let r = &raw[pos];
+    let (usage, kept) = remeasure(r, &earlier, transcripts)?;
     let c = json!({"format": CORRECTION_FORMAT, "corrects": attempt, "model_request": false,
         "original_stream_sha256": r["stream"]["sha256"], "child_transcripts": kept,
         "decision": decision, "corrected_at": ieo_evidence::time::now(),
@@ -894,6 +955,8 @@ pub fn reevaluate(
                    "stop_reason": r["stop_reason"]},
         "after": {"usage": usage, "stop_required": false}});
     append(plan, &c)?;
+    // the ledger must read back with the correction applied
+    records(plan)?;
     Ok(c)
 }
 

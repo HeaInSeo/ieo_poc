@@ -651,13 +651,12 @@ impl Service {
     /// child unmeasured.
     fn keep_child_transcripts(&self, job: &Job, stdout: &Path, dir: &Path) -> Value {
         let text = std::fs::read_to_string(stdout).unwrap_or_default();
-        let mut agents: Vec<String> = text
+        let agents: std::collections::BTreeSet<String> = text
             .lines()
             .filter_map(|l| serde_json::from_str::<Value>(l).ok())
             .filter_map(|v| v["tool_use_result"]["agentId"].as_str().map(str::to_owned))
             .filter(|a| safe_id(a))
             .collect();
-        agents.dedup();
         let projects = self.cfg.config_dir().join("projects");
         let mut out = Vec::new();
         for a in agents {

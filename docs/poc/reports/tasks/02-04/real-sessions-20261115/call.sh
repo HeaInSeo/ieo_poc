@@ -19,7 +19,14 @@ if [ "$op" = restart ]; then
 import json, os, sys
 w, a = sys.argv[1], sys.argv[2]
 st = json.load(open(f"{w}/.status.{a}"))
-recs = [json.loads(l) for l in open(f"{w}/ledger/records.jsonl")] if os.path.exists(f"{w}/ledger/records.jsonl") else []
+lines = [json.loads(l) for l in open(f"{w}/ledger/records.jsonl")] if os.path.exists(f"{w}/ledger/records.jsonl") else []
+# corrections (ieo-role-run-correction/v0) are not runs; a corrected run no longer asks for a
+# person (ieo-role-call verifies each correction when it reads the ledger)
+corrected = {l.get("corrects") for l in lines if l.get("format") == "ieo-role-run-correction/v0"}
+recs = [l for l in lines if l.get("format") != "ieo-role-run-correction/v0"]
+for r in recs:
+    if r.get("attempt_id") in corrected:
+        r["stop_required"] = False
 known = {r.get("attempt_id") for r in recs}
 why = []
 if os.path.exists(f"{w}/ledger/inflight.json"): why.append("a call is in flight without a record")

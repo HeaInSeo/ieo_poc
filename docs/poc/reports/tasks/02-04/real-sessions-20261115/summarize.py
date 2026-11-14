@@ -6,8 +6,11 @@ Usage: summarize.py <records.jsonl> <attempt>
 """
 import json, sys
 
-recs = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+lines = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+recs = [x for x in lines if x.get("format") != "ieo-role-run-correction/v0"]
 r = next(x for x in recs if x.get("attempt_id") == sys.argv[2])
+correction = next((x for x in lines if x.get("format") == "ieo-role-run-correction/v0"
+                   and x.get("corrects") == sys.argv[2]), None)
 events = []
 path = (r.get("stream") or {}).get("path")
 if path:
@@ -54,5 +57,12 @@ out = {
     "usage_run": (r.get("usage") or {}).get("run"),
     "usage_session": (r.get("usage") or {}).get("session"),
     "stream": {k: (r.get("stream") or {}).get(k) for k in ["bytes", "sha256"]},
+    "children": [{k: c.get(k) for k in ["agent_id", "bytes", "sha256"]} for c in (r.get("children") or [])],
 }
+if correction:
+    # the original record above is kept as it was; the correction is shown next to it
+    out["correction"] = {"decision": correction.get("decision"), "corrected_at": correction.get("corrected_at"),
+                         "usage_run": ((correction.get("after") or {}).get("usage") or {}).get("run"),
+                         "attribution_check": ((correction.get("after") or {}).get("usage") or {}).get("attribution_check"),
+                         "stop_required": (correction.get("after") or {}).get("stop_required")}
 print(json.dumps(out, ensure_ascii=False, indent=1))

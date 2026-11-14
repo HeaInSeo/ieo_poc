@@ -417,6 +417,27 @@ pub fn parse_with_children(
             _ => {}
         }
     }
+    // With compaction the share may exceed parent + children (compaction calls are not in
+    // either) but never fall below it, and every part must be confirmed (review 608b367 F5).
+    if mode == SessionMode::Resume && result.compact_boundaries > 0 && run.tokens().is_some() {
+        let below = match (run.tokens(), parent.tokens(), &all_children) {
+            (Some(r), Some(p), Some(c)) => {
+                let mut sum = p.clone();
+                sum.add(c);
+                r.input < sum.input
+                    || r.output < sum.output
+                    || r.cache_read < sum.cache_read
+                    || r.cache_creation < sum.cache_creation
+            }
+            _ => true,
+        };
+        if below {
+            run = Measure::unmeasured(
+                "압축이 있는 재개 회차의 몫이 부모+자식보다 작거나 대조할 수 없음(확정되지 않은 자식 등)",
+            );
+            run_cost_usd = None;
+        }
+    }
 
     let mut partial_observations = Vec::new();
     if chosen.is_none() {

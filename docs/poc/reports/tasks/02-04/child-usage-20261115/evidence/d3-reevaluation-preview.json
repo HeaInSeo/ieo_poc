@@ -1,5 +1,5 @@
 {
- "note": "D3 re-evaluation preview on a copy of the caller ledger (no model call; the real ledger is unchanged until this PR is merged). Numbers only.",
+ "note": "D3 re-evaluation preview on a copy of the caller ledger (no model call; the real ledger is unchanged until this PR is merged). Numbers only. Re-run after review 608b367 correction 1: same result; the correction verifies when the ledger copy is read.",
  "stream_sha256": "046722d2122ca207d7828d1506922996ce864a2e40ef9778ff0a6981a544aab6",
  "child_transcripts": [
   {
@@ -72,7 +72,8 @@
   }
  },
  "preserved_outside_repo": {
-  "files": 22,
-  "SHA256SUMS_sha256": "68b086a4d2044a45200d8d926e00006ea10c7d7c79704e1f1000774675e4a645"
+  "files": 21,
+  "SHA256SUMS.v2_sha256": "9b5a10bee4fe9c6e3d261aaddfef418675e93e31dc09afffafdac91944b1c9cf",
+  "note": "SHA256SUMS (first manifest) listed itself with a stale hash; SHA256SUMS.v2 lists the 21 other files and verifies"
  }
 }

@@ -1351,3 +1351,84 @@ fn a_correction_must_match_the_run_it_corrects() {
     std::fs::write(&path, format!("{good}{wrong_digest}\n")).expect("w");
     assert!(caller::records(&p).is_err());
 }
+
+// --- review 608b367 ---
+
+fn rewrite_line(path: &std::path::Path, attempt: &str, f: impl Fn(&mut Value)) {
+    let text = std::fs::read_to_string(path).expect("ledger");
+    let out: String = text
+        .lines()
+        .map(|l| {
+            let mut v: Value = serde_json::from_str(l).expect("line");
+            if v["attempt_id"] == attempt || v["corrects"] == attempt {
+                f(&mut v);
+            }
+            format!("{v}\n")
+        })
+        .collect();
+    std::fs::write(path, out).expect("w");
+}
+
+#[test]
+fn a_run_stopped_for_more_than_its_usage_is_not_corrected() {
+    // F2: another reason besides the usage keeps the stop
+    let _serial = serial();
+    let t = Tmp::new("reeval-reasons");
+    let (_a, p) = unmeasured_child_run(&t);
+    rewrite_line(&caller::records_path(&p), "d2", |v| {
+        let r = v["stop_reason"].as_str().unwrap_or_default().to_string();
+        v["stop_reason"] = json!(format!("{r}; process-group cleanup failed"));
+    });
+    let mut tr = std::collections::BTreeMap::new();
+    tr.insert(
+        "c1".to_string(),
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl"),
+    );
+    assert!(
+        caller::reevaluate(&p, "d2", &tr, "x")
+            .expect_err("reasons")
+            .contains("only for unmeasured usage")
+    );
+}
+
+#[test]
+fn a_correction_is_measured_again_when_read() {
+    // F1: an edited correction, or a changed transcript behind it, makes the ledger unusable
+    let _serial = serial();
+    let t = Tmp::new("reeval-edit");
+    let (_a, p) = unmeasured_child_run(&t);
+    let src =
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl");
+    let kept = t.0.join("kept-c1.jsonl");
+    std::fs::copy(&src, &kept).expect("copy");
+    let mut tr = std::collections::BTreeMap::new();
+    tr.insert("c1".to_string(), kept.clone());
+    caller::reevaluate(&p, "d2", &tr, "decision-x").expect("correct");
+    assert!(caller::records(&p).is_ok());
+    let path = caller::records_path(&p);
+    let good = std::fs::read_to_string(&path).expect("l");
+    // the charge zeroed by hand
+    rewrite_line(&path, "d2", |v| {
+        if v["format"] == caller::CORRECTION_FORMAT {
+            v["after"]["usage"]["run"]["tokens"] =
+                json!({"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0});
+        }
+    });
+    assert!(caller::records(&p).expect_err("zeroed").contains("differs"));
+    std::fs::write(&path, &good).expect("restore");
+    // the transcript it names changed
+    let orig = std::fs::read_to_string(&kept).expect("k");
+    std::fs::write(&kept, orig.lines().nth(1).expect("r2")).expect("w");
+    assert!(caller::records(&p).is_err());
+    std::fs::write(&kept, &orig).expect("restore");
+    assert!(caller::records(&p).is_ok());
+    // a decision left empty
+    rewrite_line(&path, "d2", |v| {
+        if v["format"] == caller::CORRECTION_FORMAT {
+            v["decision"] = json!("");
+        }
+    });
+    assert!(caller::records(&p).is_err());
+    std::fs::write(&path, &good).expect("restore");
+    assert!(caller::reevaluate(&p, "d1", &tr, " ").is_err());
+}

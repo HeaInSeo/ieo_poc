@@ -1116,3 +1116,77 @@ fn d3_a_wrong_or_larger_base_is_still_refused() {
     assert_eq!(p.usage.attribution_check, "mismatch");
     assert!(matches!(&p.usage.run, Measure::Unmeasured { .. }));
 }
+
+// --- review 608b367 ---
+
+#[test]
+fn d3_a_transcript_whose_last_response_is_not_the_reported_one_is_refused() {
+    // F2: the two responses in the other order: the last is not what tool_use_result reported
+    let t = d3_transcript();
+    let swapped: String = t.lines().rev().map(|l| format!("{l}\n")).collect();
+    let p = d3_parse(Some(&swapped), d3_base());
+    assert!(
+        matches!(&p.usage.children[0].usage, Measure::Unmeasured { reason } if reason.contains("마지막 응답")),
+        "{:?}",
+        p.usage.children[0].usage
+    );
+    assert!(matches!(&p.usage.run, Measure::Unmeasured { .. }));
+}
+
+fn d3_with_compaction(
+    transcript: Option<&str>,
+    parent_output: Option<u64>,
+) -> ieo_evidence::stream::Parsed {
+    let mut lines: Vec<serde_json::Value> = std::fs::read_to_string(format!("{D3}/stream.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    lines.insert(
+        1,
+        serde_json::json!({"type": "system", "subtype": "compact_boundary"}),
+    );
+    if let Some(o) = parent_output {
+        for v in lines.iter_mut().filter(|v| v["type"] == "result") {
+            v["usage"]["output_tokens"] = o.into();
+        }
+    }
+    let stream: String = lines.iter().map(|v| format!("{v}\n")).collect();
+    let mut t = std::collections::BTreeMap::new();
+    if let Some(x) = transcript {
+        t.insert("agent-1".to_string(), x.as_bytes().to_vec());
+    }
+    ieo_evidence::stream::parse_with_children(
+        stream.as_bytes(),
+        SessionMode::Resume,
+        Some(d3_base()),
+        &t,
+    )
+}
+
+#[test]
+fn with_compaction_a_share_below_its_parts_or_with_an_unconfirmed_child_is_unmeasured() {
+    // F5: compaction explains a share above parent + children, nothing else
+    assert_eq!(
+        tokens(&d3_with_compaction(Some(&d3_transcript()), None).usage.run),
+        D3_RUN
+    );
+    // a parent that used more output than the whole share
+    let p = d3_with_compaction(Some(&d3_transcript()), Some(500));
+    assert!(
+        matches!(&p.usage.run, Measure::Unmeasured { .. }),
+        "{:?}",
+        p.usage.run
+    );
+    // an unconfirmed child (no transcript)
+    let p = d3_with_compaction(None, None);
+    assert!(
+        matches!(&p.usage.run, Measure::Unmeasured { .. }),
+        "{:?}",
+        p.usage.run
+    );
+    // a share above parent + children with compaction stays measured (compaction calls)
+    let p = d3_with_compaction(Some(&d3_transcript()), Some(100));
+    assert_eq!(tokens(&p.usage.run), D3_RUN);
+    assert_eq!(p.usage.attribution_check, "mismatch");
+}
