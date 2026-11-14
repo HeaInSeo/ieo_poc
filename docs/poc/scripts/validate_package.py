@@ -49,9 +49,9 @@ def validate(root):
     # Amendments apply in order (A1: profile 4->5, A2: 5->6). Each profile revision differs from the
     # previous one exactly in its amendment's changed_acceptance; a task uses the latest revision that
     # changed it, a sprint the latest revision any amendment gave it (v1.3.3-A2).
-    amends=[json.loads((root/f'Amendment_v1.3.3-{a}.json').read_text()) for a in ('A1','A2','A3','A4')]
+    amends=[json.loads((root/f'Amendment_v1.3.3-{a}.json').read_text()) for a in ('A1','A2','A3','A4','A5')]
     profiles={(q['profile_id'],q['revision']):q for q in spec['inspection_profiles']}
-    assert sorted(profiles)==[('poc-acceptance-v1.3.3',r) for r in (4,5,6)]
+    assert sorted(profiles)==[('poc-acceptance-v1.3.3',r) for r in (4,5,6,7)]
     task_rev={};revs={}
     for am in amends:
         # A3/A4 add extra tasks only: no profile revision and no changed acceptance

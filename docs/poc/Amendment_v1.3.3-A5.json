@@ -1,0 +1,74 @@
+{
+  "id": "v1.3.3-A5",
+  "date": "2026-11-14",
+  "plan_version": "v1.3.3",
+  "decision_ref": "User_Decisions_2026-11-14_p28.md",
+  "baselines_unchanged": {
+    "main_tasks": 73,
+    "main_experiments": 31,
+    "followup_tasks": 12,
+    "followup_candidates": 5
+  },
+  "profile_revisions": [
+    {
+      "profile_id": "poc-acceptance-v1.3.3",
+      "revision": 7,
+      "changed_items": [
+        "02-08.accept",
+        "04-11.accept",
+        "07-05.accept"
+      ]
+    }
+  ],
+  "sprint_revisions": [
+    {
+      "sprint_id": "POC-02",
+      "revision": 7
+    },
+    {
+      "sprint_id": "POC-04",
+      "revision": 6
+    },
+    {
+      "sprint_id": "POC-07",
+      "revision": 6
+    }
+  ],
+  "changed_acceptance": [
+    "02-08",
+    "04-11",
+    "07-05"
+  ],
+  "scope_limit": "P28 기존 실험과 02-08·04-11·07-05의 수용 기준 보강만. 새 실험·작업 없음. 완료 이력·완료 수·분모 불변(세 작업 모두 미착수). 전송 방식과 독립된 실행 계약이며 gRPC를 선행으로 두지 않음. 현재 작업(02-04) 중단·새 모델 호출 없음",
+  "note": "progress/ 아래 파일은 생성 화면이므로 대조에서 제외한다. 이 목록의 sha256은 A1~A4의 같은 파일 항목보다 우선한다.",
+  "files": [
+    {
+      "path": "Console_Coordinator_Sprints_v0.json",
+      "original_sha256": "e12e07ee5d027371b4af6a58b197cff382737751caafc55699a0d15fd2b0a763",
+      "sha256": "434b77f095ca982a16555443b09751482ef664e8ba37de1fe66eb3a12025176b",
+      "change": "amended",
+      "reason": "A5 프로파일 rev 7(02-08·04-11·07-05), 해당 스프린트 revision과 digest, amendments 항목"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Execution_Ledger_v1.3.3.md",
+      "original_sha256": "23f6b3245f9894670ddbd0dab5318a3af80ab4808d0c45c7acfa16a9ff079962",
+      "sha256": "fee5a8d3f35013c7a34768d7491f813062fe164245a60bdb2121e23dc0f15d0a",
+      "change": "amended",
+      "reason": "A5 02-08·04-11·07-05 수용 기준"
+    },
+    {
+      "path": "Console_Coordinator_PoC_Validation_Plan.md",
+      "original_sha256": "96b6950273d7f1b4f0e7ea7da1253eb67230c2b4f12a29fa047ba7f38273fa1d",
+      "sha256": "5c0c29276d739d771994ae53d8895bd0260c189179b7f4511974a7dcfc32d591",
+      "change": "amended",
+      "reason": "A5 P28-F 사례 3개 추가(기존 행 불변)"
+    },
+    {
+      "path": "scripts/validate_package.py",
+      "original_sha256": "bd43577b73f090c9f89c6685660e0f2063d546521661f8dc79f816b8ecc2448c",
+      "sha256": "f7397cc12eb1cd2d4ebf94086fdfade47fca640cf5e0722af430faddd7439d65",
+      "change": "amended",
+      "reason": "A5 순차 적용, 프로파일 rev 7"
+    }
+  ]
+}

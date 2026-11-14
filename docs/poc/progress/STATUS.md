@@ -1,6 +1,6 @@
 # PoC 진행과 최근 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0021` · 원장 SHA-256 `26d45f96260135055dbc7eace337519db0b18f0b2aa4be324b2ad2a8ebbedc1c`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0022` · 원장 SHA-256 `46347c20f383f82d616f957dd268d0b30dad53d23b03857196c60e85f482bc05`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -41,8 +41,8 @@
 | --- | --- |
 | 현재 작업 | 02-04 |
 | 다음 작업 | 02-04 |
-| 마지막 실제 작업 관측 | 2026-11-14T21:07:29+09:00 |
-| 화면 snapshot 작성 | 2026-11-14T21:07:29+09:00 |
+| 마지막 실제 작업 관측 | 2026-11-14T21:22:50+09:00 |
+| 화면 snapshot 작성 | 2026-11-14T21:22:50+09:00 |
 | 보고 owner | 개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님) |
 | 열람 상태 | GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면) |
 | 고정 사용자 링크 | https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md |
