@@ -4,6 +4,15 @@
 //! `result.usage` is the parent, `result.modelUsage` the whole session
 //! including children, and each child's usage arrives in the Agent tool result
 //! (`tool_use_result.usage`, keyed by `agentId`).
+//!
+//! **Children (02-04 D3, CLI 2.1.322).** `tool_use_result.usage` (and `totalTokens`) is the
+//! child's *last* model response only, not the child's total; the child's `assistant` events in
+//! the live stream are streaming snapshots (lower bounds). A child's total is therefore taken
+//! from its transcript (`projects/<cwd>/<session>/subagents/agent-<agentId>.jsonl`): the final
+//! usage of every response, one per `message.id` ([`child_transcript_total`]). Without a
+//! transcript the child stays unmeasured (the reported last-response figure is kept as
+//! information), and a resumed run whose share cannot be matched to parent + children is
+//! unmeasured unless compaction explains the difference.
 
 use crate::record::{
     Applicability, ChildUsage, Measure, PartialObservation, ResultEvent, ResumeBase, SessionMode,
@@ -47,9 +56,97 @@ fn model_tokens(v: &Value) -> Result<Tokens, String> {
     })
 }
 
+/// A child's total from its transcript: the final usage of every model response, once per
+/// `message.id`.
+///
+/// Fails closed: an unreadable line, a response without an id, a response without a final entry
+/// (`stop_reason` set), two different final entries for one id, an entry of another agent, or no
+/// response at all is an error (the child is then unmeasured). Identical repeated final entries
+/// count once; non-final entries of a response are ignored. Returns the total, the number of
+/// responses and the last response's usage (in file order).
+pub fn child_transcript_total(
+    agent_id: &str,
+    transcript: &[u8],
+) -> Result<(Tokens, usize, Tokens), String> {
+    let mut finals: BTreeMap<String, Tokens> = BTreeMap::new();
+    let mut order: Vec<String> = Vec::new();
+    let mut seen: BTreeMap<String, bool> = BTreeMap::new();
+    for (n, line) in transcript.split(|b| *b == b'\n').enumerate() {
+        if line.trim_ascii().is_empty() {
+            continue;
+        }
+        let v: Value = serde_json::from_slice(line)
+            .map_err(|_| format!("자식 전사 {}행을 읽을 수 없음", n + 1))?;
+        if v.get("type").and_then(Value::as_str) != Some("assistant") {
+            continue;
+        }
+        let Some(usage) = v.pointer("/message/usage") else {
+            continue;
+        };
+        if let Some(a) = v.get("agentId").and_then(Value::as_str)
+            && a != agent_id
+        {
+            return Err(format!("자식 전사 {}행이 다른 자식({a})의 것", n + 1));
+        }
+        let id = v
+            .pointer("/message/id")
+            .and_then(Value::as_str)
+            .ok_or(format!("자식 전사 {}행의 응답 id 없음", n + 1))?
+            .to_owned();
+        if !seen.contains_key(&id) {
+            order.push(id.clone());
+        }
+        let is_final = v
+            .pointer("/message/stop_reason")
+            .is_some_and(|r| !r.is_null());
+        seen.entry(id.clone()).or_insert(false);
+        if !is_final {
+            continue;
+        }
+        seen.insert(id.clone(), true);
+        let t = api_tokens(usage).map_err(|e| format!("자식 전사 응답 {id}의 {e}"))?;
+        match finals.get(&id) {
+            Some(prev) if prev != &t => {
+                return Err(format!(
+                    "자식 전사 응답 {id}의 확정 사용량이 둘 이상이고 서로 다름"
+                ));
+            }
+            _ => {
+                finals.insert(id, t);
+            }
+        }
+    }
+    if let Some((id, _)) = seen.iter().find(|(_, f)| !**f) {
+        return Err(format!(
+            "자식 전사 응답 {id}의 확정 사용량 없음(진행 중 기록뿐)"
+        ));
+    }
+    let last = order
+        .last()
+        .and_then(|id| finals.get(id))
+        .cloned()
+        .ok_or("자식 전사에 모델 응답 없음")?;
+    let mut total = Tokens::default();
+    for t in finals.values() {
+        total.add(t);
+    }
+    Ok((total, finals.len(), last))
+}
+
 /// Parse a stream. `mode` and `base` say whether the CLI's session totals
 /// include earlier runs (resume) and what those earlier totals were.
+/// Without child transcripts every child is unmeasured (see the module note).
 pub fn parse(stdout: &[u8], mode: SessionMode, base: Option<ResumeBase>) -> Parsed {
+    parse_with_children(stdout, mode, base, &BTreeMap::new())
+}
+
+/// [`parse`] with child transcripts by `agentId` (the bytes of `agent-<agentId>.jsonl`).
+pub fn parse_with_children(
+    stdout: &[u8],
+    mode: SessionMode,
+    base: Option<ResumeBase>,
+    transcripts: &BTreeMap<String, Vec<u8>>,
+) -> Parsed {
     let mut events = Vec::new();
     let mut non_json = 0u32;
     for line in stdout.split(|b| *b == b'\n') {
@@ -160,22 +257,48 @@ pub fn parse(stdout: &[u8], mode: SessionMode, base: Option<ResumeBase>) -> Pars
                 tool_use_id: id.clone(),
                 agent_id: None,
                 usage: Measure::unmeasured("자식 결과(tool_result) 없음: 중단·실패 또는 기록 누락"),
+                reported_last_response: None,
             },
-            Some(tur) => ChildUsage {
-                tool_use_id: id.clone(),
-                agent_id: tur
+            Some(tur) => {
+                let agent_id = tur
                     .get("agentId")
                     .and_then(Value::as_str)
-                    .map(str::to_owned),
-                usage: match tur.get("usage").map(api_tokens) {
-                    Some(Ok(t)) => Measure::Measured {
-                        tokens: t,
-                        source: "tool_use_result.usage".into(),
+                    .map(str::to_owned);
+                let reported = tur.get("usage").map(api_tokens);
+                let usage = match (&agent_id, &reported) {
+                    (_, Some(Err(e))) => Measure::unmeasured(format!("자식 tool_use_result의 {e}")),
+                    (None, _) => Measure::unmeasured("자식 tool_use_result에 agentId 없음"),
+                    (Some(a), _) => match transcripts.get(a) {
+                        None => Measure::unmeasured(
+                            "자식 전사 없음: tool_use_result.usage는 마지막 응답만일 수 있어 자식 전체로 쓰지 않음",
+                        ),
+                        Some(bytes) => match child_transcript_total(a, bytes) {
+                            Err(e) => Measure::unmeasured(e),
+                            // the transcript must agree with what the stream reported
+                            Ok((_, _, last)) if matches!(&reported, Some(Ok(r)) if r != &last) => {
+                                Measure::unmeasured(
+                                    "자식 전사의 마지막 응답이 tool_use_result.usage와 다름",
+                                )
+                            }
+                            Ok((total, n, _)) => Measure::Measured {
+                                tokens: total,
+                                source: format!(
+                                    "자식 전사: 응답 {n}개의 확정 사용량 합(message.id별 1회)"
+                                ),
+                            },
+                        },
                     },
-                    Some(Err(e)) => Measure::unmeasured(format!("자식 tool_use_result의 {e}")),
-                    None => Measure::unmeasured("자식 tool_use_result에 usage 없음"),
-                },
-            },
+                };
+                ChildUsage {
+                    tool_use_id: id.clone(),
+                    agent_id,
+                    usage,
+                    reported_last_response: match reported {
+                        Some(Ok(t)) => Some(t),
+                        _ => None,
+                    },
+                }
+            }
         })
         .collect();
 
@@ -231,7 +354,7 @@ pub fn parse(stdout: &[u8], mode: SessionMode, base: Option<ResumeBase>) -> Pars
                 t.add(c);
                 Measure::Measured {
                     tokens: t,
-                    source: format!("result.usage + 자식 tool_use_result.usage ({e})"),
+                    source: format!("result.usage + 자식 전사 합 ({e})"),
                 }
             }
             _ => Measure::unmeasured(format!("{e}; 부모·자식 사용량으로도 합산 불가")),
@@ -275,14 +398,45 @@ pub fn parse(stdout: &[u8], mode: SessionMode, base: Option<ResumeBase>) -> Pars
     // another known unattributed call) the share must equal parent + children;
     // otherwise the base was not the run actually resumed (01-04 L2 after the
     // concurrent N4a/N4b branch) and the share is withdrawn, not reported.
-    if mode == SessionMode::Resume
-        && attribution_check == "mismatch"
-        && result.compact_boundaries == 0
-    {
-        run = Measure::unmeasured(
-            "재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제 재개 대상이 아닐 수 있음",
-        );
-        run_cost_usd = None;
+    // An unchecked share (a child without a confirmed total) is withdrawn the same way: the
+    // share is not trusted on the session difference alone (02-04 D3).
+    if mode == SessionMode::Resume && result.compact_boundaries == 0 && run.tokens().is_some() {
+        match attribution_check.as_str() {
+            "mismatch" => {
+                run = Measure::unmeasured(
+                    "재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제 재개 대상이 아니거나 귀속되지 않은 모델 호출이 있음",
+                );
+                run_cost_usd = None;
+            }
+            "not_checked" => {
+                run = Measure::unmeasured(
+                    "재개 회차 몫을 부모+자식과 대조할 수 없음(확정되지 않은 자식 사용량 등)",
+                );
+                run_cost_usd = None;
+            }
+            _ => {}
+        }
+    }
+    // With compaction the share may exceed parent + children (compaction calls are not in
+    // either) but never fall below it, and every part must be confirmed (review 608b367 F5).
+    if mode == SessionMode::Resume && result.compact_boundaries > 0 && run.tokens().is_some() {
+        let below = match (run.tokens(), parent.tokens(), &all_children) {
+            (Some(r), Some(p), Some(c)) => {
+                let mut sum = p.clone();
+                sum.add(c);
+                r.input < sum.input
+                    || r.output < sum.output
+                    || r.cache_read < sum.cache_read
+                    || r.cache_creation < sum.cache_creation
+            }
+            _ => true,
+        };
+        if below {
+            run = Measure::unmeasured(
+                "압축이 있는 재개 회차의 몫이 부모+자식보다 작거나 대조할 수 없음(확정되지 않은 자식 등)",
+            );
+            run_cost_usd = None;
+        }
     }
 
     let mut partial_observations = Vec::new();

@@ -1,0 +1,79 @@
+{
+ "note": "D3 re-evaluation preview on a copy of the caller ledger (no model call; the real ledger is unchanged until this PR is merged). Numbers only. Re-run after review 608b367 correction 1: same result; the correction verifies when the ledger copy is read.",
+ "stream_sha256": "046722d2122ca207d7828d1506922996ce864a2e40ef9778ff0a6981a544aab6",
+ "child_transcripts": [
+  {
+   "bytes": 25972,
+   "sha256": "8e509473f38db535039088d521bb465ed39bff52ea512f8eb9ae7074d0b23720"
+  }
+ ],
+ "original": {
+  "usage_run": {
+   "reason": "재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제 재개 대상이 아닐 수 있음",
+   "state": "unmeasured"
+  },
+  "stop_reason": "usage unmeasured: \"재개 회차 몫이 부모+자식과 다르고 압축 사건 없음: 기준 회차가 실제 재개 대상이 아닐 수 있음\"",
+  "attribution_check": "mismatch",
+  "children_old": [
+   {
+    "usage": {
+     "source": "tool_use_result.usage",
+     "state": "measured",
+     "tokens": {
+      "cache_creation": 90,
+      "cache_read": 2067,
+      "input": 2,
+      "output": 3
+     }
+    }
+   }
+  ]
+ },
+ "reevaluated": {
+  "parent": {
+   "cache_creation": 456,
+   "cache_read": 33595,
+   "input": 6,
+   "output": 160
+  },
+  "children": [
+   {
+    "total": {
+     "cache_creation": 2157,
+     "cache_read": 2067,
+     "input": 4,
+     "output": 64
+    },
+    "source": "자식 전사: 응답 2개의 확정 사용량 합(message.id별 1회)",
+    "reported_last_response": {
+     "cache_creation": 90,
+     "cache_read": 2067,
+     "input": 2,
+     "output": 3
+    }
+   }
+  ],
+  "session_increase_run_share": {
+   "cache_creation": 2613,
+   "cache_read": 35662,
+   "input": 10,
+   "output": 224
+  },
+  "attribution_check": "consistent",
+  "charged": {
+   "source": "재개: result.modelUsage − 기준 회차 02-04/D2/development-reconnect 누적",
+   "state": "measured",
+   "tokens": {
+    "cache_creation": 2613,
+    "cache_read": 35662,
+    "input": 10,
+    "output": 224
+   }
+  }
+ },
+ "preserved_outside_repo": {
+  "files": 21,
+  "SHA256SUMS.v2_sha256": "9b5a10bee4fe9c6e3d261aaddfef418675e93e31dc09afffafdac91944b1c9cf",
+  "note": "SHA256SUMS (first manifest) listed itself with a stale hash; SHA256SUMS.v2 lists the 21 other files and verifies"
+ }
+}

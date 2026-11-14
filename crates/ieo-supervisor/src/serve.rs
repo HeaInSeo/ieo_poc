@@ -275,6 +275,21 @@ impl Service {
                     Err(_) => err(404, "NOT_FOUND", "no such run"),
                 }
             }
+            // a child's transcript kept with the run (02-04 D3: a child's total comes from it)
+            ("GET", ["v0", "role", "runs", id, "children", agent])
+                if safe_id(id) && safe_id(agent) =>
+            {
+                match std::fs::read(
+                    self.cfg
+                        .runs()
+                        .join(id)
+                        .join("children")
+                        .join(format!("agent-{agent}.jsonl")),
+                ) {
+                    Ok(b) => resp(200, json!({"content": String::from_utf8_lossy(&b)})),
+                    Err(_) => err(404, "NOT_FOUND", "no such child transcript"),
+                }
+            }
             ("POST", ["v0", "role", op @ ("start" | "reconnect")]) => {
                 let Ok(req) = serde_json::from_slice::<Value>(body) else {
                     return err(400, "SCHEMA_VIOLATION", "body is not JSON");
@@ -600,6 +615,7 @@ impl Service {
                     return Err(format!("run: {e}"));
                 }
             };
+        let children = self.keep_child_transcripts(job, &stdout, &dir);
         self.write_checkpoint(
             job,
             &report.digest,
@@ -617,6 +633,7 @@ impl Service {
                          "messages": outcome.observed.messages,
                          "incomplete_lines": outcome.observed.incomplete_lines},
             "cleanup_failed": outcome.cleanup_failed,
+            "children": children,
             "config_cleanup": {"digest": report.digest, "removed": report.removed.len(),
                                "credentials_removed": report.credentials_removed},
             "tamper": job.tamper,
@@ -626,6 +643,42 @@ impl Service {
             serde_json::to_vec_pretty(&v).unwrap_or_default(),
         );
         Ok(v)
+    }
+
+    /// Copy the transcripts of the children this run started (`agentId`s in its stream) from
+    /// the config dir into the run directory, before a later start's cleanup can remove them.
+    /// Returns what was found; a missing transcript is reported, and the caller then keeps that
+    /// child unmeasured.
+    fn keep_child_transcripts(&self, job: &Job, stdout: &Path, dir: &Path) -> Value {
+        let text = std::fs::read_to_string(stdout).unwrap_or_default();
+        let agents: std::collections::BTreeSet<String> = text
+            .lines()
+            .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+            .filter_map(|v| v["tool_use_result"]["agentId"].as_str().map(str::to_owned))
+            .filter(|a| safe_id(a))
+            .collect();
+        let projects = self.cfg.config_dir().join("projects");
+        let mut out = Vec::new();
+        for a in agents {
+            // projects/<escaped cwd>/<session_id>/subagents/agent-<a>.jsonl
+            let found = std::fs::read_dir(&projects).ok().and_then(|d| {
+                d.filter_map(Result::ok)
+                    .map(|e| {
+                        e.path()
+                            .join(&job.session_id)
+                            .join("subagents")
+                            .join(format!("agent-{a}.jsonl"))
+                    })
+                    .find(|p| p.is_file())
+            });
+            let kept = found.as_ref().and_then(|src| {
+                let to = dir.join("children");
+                std::fs::create_dir_all(&to).ok()?;
+                std::fs::copy(src, to.join(format!("agent-{a}.jsonl"))).ok()
+            });
+            out.push(json!({"agent_id": a, "kept": kept.is_some(), "bytes": kept}));
+        }
+        json!(out)
     }
 
     /// Write the §5-1 checkpoint durably (temp file, fsync, rename, directory fsync). `phase`

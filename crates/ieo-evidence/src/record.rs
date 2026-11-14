@@ -168,7 +168,13 @@ pub struct ChildUsage {
     /// Agent tool_use id in the parent stream.
     pub tool_use_id: String,
     pub agent_id: Option<String>,
+    /// The child's total: from its transcript (every response's final usage, once per
+    /// `message.id`); unmeasured without one.
     pub usage: Measure,
+    /// `tool_use_result.usage` as reported: the child's last response only (CLI 2.1.322,
+    /// 02-04 D3). Information, never the total.
+    #[serde(default)]
+    pub reported_last_response: Option<Tokens>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
