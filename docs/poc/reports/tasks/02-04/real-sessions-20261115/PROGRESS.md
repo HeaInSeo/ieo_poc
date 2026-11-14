@@ -3,7 +3,7 @@
 | 항목 | 기록 |
 | --- | --- |
 | 구분 | 주계획 02-04의 중간 산출물. 완료 수 11/73 변동 없음 |
-| 산출물 | `crates/ieo-supervisor/src/caller.rs`(호출자), `src/bin/ieo-role-call.rs`, `run::charge_reported`, 역할 서비스 수정(검토 475b409 R1·R2·R4, PID 1 전용 거두기), 시험 `tests/caller.rs` 14건·`tests/serve.rs` 4건 추가·단위 시험 보강, 실제 회차 계획 [RUN_PLAN.md](RUN_PLAN.md)와 도구([run-real.sh](run-real.sh), [call.sh](call.sh), [steps.tsv](steps.tsv), [summarize.py](summarize.py), [prompts/](prompts/), [role/](role/), [fixture/](fixture/)), 컨테이너 예행 [dry-run.sh](dry-run.sh)와 [기록](evidence/dry-run.log), 작업 공간 시험 [cargo-test.log](evidence/cargo-test.log) |
+| 산출물 | `crates/ieo-supervisor/src/caller.rs`(호출자), `src/bin/ieo-role-call.rs`, `run::charge_reported`, 역할 서비스 수정(검토 475b409 R1·R2·R4, PID 1 전용 거두기), 시험 `tests/caller.rs` 17건·`tests/serve.rs` 4건 추가·단위 시험 보강, 실제 회차 계획 [RUN_PLAN.md](RUN_PLAN.md)와 도구([run-real.sh](run-real.sh), [call.sh](call.sh), [steps.tsv](steps.tsv), [summarize.py](summarize.py), [prompts/](prompts/), [role/](role/), [fixture/](fixture/)), 컨테이너 예행 [dry-run.sh](dry-run.sh)와 [기록](evidence/dry-run.log), 작업 공간 시험 [cargo-test.log](evidence/cargo-test.log) |
 | 모델 호출 | 0회(02-04 예산 사용 0). 실제 회차는 이 PR의 검토·병합 뒤 RUN_PLAN 순서로 한다 |
 
 ## 1. 호출자(`ieo-role-call`, 컨테이너 밖)
@@ -95,4 +95,16 @@
 | L9 | `unknown` 끝 줄의 대조 절차를 RUN_PLAN §4에 적었다 |
 | L10 | run-real.sh에 `--init`을 쓰지 않는 이유(PID 1이 거둠)를 적었다 |
 
-**더 고친 것**: 호출자 HTTP 시험이 한 번 “Connection Failed”로 실패했다(서버가 10초 안에 듣지 않음). 시험이 `serve`의 바인드 오류를 보고하고 다른 포트로 다시 시도하게 했다. 이후 8회 연속 통과했다.
+**더 고친 것**: 호출자 HTTP 시험이 한 번 “Connection Failed”로 실패했다(서버가 10초 안에 듣지 않음). 시험이 `serve`의 바인드 오류를 보고하고 다른 포트로 다시 시도하게 했다. 이후 로컬에서 8회 연속 통과했다. 그러나 이 수정의 CI는 `caller.lock` 때문에 실패했다(§6 N1). “8회 연속 통과”는 로컬 결과일 뿐이고 CI와 맞지 않았다.
+
+## 6. 검토 f90f5b5(변경 요청) 수정 2
+
+| # | 처리 |
+| --- | --- |
+| N1 (`caller.lock`으로 시험이 흔들리고 CI 실패) | 원인은 이렇게 본다. 같은 시험 프로세스의 다른 스레드가 가짜 Claude를 fork하는 동안, 자식이 직전 호출의 잠금 파일 사본을 exec 전까지 쥔다. 그래서 같은 기록에 대한 다음 호출이 “잠김”을 본다. CI 실패는 같은 시험의 연속 두 호출이었다. 수정은 세 가지다. 잠금이 막히면 3초까지 다시 시도한 뒤 거부한다. 잠금 I/O 오류는 “다른 호출자” 대신 오류로 돌려준다. 호출자 시험은 하나씩 돈다. 로컬에서 6회 연속 통과했고, CI 결과는 이 수정의 PR 검사로 확인한다. 실제 `ieo-role-call`은 한 스레드이고 아무것도 띄우지 않는다 |
+| N2 (R1 재시작에 가드 없음) | call.sh의 R1은 호출과 같은 조건이면 재시작하지 않는다: 진행 중 표식, 사람이 볼 기록, 실행 중 회차, 호출자 기록에 없는 마지막 회차, 체크포인트가 가리키는 모르는 회차. 예행에서 표식이 있을 때 재시작이 거부됨을 확인했다. 호출자도 영속 체크포인트의 `session_cumulative_attempt`가 자기 기록에 없으면 시작하지 않는다(재시작 뒤에도 남는 근거). 시험 있음 |
+| 낮음: 미계측인데 종료 0 | 미계측 회차는 `stop_required`(“usage unmeasured”, 종료 3)다. call.sh가 사용량 상태를 출력한다 |
+| 낮음: 잠금 오류 구분 | N1과 같이 처리 |
+| 낮음: 시험 없는 경로 | 거부된 시작의 표식 정리, 결과 없음, stream 저장 실패, 두 번째 호출자 거부 시험을 추가했다. 기록 뒤 표식 정리 순서는 저장 실패 시험이 확인한다 |
+| 낮음: 역할 기록 쓰기(L2) | 역할 서비스의 `attempts.jsonl`도 한 줄을 한 번에 쓴다 |
+| 낮음: PR 설명 | 갱신했다 |

@@ -396,8 +396,20 @@ pub fn call_with(
         .write(true)
         .open(plan.ledger_dir.join("caller.lock"))
         .map_err(|e| format!("caller lock: {e}"))?;
-    if lock.try_lock().is_err() {
-        return Ok(Called::NotStarted("another caller holds the ledger".into()));
+    // a short wait: a process forked elsewhere in this program may hold a copy of the previous
+    // call's lock until it execs (review f90f5b5 N1); a real second caller stays refused
+    let t0 = std::time::Instant::now();
+    loop {
+        match lock.try_lock() {
+            Ok(()) => break,
+            Err(std::fs::TryLockError::WouldBlock) if t0.elapsed() < Duration::from_secs(3) => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(std::fs::TryLockError::WouldBlock) => {
+                return Ok(Called::NotStarted("another caller holds the ledger".into()));
+            }
+            Err(std::fs::TryLockError::Error(e)) => return Err(format!("caller lock: {e}")),
+        }
     }
     if let Ok(t) = std::fs::read_to_string(inflight_path(plan)) {
         return Ok(Called::NotStarted(format!(
@@ -440,6 +452,17 @@ pub fn call_with(
     if let Some(a) = before["last"]["attempt_id"].as_str().filter(|a| !known(a)) {
         return Ok(Called::NotStarted(format!(
             "the service's last attempt {a} has no caller record: a person reconciles it"
+        )));
+    }
+    // the persisted checkpoint survives restarts (the in-memory `last` does not): the run it
+    // names must be known too (review f90f5b5 N2)
+    if let Some(a) = before["checkpoint"]["session_cumulative_attempt"]
+        .as_str()
+        .filter(|a| !known(a))
+    {
+        return Ok(Called::NotStarted(format!(
+            "the service's checkpoint names attempt {a}, which has no caller record: a person \
+             reconciles it"
         )));
     }
     let mut body = json!({"attempt_id": c.attempt_id, "prompt": c.prompt,
@@ -642,6 +665,10 @@ impl After<'_> {
                 r["subtype"], r["is_error"]
             )),
             None => reasons.push("no result event".into()),
+        }
+        // an unmeasured run stops the budget anyway; the record says so at once (review f90f5b5)
+        if usage["run"]["state"] != "measured" {
+            reasons.push(format!("usage unmeasured: {}", usage["run"]["reason"]));
         }
         let mut notes = Vec::new();
         match budget::rate_limit_events(&stream) {

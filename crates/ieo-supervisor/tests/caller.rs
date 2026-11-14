@@ -12,6 +12,13 @@ use std::time::Duration;
 
 const TOKEN: &str = "adapter-test-token";
 
+/// The caller tests run one at a time: the services spawn processes, and a fork elsewhere in
+/// the test process briefly holds copies of other tests' descriptors (review f90f5b5 N1).
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 struct Tmp(PathBuf);
 impl Tmp {
     fn new(name: &str) -> Tmp {
@@ -64,6 +71,7 @@ case "$prompt" in
 esac
 case "$prompt" in *CHILD*) sleep 300 & echo $! > "{dir}/child.pid";; esac
 case "$prompt" in *SLEEP*) sleep 60;; esac
+case "$prompt" in *NORESULT*) exit 0;; esac
 printf '{{"type":"result","subtype":"success","is_error":%s,"session_id":"%s","usage":{{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}},"modelUsage":{{"m":{{"inputTokens":%s,"outputTokens":%s,"cacheReadInputTokens":%s,"cacheCreationInputTokens":%s}}}},"total_cost_usd":0.01}}\n' "$err" "$sid" "$i" "$o" "$r" "$c"
 "#,
             cum = cum.display(),
@@ -204,6 +212,7 @@ fn both(t: &Tmp) -> (InProc, Plan) {
 
 #[test]
 fn a_new_session_then_a_resume_are_measured_and_charged_to_the_shared_budget() {
+    let _serial = serial();
     let t = Tmp::new("chain");
     let (a, p) = both(&t);
     let r1 = recorded(
@@ -306,6 +315,7 @@ fn a_new_session_then_a_resume_are_measured_and_charged_to_the_shared_budget() {
 
 #[test]
 fn a_call_is_held_without_a_no_overage_observation() {
+    let _serial = serial();
     let t = Tmp::new("hold");
     let mut m = BTreeMap::new();
     m.insert("dev".to_string(), service(&t.0, "development", None));
@@ -328,6 +338,7 @@ fn a_call_is_held_without_a_no_overage_observation() {
 
 #[test]
 fn a_breaking_signal_during_the_run_stops_the_budget() {
+    let _serial = serial();
     let t = Tmp::new("overage");
     let (a, p) = both(&t);
     let r = recorded(
@@ -369,6 +380,7 @@ fn a_breaking_signal_during_the_run_stops_the_budget() {
 
 #[test]
 fn a_cleanup_failure_or_a_run_error_asks_for_a_person() {
+    let _serial = serial();
     let t = Tmp::new("cleanup");
     let bad_kill = t.0.join("kill");
     std::fs::write(&bad_kill, "#!/bin/sh\nexit 1\n").expect("k");
@@ -425,6 +437,7 @@ fn a_cleanup_failure_or_a_run_error_asks_for_a_person() {
 
 #[test]
 fn a_resume_whose_base_is_not_the_run_resumed_is_unmeasured() {
+    let _serial = serial();
     let t = Tmp::new("base");
     let (a, p) = both(&t);
     recorded(
@@ -436,15 +449,24 @@ fn a_resume_whose_base_is_not_the_run_resumed_is_unmeasured() {
         )
         .expect("c"),
     );
-    // the service's checkpoint now names a run the caller has no record of
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s8", "more"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    // the checkpoint names an older known run, not the newest run of the session
     let cp = t.0.join("development/state/checkpoint.json");
     let mut v: Value = serde_json::from_slice(&std::fs::read(&cp).expect("cp")).expect("j");
-    v["session_cumulative_attempt"] = json!("elsewhere");
+    v["session_cumulative_attempt"] = json!("d1");
     std::fs::write(&cp, serde_json::to_vec(&v).expect("j")).expect("w");
     let r = recorded(
         caller::call(
             &p,
-            &call_of("development", "reconnect", "d2", "s9", "more"),
+            &call_of("development", "reconnect", "d3", "s9", "more"),
             &a,
             POLL,
         )
@@ -457,7 +479,14 @@ fn a_resume_whose_base_is_not_the_run_resumed_is_unmeasured() {
         "{}",
         r["usage"]["run"]
     );
-    // an unmeasured run stops the budget
+    // an unmeasured run asks for a person (and would stop the budget)
+    assert_eq!(r["stop_required"], true);
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|x| x.contains("usage unmeasured")),
+        "{r}"
+    );
     let why = not_started(
         caller::call(
             &p,
@@ -467,11 +496,38 @@ fn a_resume_whose_base_is_not_the_run_resumed_is_unmeasured() {
         )
         .expect("c"),
     );
-    assert!(why.contains("Stop"), "{why}");
+    assert!(why.contains("asks for a person"), "{why}");
+    // a checkpoint naming a run the caller does not know (it survives restarts)
+    let t = Tmp::new("base-unknown");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let cp = t.0.join("development/state/checkpoint.json");
+    let mut v: Value = serde_json::from_slice(&std::fs::read(&cp).expect("cp")).expect("j");
+    v["session_cumulative_attempt"] = json!("elsewhere");
+    std::fs::write(&cp, serde_json::to_vec(&v).expect("j")).expect("w");
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "more"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("checkpoint names attempt elsewhere"), "{why}");
 }
 
 #[test]
 fn plans_and_records_are_checked() {
+    let _serial = serial();
     let t = Tmp::new("plan");
     let base = json!({"budget": "02-04", "ledger_dir": t.0.join("ledger"), "roles": {
         "development": {"url": "u", "adapter_token_file": "f", "share": share("development")},
@@ -497,6 +553,7 @@ fn plans_and_records_are_checked() {
 
 #[test]
 fn the_caller_talks_to_the_service_over_http() {
+    let _serial = serial();
     let t = Tmp::new("http");
     let svc_cfg = {
         let s = service(&t.0, "development", None);
@@ -633,6 +690,7 @@ fn last_rewritten(inner: &InProc, f: impl Fn(&mut Value) + 'static) -> Hook<'_> 
 
 #[test]
 fn the_environment_the_stop_and_the_guard_observation_decide_the_charge() {
+    let _serial = serial();
     let t = Tmp::new("authority");
     let (a, p) = both(&t);
     // an API-key variable in the run's environment: a person looks
@@ -697,6 +755,7 @@ fn the_environment_the_stop_and_the_guard_observation_decide_the_charge() {
 
 #[test]
 fn a_failed_result_asks_for_a_person() {
+    let _serial = serial();
     // M1: e.g. an authentication failure on the first call of a role
     let t = Tmp::new("authfail");
     let (a, p) = both(&t);
@@ -721,6 +780,7 @@ fn a_failed_result_asks_for_a_person() {
 
 #[test]
 fn the_role_share_bounds_runs_and_time() {
+    let _serial = serial();
     let t = Tmp::new("share");
     let mut m = BTreeMap::new();
     m.insert("dev".to_string(), service(&t.0, "development", None));
@@ -760,6 +820,7 @@ fn the_role_share_bounds_runs_and_time() {
 
 #[test]
 fn a_running_role_or_an_unknown_last_attempt_starts_nothing() {
+    let _serial = serial();
     let t = Tmp::new("before");
     let (a, p) = both(&t);
     // only the first status answer says "running" (a missing check must not hang the test)
@@ -815,6 +876,7 @@ fn a_running_role_or_an_unknown_last_attempt_starts_nothing() {
 
 #[test]
 fn every_failure_after_the_start_is_recorded_and_blocks() {
+    let _serial = serial();
     // H1: the start's answer lost (the run did start)
     let t = Tmp::new("lost-post");
     let (a, p) = both(&t);
@@ -927,6 +989,7 @@ fn every_failure_after_the_start_is_recorded_and_blocks() {
 
 #[test]
 fn a_call_left_in_flight_blocks_until_reconciled() {
+    let _serial = serial();
     // H1: a caller that died after its start request leaves the marker behind
     let t = Tmp::new("inflight");
     let (a, p) = both(&t);
@@ -951,6 +1014,7 @@ fn a_call_left_in_flight_blocks_until_reconciled() {
 
 #[test]
 fn an_observation_from_the_future_holds_the_call() {
+    let _serial = serial();
     // L1: a clock behind the observation would make it look fresh
     let t = Tmp::new("clock");
     let mut m = BTreeMap::new();
@@ -972,4 +1036,108 @@ fn an_observation_from_the_future_holds_the_call() {
         .expect("c"),
     );
     assert!(why.contains("clock"), "{why}");
+}
+
+// --- review f90f5b5 ---
+
+#[test]
+fn a_refused_start_clears_the_marker_and_records_nothing() {
+    let _serial = serial();
+    let t = Tmp::new("refused");
+    let (a, p) = both(&t);
+    // the service refuses before anything runs (an unsafe session id)
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "-bad", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("SCHEMA_VIOLATION"), "{why}");
+    assert!(!t.0.join("ledger/inflight.json").exists());
+    assert!(caller::records(&p).expect("r").is_empty());
+    // the next call is free to start
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d2", "s2", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+}
+
+#[test]
+fn a_run_without_a_result_or_with_an_unsaved_stream_asks_for_a_person() {
+    let _serial = serial();
+    let t = Tmp::new("noresult");
+    let (a, p) = both(&t);
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "NORESULT"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|x| x.contains("no result event")),
+        "{r}"
+    );
+    // the stream cannot be saved (a file where the streams directory goes)
+    let t = Tmp::new("nosave");
+    let (a, p) = both(&t);
+    std::fs::create_dir_all(t.0.join("ledger")).expect("d");
+    std::fs::write(t.0.join("ledger/streams"), "not a directory").expect("w");
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|x| x.contains("stream save")),
+        "{r}"
+    );
+    assert!(
+        !t.0.join("ledger/inflight.json").exists(),
+        "the failure is recorded, so the marker goes"
+    );
+}
+
+#[test]
+fn a_second_caller_is_refused() {
+    let _serial = serial();
+    let t = Tmp::new("lock");
+    let (a, p) = both(&t);
+    std::fs::create_dir_all(t.0.join("ledger")).expect("d");
+    let held = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(t.0.join("ledger/caller.lock"))
+        .expect("lock");
+    held.lock().expect("held");
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("another caller"), "{why}");
+    assert!(!t.0.join("development/state/runs/d1").exists());
 }

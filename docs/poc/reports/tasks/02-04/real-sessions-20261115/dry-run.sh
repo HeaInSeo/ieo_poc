@@ -66,6 +66,8 @@ echo "## a call while one is in flight, and setup over a used workdir, are refus
 echo '{"attempt_id":"X"}' > "$W/run/ledger/inflight.json"
 out=$("$W/run/bin/ieo-role-call" --plan "$W/run/plan.json" --task 02-04 --role development --op start --attempt X1 --session "$(cat /proc/sys/kernel/random/uuid)" --prompt-file "$HERE/prompts/D5.txt" --coordinator-file "$W/run/coordinator.json"); rc=$?
 echo "in flight: exit $rc $(grep -o 'in flight[^"]*' <<<"$out" | head -1)"
+echo "restart with a call in flight: $(NAME_PREFIX=ieo-dry bash "$HERE/call.sh" "$W/run" R1 2>&1 | tail -1)"
+rm -f "$W/run/ledger/inflight.json"
 CLAUDE_BIN="$W/fake/claude" SECRETS_DIR="$W/fake/secrets" NAME_PREFIX=ieo-dry PORT_DEV=58221 PORT_GR=58222 \
   bash "$HERE/run-real.sh" "$BIN" "$W/run" 2>&1 | tail -1
 echo "## secrets in summaries and container logs: $(cat "$W/run/summaries/"*.json | grep -c 'sk-ant-oat01-fake' || true) / $( (podman logs ieo-dry-fixture0204-development; podman logs ieo-dry-fixture0204-guardrail) 2>&1 | grep -c 'sk-ant-oat01-fake' || true)"

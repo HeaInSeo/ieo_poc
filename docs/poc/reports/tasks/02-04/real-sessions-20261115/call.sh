@@ -11,6 +11,28 @@ if [ "$op" = restart ]; then
   # a container restart between runs (no model call): the checkpoint must be restored from the
   # role volume (2026-11-14 pr30 §4 checkpoint restoration)
   c="${NAME_PREFIX:-ieo-rt}-fixture0204-$role"; port=$(podman port "$c" 8080 | head -1 | cut -d: -f2)
+  # the same guards as a call (review f90f5b5 N2): a restart erases the service's in-memory last
+  # attempt, so it never runs over a call in flight, a record that asks for a person, a running
+  # attempt or a last attempt the caller does not know
+  curl -s -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" > "$W/.status.$A" || { echo "restart refused: status unavailable"; exit 1; }
+  "$PY" - "$W" "$A" <<'PYEOF' || exit 1
+import json, os, sys
+w, a = sys.argv[1], sys.argv[2]
+st = json.load(open(f"{w}/.status.{a}"))
+recs = [json.loads(l) for l in open(f"{w}/ledger/records.jsonl")] if os.path.exists(f"{w}/ledger/records.jsonl") else []
+known = {r.get("attempt_id") for r in recs}
+why = []
+if os.path.exists(f"{w}/ledger/inflight.json"): why.append("a call is in flight without a record")
+why += [f"record {r.get('attempt_id')} asks for a person" for r in recs if r.get("stop_required")]
+if st.get("running"): why.append("an attempt is running")
+last = (st.get("last") or {}).get("attempt_id")
+if last and last not in known: why.append(f"the service's last attempt {last} has no caller record")
+cpa = (st.get("checkpoint") or {}).get("session_cumulative_attempt")
+if cpa and cpa not in known: why.append(f"the checkpoint names attempt {cpa}, which has no caller record")
+if why:
+    print("restart refused: " + "; ".join(why)); sys.exit(1)
+PYEOF
+  rm -f "$W/.status.$A"
   before=$(curl -s -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" | "$PY" -c 'import json,sys; c=json.load(sys.stdin)["checkpoint"]; print(c["session_id"], c["phase"], c.get("session_cumulative_attempt"))')
   t0=$(date +%s.%N); podman restart -t 15 "$c" >/dev/null; t1=$(date +%s.%N)
   for _ in $(seq 1 50); do curl -s -o /dev/null -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" && break; sleep 0.2; done
@@ -51,5 +73,5 @@ rc=$?
   done; } >> "$W/summaries/$A.volume.txt"
 "$PY" "$HERE/summarize.py" "$W/ledger/records.jsonl" "$A" > "$W/summaries/$A.json" 2>&1 || true
 # exit: 0 recorded and nothing to look at; 2 not started; anything else (3, 1, …): stop
-echo "exit $rc · result $("$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["result"]["subtype"], "is_error", d["result"]["is_error"], "stop_required", d["stop_required"])' "$W/summaries/$A.json" 2>/dev/null || echo unknown) · summary $W/summaries/$A.json"
+echo "exit $rc · result $("$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["result"]["subtype"], "is_error", d["result"]["is_error"], "usage", (d["usage_run"] or {}).get("state"), "stop_required", d["stop_required"])' "$W/summaries/$A.json" 2>/dev/null || echo unknown) · summary $W/summaries/$A.json"
 exit $rc

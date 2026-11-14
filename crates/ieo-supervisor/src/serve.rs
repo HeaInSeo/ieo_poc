@@ -844,7 +844,8 @@ impl Service {
             .create(true)
             .append(true)
             .open(&p)?;
-        writeln!(f, "{line}")?;
+        // the whole line in one write (review f90f5b5, L2 for the role ledger)
+        f.write_all(format!("{line}\n").as_bytes())?;
         f.sync_all()
     }
 
