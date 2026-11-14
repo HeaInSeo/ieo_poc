@@ -1,0 +1,30 @@
+# 02-04 real-session dry run (fake claude, fake credentials, no model call) · 2026-11-14T22:29:09Z
+# role containers up: ieo-dry-fixture0204-{development,guardrail} on 127.0.0.1:58221/58222 · image docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c · network slirp4netns
+# plan: <scratch>/dry/run/plan.json · ledger: <scratch>/dry/run/ledger · credentials: OAuth form (values not printed)
+D1: exit 0 · result success is_error False usage measured stop_required False · summary <scratch>/dry/run/summaries/D1.json
+G1: exit 0 · result success is_error False usage measured stop_required False · summary <scratch>/dry/run/summaries/G1.json
+R1: {"step": "R1", "restart_seconds": 0.6, "pid1": "/opt/ieo/ieo-supervisor serve --config /", "before": "a9932daf-8130-42f3-b52d-44ba21c7acfa after_run D1", "after": "a9932daf-8130-42f3-b52d-44ba21c7acfa after_run D1 last None"}
+D2: exit 0 · result success is_error False usage measured stop_required False · summary <scratch>/dry/run/summaries/D2.json
+D3: exit 0 · result success is_error False usage measured stop_required False · summary <scratch>/dry/run/summaries/D3.json
+D4: exit 0 · result success is_error False usage measured stop_required False · summary <scratch>/dry/run/summaries/D4.json
+D5: exit 0 · result success is_error False usage measured stop_required False · summary <scratch>/dry/run/summaries/D5.json
+D6: exit 0 · result success is_error False usage measured stop_required False · summary <scratch>/dry/run/summaries/D6.json
+## checks
+PASS 7 records, none asks for a person
+PASS every run measured
+PASS D2..D5 resume D1's session on the previous run's base
+PASS §11 item 7: sum of D1..D5 shares {'input': 21, 'output': 97, 'cache_read': 2147, 'cache_creation': 2202} = D5 session total
+PASS D6: tamper detected, new session
+PASS D1: planted config-dir entries removed (no credential file among them)
+PASS G1 on the Guardrail role
+PASS D3: the child's two responses from its kept transcript, not the last one reported
+PASS environment: OAuth variable, no API key
+records: 7 · spent: {"input": 27, "output": 111, "cache_read": 2187, "cache_creation": 2222}
+## a call while one is in flight, and setup over a used workdir, are refused
+in flight: exit 2 in flight without a record ({\
+restart with a call in flight: restart refused: a call is in flight without a record
+<scratch>/dry/run already holds role volumes or a ledger: refusing to reset them (use a new workdir)
+## secrets in summaries and container logs: 0 / 0
+development: podman stop 0.5 s, exit 0, stop timeout 15 s
+guardrail: podman stop 0.3 s, exit 0, stop timeout 15 s
+# done

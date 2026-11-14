@@ -62,7 +62,11 @@ err=false; case "$prompt" in *AUTHFAIL*) err=true;; esac
 sid=$(printf '%s\n' "$@" | awk 'prev=="--session-id"||prev=="--resume"{{print; exit}} {{prev=$0}}')
 f="{cum}-$sid"
 set -- $(cat "$f" 2>/dev/null || echo 0 0 0 0)
-i=$(($1+3)); o=$(($2+7)); r=$(($3+20)); c=$(($4+10)); echo "$i $o $r $c" > "$f"
+case "$prompt" in
+  *AGENTRUN*) i=$(($1+5)); o=$(($2+14)); r=$(($3+27)); c=$(($4+20));;
+  *) i=$(($1+3)); o=$(($2+7)); r=$(($3+20)); c=$(($4+10));;
+esac
+echo "$i $o $r $c" > "$f"
 printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
 printf '{{"type":"assistant","message":{{"id":"m-%s-%s","usage":{{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}}}}\n' "$sid" "$i"
 case "$prompt" in
@@ -70,6 +74,17 @@ case "$prompt" in
   *) printf '{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed","overageStatus":"rejected","isUsingOverage":false}}}}\n';;
 esac
 case "$prompt" in *CHILD*) sleep 300 & echo $! > "{dir}/child.pid";; esac
+case "$prompt" in *AGENTRUN*)
+  # a child with two responses: its transcript has both, tool_use_result only the last (D3)
+  t="$CLAUDE_CONFIG_DIR/projects/-state-work-x/$sid/subagents"; mkdir -p "$t"
+  printf '{{"type":"assistant","isSidechain":true,"agentId":"c1","message":{{"id":"c1-r1","stop_reason":"tool_use","usage":{{"input_tokens":1,"output_tokens":5,"cache_creation_input_tokens":7,"cache_read_input_tokens":0}}}}}}
+{{"type":"assistant","isSidechain":true,"agentId":"c1","message":{{"id":"c1-r2","stop_reason":"end_turn","usage":{{"input_tokens":1,"output_tokens":2,"cache_creation_input_tokens":3,"cache_read_input_tokens":7}}}}}}
+' > "$t/agent-c1.jsonl"
+  printf '{{"type":"assistant","message":{{"id":"m-agent-%s","usage":{{"input_tokens":0,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"content":[{{"type":"tool_use","id":"tu-%s","name":"Agent"}}]}}}}
+' "$i" "$i"
+  printf '{{"type":"user","message":{{"content":[{{"type":"tool_result","tool_use_id":"tu-%s"}}]}},"tool_use_result":{{"agentId":"c1","usage":{{"input_tokens":1,"output_tokens":2,"cache_creation_input_tokens":3,"cache_read_input_tokens":7}}}}}}
+' "$i";;
+esac
 case "$prompt" in *SLEEP*) sleep 60;; esac
 case "$prompt" in *NORESULT*) exit 0;; esac
 printf '{{"type":"result","subtype":"success","is_error":%s,"session_id":"%s","usage":{{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}},"modelUsage":{{"m":{{"inputTokens":%s,"outputTokens":%s,"cacheReadInputTokens":%s,"cacheCreationInputTokens":%s}}}},"total_cost_usd":0.01}}\n' "$err" "$sid" "$i" "$o" "$r" "$c"
@@ -1140,4 +1155,199 @@ fn a_second_caller_is_refused() {
     );
     assert!(why.contains("another caller"), "{why}");
     assert!(!t.0.join("development/state/runs/d1").exists());
+}
+
+// --- 02-04 D3: children's totals from their transcripts; re-evaluation ---
+
+#[test]
+fn a_resumed_run_with_a_child_is_measured_from_the_child_transcript() {
+    let _serial = serial();
+    let t = Tmp::new("agent");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "AGENTRUN"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["stop_required"], false, "{r}");
+    assert_eq!(
+        r["usage"]["attribution_check"], "consistent",
+        "{}",
+        r["usage"]
+    );
+    // parent 3/7/20/10 + child 2/7/7/10 (both responses), not the last response 1/2/7/3
+    assert_eq!(
+        r["usage"]["run"]["tokens"],
+        json!({"input": 5, "output": 14, "cache_read": 27, "cache_creation": 20})
+    );
+    assert_eq!(
+        r["usage"]["children"][0]["usage"]["tokens"],
+        json!({"input": 2, "output": 7, "cache_read": 7, "cache_creation": 10})
+    );
+    // the transcript is kept in the private ledger with its digest
+    let kept = r["children"][0]["path"].as_str().expect("kept");
+    assert!(kept.starts_with(t.0.join("ledger/children/d2").to_str().expect("s")));
+    assert!(r["children"][0]["sha256"].is_string());
+}
+
+/// A run whose child transcript could not be fetched: unmeasured, recorded, a person decides.
+fn unmeasured_child_run(t: &Tmp) -> (InProc, Plan) {
+    let (a, p) = both(t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let h = hook(&a, |_m, path, r| {
+        if path.contains("/children/") {
+            Ok((404, json!({"code": "NOT_FOUND"})))
+        } else {
+            r
+        }
+    });
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "AGENTRUN"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{}", r["usage"]);
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|x| x.starts_with("usage unmeasured")),
+        "{r}"
+    );
+    (a, p)
+}
+
+#[test]
+fn a_run_is_corrected_once_from_its_kept_records_and_not_counted_again() {
+    let _serial = serial();
+    let t = Tmp::new("reeval");
+    let (a, p) = unmeasured_child_run(&t);
+    // blocked until the decision
+    assert!(
+        not_started(
+            caller::call(
+                &p,
+                &call_of("guardrail", "start", "g1", "sg", "x"),
+                &a,
+                POLL
+            )
+            .expect("c")
+        )
+        .contains("asks for a person")
+    );
+    let src =
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl");
+    let mut tr = std::collections::BTreeMap::new();
+    // the last response only does not reconcile: nothing is written
+    let last_only = t.0.join("last-only.jsonl");
+    let full = std::fs::read_to_string(&src).expect("kept by the service");
+    std::fs::write(&last_only, full.lines().nth(1).expect("r2")).expect("w");
+    tr.insert("c1".to_string(), last_only);
+    assert!(caller::reevaluate(&p, "d2", &tr, "decision-x").is_err());
+    assert_eq!(caller::raw_records(&p).expect("r").len(), 2);
+    // the full transcript does
+    tr.insert("c1".to_string(), src);
+    let c = caller::reevaluate(&p, "d2", &tr, "decision-x").expect("correct");
+    assert_eq!(
+        c["after"]["usage"]["run"]["tokens"],
+        json!({"input": 5, "output": 14, "cache_read": 27, "cache_creation": 20})
+    );
+    assert_eq!(c["before"]["usage_run"]["state"], "unmeasured");
+    // the original line stays; the effective record is corrected; runs are not counted again
+    let raw = caller::raw_records(&p).expect("raw");
+    assert_eq!(raw.len(), 3);
+    assert_eq!(raw[1]["usage"]["run"]["state"], "unmeasured");
+    let recs = caller::records(&p).expect("eff");
+    assert_eq!(recs.len(), 2);
+    assert_eq!(recs[1]["corrected_by"]["decision"], "decision-x");
+    let s = budget::spent(&recs);
+    assert_eq!(
+        (s.runs, s.unmeasured_runs.len(), s.billable_tokens),
+        (2, 0, 20 + 39)
+    );
+    // once only
+    assert!(
+        caller::reevaluate(&p, "d2", &tr, "decision-y")
+            .expect_err("twice")
+            .contains("already")
+    );
+    // and the series continues: the next resume takes the corrected run as its base
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d3", "s8", "more"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(
+        (
+            r["session"]["resume_base_attempt"].as_str(),
+            r["usage"]["run"]["state"].as_str()
+        ),
+        (Some("d2"), Some("measured")),
+        "{r}"
+    );
+}
+
+#[test]
+fn a_correction_must_match_the_run_it_corrects() {
+    let _serial = serial();
+    let t = Tmp::new("reeval-bad");
+    let (_a, p) = unmeasured_child_run(&t);
+    let mut tr = std::collections::BTreeMap::new();
+    tr.insert(
+        "c1".to_string(),
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl"),
+    );
+    // a changed stream file
+    let rec = &caller::raw_records(&p).expect("r")[1];
+    let sp = rec["stream"]["path"].as_str().expect("p").to_string();
+    let orig = std::fs::read(&sp).expect("s");
+    std::fs::write(&sp, [orig.clone(), b"\n".to_vec()].concat()).expect("w");
+    assert!(
+        caller::reevaluate(&p, "d2", &tr, "x")
+            .expect_err("digest")
+            .contains("digest")
+    );
+    std::fs::write(&sp, &orig).expect("w");
+    // a run that is not stopped for usage alone, or an unknown run
+    assert!(caller::reevaluate(&p, "d1", &tr, "x").is_err());
+    assert!(caller::reevaluate(&p, "zz", &tr, "x").is_err());
+    // forged correction lines make the ledger unusable
+    let path = caller::records_path(&p);
+    let good = std::fs::read_to_string(&path).expect("l");
+    let forged = json!({"format": caller::CORRECTION_FORMAT, "corrects": "nope", "original_stream_sha256": "x",
+                        "after": {"usage": {}, "stop_required": false}});
+    std::fs::write(&path, format!("{good}{forged}\n")).expect("w");
+    assert!(caller::records(&p).is_err());
+    let wrong_digest = json!({"format": caller::CORRECTION_FORMAT, "corrects": "d2", "original_stream_sha256": "x",
+                              "after": {"usage": {}, "stop_required": false}});
+    std::fs::write(&path, format!("{good}{wrong_digest}\n")).expect("w");
+    assert!(caller::records(&p).is_err());
 }

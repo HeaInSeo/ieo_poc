@@ -22,6 +22,13 @@ printf '{"type":"system","subtype":"init","session_id":"%s","cwd":"%s","tools":[
 case "$prompt" in
   */compact*) i=$(($1+5)); o=$(($2+5)); r=$3; c=$(($4+5)); u='0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0'
      printf '{"type":"system","subtype":"compact_boundary","session_id":"%s"}\n' "$sid";;
+  *"Agent tool"*)
+     # a D3-shaped child: two responses in its transcript, tool_use_result reports the last only
+     t="$CLAUDE_CONFIG_DIR/projects/-state-work-fixture0204/$sid/subagents"; mkdir -p "$t"
+     printf '{"type":"assistant","isSidechain":true,"agentId":"dry1","message":{"id":"dry1-r1","stop_reason":"tool_use","usage":{"input_tokens":2,"output_tokens":61,"cache_creation_input_tokens":2067,"cache_read_input_tokens":0}}}\n{"type":"assistant","isSidechain":true,"agentId":"dry1","message":{"id":"dry1-r2","stop_reason":"end_turn","usage":{"input_tokens":2,"output_tokens":3,"cache_creation_input_tokens":90,"cache_read_input_tokens":2067}}}\n' > "$t/agent-dry1.jsonl"
+     printf '{"type":"assistant","message":{"id":"m-%s-p","usage":{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20},"content":[{"type":"tool_use","id":"tu-dry1","name":"Agent"}]}}\n' "$sid"
+     printf '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu-dry1"}]},"tool_use_result":{"agentId":"dry1","usage":{"input_tokens":2,"output_tokens":3,"cache_creation_input_tokens":90,"cache_read_input_tokens":2067}}}\n'
+     i=$(($1+3+4)); o=$(($2+7+64)); r=$(($3+20+2067)); c=$(($4+10+2157)); u='3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20';;
   *) i=$(($1+3)); o=$(($2+7)); r=$(($3+20)); c=$(($4+10)); u='3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20'
      printf '{"type":"assistant","message":{"id":"m-%s-%s","usage":{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}\n' "$sid" "$i";;
 esac
@@ -59,6 +66,9 @@ ok(d6["session"]["mode"] == "new" and d6["session"]["session_id"] != s1 and d6["
    "D6: tamper detected, new session")
 ok(by["D1"]["outcome"]["config_cleanup"]["removed"] > 0 and by["D1"]["outcome"]["config_cleanup"]["credentials_removed"] == [], "D1: planted config-dir entries removed (no credential file among them)")
 ok(by["G1"]["role"] == "guardrail" and by["G1"]["session"]["mode"] == "new", "G1 on the Guardrail role")
+d3 = by["D3"]["usage"]
+ok(d3["attribution_check"] == "consistent" and d3["children"][0]["usage"]["tokens"] == {"input": 4, "output": 64, "cache_read": 2067, "cache_creation": 2157}
+   and by["D3"]["children"][0].get("sha256"), "D3: the child's two responses from its kept transcript, not the last one reported")
 ok(all("CLAUDE_CODE_OAUTH_TOKEN" in r["outcome"]["env_names"] and not any(n.startswith("ANTHROPIC_") for n in r["outcome"]["env_names"]) for r in recs), "environment: OAuth variable, no API key")
 print("records:", len(recs), "· spent:", json.dumps({k: sum(t(r)[k] for r in recs) for k in keys}))
 PYEOF

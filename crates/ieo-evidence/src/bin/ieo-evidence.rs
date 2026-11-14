@@ -4,7 +4,8 @@
 //! ```text
 //! ieo-evidence run --out DIR --task T --attempt A --command C [--role R] [--retry-of A0]
 //!     [--timeout-s N] [--grace-s N] [--model-request --session new|resume [--resume-base RECORD.json]] [--expect E] [--artifact PATH]...
-//!     [--marker REGEX]... [--env NAME]... [--secret-file PATH]... [--cwd DIR] -- ARGV...
+//!     [--marker REGEX]... [--env NAME]... [--secret-file PATH]... [--cwd DIR]
+//!     [--child-transcript AGENT_ID=PATH]... -- ARGV...
 //! ieo-evidence summarize RECORD.json|DIR...
 //! ieo-evidence inspect-stream FILE
 //! ```
@@ -62,6 +63,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
         expected: Expected::Success,
         out_root: PathBuf::new(),
         secrets: vec![],
+        child_transcripts: Default::default(),
     };
     let mut i = 0;
     while i < opts.len() {
@@ -104,6 +106,13 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
             "--marker" => spec.required_markers.push(v),
             "--env" => spec.env_allow.push(v),
             "--cwd" => spec.cwd = PathBuf::from(v),
+            "--child-transcript" => {
+                let (a, p) = v
+                    .split_once('=')
+                    .ok_or("--child-transcript AGENT_ID=PATH")?;
+                spec.child_transcripts
+                    .insert(a.to_owned(), PathBuf::from(p));
+            }
             "--secret-file" => spec
                 .secrets
                 .push(std::fs::read(&v).map_err(|e| format!("--secret-file 읽기 실패: {e}"))?),

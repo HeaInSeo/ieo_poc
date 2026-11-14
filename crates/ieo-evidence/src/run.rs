@@ -45,6 +45,9 @@ pub struct RunSpec {
     pub out_root: PathBuf,
     /// Secret values (in memory only) to mask.
     pub secrets: Vec<Vec<u8>>,
+    /// Child transcripts by `agentId` (`subagents/agent-<agentId>.jsonl`): a child's total comes
+    /// only from its transcript (02-04 D3). An unreadable file leaves that child unmeasured.
+    pub child_transcripts: std::collections::BTreeMap<String, PathBuf>,
 }
 
 /// Time given to output pipes after the command exits.
@@ -387,7 +390,12 @@ pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
         })
         .collect();
     let (result_event, usage) = if spec.model_request {
-        let parsed = stream::parse(&out.bytes, spec.session_mode, base);
+        let transcripts = spec
+            .child_transcripts
+            .iter()
+            .filter_map(|(a, p)| std::fs::read(p).ok().map(|b| (a.clone(), b)))
+            .collect();
+        let parsed = stream::parse_with_children(&out.bytes, spec.session_mode, base, &transcripts);
         (Some(parsed.result), parsed.usage)
     } else {
         (None, Usage::not_applicable())

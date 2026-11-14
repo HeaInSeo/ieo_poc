@@ -207,8 +207,51 @@ fn unix_now() -> u64 {
         .unwrap_or_default()
 }
 
-/// All records of the budget, fail-closed: an unreadable line is an error.
+pub const CORRECTION_FORMAT: &str = "ieo-role-run-correction/v0";
+
+/// The records of the budget as they count: [`raw_records`] with each correction applied to the
+/// run it corrects (the original line stays in the file; the corrected run carries
+/// `corrected_by` and the original values under `before_correction`). Corrections are not runs.
+/// Fail-closed: a correction naming an unknown run, a second correction of one run, or a
+/// correction whose stream digest differs from the run's is an error.
 pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
+    effective(raw_records(plan)?)
+}
+
+fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
+    let (corrections, mut runs): (Vec<Value>, Vec<Value>) = raw
+        .into_iter()
+        .partition(|r| r["format"] == CORRECTION_FORMAT);
+    let mut done = std::collections::BTreeSet::new();
+    for c in corrections {
+        let id = c["corrects"]
+            .as_str()
+            .ok_or("correction without `corrects`")?;
+        if !done.insert(id.to_owned()) {
+            return Err(format!("run {id} has more than one correction"));
+        }
+        let r = runs
+            .iter_mut()
+            .find(|r| r["attempt_id"] == id)
+            .ok_or(format!("correction of an unknown run {id}"))?;
+        if r["stream"]["sha256"] != c["original_stream_sha256"] || !c["after"]["usage"].is_object()
+        {
+            return Err(format!(
+                "correction of {id} does not match the run's stream or has no usage"
+            ));
+        }
+        r["before_correction"] = json!({"usage": r["usage"].take(),
+            "stop_required": r["stop_required"], "stop_reason": r["stop_reason"]});
+        r["usage"] = c["after"]["usage"].clone();
+        r["stop_required"] = c["after"]["stop_required"].clone();
+        r["stop_reason"] = Value::Null;
+        r["corrected_by"] = json!({"decision": c["decision"], "corrected_at": c["corrected_at"]});
+    }
+    Ok(runs)
+}
+
+/// All lines of the ledger as written, fail-closed: an unreadable line is an error.
+pub fn raw_records(plan: &Plan) -> Result<Vec<Value>, String> {
     let text = match std::fs::read_to_string(plan.records_path()) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -589,6 +632,42 @@ impl After<'_> {
         std::fs::create_dir_all(&streams)
             .and_then(|()| std::fs::write(&stream_path, &stream))
             .map_err(|e| format!("stream save: {e}"))?;
+        // the children's transcripts (a child's total comes only from its transcript)
+        let mut transcripts = std::collections::BTreeMap::new();
+        let mut children = Vec::new();
+        let agents: std::collections::BTreeSet<String> = stream
+            .lines()
+            .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+            .filter_map(|v| v["tool_use_result"]["agentId"].as_str().map(str::to_owned))
+            .collect();
+        for a in agents {
+            let got = adapter
+                .send(
+                    target,
+                    "GET",
+                    &format!("/v0/role/runs/{}/children/{a}", c.attempt_id),
+                    None,
+                )
+                .ok()
+                .filter(|(st, _)| *st == 200)
+                .and_then(|(_, v)| v["content"].as_str().map(str::to_owned));
+            match got {
+                Some(t) => {
+                    let p = plan
+                        .ledger_dir
+                        .join("children")
+                        .join(&c.attempt_id)
+                        .join(format!("agent-{a}.jsonl"));
+                    std::fs::create_dir_all(p.parent().unwrap_or(&plan.ledger_dir))
+                        .and_then(|()| std::fs::write(&p, &t))
+                        .map_err(|e| format!("child transcript save: {e}"))?;
+                    children.push(json!({"agent_id": a, "path": p, "bytes": t.len(),
+                        "sha256": hex::encode(Sha256::digest(t.as_bytes()))}));
+                    transcripts.insert(a, t.into_bytes());
+                }
+                None => children.push(json!({"agent_id": a, "path": null})),
+            }
+        }
         let mode = if last["mode"] == "resume" {
             SessionMode::Resume
         } else {
@@ -622,7 +701,8 @@ impl After<'_> {
             })
             .flatten();
         let base_attempt = base.as_ref().map(|b| b.attempt_id.clone());
-        let parsed = ieo_evidence::stream::parse(stream.as_bytes(), mode, base);
+        let parsed =
+            ieo_evidence::stream::parse_with_children(stream.as_bytes(), mode, base, &transcripts);
         let collected_run = serde_json::to_value(&parsed.usage.run).map_err(|e| e.to_string())?;
         let o = &last["observed"];
         // a missing guard observation is never 0: it makes any collector figure "below" it
@@ -700,6 +780,7 @@ impl After<'_> {
             "result": result.map(|r| json!({"subtype": r["subtype"], "is_error": r["is_error"]}))});
         r["result_event"] = serde_json::to_value(&parsed.result).unwrap_or(Value::Null);
         r["usage"] = usage;
+        r["children"] = json!(children);
         r["stream"] = json!({"path": stream_path, "bytes": stream.len(),
                              "sha256": hex::encode(Sha256::digest(stream.as_bytes()))});
         r["stop_required"] = json!(!reasons.is_empty());
@@ -711,6 +792,109 @@ impl After<'_> {
         }
         Ok(r)
     }
+}
+
+/// Re-evaluate a recorded run from its kept stream and child transcripts (no model call), for a
+/// user decision (02-04 D3). Appends a correction only when the run is now measured and its
+/// share matches parent + children; the run is not counted again and its stream must be the one
+/// recorded. Returns the correction.
+pub fn reevaluate(
+    plan: &Plan,
+    attempt: &str,
+    transcripts: &std::collections::BTreeMap<String, PathBuf>,
+    decision: &str,
+) -> Result<Value, String> {
+    let raw = raw_records(plan)?;
+    if raw
+        .iter()
+        .any(|r| r["format"] == CORRECTION_FORMAT && r["corrects"] == attempt)
+    {
+        return Err(format!("{attempt} is already corrected"));
+    }
+    let pos = raw
+        .iter()
+        .position(|r| r["attempt_id"] == attempt && r["format"] == RECORD_FORMAT)
+        .ok_or(format!("no record of {attempt}"))?;
+    let r = &raw[pos];
+    // only a run stopped for its usage alone (nothing else to look at)
+    let reason = r["stop_reason"].as_str().unwrap_or_default();
+    if r["usage"]["run"]["state"] != "unmeasured"
+        || !reason.starts_with("usage unmeasured")
+        || reason.contains("; ")
+    {
+        return Err(format!(
+            "{attempt} is not a run stopped only for unmeasured usage"
+        ));
+    }
+    let path = r["stream"]["path"].as_str().ok_or("no stream path")?;
+    let stream = std::fs::read(path).map_err(|e| format!("stream {path}: {e}"))?;
+    if hex::encode(Sha256::digest(&stream)) != r["stream"]["sha256"].as_str().unwrap_or_default() {
+        return Err("the kept stream differs from the recorded digest".into());
+    }
+    let mut bytes = std::collections::BTreeMap::new();
+    let mut kept = Vec::new();
+    for (a, p) in transcripts {
+        let b = std::fs::read(p).map_err(|e| format!("transcript {}: {e}", p.display()))?;
+        kept.push(json!({"agent_id": a, "path": p, "bytes": b.len(),
+            "sha256": hex::encode(Sha256::digest(&b))}));
+        bytes.insert(a.clone(), b);
+    }
+    // the base the run was recorded with (the run actually resumed)
+    let earlier = effective(raw[..pos].to_vec())?;
+    let mode = if r["session"]["mode"] == "resume" {
+        SessionMode::Resume
+    } else {
+        SessionMode::New
+    };
+    let base = match r["session"]["resume_base_attempt"].as_str() {
+        None => None,
+        Some(b) => {
+            let br = earlier
+                .iter()
+                .find(|x| x["attempt_id"] == b)
+                .ok_or(format!("base {b} not recorded"))?;
+            Some(ResumeBase {
+                task_id: br["task_id"].as_str().unwrap_or_default().into(),
+                attempt_id: b.into(),
+                command_id: br["command_id"].as_str().unwrap_or_default().into(),
+                session_id: r["session"]["session_id"].as_str().map(str::to_owned),
+                session: serde_json::from_value(br["usage"]["session"].clone())
+                    .map_err(|e| format!("base session: {e}"))?,
+                cost_usd_reported: br["usage"]["cost_usd_reported"].as_f64(),
+            })
+        }
+    };
+    let parsed = ieo_evidence::stream::parse_with_children(&stream, mode, base, &bytes);
+    if parsed.usage.attribution_check != "consistent" || parsed.usage.run.tokens().is_none() {
+        return Err(format!(
+            "{attempt} is still not measured: {} {:?}",
+            parsed.usage.attribution_check, parsed.usage.attribution_detail
+        ));
+    }
+    let o = &r["outcome"]["observed"];
+    let observed = Observed {
+        billable: o["billable_lower_bound"].as_u64().unwrap_or(u64::MAX),
+        cache_read: o["cache_read_lower_bound"].as_u64().unwrap_or(u64::MAX),
+        messages: o["messages"].as_u64().unwrap_or_default() as usize,
+        incomplete_lines: o["incomplete_lines"].as_u64().unwrap_or_default() as usize,
+    };
+    let stop = r["outcome"]["stop"].as_str().unwrap_or("unknown");
+    let collected = serde_json::to_value(&parsed.usage.run).map_err(|e| e.to_string())?;
+    let charged = run::charge_reported(stop == "Exited", stop, &observed, &collected);
+    if charged["state"] != "measured" {
+        return Err(format!("{attempt} charge is not measured: {charged}"));
+    }
+    let mut usage = serde_json::to_value(&parsed.usage).map_err(|e| e.to_string())?;
+    usage["collector_run"] = usage["run"].take();
+    usage["run"] = charged;
+    let c = json!({"format": CORRECTION_FORMAT, "corrects": attempt, "model_request": false,
+        "original_stream_sha256": r["stream"]["sha256"], "child_transcripts": kept,
+        "decision": decision, "corrected_at": ieo_evidence::time::now(),
+        "before": {"usage_run": r["usage"]["run"], "stop_required": r["stop_required"],
+                   "stop_reason": r["stop_reason"]},
+        "after": {"usage": usage, "stop_required": false}});
+    append(plan, &c)?;
+    Ok(c)
 }
 
 /// Ledger file of a plan, for reports.

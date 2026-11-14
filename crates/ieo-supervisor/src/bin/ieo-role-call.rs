@@ -6,6 +6,11 @@
 //! 3: recorded with `stop_required`; 1: an error (bad arguments, or a failure the caller could
 //! not record — its in-flight marker then blocks every further call). **Anything but 0 or 2
 //! means stop**: a person decides before the next call.
+//!
+//! `ieo-role-call reevaluate --plan <plan.json> --attempt <id> --decision <ref>
+//!  [--child-transcript <agentId>=<path>]...`: re-evaluate a recorded run from its kept stream
+//! and child transcripts (no model call) and append a correction if it is now measured and
+//! consistent (exit 0); otherwise nothing is written (exit 1).
 
 use ieo_supervisor::caller::{self, Call, Called, Plan};
 use serde_json::{Value, json};
@@ -36,6 +41,26 @@ fn run() -> Result<i32, String> {
     };
     let plan_v: Value = serde_json::from_str(&read("--plan")?).map_err(|e| e.to_string())?;
     let plan = Plan::from_json(&plan_v)?;
+    if args.first().map(String::as_str) == Some("reevaluate") {
+        let mut transcripts = std::collections::BTreeMap::new();
+        for (i, a) in args.iter().enumerate() {
+            if a == "--child-transcript" {
+                let v = args.get(i + 1).ok_or("--child-transcript value")?;
+                let (id, p) = v
+                    .split_once('=')
+                    .ok_or("--child-transcript AGENT_ID=PATH")?;
+                transcripts.insert(id.to_owned(), std::path::PathBuf::from(p));
+            }
+        }
+        let c = caller::reevaluate(&plan, &get("--attempt")?, &transcripts, &get("--decision")?)?;
+        println!(
+            "{}",
+            json!({"corrected": c["corrects"], "before": c["before"]["usage_run"],
+                   "after": c["after"]["usage"]["run"], "attribution": c["after"]["usage"]["attribution_check"],
+                   "decision": c["decision"]})
+        );
+        return Ok(0);
+    }
     let c = Call {
         task_id: get("--task")?,
         role: get("--role")?,

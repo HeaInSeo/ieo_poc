@@ -49,7 +49,31 @@ fn spec(out: &Path, cmd: &str) -> RunSpec {
         expected: Expected::Success,
         out_root: out.join("ev"),
         secrets: vec![],
+        child_transcripts: Default::default(),
     }
+}
+
+/// The 01-04 T23 child made one model response; its transcript (not kept by 01-04) is rebuilt
+/// with that one final response, which equals the reported `tool_use_result.usage`.
+const T23_AGENT: &str = "af06f3de7793d2534";
+fn t23_transcript(out: &Path) -> PathBuf {
+    fixture(
+        out,
+        "agent-t23.jsonl",
+        &format!(
+            "{}\n",
+            serde_json::json!({"type": "assistant", "isSidechain": true, "agentId": T23_AGENT,
+                "message": {"id": "msg_t23_child_1", "stop_reason": "end_turn",
+                    "usage": {"input_tokens": 2, "output_tokens": 9,
+                              "cache_creation_input_tokens": 844, "cache_read_input_tokens": 0}}})
+        ),
+    )
+}
+
+fn with_t23_child(out: &Path, mut s: RunSpec) -> RunSpec {
+    s.child_transcripts
+        .insert(T23_AGENT.into(), t23_transcript(out));
+    s
 }
 
 fn fixture(out: &Path, name: &str, text: &str) -> PathBuf {
@@ -217,7 +241,7 @@ fn exit_zero_without_required_evidence_is_incomplete() {
 fn model_run_real_stream_measures_parent_child_session() {
     let out = tmp();
     let f = fixture(&out, "t23.jsonl", &real_stream());
-    let mut s = spec(&out, &format!("cat {}", f.display()));
+    let mut s = with_t23_child(&out, spec(&out, &format!("cat {}", f.display())));
     s.model_request = true;
     let r = execute(&s).unwrap();
     assert_eq!(r.judgment.status, JudgmentStatus::Succeeded);
@@ -356,7 +380,7 @@ fn model_usage_missing_falls_back_to_parent_plus_children() {
         })
         .collect();
     let f = fixture(&out, "nomodel.jsonl", &text);
-    let mut s = spec(&out, &format!("cat {}", f.display()));
+    let mut s = with_t23_child(&out, spec(&out, &format!("cat {}", f.display())));
     s.model_request = true;
     let r = execute(&s).unwrap();
     let Measure::Measured { tokens, source } = &r.usage.session else {
@@ -389,7 +413,7 @@ fn attribution_mismatch_is_reported() {
         })
         .collect();
     let f = fixture(&out, "mismatch.jsonl", &text);
-    let mut s = spec(&out, &format!("cat {}", f.display()));
+    let mut s = with_t23_child(&out, spec(&out, &format!("cat {}", f.display())));
     s.model_request = true;
     let r = execute(&s).unwrap();
     assert_eq!(r.usage.attribution_check, "mismatch");
@@ -418,24 +442,24 @@ fn aggregate_includes_children_failures_retries_and_reviews() {
     let f = fixture(&out, "t23.jsonl", &real_stream());
     let mut recs = vec![];
     // development run that succeeded
-    let mut s = spec(&out, &format!("cat {}", f.display()));
+    let mut s = with_t23_child(&out, spec(&out, &format!("cat {}", f.display())));
     s.model_request = true;
     recs.push(execute(&s).unwrap());
     // the same stream from a run that then failed (exit 2): usage still counted
-    let mut s = spec(&out, &format!("cat {}; exit 2", f.display()));
+    let mut s = with_t23_child(&out, spec(&out, &format!("cat {}; exit 2", f.display())));
     s.model_request = true;
     s.attempt_id = "a2".into();
     let failed = execute(&s).unwrap();
     assert_eq!(failed.judgment.status, JudgmentStatus::Failed);
     recs.push(failed);
     // its retry
-    let mut s = spec(&out, &format!("cat {}", f.display()));
+    let mut s = with_t23_child(&out, spec(&out, &format!("cat {}", f.display())));
     s.model_request = true;
     s.attempt_id = "a3".into();
     s.retry_of = Some("a2".into());
     recs.push(execute(&s).unwrap());
     // a review run
-    let mut s = spec(&out, &format!("cat {}", f.display()));
+    let mut s = with_t23_child(&out, spec(&out, &format!("cat {}", f.display())));
     s.model_request = true;
     s.attempt_id = "r1".into();
     s.role = "review".into();
@@ -873,4 +897,222 @@ fn late_stderr_from_detached_descendant_is_kept_like_stdout() {
     );
     assert!(!r.process.output_incomplete);
     assert_eq!(r.judgment.status, JudgmentStatus::Succeeded);
+}
+
+// --- 02-04 D3: a child's total comes from its transcript ---
+
+#[test]
+fn without_a_transcript_the_child_is_unmeasured_and_its_last_response_kept() {
+    let out = tmp();
+    let f = fixture(&out, "t23.jsonl", &real_stream());
+    let mut s = spec(&out, &format!("cat {}", f.display()));
+    s.model_request = true;
+    let r = execute(&s).unwrap();
+    let c = &r.usage.children[0];
+    assert!(
+        matches!(&c.usage, Measure::Unmeasured { reason } if reason.contains("자식 전사 없음")),
+        "{:?}",
+        c.usage
+    );
+    assert_eq!(
+        c.reported_last_response,
+        Some(Tokens {
+            input: 2,
+            output: 9,
+            cache_read: 0,
+            cache_creation: 844
+        })
+    );
+    // a new session's share is its session total either way
+    assert!(r.usage.run.tokens().is_some());
+    assert_eq!(r.usage.attribution_check, "not_checked");
+}
+
+// --- 02-04 D3 replay (de-identified stored record, no model call) ---
+
+const D3: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/d3-child-usage");
+
+fn d3_base() -> ieo_evidence::record::ResumeBase {
+    let b: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(format!("{D3}/base-d2.json")).unwrap())
+            .unwrap();
+    ieo_evidence::record::ResumeBase {
+        task_id: "02-04".into(),
+        attempt_id: "D2".into(),
+        command_id: "development-reconnect".into(),
+        session_id: b["session_id"].as_str().map(str::to_owned),
+        session: serde_json::from_value(b["session"].clone()).unwrap(),
+        cost_usd_reported: b["cost_usd_reported"].as_f64(),
+    }
+}
+
+fn d3_parse(
+    transcript: Option<&str>,
+    base: ieo_evidence::record::ResumeBase,
+) -> ieo_evidence::stream::Parsed {
+    let stream = std::fs::read(format!("{D3}/stream.jsonl")).unwrap();
+    let mut t = std::collections::BTreeMap::new();
+    if let Some(x) = transcript {
+        t.insert("agent-1".to_string(), x.as_bytes().to_vec());
+    }
+    ieo_evidence::stream::parse_with_children(&stream, SessionMode::Resume, Some(base), &t)
+}
+
+fn d3_transcript() -> String {
+    std::fs::read_to_string(format!("{D3}/child-transcript.jsonl")).unwrap()
+}
+
+const D3_RUN: Tokens = Tokens {
+    input: 10,
+    output: 224,
+    cache_read: 35_662,
+    cache_creation: 2_613,
+};
+
+#[test]
+fn d3_the_child_s_two_responses_reconcile_the_session_increase() {
+    let p = d3_parse(Some(&d3_transcript()), d3_base());
+    let u = &p.usage;
+    // child: both responses (2/61/0/2067 and 2/3/2067/90), not the last one reported
+    assert_eq!(
+        tokens(&u.children[0].usage),
+        Tokens {
+            input: 4,
+            output: 64,
+            cache_read: 2_067,
+            cache_creation: 2_157
+        }
+    );
+    assert_eq!(
+        u.children[0].reported_last_response,
+        Some(Tokens {
+            input: 2,
+            output: 3,
+            cache_read: 2_067,
+            cache_creation: 90
+        })
+    );
+    assert_eq!(
+        tokens(&u.parent),
+        Tokens {
+            input: 6,
+            output: 160,
+            cache_read: 33_595,
+            cache_creation: 456
+        }
+    );
+    // parent + child = session increase, all four fields
+    assert_eq!(
+        u.attribution_check, "consistent",
+        "{:?}",
+        u.attribution_detail
+    );
+    assert_eq!(tokens(&u.run), D3_RUN);
+}
+
+#[test]
+fn d3_without_the_child_total_the_resume_stays_unmeasured() {
+    // no transcript: the child is unmeasured, the share cannot be matched
+    let p = d3_parse(None, d3_base());
+    assert!(
+        matches!(&p.usage.run, Measure::Unmeasured { .. }),
+        "{:?}",
+        p.usage.run
+    );
+    // the last response only (what tool_use_result reports): parent + child < increase
+    let last_only: String = d3_transcript()
+        .lines()
+        .skip(1)
+        .map(|l| format!("{l}\n"))
+        .collect();
+    let p = d3_parse(Some(&last_only), d3_base());
+    assert_eq!(p.usage.attribution_check, "mismatch");
+    assert!(matches!(&p.usage.run, Measure::Unmeasured { .. }));
+}
+
+#[test]
+fn d3_repeated_or_in_progress_entries_count_once() {
+    let t = d3_transcript();
+    let first = t.lines().next().unwrap();
+    // an in-progress entry of the first response (no stop_reason, streaming output 16) and an
+    // identical repeat of its final entry
+    let mut partial: serde_json::Value = serde_json::from_str(first).unwrap();
+    partial["message"]["stop_reason"] = serde_json::Value::Null;
+    partial["message"]["usage"]["output_tokens"] = 16.into();
+    let noisy = format!("{partial}\n{first}\n{first}\n{t}");
+    let p = d3_parse(Some(&noisy), d3_base());
+    assert_eq!(tokens(&p.usage.run), D3_RUN);
+    assert_eq!(p.usage.attribution_check, "consistent");
+}
+
+#[test]
+fn d3_unconfirmed_or_conflicting_child_records_stay_unmeasured() {
+    let t = d3_transcript();
+    let first = t.lines().next().unwrap();
+    let mut v: serde_json::Value = serde_json::from_str(first).unwrap();
+    // a response with only an in-progress entry
+    v["message"]["stop_reason"] = serde_json::Value::Null;
+    let only_partial = format!("{v}\n{}\n", t.lines().nth(1).unwrap());
+    // two different final entries for one response
+    let mut w: serde_json::Value = serde_json::from_str(first).unwrap();
+    w["message"]["usage"]["output_tokens"] = 62.into();
+    let conflicting = format!("{t}{w}\n");
+    // an entry of another agent, and an unreadable line
+    let mut x: serde_json::Value = serde_json::from_str(first).unwrap();
+    x["agentId"] = "agent-9".into();
+    let other_agent = format!("{t}{x}\n");
+    let broken = format!("{t}{{not json\n");
+    for (name, tr) in [
+        ("partial", only_partial),
+        ("conflict", conflicting),
+        ("other agent", other_agent),
+        ("broken", broken),
+    ] {
+        let p = d3_parse(Some(&tr), d3_base());
+        assert!(
+            matches!(&p.usage.children[0].usage, Measure::Unmeasured { .. }),
+            "{name}"
+        );
+        assert!(matches!(&p.usage.run, Measure::Unmeasured { .. }), "{name}");
+    }
+}
+
+#[test]
+fn d3_a_wrong_or_larger_base_is_still_refused() {
+    // another session's base
+    let mut b = d3_base();
+    b.session_id = Some("session-other".into());
+    assert!(matches!(
+        &d3_parse(Some(&d3_transcript()), b).usage.run,
+        Measure::Unmeasured { .. }
+    ));
+    // a base above the session total (cumulative went down)
+    let mut b = d3_base();
+    b.session = Measure::Measured {
+        tokens: Tokens {
+            input: 100,
+            output: 1_000,
+            cache_read: 100_000,
+            cache_creation: 100_000,
+        },
+        source: "test".into(),
+    };
+    assert!(matches!(
+        &d3_parse(Some(&d3_transcript()), b).usage.run,
+        Measure::Unmeasured { .. }
+    ));
+    // an older base (D1's totals would leave D2's usage unattributed)
+    let mut b = d3_base();
+    b.session = Measure::Measured {
+        tokens: Tokens {
+            input: 2,
+            output: 17,
+            cache_read: 11_393,
+            cache_creation: 5_231,
+        },
+        source: "test".into(),
+    };
+    let p = d3_parse(Some(&d3_transcript()), b);
+    assert_eq!(p.usage.attribution_check, "mismatch");
+    assert!(matches!(&p.usage.run, Measure::Unmeasured { .. }));
 }

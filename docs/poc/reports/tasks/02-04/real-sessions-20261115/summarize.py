@@ -21,7 +21,11 @@ if path:
 init = next((e for e in events if e.get("type") == "system" and e.get("subtype") == "init"), {})
 tool_uses, denials = [], []
 for e in events:
-    for c in ((e.get("message") or {}).get("content") or []) if isinstance((e.get("message") or {}).get("content"), list) else []:
+    msg = e.get("message")
+    content = msg.get("content") if isinstance(msg, dict) else None
+    for c in content if isinstance(content, list) else []:
+        if not isinstance(c, dict):
+            continue
         if c.get("type") == "tool_use":
             inp = c.get("input") or {}
             tool_uses.append({"name": c.get("name"), "file_path": inp.get("file_path"),

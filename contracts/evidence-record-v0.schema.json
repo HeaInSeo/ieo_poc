@@ -383,6 +383,17 @@
               },
               "usage": {
                 "$ref": "#/$defs/measure"
+              },
+              "reported_last_response": {
+                "description": "tool_use_result.usage as reported: the child's last response only (CLI 2.1.322, 02-04 D3); never the child's total",
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/tokens"
+                  }
+                ]
               }
             }
           }

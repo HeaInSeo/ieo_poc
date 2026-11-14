@@ -1,0 +1,15 @@
+{
+ "note": "02-04 D2 session totals (the run D3 resumed), from the caller record",
+ "session_id": "session-1",
+ "session": {
+  "source": "result.modelUsage",
+  "state": "measured",
+  "tokens": {
+   "cache_creation": 8922,
+   "cache_read": 41139,
+   "input": 8,
+   "output": 111
+  }
+ },
+ "cost_usd_reported": 0.0409279
+}
