@@ -1,9 +1,9 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0020",
-  "snapshot_created_at": "2026-11-14T20:42:22+09:00",
-  "last_actual_work_observed_at": "2026-11-14T20:42:22+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0021",
+  "snapshot_created_at": "2026-11-14T21:07:29+09:00",
+  "last_actual_work_observed_at": "2026-11-14T21:07:29+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
   "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 진행(supervisor 핵심 PR #31·#32, 실행 중 예산 집행 PR #40 병합, 실제 세션 시험 전) · gRPC 계획 개정 A4(X-03~X-07, PR #41)",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
@@ -300,10 +300,11 @@
         "reports/tasks/02-04/run-guard-20261114/evidence/mutants.txt",
         "reports/tasks/02-04/run-guard-20261114/evidence/cargo-test.log",
         "reports/tasks/02-04/run-guard-20261114/reviews/review-pr40-23fee80.md",
-        "https://github.com/HeaInSeo/ieo_poc/pull/40"
+        "https://github.com/HeaInSeo/ieo_poc/pull/40",
+        "reports/tasks/02-04/run-guard-20261114/reviews/review-pr42-2d8b488.md"
       ],
       "next_action": "역할 자격 유효성(값 출력 없음, 이번 실행 신호와 대조) → supervisor 바이너리·역할 컨테이너·PID 1·어댑터 연결(run::run·charge 사용, 기록에 charge 값 기록) → 결정 ① 02-04 예산 안 실제 세션 시험(§10 항목 1~5, §11 항목 7)",
-      "unresolved": "PR #40 최종 검토 23fee80 이월(P3·정보, 어댑터 단계): cleanup_failed 또는 run 오류는 정지·보고로 처리(또는 charge가 미계측), 어댑터가 charge 값을 budget::spent가 읽는 기록에 쓰는지 종단 시험, charge 변이 Y1(cache_read 비교)·Y4(누락 필드 0)·Y7(미계측 통과) 고정 시험, PROGRESS §2 마지막 항목에 charge 미계측 명시, 수집 값이 객체가 아니면 명시적 미계측. PROGRESS §2·§3(실제 세션 시험 전부 미실행, 토큰 상한은 회차 사이 확인만·회차 중 정지는 어댑터 단계, 기동과 잠금 해제 직렬화, 디버그 로그 끔). 이전 이월: 착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달 · 02-01→02-02 이월 판정 규칙(담당 02-04, 시점: 02-04가 계측기 판정을 supervisor 판정 입력으로 연결하기 전): 2df3c35 P3-2 결과 subtype≠success이고 is_error가 false/없음(현재 succeeded — 02-02 validation V-33 관측), P3-3 nonzero_exit/no_result 기대가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 일치 불가, P3-6 마감 직전 자연 종료 경쟁. 규칙을 정한 뒤 새 평가 세트 버전으로 시험(02-02 validation은 사용 완료) · 02-03 이월(02-04 수용 전): supervisor가 elapsed_seconds·total_tokens 집행(02-01 계측기 연결), 실제 GitHub 증거 수집기를 ieo-coord 증거 입력에 연결(PR 작성자 신원 직접 확인 F4·PR 수준 검토 상태 N5의 규칙은 02-05 착수 전 결정) · X-01 이월(02-04 기동 검사): 바인딩 sprint_id와 기존 Notion 가져오기 시험 ID 충돌 확인(X-01 최종 검토 U3)"
+      "unresolved": "PR #40 최종 검토 23fee80 이월(P3·정보, 어댑터 단계): cleanup_failed 또는 run 오류는 정지·보고로 처리(또는 charge가 미계측), 어댑터가 charge 값을 budget::spent가 읽는 기록에 쓰는지 종단 시험, charge 변이 Y1(cache_read 비교)·Y4(누락 필드 0)·Y7(미계측 통과) 고정 시험, PROGRESS §2 마지막 항목에 charge 미계측 명시, 수집 값이 객체가 아니면 명시적 미계측. reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md §2·§3(실제 세션 시험 전부 미실행, 기동과 잠금 해제 직렬화, 디버그 로그 끔) — 토큰 상한의 회차 중 정지는 reports/tasks/02-04/run-guard-20261114/PROGRESS.md의 run::run으로 구현됨(관측 하한 기준), 남은 것은 어댑터 연결. 이전 이월: 착수 전제: 런타임 계약 rev 6 §10 항목 1~5의 완료 조건 시험을 02-04에서 통과(Edit(//path) 인자 생성·rev 6 Guardrail 규칙 집합 실행, 개발 repo CLAUDE.md 공급 방식 결정, CLAUDE_CONFIG_DIR 정리(a)·변조 탐지(b)·정상 재개(c, 도구 없음·허용 도구·자식·/compact), 세션당 단일 실행, 재개 키 session_id만). 검토 f73ac13 P3: projects/*/memory 빈 디렉터리의 digest 처리, 정리가 projects/<cwd>/<sid>/subagents 기록을 지우는 영향 — (c)의 자식 회차로 확인 · 런타임 계약 rev 7 §11 항목 7: supervisor가 매 회차 세션 방식(새/재개)·재개 기준 회차를 계측기에 넘기고 체크포인트에 세션 누적을 남김, 새 세션→재개→/compact 재개 연쇄의 회차 몫 합 = 마지막 세션 누적 시험. 비밀은 --secret-file로 전달(--env만으로는 sk-ant- 형태만 가림; 02-01 검토 2df3c35 P3-9) · 02-02 검토 f46818a P3-7: 셸 스크립트 안에서 나눠 쓴 토큰 문자열은 argv 가림 대상이 아님 — supervisor는 비밀을 argv에 넣지 않고 --secret-file로 전달 · 02-01→02-02 이월 판정 규칙(담당 02-04, 시점: 02-04가 계측기 판정을 supervisor 판정 입력으로 연결하기 전): 2df3c35 P3-2 결과 subtype≠success이고 is_error가 false/없음(현재 succeeded — 02-02 validation V-33 관측), P3-3 nonzero_exit/no_result 기대가 무관한 실패와 일치·표식 stdout만 검색, P3-4 모델 요청의 --expect timeout 일치 불가, P3-6 마감 직전 자연 종료 경쟁. 규칙을 정한 뒤 새 평가 세트 버전으로 시험(02-02 validation은 사용 완료) · 02-03 이월(02-04 수용 전): supervisor가 elapsed_seconds·total_tokens 집행(02-01 계측기 연결), 실제 GitHub 증거 수집기를 ieo-coord 증거 입력에 연결(PR 작성자 신원 직접 확인 F4·PR 수준 검토 상태 N5의 규칙은 02-05 착수 전 결정) · X-01 이월(02-04 기동 검사): 바인딩 sprint_id와 기존 Notion 가져오기 시험 ID 충돌 확인(X-01 최종 검토 U3)"
     },
     {
       "task_id": "02-05",
@@ -2318,14 +2319,26 @@
         "reports/extra/grpc-plan-20261114/reviews/review-pr41-b3cb083.md",
         "https://github.com/HeaInSeo/ieo_poc/pull/41"
       ]
+    },
+    {
+      "event_id": "X-02-PREP-URL-20261114",
+      "event_revision": 1,
+      "task_id": "X-02",
+      "observed_at": "2026-11-14T21:07:29+09:00",
+      "state": "X-02 준비: 가져온 page_id와 URL 안 페이지 ID 일치 검사·불일치 거부(사용자 결정 2026-11-14 §5). PR #43 5457cb3 approve → 병합 42b435e(main CI 43592324926 success), 후속 PR #44(공유 규칙 ieo_spec::notion_url, 모든 가져오기 경로 송신 전 검사) 65d56ce approve → 병합 778ee47. 영속 코디네이터 main 778ee47 재적용: 불일치 400(source.url)·행 불변, 읽기 전용 확인 3·0·0·1. 모델 호출 0",
+      "evidence": [
+        "reports/extra/X-02/prep-page-url-20261114/evidence/x02-url-live.txt",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr43-5457cb3.md",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr44-65d56ce.md"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 병합, 02-04 진행 기록 2(PR #40 병합 ccf7291), gRPC 계획 A4(PR #41 병합 b5f25d2)",
+    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 병합, 02-04 진행 기록 2, gRPC 계획 A4, X-02 준비 page_id·URL 검사(PR #43·#44 병합 778ee47, 영속 재적용)",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main b5f25d21438b8b75194b592d8182b07f7ec0d0a1 (이 보고 PR 병합 전)",
+    "branch_sha": "main 778ee47808ae1532628c8f34c3d9aa12d2dcbec4 (이 보고 PR 병합 전)",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4 · 명세 8개 rev 5·POC-02 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9",
-    "running": "보고 PR(report/0204-run-guard-20261114). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090, main 7e9f5ea 빌드 — 이후 main 변경은 문서와 ieo-supervisor뿐) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
+    "running": "보고 PR(report/x02-prep-url-20261114). 영속 PoC DB ieo-poc-db(127.0.0.1:55433, 데이터·백업은 저장소 밖 비공개 디렉터리)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs)",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2350,7 +2363,7 @@
       "reports/tasks/02-04/run-guard-20261114/PROGRESS.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "X-02 준비 page_id·URL 검사 PR → 02-04 실제 세션 시험(역할 자격 확인, supervisor 바이너리·역할 컨테이너·어댑터, 02-04 예산) → X-03 계약 → X-04 → 02-05. X-05는 X-03 뒤 자원이 허락할 때(02-04 실제 시험과 동시 실행 금지). PR은 하나씩 · 다음 정규 보고에 gRPC 반영 위치·실행 순서 포함",
+    "next_action": "02-04 실제 세션 시험(역할 자격 확인, supervisor 바이너리·역할 컨테이너·어댑터, 02-04 예산) → X-03 계약 → X-04 → 02-05. X-05는 X-03 뒤 자원이 허락할 때(02-04 실제 시험과 동시 실행 금지). PR은 하나씩 · gRPC 반영 위치·실행 순서는 이 보고 PR(report/x02-prep-url-20261114) 본문에 포함",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
@@ -2425,13 +2438,19 @@
         "02-04"
       ],
       "status": "조건 대기",
-      "last_observed_at": null,
+      "last_observed_at": "2026-11-14T21:07:29+09:00",
       "latest_report": null,
       "result_state": "미실행",
       "verification_level": "unverified",
-      "evidence": [],
+      "evidence": [
+        "reports/extra/X-02/prep-page-url-20261114/evidence/x02-url-live.txt",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr43-5457cb3.md",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr44-65d56ce.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/43",
+        "https://github.com/HeaInSeo/ieo_poc/pull/44"
+      ],
       "next_action": "02-04 수용 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음)",
-      "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, executable 등록·의미 검토. 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), 가져온 page_id와 URL 안 페이지 ID 일치 검사·불일치 거부 시험 추가(사용자 결정 2026-11-14 §5)"
+      "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, executable 등록·의미 검토. 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), 가져온 page_id와 URL 안 페이지 ID 일치 검사는 완료(PR #43 병합 42b435e·#44 병합 778ee47, 영속 코디네이터 재적용 x02-url-live: 불일치 400·행 불변). 남은 관찰: URL 호스트 허용 목록은 별도 결정, 연결·URL 경로 고정 시험(검토 65d56ce P3)"
     },
     {
       "task_id": "X-03",
