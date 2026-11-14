@@ -1,5 +1,6 @@
 //! `ieo-coord migrate` | `ieo-coord serve --listen ADDR --tokens FILE --manifest FILE
-//!  --policy FILE [--bindings FILE] [--profiles FILE] [--workers N]`. The DB URL is read from `IEO_DB_URL`.
+//!  --policy FILE [--bindings FILE] [--profiles FILE] [--roles FILE] [--workers N]`. The DB URL is read from `IEO_DB_URL`,
+//!  or from the file named by `IEO_DB_URL_FILE`.
 
 use ieo_coord::api::{Ctx, migrate};
 use ieo_coord::auth::Credentials;
@@ -22,7 +23,18 @@ fn read_json(path: &str) -> Result<serde_json::Value, String> {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
-    let url = std::env::var("IEO_DB_URL").map_err(|_| "IEO_DB_URL is not set".to_string())?;
+    // IEO_DB_URL, or IEO_DB_URL_FILE naming a file that holds it (a mounted secret: the value
+    // then appears in no environment listing)
+    let url = match (
+        std::env::var("IEO_DB_URL"),
+        std::env::var("IEO_DB_URL_FILE"),
+    ) {
+        (Ok(u), _) => u,
+        (Err(_), Ok(f)) => std::fs::read_to_string(&f)
+            .map(|s| s.trim().to_string())
+            .map_err(|e| format!("IEO_DB_URL_FILE: {}", e.kind()))?,
+        _ => return Err("IEO_DB_URL (or IEO_DB_URL_FILE) is not set".into()),
+    };
     let cfg: Config = url
         .parse()
         .map_err(|_| "IEO_DB_URL is not a valid PostgreSQL config".to_string())?;
@@ -51,6 +63,10 @@ fn run() -> Result<(), String> {
                 Some(p) => read_json(&p)?,
                 None => serde_json::json!({}),
             };
+            let roles = match arg(&args, "--roles") {
+                Some(p) => read_json(&p)?,
+                None => serde_json::json!({}),
+            };
             let workers = arg(&args, "--workers")
                 .and_then(|w| w.parse().ok())
                 .unwrap_or(4);
@@ -58,14 +74,66 @@ fn run() -> Result<(), String> {
             {
                 let mut db = cfg.connect(NoTls).map_err(|e| format!("db connect: {e}"))?;
                 migrate(&mut db).map_err(|e| format!("migrate: {e}"))?;
+                // startup check (X-01 U3): a repo binding's sprint_id may not be a test id that a
+                // Notion import already owns; the conversion path would otherwise write into it
+                let imported: std::collections::BTreeSet<String> = db
+                    .query("SELECT DISTINCT test_id FROM notion_imports", &[])
+                    .map_err(|e| format!("startup check: {e}"))?
+                    .iter()
+                    .map(|r| r.get::<_, String>(0))
+                    .collect();
+                let clashes: Vec<String> = bindings
+                    .as_object()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|(repo, b)| {
+                        b["sprint_id"]
+                            .as_str()
+                            .filter(|sid| imported.contains(*sid))
+                            .map(|sid| format!("{repo}: {sid}"))
+                    })
+                    .collect();
+                if !clashes.is_empty() {
+                    return Err(format!(
+                        "startup check: binding sprint_id owned by a Notion import ({})",
+                        clashes.join(", ")
+                    ));
+                }
             }
             let server = tiny_http::Server::http(&listen).map_err(|e| format!("listen {listen}: {e}"))?;
             eprintln!("ieo-coord listening on {listen}; policy {}", policy.digest);
             let app = App {
-                ctx: Ctx { policy, manifest, bindings },
+                ctx: Ctx {
+                    policy,
+                    manifest,
+                    bindings,
+                    roles,
+                },
                 creds,
             };
-            serve(Arc::new(server), Arc::new(app), &cfg, workers)
+            // PID 1 in the coordinator container (02-04): SIGTERM/SIGINT stop accepting, let the
+            // requests in progress finish, and exit 0 (a PID 1 without a handler ignores SIGTERM)
+            let server = Arc::new(server);
+            let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            for sig in [signal_hook::consts::SIGTERM, signal_hook::consts::SIGINT] {
+                signal_hook::flag::register(sig, Arc::clone(&stop)).map_err(|e| format!("signal: {e}"))?;
+            }
+            {
+                let server = Arc::clone(&server);
+                std::thread::spawn(move || {
+                    while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                    eprintln!("ieo-coord: stopping (signal)");
+                    // one unblock per worker waiting in recv
+                    for _ in 0..workers.max(1) {
+                        server.unblock();
+                    }
+                });
+            }
+            serve(server, Arc::new(app), &cfg, workers)?;
+            eprintln!("ieo-coord: stopped");
+            Ok(())
         }
         _ => Err("usage: ieo-coord migrate | serve --listen ADDR --tokens FILE --manifest FILE --policy FILE [--bindings FILE] [--profiles FILE] [--workers N]".into()),
     }

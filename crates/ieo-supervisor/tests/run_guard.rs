@@ -832,3 +832,50 @@ fn the_group_is_signalled_in_the_form_the_role_image_accepts() {
         "{log}"
     );
 }
+
+// --- PR #40 review 23fee80 carried items (Y1, Y4, Y7, non-object) ---
+
+#[test]
+fn charge_compares_every_part_and_never_fills_a_gap() {
+    let obs = run::Observed {
+        billable: 100,
+        cache_read: 1_000,
+        messages: 1,
+        incomplete_lines: 0,
+    };
+    let measured = |i: u64, o: u64, cc: u64, cr: u64| json!({"state": "measured", "source": "t", "tokens": {"input": i, "output": o, "cache_creation": cc, "cache_read": cr}});
+    // at or above both observed bounds: charged as collected
+    assert_eq!(
+        run::charge_reported(true, "Exited", &obs, &measured(10, 40, 50, 1_000))["state"],
+        "measured"
+    );
+    // Y1: billable fine but cache_read below the observed bound -> unmeasured
+    assert_eq!(
+        run::charge_reported(true, "Exited", &obs, &measured(10, 40, 50, 999))["state"],
+        "unmeasured"
+    );
+    // Y4: a missing token field is not 0 -> unmeasured
+    let mut gap = measured(10, 40, 50, 1_000);
+    gap["tokens"].as_object_mut().expect("o").remove("output");
+    assert_eq!(
+        run::charge_reported(true, "Exited", &obs, &gap)["state"],
+        "unmeasured"
+    );
+    // Y7: an unmeasured collector value stays unmeasured
+    let un = json!({"state": "unmeasured", "reason": "x"});
+    assert_eq!(
+        run::charge_reported(true, "Exited", &obs, &un)["state"],
+        "unmeasured"
+    );
+    // a value that is not an object is explicitly unmeasured
+    for v in [serde_json::Value::Null, json!("measured"), json!(5)] {
+        let c = run::charge_reported(true, "Exited", &obs, &v);
+        assert_eq!(c["state"], "unmeasured", "{v}");
+        assert!(
+            c["reason"]
+                .as_str()
+                .is_some_and(|r| r.contains("not an object")),
+            "{c}"
+        );
+    }
+}

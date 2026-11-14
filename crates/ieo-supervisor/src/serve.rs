@@ -235,8 +235,21 @@ impl Service {
         let cp = std::fs::read(self.cfg.checkpoint_path())
             .ok()
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+        // §7 safe-shutdown report: what this role can say about its own state. Active children
+        // and pending external requests are not tracked yet (PROGRESS §1): reported as such,
+        // never as zero, so a stop that depends on them stays unconfirmed.
+        let phase = cp
+            .as_ref()
+            .and_then(|c| c["phase"].as_str().map(str::to_owned));
+        let safe = json!({
+            "running": st.running.is_some(),
+            "checkpoint_phase": phase,
+            "checkpoint_saved": st.running.is_none() && phase.as_deref().is_none_or(|p| p == "after_run"),
+            "active_children": "not_tracked",
+            "pending_external_requests": "not_tracked",
+        });
         json!({"role": self.cfg.role_name(), "repo": self.cfg.repo,
-               "running": st.running, "last": st.last, "checkpoint": cp})
+               "running": st.running, "last": st.last, "checkpoint": cp, "safe_shutdown": safe})
     }
 
     /// Handle one request. `bearer` is the token from `Authorization: Bearer …`.

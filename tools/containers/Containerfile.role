@@ -1,0 +1,23 @@
+# 02-04 role images: the repo supervisor as PID 1 with the Claude Code CLI, one image per role
+# (development UID 20001, Guardrail UID 20002; runtime contract §2 U3). The role's own
+# configuration, credential and volume are mounted at run time (/etc/ieo/role ro,
+# /run/ieo/cred ro, /state rw). Built by build-images.sh.
+FROM docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS role-base
+ARG REVISION
+ARG SUPERVISOR_SHA256
+ARG CLAUDE_SHA256
+LABEL org.opencontainers.image.revision="${REVISION}" \
+      ieo.binary.ieo-supervisor.sha256="${SUPERVISOR_SHA256}" \
+      ieo.binary.claude.sha256="${CLAUDE_SHA256}"
+COPY claude /opt/claude/claude
+COPY ieo-supervisor /usr/local/bin/ieo-supervisor
+# no --init: the supervisor must be PID 1 (it reaps orphans only as PID 1)
+ENTRYPOINT ["/usr/local/bin/ieo-supervisor", "serve", "--config", "/etc/ieo/role/supervisor.json", "--listen", "0.0.0.0:8080"]
+
+FROM role-base AS development
+LABEL ieo.component="role" ieo.role="development"
+USER 20001:20001
+
+FROM role-base AS guardrail
+LABEL ieo.component="role" ieo.role="guardrail"
+USER 20002:20002

@@ -550,7 +550,9 @@ dependencies = [
  "postgres",
  "serde_json",
  "sha2",
+ "signal-hook",
  "tiny_http",
+ "ureq",
 ]
 
 [[package]]

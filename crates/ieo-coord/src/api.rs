@@ -27,6 +27,8 @@ pub struct Ctx {
     pub manifest: Value,
     /// Approved per-repo bindings for human-input conversion (01-07 §3), keyed by repo_id.
     pub bindings: Value,
+    /// Role supervisors per repo (`--roles`, runtime contract §7), for repo-scope status/stop.
+    pub roles: Value,
 }
 
 pub struct Req<'a> {
@@ -270,6 +272,30 @@ pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Re
         );
     };
     let route = (req.method, segs.as_slice());
+    // repo-scope role control (§7): no database; service and user credentials with
+    // `roles:control`
+    match route {
+        ("GET", ["v0", "repos", repo, "roles"]) | ("POST", ["v0", "repos", repo, "stop"]) => {
+            if let Err(r) = need_client_scope(who, "roles:control", false) {
+                return r;
+            }
+            if !who.repos.is_empty() && !who.repos.contains(*repo) {
+                return problem(403, "SCOPE_DENIED", "repo outside the credential's repos");
+            }
+            let (status, body) = if req.method == "GET" {
+                crate::roles::status(&ctx.roles, repo)
+            } else {
+                crate::roles::stop(
+                    &ctx.roles,
+                    repo,
+                    std::time::Duration::from_secs(30),
+                    std::time::Duration::from_millis(250),
+                )
+            };
+            return Resp { status, body };
+        }
+        _ => {}
+    }
     let run = |db: &mut Client, f: &dyn Fn(&mut Transaction) -> R| -> Resp {
         let mut tx = match db.transaction() {
             Ok(t) => t,

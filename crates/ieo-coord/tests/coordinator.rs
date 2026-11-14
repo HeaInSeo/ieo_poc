@@ -88,7 +88,8 @@ type PrincipalRow = (
     Option<&'static str>,
 );
 
-const PRINCIPALS: [PrincipalRow; 15] = [
+const PRINCIPALS: [PrincipalRow; 16] = [
+    ("operator", "service", &["roles:control"], &["repo-a"], None),
     (
         "importer",
         "service",
@@ -240,6 +241,10 @@ fn start() -> Option<Env> {
             policy: policy::load(POLICY).expect("policy"),
             manifest,
             bindings,
+            // repo-a's supervisors on a closed port: the report says unreachable, never "stopped"
+            roles: json!({"repo-a": {
+                "development": {"url": "http://127.0.0.1:9", "adapter_token_file": "/nonexistent"},
+                "guardrail": {"url": "http://127.0.0.1:9", "adapter_token_file": "/nonexistent"}}}),
         },
         creds,
     };
@@ -3840,4 +3845,26 @@ fn an_import_whose_url_names_another_page_is_refused() {
         let (st, r) = e.post("importer", "/v0/imports/notion", &b);
         assert!(st == 201 || (i > 0 && st == 200), "{url}: {st} {r}");
     }
+}
+
+#[test]
+fn repo_scope_role_control_needs_its_scope_and_reports_unreachable_roles() {
+    let Some(env) = start() else { return };
+    // without the scope, as an agent, or for another repo: refused
+    let (st, b) = env.get("uma", "/v0/repos/repo-a/roles");
+    assert_eq!((st, b["code"].as_str()), (403, Some("SCOPE_DENIED")), "{b}");
+    let (st, _) = env.post("operator", "/v0/repos/repo-b/stop", &json!({}));
+    assert_eq!(st, 403);
+    // the operator: both roles reported, unreachable, and the shutdown not confirmed
+    let (st, b) = env.post("operator", "/v0/repos/repo-a/stop", &json!({}));
+    assert_eq!(st, 200, "{b}");
+    assert_eq!(b["safe_shutdown_confirmed"], false, "{b}");
+    assert_eq!(b["roles"]["development"]["reachable"], false, "{b}");
+    assert_eq!(b["roles"]["guardrail"]["reachable"], false, "{b}");
+    assert!(
+        b["unconfirmed"].as_array().is_some_and(|u| u.len() == 2),
+        "{b}"
+    );
+    let (st, b) = env.get("operator", "/v0/repos/repo-z/roles");
+    assert_eq!(st, 403, "{b}");
 }
