@@ -30,3 +30,8 @@ ieo-supervisor af684e6f9327964f18bae1879744592bc20c3ad95ae4f79e0200b39ee93b9ad5 
 ieo-role-call 0e9551b62950107a2361ab1c5f48059e30603045584dec9713d461274bdada50 (deployed dde8db51…): differs
 -> a debug build embeds source and target paths; a rebuild cannot confirm the deployed binary's commit. Not confirmed by rebuild.
 ## code between d41e70f and this re-query's main: git diff d41e70f origin/main -- crates Cargo.lock Cargo.toml rust-toolchain.toml = empty
+## parent transcript of session 58f8976d around D4 (current re-query 2026-11-14T23:44:45Z; private file, counts and usage fields only)
+lines 101 ; compact_boundary entries 1 at line(s) [60]
+compact summary entries 1 ; usage fields on boundary/summary entries: 0
+assistant entries with usage after the boundary: 1 [{'input_tokens': 2, 'output_tokens': 7, 'cache_creation_input_tokens': 6455, 'cache_read_input_tokens': 11393}]
+-> the first usage after the boundary equals D5's share (2/7/6,455/11,393); no entry records the compaction call's usage

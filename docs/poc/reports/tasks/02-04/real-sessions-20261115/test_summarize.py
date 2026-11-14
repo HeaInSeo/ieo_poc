@@ -59,5 +59,19 @@ s = summarize([rec("D7", usage={"children": [CHILD]}, children=[{"agent_id": "a1
 check("new record: kept transcripts from the record",
       s["children"]["kept_transcripts"]["source"].startswith("record children") and s["children"]["kept_transcripts"]["transcripts"][0]["sha256"] == "k",
       s["children"])
+# the real D3 record and its correction, from the public ledger copy (review 56882cb L5)
+pub = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evidence", "real", "records.jsonl")
+real = open(pub).read().splitlines()
+s = summarize(real, "D3", read_stream=False)
+c = s["children"]
+check("public D3 record: a child, not none", c["status"] == "present", c)
+check("public D3 record: agent a13188dc0170f8901 from the record's stream reading",
+      [x["agent_id"] for x in c["observed_in_stream"]["children"]] == ["a13188dc0170f8901"], c)
+check("public D3 record: kept transcript from the correction (8e509473…)",
+      c["kept_transcripts"]["source"].startswith("correction") and c["kept_transcripts"]["transcripts"][0]["sha256"].startswith("8e509473"), c)
+check("public D3 record: original unmeasured, correction measured",
+      s["usage_run"]["state"] == "unmeasured" and s["correction"]["usage_run"]["state"] == "measured", s)
+s = summarize(real, "D4", read_stream=False)
+check("public D4 record: confirmed none", s["children"]["status"] == "confirmed_none", s["children"])
 print("RESULT", "PASS" if not fails else "FAIL", fails)
 sys.exit(1 if fails else 0)
