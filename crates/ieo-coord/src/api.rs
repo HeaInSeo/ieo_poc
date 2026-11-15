@@ -12,8 +12,8 @@ use ieo_report::{
     validate_report,
 };
 use ieo_spec::{
-    CheckMode, CheckState, ConversionContext, Registry, canonical_json, check_registration,
-    convert_human_input,
+    CheckMode, CheckOutcome, CheckState, ConversionContext, Registry, canonical_json,
+    check_registration, convert_human_input,
 };
 use postgres::{Client, GenericClient, Transaction};
 use serde_json::{Value, json};
@@ -647,6 +647,119 @@ fn reevaluate(tx: &mut Transaction, mut result: Value) -> Result<Value, Resp> {
     Ok(result)
 }
 
+/// The repo that a binding reserves this sprint_id for (02-05 C2, 02-03 N2), if any.
+pub fn reserved_for<'a>(ctx: &'a Ctx, sprint_id: &str) -> Option<&'a str> {
+    ctx.bindings
+        .as_object()
+        .into_iter()
+        .flatten()
+        .find(|(_, b)| b["sprint_id"].as_str() == Some(sprint_id))
+        .map(|(repo, _)| repo.as_str())
+}
+
+/// Start-up check of the repo bindings against the stored sprints (X-01 U3, 02-05 C2). A
+/// binding's sprint_id may not be (1) a test id that a Notion import owns (the conversion path
+/// would write into it), (2) a sprint registered for another repo (RG2 would refuse the binding's
+/// repo and the reservation every other repo, so nobody could register it), or (3) named by
+/// another repo's binding too. The coordinator refuses to start; the operator fixes the binding.
+pub fn check_bindings(db: &mut impl GenericClient, bindings: &Value) -> Result<(), String> {
+    let mut problems = Vec::new();
+    let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
+    for (repo, b) in bindings.as_object().into_iter().flatten() {
+        let Some(sid) = b["sprint_id"].as_str() else {
+            continue;
+        };
+        if let Some(first) = seen.insert(sid, repo) {
+            problems.push(format!(
+                "binding sprint_id named by two repos ({first}, {repo}: {sid})"
+            ));
+        }
+        let imported: bool = db
+            .query_one(
+                "SELECT EXISTS (SELECT 1 FROM notion_imports WHERE test_id = $1)",
+                &[&sid],
+            )
+            .map_err(|e| format!("startup check: {e}"))?
+            .get(0);
+        if imported {
+            problems.push(format!(
+                "binding sprint_id owned by a Notion import ({repo}: {sid})"
+            ));
+        }
+        let owner: Option<String> = db
+            .query_opt(
+                "SELECT repo_id FROM sprint_revisions WHERE sprint_id = $1 LIMIT 1",
+                &[&sid],
+            )
+            .map_err(|e| format!("startup check: {e}"))?
+            .map(|r| r.get(0));
+        if let Some(o) = owner.filter(|o| o != repo) {
+            problems.push(format!(
+                "binding sprint_id registered for another repo ({repo}: {sid}, owned by {o})"
+            ));
+        }
+    }
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("startup check: {}", problems.join("; ")))
+    }
+}
+
+/// Which repo a sprint_id belongs to, checked before anything else of the body (so a malformed
+/// body that names another repo's sprint stays 409, as before 02-05):
+/// - RG2 (review 1e98f17 F1): a sprint_id belongs to the repo of its first registered revision;
+///   a revision that names another repo would hand the sprint to that repo;
+/// - 02-05 C2: a sprint_id that a repo binding names is reserved for that repo, also before its
+///   first registration. The start-up check (`check_bindings`) keeps the two rules consistent.
+fn guard_sprint_repo(tx: &mut Transaction, ctx: &Ctx, spec: &Value) -> Result<(), Resp> {
+    let Some(sid) = spec["sprint_id"].as_str() else {
+        return Ok(());
+    };
+    let repo = spec["target"]["repo_id"].as_str();
+    let owner: Option<String> = match tx.query_opt(
+        "SELECT repo_id FROM sprint_revisions WHERE sprint_id = $1 LIMIT 1",
+        &[&sid],
+    )? {
+        Some(r) => Some(r.get(0)),
+        None => reserved_for(ctx, sid).map(str::to_string),
+    };
+    if owner.is_some_and(|o| Some(o.as_str()) != repo) {
+        return Err(one(
+            409,
+            "SPRINT_REPO_CONFLICT",
+            "target.repo_id",
+            "this sprint_id is registered or reserved for another repo",
+            "use a new sprint_id for this repo",
+        ));
+    }
+    Ok(())
+}
+
+/// The checks of a registration, without writing: the sprint's repo (RG2, C2 reservation), then
+/// the 01-07 checks (format → digest → revision → references → binding for `mode=executable`).
+/// A rejection is the error; any other outcome (new revision, `AlreadyRegistered`,
+/// `Superseded`) is returned for the caller's further checks and `save_spec`.
+fn check_spec(
+    tx: &mut Transaction,
+    ctx: &Ctx,
+    spec: &Value,
+    mode: CheckMode,
+) -> Result<CheckOutcome, Resp> {
+    guard_sprint_repo(tx, ctx, spec)?;
+    let reg = load_registry(tx, ctx)?;
+    let out = check_registration(spec, &reg, mode);
+    if out.state == CheckState::Rejected {
+        let list = out
+            .rejections
+            .iter()
+            .filter_map(|r| serde_json::to_value(r).ok())
+            .collect();
+        return Err(rejected(out.http_status(), list));
+    }
+    Ok(out)
+}
+
 /// Shared by `registerSprint` and `convertHumanInput`. Returns (status, RegistrationResult).
 fn register_spec(
     tx: &mut Transaction,
@@ -655,25 +768,19 @@ fn register_spec(
     spec: &Value,
     mode: CheckMode,
 ) -> Result<(u16, Value), Resp> {
-    // review 1e98f17 F1: a sprint_id belongs to one repo for life (RG2); a revision that
-    // names another repo would hand the sprint to that repo
-    if let Some(sid) = spec["sprint_id"].as_str()
-        && let Some(r) = tx.query_opt(
-            "SELECT repo_id FROM sprint_revisions WHERE sprint_id = $1 LIMIT 1",
-            &[&sid],
-        )?
-        && Some(r.get::<_, &str>(0)) != spec["target"]["repo_id"].as_str()
-    {
-        return Err(one(
-            409,
-            "SPRINT_REPO_CONFLICT",
-            "target.repo_id",
-            "this sprint_id is registered for another repo",
-            "use a new sprint_id for this repo",
-        ));
-    }
-    let reg = load_registry(tx, ctx)?;
-    let out = check_registration(spec, &reg, mode);
+    let out = check_spec(tx, ctx, spec, mode)?;
+    save_spec(tx, who, spec, mode, out)
+}
+
+/// Store a checked registration (a new revision, or a draft-stored revision promoted to
+/// executable); `AlreadyRegistered` and `Superseded` write nothing.
+fn save_spec(
+    tx: &mut Transaction,
+    who: &Caller,
+    spec: &Value,
+    mode: CheckMode,
+    out: CheckOutcome,
+) -> Result<(u16, Value), Resp> {
     let status = out.http_status();
     let mode_s = if mode == CheckMode::Executable {
         "executable"
@@ -684,13 +791,13 @@ fn register_spec(
     let revision = spec["revision"].as_i64().unwrap_or_default();
     let digest = out.computed_digest.clone().unwrap_or_default();
     let state = match out.state {
+        // check_spec returns every rejection as its error; never stored
         CheckState::Rejected => {
-            let list = out
-                .rejections
-                .iter()
-                .filter_map(|r| serde_json::to_value(r).ok())
-                .collect();
-            return Err(rejected(status, list));
+            return Err(problem(
+                500,
+                "INTERNAL",
+                "a rejected registration reached the store",
+            ));
         }
         CheckState::AcceptedForSemanticReview => {
             let existing = tx.execute(
@@ -829,26 +936,24 @@ fn register(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         let result = reevaluate(tx, stored)?;
         return ok(200, result);
     }
-    guard_import_owned(tx, &body, mode)?;
+    // 02-05 U2 (X-01 review 74bd796): sprint repo (RG2, C2 reservation) → the 01-07 checks →
+    // import ownership → import gate → store. Ownership and the gate apply to every outcome the
+    // 01-07 checks do not reject — a new revision (201), `AlreadyRegistered` and `Superseded`
+    // (200) — so moving them after the 01-07 checks changes only which code a request that
+    // fails several checks gets first, never whether it is refused (review 3c017a4 N-2).
+    let out = check_spec(tx, ctx, &body, mode)?;
+    guard_import_owned(tx, &body)?;
     // C2 (review 9a421b7 F1): the gate follows the Notion sources a spec cites, whatever its
-    // sprint_id, so a copy of a gated task under another sprint id is gated too. Format errors
-    // keep their 400 (checked by register_spec).
-    if mode == CheckMode::Executable
-        && ieo_spec::schema::format_rejections(ieo_spec::schema::sprint_spec_validator(), &body)
-            .is_empty()
-    {
-        let repo = body["target"]["repo_id"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
+    // sprint_id, so a copy of a gated task under another sprint id is gated too.
+    if mode == CheckMode::Executable {
         notion_gate(
             tx,
             &body,
             body["sprint_id"].as_str().unwrap_or_default(),
-            &repo,
+            repo,
         )?;
     }
-    let (status, result) = register_spec(tx, ctx, who, &body, mode)?;
+    let (status, result) = save_spec(tx, who, &body, mode, out)?;
     idempotent_store(
         tx,
         who,
@@ -1155,12 +1260,7 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
             &[&test_id],
         )?
         .get(0);
-    let reserved = ctx
-        .bindings
-        .as_object()
-        .into_iter()
-        .flatten()
-        .any(|(_, b)| b["sprint_id"].as_str() == Some(test_id.as_str()));
+    let reserved = reserved_for(ctx, &test_id).is_some();
     if !imported_before && (reserved || latest_revision(tx, &test_id)?.is_some()) {
         return Err(one(
             409,
@@ -1268,9 +1368,10 @@ fn import_notion(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R 
 /// A sprint created by a Notion import (X-01) accepts a `/v0/sprints` registration only when the
 /// spec is derived from its latest import: the same tasks and the same `notion_page` source digest.
 /// That is how an imported draft becomes executable once its limits are bound and its reasons are
-/// resolved (review 7a48a4f T1); any other content → 409 (review 38b671b S2). Malformed bodies
-/// and other repos fall through to the normal checks (400 / `SPRINT_REPO_CONFLICT`, T2/T5).
-fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Result<(), Resp> {
+/// resolved (review 7a48a4f T1); any other content → 409 (review 38b671b S2). Runs after
+/// `check_spec` (02-05 U2), so the body is well-formed and names the sprint's own repo; the repo
+/// test below only keeps the guard self-contained.
+fn guard_import_owned(tx: &mut Transaction, spec: &Value) -> Result<(), Resp> {
     let sid = spec["sprint_id"].as_str().unwrap_or_default();
     let Some(row) = tx.query_opt(
         "SELECT n.content_digest, s.repo_id, s.spec FROM notion_imports n
@@ -1284,10 +1385,7 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Re
     let digest: String = row.get(0);
     let owner: String = row.get(1);
     let imported: Value = row.get(2);
-    if spec["target"]["repo_id"].as_str() != Some(owner.as_str())
-        || !ieo_spec::schema::format_rejections(ieo_spec::schema::sprint_spec_validator(), spec)
-            .is_empty()
-    {
+    if spec["target"]["repo_id"].as_str() != Some(owner.as_str()) {
         return Ok(());
     }
     let same_source = spec["sources"]
@@ -1296,7 +1394,6 @@ fn guard_import_owned(tx: &mut Transaction, spec: &Value, mode: CheckMode) -> Re
         .flatten()
         .any(|x| x["kind"] == "notion_page" && x["digest"].as_str() == Some(digest.as_str()));
     if same_source && spec["tasks"] == imported["tasks"] {
-        let _ = mode;
         return Ok(());
     }
     Err(one(
