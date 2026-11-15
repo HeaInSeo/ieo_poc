@@ -28,7 +28,7 @@ use ieo_evidence::record::{Measure, ResumeBase, SessionMode};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub const RECORD_FORMAT: &str = "ieo-role-run/v0";
@@ -345,6 +345,138 @@ fn clear_inflight(plan: &Plan) -> Result<(), String> {
     std::fs::remove_file(inflight_path(plan)).map_err(|e| format!("in-flight marker: {e}"))
 }
 
+/// How long a call waits for `caller.lock` before it is refused. Production never needs the
+/// wait: `ieo-role-call` is one process that starts none, and `call.sh` holds the lock only
+/// around a restart. It serves the in-process test harness, where a process forked by another
+/// test thread holds a copy of the previous call's lock until it execs (reviews f90f5b5 N1,
+/// dc11612 L-c3-2). A real second caller stays refused.
+pub const LOCK_WAIT: Duration = Duration::from_secs(3);
+
+/// The ledger names its files (streams, child transcripts) by absolute path, so a moved or
+/// renamed ledger directory makes every read refuse (review 71e408a P4). Said with the error.
+fn moved_hint(e: &std::io::Error) -> &'static str {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        " (the ledger names its files by absolute path: a ledger directory moved or renamed \
+         while its budget is open is refused; move it back)"
+    } else {
+        ""
+    }
+}
+
+/// A record that asks for a person stops every call until it is reconciled.
+fn asks_for_a_person(recs: &[Value]) -> Option<String> {
+    recs.iter().find(|r| r["stop_required"] == true).map(|r| {
+        format!(
+            "record {} asks for a person: {}",
+            r["attempt_id"], r["stop_reason"]
+        )
+    })
+}
+
+/// The services' state before a call or a restart, for **every** role of the plan (`first`
+/// asked first): each answers its status, runs nothing, and the last attempt it ran and the
+/// attempt its persisted checkpoint names are known to the ledger (reviews f90f5b5 N2, dc11612
+/// L-c3-3: a run of one role that the ledger lost blocks the other role too). `Ok(Ok(statuses
+/// by role))`, `Ok(Err(why))` for a refusal, `Err` when a service cannot be asked.
+fn services_clear(
+    plan: &Plan,
+    recs: &[Value],
+    adapter: &dyn Adapter,
+    first: &str,
+) -> Result<Result<BTreeMap<String, Value>, String>, String> {
+    let known = |a: &str| recs.iter().any(|r| r["attempt_id"] == a);
+    let mut order: Vec<&String> = plan.roles.keys().filter(|r| *r == first).collect();
+    order.extend(plan.roles.keys().filter(|r| *r != first));
+    let mut out = BTreeMap::new();
+    for role in order {
+        let target = &plan.roles[role];
+        let (st, s) = adapter.send(target, "GET", "/v0/role/status", None)?;
+        if st != 200 {
+            return Ok(Err(format!("role {role}: status {st}: {}", s["code"])));
+        }
+        if !s["running"].is_null() {
+            return Ok(Err(format!("role {role} is running another attempt")));
+        }
+        if let Some(a) = s["last"]["attempt_id"].as_str().filter(|a| !known(a)) {
+            return Ok(Err(format!(
+                "role {role}: the service's last attempt {a} has no caller record: a person \
+                 reconciles it"
+            )));
+        }
+        // the persisted checkpoint survives restarts (the in-memory `last` does not): the run
+        // it names must be known too (review f90f5b5 N2)
+        if let Some(a) = s["checkpoint"]["session_cumulative_attempt"]
+            .as_str()
+            .filter(|a| !known(a))
+        {
+            return Ok(Err(format!(
+                "role {role}: the service's checkpoint names attempt {a}, which has no caller \
+                 record: a person reconciles it"
+            )));
+        }
+        out.insert(role.clone(), s);
+    }
+    Ok(Ok(out))
+}
+
+/// The guards of a call without the call (read only, no lock taken, nothing written): no call
+/// in flight, the ledger reads (every correction measured again), no record asks for a person,
+/// and every service is idle with its runs known. `call.sh` runs it under `caller.lock` before
+/// a container restart (reviews 12c9a21 N6, dc11612 L-c3-3/L-c3-4). `Ok(None)`: clear;
+/// `Ok(Some(why))`: refused; `Err`: the ledger or a service could not be read.
+pub fn check(plan: &Plan, adapter: &dyn Adapter) -> Result<Option<String>, String> {
+    if let Ok(t) = std::fs::read_to_string(inflight_path(plan)) {
+        return Ok(Some(format!(
+            "a call is in flight without a record ({}): a person reconciles it",
+            t.trim()
+        )));
+    }
+    let recs = records(plan)?;
+    if let Some(why) = asks_for_a_person(&recs) {
+        return Ok(Some(why));
+    }
+    let first = plan.roles.keys().next().cloned().unwrap_or_default();
+    Ok(services_clear(plan, &recs, adapter, &first)?.err())
+}
+
+/// Ledger files are private (review 71e408a P3): a directory created here is 0700, a file
+/// created here 0600.
+fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    if let Some(d) = path.parent() {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(d)?;
+    }
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    f.write_all(bytes).and_then(|()| f.sync_all())
+}
+
+/// An agent id usable in a file name and a URL path: letters, digits, `-` and `_` only (review
+/// 71e408a P1: never a path separator or `..`).
+fn safe_agent_id(a: &str) -> bool {
+    !a.is_empty()
+        && a.len() <= 128
+        && a.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// The children of a stream: the `agentId` of every `tool_use_result`.
+fn stream_agents(stream: &[u8]) -> std::collections::BTreeSet<String> {
+    stream
+        .split(|b| *b == b'\n')
+        .filter_map(|l| serde_json::from_slice::<Value>(l).ok())
+        .filter_map(|v| v["tool_use_result"]["agentId"].as_str().map(str::to_owned))
+        .collect()
+}
+
 /// The no-overage observation for the next run: the newest record's stream, or for the first
 /// run the configured stored stream. `None` when neither exists (the call is then held).
 fn observation(plan: &Plan, recs: &[Value]) -> Result<Option<(String, u64)>, String> {
@@ -360,8 +492,14 @@ fn observation(plan: &Plan, recs: &[Value]) -> Result<Option<(String, u64)>, Str
         (None, Some((p, at))) => (p.clone(), *at),
         (None, None) => return Ok(None),
     };
-    let text = std::fs::read_to_string(&path)
-        .map_err(|e| format!("observation stream {}: {}", path.display(), e.kind()))?;
+    let text = std::fs::read_to_string(&path).map_err(|e| {
+        format!(
+            "observation stream {}: {}{}",
+            path.display(),
+            e.kind(),
+            moved_hint(&e)
+        )
+    })?;
     let now = unix_now();
     if now < at {
         // a clock before the observation would make a stale observation look fresh (L1)
@@ -474,13 +612,11 @@ pub fn call_with(
         .write(true)
         .open(plan.ledger_dir.join("caller.lock"))
         .map_err(|e| format!("caller lock: {e}"))?;
-    // a short wait: a process forked elsewhere in this program may hold a copy of the previous
-    // call's lock until it execs (review f90f5b5 N1); a real second caller stays refused
     let t0 = std::time::Instant::now();
     loop {
         match lock.try_lock() {
             Ok(()) => break,
-            Err(std::fs::TryLockError::WouldBlock) if t0.elapsed() < Duration::from_secs(3) => {
+            Err(std::fs::TryLockError::WouldBlock) if t0.elapsed() < LOCK_WAIT => {
                 std::thread::sleep(Duration::from_millis(50));
             }
             Err(std::fs::TryLockError::WouldBlock) => {
@@ -496,11 +632,8 @@ pub fn call_with(
         )));
     }
     let recs = records(plan)?;
-    if let Some(r) = recs.iter().find(|r| r["stop_required"] == true) {
-        return Ok(Called::NotStarted(format!(
-            "record {} asks for a person: {}",
-            r["attempt_id"], r["stop_reason"]
-        )));
+    if let Some(why) = asks_for_a_person(&recs) {
+        return Ok(Called::NotStarted(why));
     }
     let known = |a: &str| recs.iter().any(|r| r["attempt_id"] == a);
     if known(&c.attempt_id) {
@@ -513,36 +646,13 @@ pub fn call_with(
         Ok(l) => l,
         Err(why) => return Ok(Called::NotStarted(why)),
     };
-    // the service's state before the run: nothing running, its last attempt known to the
-    // caller, and the checkpoint (the resume base candidate)
-    let (st, before) = adapter.send(target, "GET", "/v0/role/status", None)?;
-    if st != 200 {
-        return Ok(Called::NotStarted(format!(
-            "status {st}: {}",
-            before["code"]
-        )));
-    }
-    if !before["running"].is_null() {
-        return Ok(Called::NotStarted(
-            "the role is running another attempt".into(),
-        ));
-    }
-    if let Some(a) = before["last"]["attempt_id"].as_str().filter(|a| !known(a)) {
-        return Ok(Called::NotStarted(format!(
-            "the service's last attempt {a} has no caller record: a person reconciles it"
-        )));
-    }
-    // the persisted checkpoint survives restarts (the in-memory `last` does not): the run it
-    // names must be known too (review f90f5b5 N2)
-    if let Some(a) = before["checkpoint"]["session_cumulative_attempt"]
-        .as_str()
-        .filter(|a| !known(a))
-    {
-        return Ok(Called::NotStarted(format!(
-            "the service's checkpoint names attempt {a}, which has no caller record: a person \
-             reconciles it"
-        )));
-    }
+    // every service's state before the run (the target's checkpoint is the resume base
+    // candidate)
+    let mut statuses = match services_clear(plan, &recs, adapter, &c.role)? {
+        Ok(s) => s,
+        Err(why) => return Ok(Called::NotStarted(why)),
+    };
+    let before = statuses.remove(&c.role).unwrap_or_default();
     let mut body = json!({"attempt_id": c.attempt_id, "prompt": c.prompt,
         "coordinator": c.coordinator,
         "limits": {"timeout_ms": limits.timeout.as_millis() as u64,
@@ -662,20 +772,21 @@ impl After<'_> {
         // the service reads the file lossily as UTF-8: the saved text and its digest are of
         // that text (review c4620d2 L8)
         let stream = out["content"].as_str().unwrap_or_default().to_string();
-        let streams = plan.ledger_dir.join("streams");
-        let stream_path = streams.join(format!("{}.jsonl", c.attempt_id));
-        std::fs::create_dir_all(&streams)
-            .and_then(|()| std::fs::write(&stream_path, &stream))
-            .map_err(|e| format!("stream save: {e}"))?;
+        let stream_path = plan
+            .ledger_dir
+            .join("streams")
+            .join(format!("{}.jsonl", c.attempt_id));
+        write_private(&stream_path, stream.as_bytes()).map_err(|e| format!("stream save: {e}"))?;
         // the children's transcripts (a child's total comes only from its transcript)
         let mut transcripts = std::collections::BTreeMap::new();
         let mut children = Vec::new();
-        let agents: std::collections::BTreeSet<String> = stream
-            .lines()
-            .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-            .filter_map(|v| v["tool_use_result"]["agentId"].as_str().map(str::to_owned))
-            .collect();
-        for a in agents {
+        for a in stream_agents(stream.as_bytes()) {
+            // the id names a file and a URL path: anything else stays unmeasured (review
+            // 71e408a P1)
+            if !safe_agent_id(&a) {
+                children.push(json!({"agent_id": a, "path": null, "refused": "unsafe agent id"}));
+                continue;
+            }
             let got = adapter
                 .send(
                     target,
@@ -693,8 +804,7 @@ impl After<'_> {
                         .join("children")
                         .join(&c.attempt_id)
                         .join(format!("agent-{a}.jsonl"));
-                    std::fs::create_dir_all(p.parent().unwrap_or(&plan.ledger_dir))
-                        .and_then(|()| std::fs::write(&p, &t))
+                    write_private(&p, t.as_bytes())
                         .map_err(|e| format!("child transcript save: {e}"))?;
                     children.push(json!({"agent_id": a, "path": p, "bytes": t.len(),
                         "sha256": hex::encode(Sha256::digest(t.as_bytes()))}));
@@ -786,6 +896,9 @@ impl After<'_> {
             reasons.push(format!("usage unmeasured: {}", usage["run"]["reason"]));
         }
         let mut notes = Vec::new();
+        if stop_sent {
+            notes.push("the caller sent a stop at its deadline".to_string());
+        }
         match budget::rate_limit_events(&stream) {
             Ok(evs) if evs.is_empty() => notes.push(
                 "no rate_limit_event in this run: the next call is held until one is observed"
@@ -852,14 +965,26 @@ fn remeasure(
         ));
     }
     let path = r["stream"]["path"].as_str().ok_or("no stream path")?;
-    let stream = std::fs::read(path).map_err(|e| format!("stream {path}: {e}"))?;
+    let stream =
+        std::fs::read(path).map_err(|e| format!("stream {path}: {e}{}", moved_hint(&e)))?;
     if hex::encode(Sha256::digest(&stream)) != r["stream"]["sha256"].as_str().unwrap_or_default() {
         return Err("the kept stream differs from the recorded digest".into());
+    }
+    // a transcript only for a child of this run, under a plain id (review 71e408a P1)
+    let agents = stream_agents(&stream);
+    if let Some(a) = transcripts
+        .keys()
+        .find(|a| !safe_agent_id(a) || !agents.contains(*a))
+    {
+        return Err(format!(
+            "{a:?} is not an agent id of {attempt}'s stream ({agents:?})"
+        ));
     }
     let mut bytes = std::collections::BTreeMap::new();
     let mut kept = Vec::new();
     for (a, p) in transcripts {
-        let b = std::fs::read(p).map_err(|e| format!("transcript {}: {e}", p.display()))?;
+        let b = std::fs::read(p)
+            .map_err(|e| format!("transcript {}: {e}{}", p.display(), moved_hint(&e)))?;
         let sha = hex::encode(Sha256::digest(&b));
         // a transcript the run itself kept must be that one (review 608b367 F4)
         if let Some(rec) = r["children"]
@@ -959,27 +1084,43 @@ pub fn reevaluate(
     // measured again on every read (review 12c9a21 N1, N2)
     let dir = std::path::absolute(plan.ledger_dir.join("children").join(attempt))
         .map_err(|e| format!("ledger path: {e}"))?;
-    let mut in_ledger = std::collections::BTreeMap::new();
-    for (a, p) in transcripts {
-        let b = std::fs::read(p).map_err(|e| format!("transcript {}: {e}", p.display()))?;
-        let to = dir.join(format!("agent-{a}.jsonl"));
-        match std::fs::read(&to) {
-            Ok(existing) if existing != b => {
-                return Err(format!(
-                    "{} already holds a different transcript of {a}",
-                    to.display()
-                ));
+    // what this call creates is removed again when it ends in a refusal (review 71e408a P1)
+    let dir_existed = dir.exists();
+    let mut created: Vec<PathBuf> = Vec::new();
+    let copied = (|| -> Result<(Value, Vec<Value>), String> {
+        let mut in_ledger = std::collections::BTreeMap::new();
+        for (a, p) in transcripts {
+            let b = std::fs::read(p).map_err(|e| format!("transcript {}: {e}", p.display()))?;
+            let to = dir.join(format!("agent-{a}.jsonl"));
+            match std::fs::read(&to) {
+                Ok(existing) if existing != b => {
+                    return Err(format!(
+                        "{} already holds a different transcript of {a}",
+                        to.display()
+                    ));
+                }
+                Ok(_) => {}
+                Err(_) => {
+                    created.push(to.clone());
+                    write_private(&to, &b).map_err(|e| format!("transcript copy: {e}"))?;
+                }
             }
-            Ok(_) => {}
-            Err(_) => {
-                std::fs::create_dir_all(&dir)
-                    .and_then(|()| std::fs::write(&to, &b))
-                    .map_err(|e| format!("transcript copy: {e}"))?;
-            }
+            in_ledger.insert(a.clone(), to);
         }
-        in_ledger.insert(a.clone(), to);
-    }
-    let (usage, kept) = remeasure(r, &earlier, &in_ledger)?;
+        remeasure(r, &earlier, &in_ledger)
+    })();
+    let (usage, kept) = match copied {
+        Ok(x) => x,
+        Err(e) => {
+            for f in &created {
+                let _ = std::fs::remove_file(f);
+            }
+            if !dir_existed {
+                let _ = std::fs::remove_dir(&dir);
+            }
+            return Err(e);
+        }
+    };
     let c = json!({"format": CORRECTION_FORMAT, "corrects": attempt, "model_request": false,
         "original_stream_sha256": r["stream"]["sha256"], "child_transcripts": kept,
         "decision": decision, "corrected_at": ieo_evidence::time::now(),

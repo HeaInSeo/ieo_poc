@@ -928,6 +928,31 @@ fn without_a_transcript_the_child_is_unmeasured_and_its_last_response_kept() {
     assert_eq!(r.usage.attribution_check, "not_checked");
 }
 
+/// Review 608b367 F8: a `--child-transcript` that cannot be read is reported as a read error,
+/// not as "no transcript".
+#[test]
+fn an_unreadable_transcript_is_reported_as_a_read_error() {
+    let out = tmp();
+    let f = fixture(&out, "t23.jsonl", &real_stream());
+    let mut s = spec(&out, &format!("cat {}", f.display()));
+    s.model_request = true;
+    let missing = out.join("no-such-transcript.jsonl");
+    s.child_transcripts
+        .insert(T23_AGENT.into(), missing.clone());
+    let r = execute(&s).unwrap();
+    let c = &r.usage.children[0];
+    assert!(
+        matches!(&c.usage, Measure::Unmeasured { reason }
+            if reason.contains("자식 전사를 읽지 못함")
+                && reason.contains(missing.to_str().unwrap())
+                && !reason.contains("자식 전사 없음")),
+        "{:?}",
+        c.usage
+    );
+    // fail-closed as before: the run is not checked against its children
+    assert_eq!(r.usage.attribution_check, "not_checked");
+}
+
 // --- 02-04 D3 replay (de-identified stored record, no model call) ---
 
 const D3: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/d3-child-usage");

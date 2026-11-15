@@ -147,6 +147,22 @@ pub fn parse_with_children(
     base: Option<ResumeBase>,
     transcripts: &BTreeMap<String, Vec<u8>>,
 ) -> Parsed {
+    let reads = transcripts
+        .iter()
+        .map(|(a, b)| (a.clone(), Ok(b.clone())))
+        .collect();
+    parse_with_child_reads(stdout, mode, base, &reads)
+}
+
+/// [`parse_with_children`] with the result of reading each given transcript: a transcript that
+/// was given but could not be read leaves its child unmeasured with the read error as the
+/// reason, not as "no transcript" (review 608b367 F8).
+pub fn parse_with_child_reads(
+    stdout: &[u8],
+    mode: SessionMode,
+    base: Option<ResumeBase>,
+    transcripts: &BTreeMap<String, Result<Vec<u8>, String>>,
+) -> Parsed {
     let mut events = Vec::new();
     let mut non_json = 0u32;
     for line in stdout.split(|b| *b == b'\n') {
@@ -272,7 +288,10 @@ pub fn parse_with_children(
                         None => Measure::unmeasured(
                             "자식 전사 없음: tool_use_result.usage는 마지막 응답만일 수 있어 자식 전체로 쓰지 않음",
                         ),
-                        Some(bytes) => match child_transcript_total(a, bytes) {
+                        Some(Err(e)) => {
+                            Measure::unmeasured(format!("자식 전사를 읽지 못함: {e}"))
+                        }
+                        Some(Ok(bytes)) => match child_transcript_total(a, bytes) {
                             Err(e) => Measure::unmeasured(e),
                             // the transcript must agree with what the stream reported
                             Ok((_, _, last)) if matches!(&reported, Some(Ok(r)) if r != &last) => {

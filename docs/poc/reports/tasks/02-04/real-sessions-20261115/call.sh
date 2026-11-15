@@ -4,46 +4,34 @@
 set -uo pipefail
 W=$1; A=$2
 HERE=$(cd "$(dirname "$0")" && pwd)
-PY=/opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python
+PY=${IEO_POC_PY:-/opt/rust/src/github.com/HeaInSeo/ieo_poc/.venv-poc/bin/python}
 line=$(grep -P "^$A\t" "$HERE/steps.tsv") || { echo "no step $A"; exit 1; }
 role=$(cut -f2 <<<"$line"); op=$(cut -f3 <<<"$line")
 if [ "$op" = restart ]; then
   # a container restart between runs (no model call): the checkpoint must be restored from the
   # role volume (2026-11-14 pr30 §4 checkpoint restoration)
   c="${NAME_PREFIX:-ieo-rt}-fixture0204-$role"; port=$(podman port "$c" 8080 | head -1 | cut -d: -f2)
-  # the same guards as a call (review f90f5b5 N2): a restart erases the service's in-memory last
-  # attempt, so it never runs over a call in flight, a record that asks for a person, a running
-  # attempt or a last attempt the caller does not know
-  curl -s -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" > "$W/.status.$A" || { echo "restart refused: status unavailable"; exit 1; }
-  "$PY" - "$W" "$A" <<'PYEOF' || exit 1
-import json, os, sys
-w, a = sys.argv[1], sys.argv[2]
-st = json.load(open(f"{w}/.status.{a}"))
-lines = [json.loads(l) for l in open(f"{w}/ledger/records.jsonl")] if os.path.exists(f"{w}/ledger/records.jsonl") else []
-# corrections (ieo-role-run-correction/v0) are not runs; a corrected run no longer asks for a
-# person (ieo-role-call verifies each correction when it reads the ledger)
-corrected = {l.get("corrects") for l in lines if l.get("format") == "ieo-role-run-correction/v0"}
-recs = [l for l in lines if l.get("format") != "ieo-role-run-correction/v0"]
-for r in recs:
-    if r.get("attempt_id") in corrected:
-        r["stop_required"] = False
-known = {r.get("attempt_id") for r in recs}
-why = []
-if os.path.exists(f"{w}/ledger/inflight.json"): why.append("a call is in flight without a record")
-why += [f"record {r.get('attempt_id')} asks for a person" for r in recs if r.get("stop_required")]
-if st.get("running"): why.append("an attempt is running")
-last = (st.get("last") or {}).get("attempt_id")
-if last and last not in known: why.append(f"the service's last attempt {last} has no caller record")
-cpa = (st.get("checkpoint") or {}).get("session_cumulative_attempt")
-if cpa and cpa not in known: why.append(f"the checkpoint names attempt {cpa}, which has no caller record")
-if why:
-    print("restart refused: " + "; ".join(why)); sys.exit(1)
-PYEOF
-  rm -f "$W/.status.$A"
-  before=$(curl -s -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" | "$PY" -c 'import json,sys; c=json.load(sys.stdin)["checkpoint"]; print(c["session_id"], c["phase"], c.get("session_cumulative_attempt"))')
-  t0=$(date +%s.%N); podman restart -t 15 "$c" >/dev/null; t1=$(date +%s.%N)
-  for _ in $(seq 1 50); do curl -s -o /dev/null -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" && break; sleep 0.2; done
-  after=$(curl -s -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" | "$PY" -c 'import json,sys; s=json.load(sys.stdin); c=s["checkpoint"]; print(c["session_id"], c["phase"], c.get("session_cumulative_attempt"), "last", s["last"])')
+  [ -n "$port" ] || { echo "restart refused: no port for $c"; exit 1; }
+  # the same guards as a call, for every role, under the caller's lock (reviews f90f5b5 N2,
+  # 12c9a21 N6, dc11612 L-c3-3/L-c3-4): a restart erases the service's in-memory last attempt,
+  # so it never runs over a call in flight, a record that asks for a person, a correction that
+  # does not hold, a running attempt or an attempt the ledger does not know. No call starts
+  # between the check and the restart: ieo-role-call waits for caller.lock and is refused.
+  # The lock descriptor (9) is closed for every command run under it, so nothing that outlives
+  # the script (a podman helper) keeps the lock.
+  mkdir -p "$W/ledger"
+  exec 9>>"$W/ledger/caller.lock"
+  flock -w "${CALLER_LOCK_WAIT:-5}" 9 || { echo "restart refused: another caller holds the ledger"; exit 1; }
+  chk=$("$W/bin/ieo-role-call" check --plan "$W/plan.json" 2>&1 9>&-) || { echo "restart refused: $chk"; exit 1; }
+  status() { curl -sf -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" 9>&-; }
+  before=$(status | "$PY" -c 'import json,sys; c=json.load(sys.stdin)["checkpoint"]; print(c["session_id"], c["phase"], c.get("session_cumulative_attempt"))' 9>&-)
+  [ -n "$before" ] || { echo "restart refused: status unavailable"; exit 1; }
+  t0=$(date +%s.%N); podman restart -t 15 "$c" >/dev/null 9>&- || { echo "restart failed"; exit 1; }; t1=$(date +%s.%N)
+  # the lock is kept until the restarted service answers (a call in between would find no service)
+  for _ in $(seq 1 50); do status >/dev/null && break; sleep 0.2; done
+  after=$(status | "$PY" -c 'import json,sys; s=json.load(sys.stdin); c=s["checkpoint"]; print(c["session_id"], c["phase"], c.get("session_cumulative_attempt"), "last", s["last"])' 9>&-)
+  exec 9>&-
+  [ -n "$after" ] || { echo "restarted, but its status is unavailable: a person looks"; exit 1; }
   mkdir -p "$W/summaries"
   printf '{"step": "%s", "restart_seconds": %s, "pid1": "%s", "before": "%s", "after": "%s"}\n' "$A" \
     "$("$PY" -c "print(round($t1-$t0,1))")" "$(podman exec "$c" cat /proc/1/cmdline | tr '\0' ' ' | cut -c1-40)" "$before" "$after" > "$W/summaries/$A.json"

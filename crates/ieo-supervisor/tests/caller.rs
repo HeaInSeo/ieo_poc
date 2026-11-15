@@ -49,7 +49,8 @@ impl Drop for Tmp {
 /// A fake `claude` whose session totals grow like the CLI's: the cumulative per session is kept
 /// in a file next to the script, and `modelUsage` reports it. Each run uses 3/7/20/10
 /// (input/output/cache_read/cache_creation). Prompt words: OVERAGE (a breaking rate-limit
-/// event), CHILD (leaves a background child), SLEEP.
+/// event), CHILD (leaves a background child), SLEEP, AGENTRUN (one child agent c1), with
+/// AGENTTWO a second child c2 like c1.
 fn fake_claude(dir: &Path) -> PathBuf {
     let p = dir.join("fake-claude");
     let cum = dir.join("cum");
@@ -63,6 +64,7 @@ sid=$(printf '%s\n' "$@" | awk 'prev=="--session-id"||prev=="--resume"{{print; e
 f="{cum}-$sid"
 set -- $(cat "$f" 2>/dev/null || echo 0 0 0 0)
 case "$prompt" in
+  *AGENTTWO*) i=$(($1+7)); o=$(($2+21)); r=$(($3+34)); c=$(($4+30));;
   *AGENTRUN*) i=$(($1+5)); o=$(($2+14)); r=$(($3+27)); c=$(($4+20));;
   *) i=$(($1+3)); o=$(($2+7)); r=$(($3+20)); c=$(($4+10));;
 esac
@@ -83,6 +85,13 @@ case "$prompt" in *AGENTRUN*)
   printf '{{"type":"assistant","message":{{"id":"m-agent-%s","usage":{{"input_tokens":0,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"content":[{{"type":"tool_use","id":"tu-%s","name":"Agent"}}]}}}}
 ' "$i" "$i"
   printf '{{"type":"user","message":{{"content":[{{"type":"tool_result","tool_use_id":"tu-%s"}}]}},"tool_use_result":{{"agentId":"c1","usage":{{"input_tokens":1,"output_tokens":2,"cache_creation_input_tokens":3,"cache_read_input_tokens":7}}}}}}
+' "$i";;
+esac
+case "$prompt" in *AGENTTWO*)
+  sed 's/c1/c2/g' "$t/agent-c1.jsonl" > "$t/agent-c2.jsonl"
+  printf '{{"type":"assistant","message":{{"id":"m-agent2-%s","usage":{{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"content":[{{"type":"tool_use","id":"tv-%s","name":"Agent"}}]}}}}
+' "$i" "$i"
+  printf '{{"type":"user","message":{{"content":[{{"type":"tool_result","tool_use_id":"tv-%s"}}]}},"tool_use_result":{{"agentId":"c2","usage":{{"input_tokens":1,"output_tokens":2,"cache_creation_input_tokens":3,"cache_read_input_tokens":7}}}}}}
 ' "$i";;
 esac
 case "$prompt" in *SLEEP*) sleep 60;; esac
@@ -1523,4 +1532,554 @@ fn pathdiff(to: &Path, from: &Path) -> PathBuf {
         p.push(c);
     }
     p
+}
+
+// --- X-08: the 02-04 caller carry-overs (decision item 8) ---
+
+fn mode(p: &Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(p).expect("meta").permissions().mode() & 0o777
+}
+
+/// A plan over `dev`/`gr` (both roles) with its ledger at `ledger`.
+fn plan_at(t: &Tmp, ledger: &Path) -> Plan {
+    let v = json!({"budget": "02-04", "ledger_dir": ledger,
+        "first_observation": {"stream": t.0.join("first-observation.jsonl"), "observed_unix": now() - 60},
+        "roles": {
+            "development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token"), "share": share("development")},
+            "guardrail": {"url": "gr", "adapter_token_file": t.0.join("adapter.token"), "share": share("guardrail")}}});
+    Plan::from_json(&v).expect("plan")
+}
+
+/// Review 71e408a P1 (and P3): a transcript for an id that is not a child of the run, or an id
+/// that is not a plain name, is refused before anything is copied; a run's own stream naming
+/// such a child gets no file. Ledger copies are private.
+#[test]
+fn transcripts_only_for_the_run_s_own_children_and_kept_privately() {
+    let _serial = serial();
+    let t = Tmp::new("x08-p1");
+    let (_a, p) = unmeasured_child_run(&t);
+    let src =
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl");
+    for extra in ["zz", "../../escape", "c1/../c1", ""] {
+        let mut tr = BTreeMap::new();
+        tr.insert("c1".to_string(), src.clone());
+        tr.insert(extra.to_string(), src.clone());
+        let e = caller::reevaluate(&p, "d2", &tr, "x").expect_err(extra);
+        assert!(e.contains("not an agent id"), "{extra}: {e}");
+        assert!(
+            !t.0.join("ledger/children").exists(),
+            "{extra}: a refusal copies nothing"
+        );
+        assert_eq!(caller::raw_records(&p).expect("r").len(), 2);
+    }
+    let mut tr = BTreeMap::new();
+    tr.insert("c1".to_string(), src);
+    caller::reevaluate(&p, "d2", &tr, "x").expect("correct");
+    let copy = t.0.join("ledger/children/d2/agent-c1.jsonl");
+    assert_eq!(
+        (mode(&copy), mode(copy.parent().expect("d"))),
+        (0o600, 0o700)
+    );
+    let stream = caller::raw_records(&p).expect("r")[1]["stream"]["path"]
+        .as_str()
+        .expect("p")
+        .to_string();
+    assert_eq!(mode(Path::new(&stream)), 0o600);
+
+    // the run's own stream names an id with path separators: no file, the child unmeasured
+    let t = Tmp::new("x08-p1-stream");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let h = hook(&a, |_m, path, r| {
+        let mut r = r?;
+        if path.ends_with("/stdout")
+            && let Some(c) = r.1["content"].as_str()
+        {
+            r.1["content"] = json!(c.replace(r#""agentId":"c1""#, r#""agentId":"../../esc""#));
+        }
+        Ok(r)
+    });
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "AGENTRUN"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["children"][0]["refused"], "unsafe agent id", "{r}");
+    assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{}", r["usage"]);
+    assert!(!t.0.join("ledger/children").exists());
+    assert!(!t.0.join("esc.jsonl").exists());
+}
+
+/// Review 71e408a P2: a different transcript already at the copy location is refused even
+/// when it would reconcile too (C4), and a ledger the append leaves unreadable is reported at
+/// once by the read-back (C6).
+#[test]
+fn a_correction_refuses_a_different_copy_and_reads_the_ledger_back() {
+    let _serial = serial();
+    let t = Tmp::new("x08-p2");
+    let (_a, p) = unmeasured_child_run(&t);
+    let src =
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl");
+    let mut tr = BTreeMap::new();
+    tr.insert("c1".to_string(), src.clone());
+    // the same responses with one more blank line: it reconciles, but it is not the file given
+    let copy = t.0.join("ledger/children/d2/agent-c1.jsonl");
+    std::fs::create_dir_all(copy.parent().expect("d")).expect("d");
+    let different = format!("{}\n", std::fs::read_to_string(&src).expect("s"));
+    std::fs::write(&copy, &different).expect("w");
+    let mut alt = BTreeMap::new();
+    alt.insert("c1".to_string(), copy.clone());
+    let probe = Tmp::new("x08-p2-probe");
+    let (_b, q) = unmeasured_child_run(&probe);
+    let probe_copy = probe.0.join("different.jsonl");
+    std::fs::write(&probe_copy, &different).expect("w");
+    let mut probe_tr = BTreeMap::new();
+    probe_tr.insert("c1".to_string(), probe_copy);
+    caller::reevaluate(&q, "d2", &probe_tr, "x").expect("the different file reconciles too");
+    let e = caller::reevaluate(&p, "d2", &tr, "x").expect_err("different copy");
+    assert!(e.contains("already holds a different transcript"), "{e}");
+    assert_eq!(std::fs::read_to_string(&copy).expect("c"), different);
+    assert_eq!(caller::raw_records(&p).expect("r").len(), 2);
+    std::fs::remove_file(&copy).expect("rm");
+    // a last line without its newline: the appended correction joins it, and the read-back
+    // reports the broken ledger instead of the next call finding it
+    let path = caller::records_path(&p);
+    let text = std::fs::read_to_string(&path).expect("l");
+    std::fs::write(&path, text.trim_end()).expect("w");
+    let e = caller::reevaluate(&p, "d2", &tr, "x").expect_err("read-back");
+    assert!(e.contains("unreadable"), "{e}");
+}
+
+/// Review 71e408a P4: the ledger names its files by absolute path; a moved ledger directory is
+/// refused, and the refusal says why.
+#[test]
+fn a_moved_ledger_is_refused_with_its_cause() {
+    let _serial = serial();
+    let t = Tmp::new("x08-p4");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    std::fs::rename(t.0.join("ledger"), t.0.join("ledger-moved")).expect("mv");
+    let moved = plan_at(&t, &t.0.join("ledger-moved"));
+    let why = match caller::call(
+        &moved,
+        &call_of("development", "reconnect", "d2", "s2", "hi"),
+        &a,
+        POLL,
+    ) {
+        Ok(Called::NotStarted(w)) | Err(w) => w,
+        Ok(Called::Recorded(r)) => panic!("started: {r}"),
+    };
+    assert!(why.contains("moved or renamed"), "{why}");
+    // a correction's files the same way
+    let t = Tmp::new("x08-p4-corr");
+    let (_a, p) = unmeasured_child_run(&t);
+    let mut tr = BTreeMap::new();
+    tr.insert(
+        "c1".to_string(),
+        t.0.join("development/state/runs/d2/children/agent-c1.jsonl"),
+    );
+    caller::reevaluate(&p, "d2", &tr, "x").expect("correct");
+    std::fs::rename(t.0.join("ledger"), t.0.join("ledger-moved")).expect("mv");
+    let e = caller::records(&plan_at(&t, &t.0.join("ledger-moved"))).expect_err("moved");
+    assert!(e.contains("moved or renamed"), "{e}");
+}
+
+/// Review dc11612 L-c3-2: the short lock wait lets a call through once an earlier holder lets
+/// go (the in-process harness case it exists for); a holder past the wait is refused
+/// (`a_second_caller_is_refused`).
+#[test]
+fn a_call_waits_briefly_for_a_released_lock() {
+    let _serial = serial();
+    let t = Tmp::new("x08-lockwait");
+    let (a, p) = both(&t);
+    std::fs::create_dir_all(t.0.join("ledger")).expect("d");
+    let held = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(t.0.join("ledger/caller.lock"))
+        .expect("lock");
+    held.lock().expect("held");
+    let release = caller::LOCK_WAIT / 3;
+    let h = std::thread::spawn(move || {
+        std::thread::sleep(release);
+        drop(held);
+    });
+    let t0 = std::time::Instant::now();
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(t0.elapsed() >= release);
+    h.join().expect("j");
+}
+
+/// Review dc11612 L-c3-3: a run of one role that this ledger does not know (a service's last
+/// attempt, or the attempt its persisted checkpoint names after a restart) blocks a call of the
+/// other role too.
+#[test]
+fn an_unknown_run_of_another_role_blocks_the_call() {
+    let _serial = serial();
+    let t = Tmp::new("x08-crossrole");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    // another ledger over the same services: d1 has no record there
+    let other = plan_at(&t, &t.0.join("other-ledger"));
+    let why = not_started(
+        caller::call(
+            &other,
+            &call_of("guardrail", "start", "g1", "sg", "x"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(
+        why.contains("role development") && why.contains("last attempt d1 has no caller record"),
+        "{why}"
+    );
+    // the development service restarted: no `last`, but its checkpoint still names d1
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service(&t.0, "development", None));
+    m.insert("gr".to_string(), service(&t.0, "guardrail", None));
+    let restarted = InProc(m);
+    let why = not_started(
+        caller::call(
+            &other,
+            &call_of("guardrail", "start", "g1", "sg", "x"),
+            &restarted,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(
+        why.contains("role development") && why.contains("checkpoint names attempt d1"),
+        "{why}"
+    );
+    assert!(!t.0.join("guardrail/state/runs/g1").exists());
+    // the ledger that knows d1 goes on
+    recorded(
+        caller::call(
+            &p,
+            &call_of("guardrail", "start", "g1", "sg", "x"),
+            &restarted,
+            POLL,
+        )
+        .expect("c"),
+    );
+}
+
+/// Reviews 12c9a21 N6, dc11612 L-c3-3: `check` (what `call.sh` runs before a restart) refuses
+/// what a call refuses, verifies corrections, and writes nothing.
+#[test]
+fn check_refuses_what_a_call_would_refuse() {
+    let _serial = serial();
+    let t = Tmp::new("x08-check");
+    let (a, p) = both(&t);
+    assert_eq!(caller::check(&p, &a).expect("c"), None);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(caller::check(&p, &a).expect("c"), None);
+    let before = std::fs::read(caller::records_path(&p)).expect("r");
+    // a call in flight
+    std::fs::write(
+        t.0.join("ledger/inflight.json"),
+        "{\"attempt_id\":\"d2\"}\n",
+    )
+    .expect("w");
+    let why = caller::check(&p, &a).expect("c").expect("refused");
+    assert!(why.contains("in flight"), "{why}");
+    std::fs::remove_file(t.0.join("ledger/inflight.json")).expect("rm");
+    // another role's unknown run
+    let other = plan_at(&t, &t.0.join("other-ledger"));
+    let why = caller::check(&other, &a).expect("c").expect("refused");
+    assert!(why.contains("d1 has no caller record"), "{why}");
+    assert!(!t.0.join("other-ledger").exists(), "check writes nothing");
+    // a correction that does not hold makes the ledger unreadable (call.sh trusted it)
+    let forged = json!({"format": caller::CORRECTION_FORMAT, "corrects": "d1",
+        "original_stream_sha256": "x", "after": {"usage": {}, "stop_required": false}});
+    let path = caller::records_path(&p);
+    std::fs::write(
+        &path,
+        [before.clone(), format!("{forged}\n").into_bytes()].concat(),
+    )
+    .expect("w");
+    assert!(caller::check(&p, &a).is_err());
+    // a record that asks for a person
+    rewrite_line(&path, "d1", |v| {
+        if v["format"] == caller::RECORD_FORMAT {
+            v["stop_required"] = json!(true);
+        }
+    });
+    std::fs::write(&path, {
+        let t = std::fs::read_to_string(&path).expect("l");
+        t.lines()
+            .filter(|l| !l.contains(caller::CORRECTION_FORMAT))
+            .map(|l| format!("{l}\n"))
+            .collect::<String>()
+    })
+    .expect("w");
+    let why = caller::check(&p, &a).expect("c").expect("refused");
+    assert!(why.contains("asks for a person"), "{why}");
+    // a running role
+    let h = hook(&a, |m, p, r| {
+        let mut r = r?;
+        if m == "GET" && p == "/v0/role/status" {
+            r.1["running"] = json!({"attempt_id": "x"});
+        }
+        Ok(r)
+    });
+    std::fs::write(&path, &before).expect("w");
+    let why = caller::check(&p, &h).expect("c").expect("refused");
+    assert!(why.contains("running"), "{why}");
+}
+
+/// Review dc11612 L-new-3 / 02-04 acceptance §4 item 8 ("마감 정지 시험"), part 1: a run that
+/// does not end within its window is sent a stop at the caller's deadline (window + margin),
+/// once, and the record says so.
+#[test]
+fn the_caller_sends_a_stop_at_its_deadline() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    let _serial = serial();
+    let t = Tmp::new("x08-deadline");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service(&t.0, "development", None));
+    let a = InProc(m);
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    std::fs::write(t.0.join("first.jsonl"), rate("rejected")).expect("obs");
+    let window = 7u64;
+    let v = json!({"budget": "02-04", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first.jsonl"), "observed_unix": now() - 60},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token"),
+                                  "share": share("development"), "max_window_seconds": window}}});
+    let p = Plan::from_json(&v).expect("plan");
+    // after the start, the status says "running" until a stop is sent (at most 40 s, so a
+    // caller that never sends one fails the test instead of hanging it)
+    let started = Arc::new(AtomicBool::new(false));
+    let stops: Arc<Mutex<Vec<std::time::Instant>>> = Arc::new(Mutex::new(Vec::new()));
+    let (s1, s2) = (started.clone(), stops.clone());
+    let t0 = std::time::Instant::now();
+    let h = hook(&a, move |m, path, r| {
+        let mut r = r?;
+        if m == "POST" && path == "/v0/role/start" {
+            s1.store(true, Ordering::SeqCst);
+        }
+        if m == "POST" && path == "/v0/role/stop" {
+            s2.lock().expect("s").push(std::time::Instant::now());
+        }
+        if m == "GET"
+            && path == "/v0/role/status"
+            && s1.load(Ordering::SeqCst)
+            && s2.lock().expect("s").is_empty()
+            && t0.elapsed() < Duration::from_secs(40)
+        {
+            r.1["running"] = json!({"attempt_id": "d1"});
+        }
+        Ok(r)
+    });
+    let margin = Duration::from_millis(300);
+    let r = recorded(
+        caller::call_with(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &h,
+            POLL,
+            margin,
+        )
+        .expect("c"),
+    );
+    let stops = stops.lock().expect("s").clone();
+    assert_eq!(stops.len(), 1, "one stop");
+    let at = stops[0] - t0;
+    assert!(
+        at >= Duration::from_secs(window) + margin && at < Duration::from_secs(window + 5),
+        "the stop at the deadline, not before: {at:?}"
+    );
+    assert!(
+        r["notes"].as_array().is_some_and(|n| n
+            .iter()
+            .any(|x| x.as_str() == Some("the caller sent a stop at its deadline"))),
+        "{r}"
+    );
+}
+
+/// Part 2: the role's run guard stops a run at its time limit (fake runtime), and the caller
+/// records it as stopped by the guard, unmeasured, asking for a person; nothing further starts.
+#[test]
+fn a_run_at_its_time_limit_is_stopped_and_recorded() {
+    let _serial = serial();
+    let t = Tmp::new("x08-timelimit");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service(&t.0, "development", None));
+    let a = InProc(m);
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    std::fs::write(t.0.join("first.jsonl"), rate("rejected")).expect("obs");
+    // window 8 s: the run gets 8 − 6 (grace) = 2 s
+    let v = json!({"budget": "02-04", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first.jsonl"), "observed_unix": now() - 60},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token"),
+                                  "share": share("development"), "max_window_seconds": 8}}});
+    let p = Plan::from_json(&v).expect("plan");
+    let t0 = std::time::Instant::now();
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "SLEEP"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(t0.elapsed() < Duration::from_secs(20), "{:?}", t0.elapsed());
+    assert_eq!(r["limits"]["timeout_ms"], 2_000, "{r}");
+    assert_eq!(r["outcome"]["stop"], "RunTimeout", "{r}");
+    assert_eq!(r["outcome"]["stopped_by_guard"], true, "{r}");
+    let ms = r["duration_ms"].as_u64().expect("duration");
+    assert!((2_000..8_000).contains(&ms), "{ms}");
+    assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{}", r["usage"]);
+    assert_eq!(r["stop_required"], true);
+    assert!(
+        r["stop_reason"]
+            .as_str()
+            .is_some_and(|s| s.contains("usage unmeasured")),
+        "{r}"
+    );
+    assert_eq!(caller::raw_records(&p).expect("r").len(), 1);
+    assert!(!t.0.join("ledger/inflight.json").exists());
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s2", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert!(why.contains("asks for a person"), "{why}");
+}
+
+/// Review 71e408a P1, the part "a refusal leaves nothing behind" with more than one child: a
+/// copy already made is removed again when a later one is refused.
+#[test]
+fn a_refused_correction_removes_the_copies_it_made() {
+    let _serial = serial();
+    let t = Tmp::new("x08-cleanup");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    // the measured case first: two children, both transcripts fetched, consistent
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "AGENTRUN AGENTTWO"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(
+        r["usage"]["attribution_check"], "consistent",
+        "{}",
+        r["usage"]
+    );
+    // the same with the transcripts not fetched: unmeasured, a person decides
+    let t = Tmp::new("x08-cleanup2");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let h = hook(&a, |_m, path, r| {
+        if path.contains("/children/") {
+            Ok((404, json!({"code": "NOT_FOUND"})))
+        } else {
+            r
+        }
+    });
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "AGENTRUN AGENTTWO"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{}", r["usage"]);
+    let kept = t.0.join("development/state/runs/d2/children");
+    let mut tr = BTreeMap::new();
+    tr.insert("c1".to_string(), kept.join("agent-c1.jsonl"));
+    tr.insert("c2".to_string(), kept.join("agent-c2.jsonl"));
+    // c2's place in the ledger already holds another file: c1 is copied first, then refused
+    let dir = t.0.join("ledger/children/d2");
+    std::fs::create_dir_all(&dir).expect("d");
+    std::fs::write(dir.join("agent-c2.jsonl"), "other\n").expect("w");
+    let e = caller::reevaluate(&p, "d2", &tr, "x").expect_err("refused");
+    assert!(
+        e.contains("already holds a different transcript of c2"),
+        "{e}"
+    );
+    assert!(
+        !dir.join("agent-c1.jsonl").exists(),
+        "the copy made before the refusal is removed"
+    );
+    assert_eq!(caller::raw_records(&p).expect("r").len(), 2);
+    // with the place free, both are copied and the correction holds
+    std::fs::remove_file(dir.join("agent-c2.jsonl")).expect("rm");
+    caller::reevaluate(&p, "d2", &tr, "x").expect("correct");
+    assert!(dir.join("agent-c1.jsonl").exists() && dir.join("agent-c2.jsonl").exists());
 }
