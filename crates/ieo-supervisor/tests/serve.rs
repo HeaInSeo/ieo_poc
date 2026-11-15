@@ -1240,3 +1240,275 @@ fn a_missing_archive_copy_is_written_and_a_rollback_is_not_hidden() {
         third
     );
 }
+
+// --- review 802e4a1 (PR #57): staged takeover adoption, tamper reported once ---
+
+/// A fake central record: stores reported checkpoints in order and answers `latest`. With
+/// `lose` set, the next report is stored but answered with a server error (an answer the
+/// supervisor cannot trust).
+struct FakeCentral {
+    url: String,
+    store: Arc<std::sync::Mutex<Vec<(u64, String, Value)>>>,
+    lose: Arc<std::sync::atomic::AtomicBool>,
+}
+
+fn fake_central() -> FakeCentral {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let server = tiny_http::Server::http("127.0.0.1:0").expect("bind");
+    let url = format!("http://{}", server.server_addr().to_ip().expect("ip"));
+    let store = Arc::new(std::sync::Mutex::new(Vec::<(u64, String, Value)>::new()));
+    let lose = Arc::new(AtomicBool::new(false));
+    let (st, lo) = (Arc::clone(&store), Arc::clone(&lose));
+    std::thread::spawn(move || {
+        for mut req in server.incoming_requests() {
+            let mut body = Vec::new();
+            let _ = std::io::Read::read_to_end(req.as_reader(), &mut body);
+            let mut s = st.lock().expect("store");
+            let (code, out) = if req.method().as_str() == "GET" {
+                match s.last() {
+                    Some((n, sha, _)) => (200, json!({"seq": n, "checkpoint_sha256": sha})),
+                    None => (404, json!({"code": "NO_CHECKPOINT"})),
+                }
+            } else {
+                let v: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+                let seq = v["seq"].as_u64().unwrap_or(0);
+                let raw = v["checkpoint_json"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
+                let sha = hex::encode(Sha256::digest(raw.as_bytes()));
+                let last = s.last().map(|x| x.0).unwrap_or(0);
+                if seq == last + 1 {
+                    let cp: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+                    s.push((seq, sha.clone(), cp));
+                    if lo.swap(false, Ordering::SeqCst) {
+                        (502, json!({"code": "BAD_GATEWAY"}))
+                    } else {
+                        (
+                            201,
+                            json!({"stored": true, "seq": seq, "checkpoint_sha256": sha}),
+                        )
+                    }
+                } else {
+                    (
+                        409,
+                        json!({"rejections": [{"code": "CHECKPOINT_SEQUENCE_GAP"}]}),
+                    )
+                }
+            };
+            drop(s);
+            let _ = req
+                .respond(tiny_http::Response::from_string(out.to_string()).with_status_code(code));
+        }
+    });
+    FakeCentral { url, store, lose }
+}
+
+fn svc_central(t: &Tmp, c: &FakeCentral) -> Arc<Service> {
+    let root = &t.0;
+    std::fs::write(root.join("cred/coordinator_token"), "sup-token").expect("token");
+    Arc::new(Service::new(
+        Config::from_json(&json!({"role": "development", "repo": "sori",
+            "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
+            "claude": root.join("fake-claude"), "budget": "02-04", "quota_group_id": "test-shared",
+            "checkpoint_central": {"url": c.url, "token_file": root.join("cred/coordinator_token")},
+            "share": {"max_runs": 8, "total_seconds": 9_600, "billable_tokens": 1_000_000,
+                      "cache_read_tokens": 10_000_000}}))
+        .expect("config"),
+    ))
+}
+
+#[test]
+fn a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once() {
+    let (t, _) = setup("lost-answer");
+    let c = fake_central();
+    let svc = svc_central(&t, &c);
+    let state = t.0.join("state");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("l1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "l1");
+    assert_eq!(c.store.lock().expect("s").len(), 2);
+    // a tamper, and the takeover carrying it is stored but its answer is a server error
+    std::fs::write(state.join("claude/CLAUDE.md"), "injected").expect("tamper");
+    c.lose.store(true, std::sync::atomic::Ordering::SeqCst);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("l2", "hi", json!({"new_session_id": "s2"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    let last = wait(&svc, "l2");
+    assert_eq!(
+        (last["spawned"].as_bool(), last["stop"].as_str()),
+        (Some(false), Some("CentralRefused")),
+        "{last}"
+    );
+    assert!(
+        state.join("checkpoint-staged.json").exists(),
+        "a 5xx keeps the staged copy"
+    );
+    assert!(state.join("pending-tamper.json").exists());
+    // the next reconnect adopts the stored takeover and its tamper counts as reported
+    // (review 802e4a1 N-1); the takeover is an unfinished run, so nothing resumes on it
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("l3", "hi", json!({"new_session_id": "s3"})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+    assert!(!state.join("checkpoint-staged.json").exists());
+    assert!(
+        !state.join("pending-tamper.json").exists(),
+        "the tamper was reported with the adopted takeover"
+    );
+    let cp: Value =
+        serde_json::from_slice(&std::fs::read(state.join("checkpoint.json")).expect("cp"))
+            .expect("j");
+    assert_eq!(
+        (cp["seq"].as_u64(), cp["session_id"].as_str()),
+        (Some(3), Some("s2"))
+    );
+    // a new session starts without carrying the tamper again
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("l4", "hi", json!({"session_id": "s4"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert!(b["accepted"]["tamper"].is_null(), "{b}");
+    wait(&svc, "l4");
+    let tampers = c
+        .store
+        .lock()
+        .expect("s")
+        .iter()
+        .filter(|x| !x.2["config_tamper_detected"].is_null())
+        .count();
+    assert_eq!(tampers, 1, "one detection, one report");
+}
+
+#[test]
+fn a_takeover_accepted_but_not_written_locally_is_adopted_next_time() {
+    let (t, _) = setup("local-write");
+    let c = fake_central();
+    let svc = svc_central(&t, &c);
+    let state = t.0.join("state");
+    // checkpoint.json cannot be written (a directory in its place)
+    std::fs::create_dir_all(state.join("checkpoint.json")).expect("dir");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("w1", "hi", json!({"session_id": "s1"})),
+    );
+    let last = wait(&svc, "w1");
+    assert_eq!(
+        (last["spawned"].as_bool(), last["stop"].as_str()),
+        (Some(false), Some("LocalWriteFailed")),
+        "{last}"
+    );
+    assert_eq!(
+        c.store.lock().expect("s").len(),
+        1,
+        "the coordinator holds the takeover"
+    );
+    assert!(state.join("checkpoint-staged.json").exists());
+    // the attempt closed as not spawned (0/0): the next start is not blocked
+    let ledger = std::fs::read_to_string(state.join("budget/attempts.jsonl")).expect("ledger");
+    assert!(
+        ledger.contains(r#""end":{"observed_billable":0,"observed_cache_read":0}"#),
+        "{ledger}"
+    );
+    std::fs::remove_dir(state.join("checkpoint.json")).expect("rmdir");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("w2", "hi", json!({"session_id": "s2"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "w2");
+    assert!(!state.join("checkpoint-staged.json").exists());
+    let cp: Value =
+        serde_json::from_slice(&std::fs::read(state.join("checkpoint.json")).expect("cp"))
+            .expect("j");
+    assert_eq!(
+        (cp["seq"].as_u64(), cp["phase"].as_str()),
+        (Some(3), Some("after_run")),
+        "{cp}"
+    );
+    assert_eq!(c.store.lock().expect("s").len(), 3);
+}
+
+/// A pending tamper is reported with a new session only: the tampered session id is refused
+/// (review 802e4a1 N-2).
+#[test]
+fn a_pending_tamper_needs_a_session_other_than_the_tampered_one() {
+    let (t, svc) = setup("tamper-new");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("n1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "n1");
+    std::fs::write(
+        t.0.join("state/pending-tamper.json"),
+        json!({"config_tamper_detected": true, "old_session_id": "s1", "new_session_id": "x",
+               "checkpoint_digest": "a".repeat(64), "observed_digest": "b".repeat(64)})
+        .to_string(),
+    )
+    .expect("pending");
+    for (op, extra) in [
+        ("start", json!({"session_id": "s1"})),
+        ("reconnect", json!({"new_session_id": "s1"})),
+    ] {
+        let (st, b) = call(
+            &svc,
+            "POST",
+            &format!("/v0/role/{op}"),
+            &req("n2", "hi", extra),
+        );
+        assert_eq!(
+            (st, b["code"].as_str()),
+            (400, Some("SCHEMA_VIOLATION")),
+            "{op}: {b}"
+        );
+    }
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("n2", "hi", json!({})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (400, Some("SCHEMA_VIOLATION")),
+        "{b}"
+    );
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("n2", "hi", json!({"session_id": "s2"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s1", "{b}");
+    assert_eq!(b["accepted"]["tamper"]["new_session_id"], "s2", "{b}");
+    wait(&svc, "n2");
+    assert!(
+        !t.0.join("state/pending-tamper.json").exists(),
+        "reported with the takeover"
+    );
+}

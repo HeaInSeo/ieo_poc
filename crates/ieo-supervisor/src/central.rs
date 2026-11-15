@@ -127,6 +127,7 @@ impl Central {
                 "the coordinator refused checkpoint {seq} ({st} {})",
                 code_of(&v)
             ))
+            .with("coordinator_status", json!(st))
             .with("coordinator_answer", v)),
         }
     }

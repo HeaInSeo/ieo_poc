@@ -213,6 +213,8 @@ pub struct Service {
     /// The newest provider observation of an attempt before this service started: shown as
     /// history, never as the current status.
     previous_provider: Value,
+    /// Serializes `launch`.
+    launch_gate: Mutex<()>,
 }
 
 pub struct Response {
@@ -312,6 +314,7 @@ impl Service {
             }),
             restored,
             previous_provider,
+            launch_gate: Mutex::new(()),
         }
     }
 
@@ -325,11 +328,22 @@ impl Service {
     fn local_checkpoint(&self) -> Option<Vec<u8>> {
         let cfg = &self.cfg;
         let archive = cfg.checkpoint_archive();
+        let local_seq = std::fs::read(cfg.checkpoint_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|c| c["seq"].as_u64())
+            .unwrap_or(0);
         if let Ok(staged) = std::fs::read(cfg.staged_path()) {
-            let seq = serde_json::from_slice::<Value>(&staged)
-                .ok()
-                .and_then(|c| c["seq"].as_u64());
+            let parsed = serde_json::from_slice::<Value>(&staged).ok();
+            let seq = parsed.as_ref().and_then(|c| c["seq"].as_u64());
+            let carries_tamper = parsed
+                .as_ref()
+                .is_some_and(|c| !c["config_tamper_detected"].is_null());
             match (seq, cfg.central.latest(&cfg.repo, cfg.role_name())) {
+                // a staged copy never replaces a newer local checkpoint (review 802e4a1 I-2)
+                (Some(n), _) if n <= local_seq => {
+                    let _ = std::fs::remove_file(cfg.staged_path());
+                }
                 (Some(n), Ok(Some(l)))
                     if l["seq"].as_u64() == Some(n)
                         && l["checkpoint_sha256"].as_str()
@@ -344,6 +358,10 @@ impl Service {
                     {
                         let _ = std::fs::remove_file(cfg.staged_path());
                         self.mark_accepted(n, &crate::central::sha256(&staged));
+                        // its tamper report is in the central record now (review 802e4a1 N-1)
+                        if carries_tamper {
+                            let _ = std::fs::remove_file(cfg.pending_tamper_path());
+                        }
                     }
                 }
                 (Some(n), Ok(l)) if l.as_ref().and_then(|l| l["seq"].as_u64()).unwrap_or(0) < n => {
@@ -527,6 +545,9 @@ impl Service {
     }
 
     fn launch(self: &Arc<Self>, op: &str, req: &Value) -> Response {
+        // one launch at a time: staged and pending files are read and changed here
+        // (review 802e4a1 I-3)
+        let _gate = self.launch_gate.lock().unwrap_or_else(|e| e.into_inner());
         let s = |k: &str| req[k].as_str().map(str::to_string);
         let Some(attempt) = s("attempt_id").filter(|a| safe_id(a)) else {
             return err(
@@ -750,6 +771,16 @@ impl Service {
             }
             (_, r, t) => (session_id, r, t),
         };
+        // the session after a tamper is a new one (review 802e4a1 N-2)
+        if let Some(t) = &tamper
+            && t["new_session_id"] == t["old_session_id"]
+        {
+            return err(
+                400,
+                "SCHEMA_VIOLATION",
+                "a detected config tamper needs a new session: session id equals the tampered one",
+            );
+        }
         if let Some(t) = &tamper
             && let Err(e) = crate::central::durable_write(
                 &self.cfg.pending_tamper_path(),
@@ -877,7 +908,8 @@ impl Service {
             // the attempt ends as not spawned (0/0 in the budget ledger, review 48b1d0e M-1)
             let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
                 "mode": if job.resume { "resume" } else { "new" },
-                "stop": "CentralRefused", "stopped_by_guard": false, "spawned": false,
+                "stop": if refusal["code"] == "LOCAL_WRITE_FAILED" { "LocalWriteFailed" } else { "CentralRefused" },
+                "stopped_by_guard": false, "spawned": false,
                 "central_refusal": refusal, "tamper": job.tamper});
             let _ = std::fs::write(
                 dir.join("outcome.json"),
@@ -1096,10 +1128,19 @@ impl Service {
             let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
             self.record_report(seq, phase, &answer, &bytes);
             if let Err(r) = answer {
-                if r.status != 503 {
+                // only a refusal the coordinator answered (4xx) drops the staged copy; a server
+                // error or no answer keeps it for the next start to check (review 802e4a1 I-1)
+                let answered = r.body["coordinator_status"]
+                    .as_u64()
+                    .is_some_and(|c| (400..500).contains(&c));
+                if answered {
                     let _ = std::fs::remove_file(cfg.staged_path());
                 }
                 return Ok(Some(r.body));
+            }
+            // the tamper is recorded with this takeover (review 802e4a1 N-1)
+            if job.tamper.is_some() {
+                let _ = std::fs::remove_file(cfg.pending_tamper_path());
             }
             if let Err(e) = write_local() {
                 // accepted centrally but not written: nothing runs; the staged copy is adopted
