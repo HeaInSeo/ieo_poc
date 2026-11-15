@@ -1,0 +1,35 @@
+# 02-04 items 4 and 9 in containers, no model call · 2026-11-15T04:20:33Z · tag 5f38ab9
+coordinator: id=162bda6ad3c58980b16ce9c9b9eae32ea8c0e338a7c4c5d833fe0b5d4bfac1e0 user=20000:20000 revision=5f38ab9ed6b834a3c5c94ba3c57331fac3cb7f28 binary=ec2093187af2913db7f50a80de5316ae22d9d88fd9ec1e4e704329b02a26cc8d
+role-development: id=839b1ec410cb6804e080085db1fcaa6d08c53e63f56ab60f30c24cbdd2dfe53c user=20001:20001 revision=5f38ab9ed6b834a3c5c94ba3c57331fac3cb7f28 binary=7a9bde429b2af2d057bc7e197865b77c22a1f41a8e0cb9b70cd89e7cf58e30e5
+role-guardrail: id=9bac0957273da0e354b31266553f8bcf3a0827ff6a9484b377580e82d361fe0b user=20002:20002 revision=5f38ab9ed6b834a3c5c94ba3c57331fac3cb7f28 binary=7a9bde429b2af2d057bc7e197865b77c22a1f41a8e0cb9b70cd89e7cf58e30e5
+## coordinator container (UID 20000, PID 1, its own test DB)
+pid1: /usr/local/bin/ieo-coord serve --listen  uid: 20000
+register 201 · semantic review 201 · assign development 201 guardrail 201
+## item 9: checkpoints reported, stored and judged
+before any run: development no_checkpoint [] · guardrail no_checkpoint []
+development start: 202 · guardrail start: 202
+development central: seq 2 phase after_run session s-dev-1 generation 0 target 1111111 tamper_events 0 · judgment: resume_allowed []
+guardrail central: seq 2 phase after_run session s-gr-1 generation 0 target 1111111 tamper_events 0 · judgment: resume_allowed []
+## item 4: provider status and the shared quota group, through the coordinator
+{'anthropic-subscription-shared-0104': ('available', [])} mismatches []
+  per role: {'development': ('anthropic-subscription-shared-0104', 'available'), 'guardrail': ('anthropic-subscription-shared-0104', 'available')}
+## restart the coordinator container (its DB persists)
+development after coordinator restart: resume_allowed []
+guardrail after coordinator restart: resume_allowed []
+## restart the development role container (PID 1 again)
+development after restart: provider unknown · before start available current False · checkpoint seq 2
+development judgment after its restart: resume_allowed []
+development reconnect: 202 mode resume central {'central_seq': 2, 'compared': True, 'local_seq': 2, 'sent': 0}
+development central: seq 4 phase after_run session s-dev-1 generation 0 target 1111111 tamper_events 0 · judgment: resume_allowed []
+after development saw a rejected window:
+{'anthropic-subscription-shared-0104': ('usage_limit', ['development', 'guardrail'])} mismatches []
+  per role: {'development': ('anthropic-subscription-shared-0104', 'usage_limit'), 'guardrail': ('anthropic-subscription-shared-0104', 'available')}
+## a changed local checkpoint is refused by both sides
+judgment: external_reconciliation_required ['checkpoint 4: local digest differs from the central record']
+development reconnect: 409 EXTERNAL_RECONCILIATION_REQUIRED
+## SIGTERM to PID 1
+coordinator: podman stop 0.3 s, exit 0
+development: podman stop 0.4 s, exit 0
+guardrail: podman stop 0.5 s, exit 0
+rows in the coordinator DB: checkpoints 6 · tamper events 0
+# done

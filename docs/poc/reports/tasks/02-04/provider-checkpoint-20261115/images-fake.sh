@@ -25,7 +25,7 @@ podman unshare rm -rf "$W"; mkdir -p "$W/coord-etc" "$W/fake"; touch "$W/.images
 rnd() { head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 echo "# 02-04 items 4 and 9 in containers, no model call · $(date -u +%FT%TZ) · tag $TAG"
 for i in coordinator role-development role-guardrail; do
-  echo "$i: $(podman image inspect --format 'id={{.Id}} user={{.Config.User}} revision={{index .Labels "org.opencontainers.image.revision"}} supervisor={{index .Labels "ieo.binary.ieo-supervisor.sha256"}}{{index .Labels "ieo.binary.ieo-coord.sha256"}}' localhost/ieo-poc/$i:$TAG)"
+  echo "$i: $(podman image inspect --format 'id={{.Id}} user={{.Config.User}} revision={{index .Labels "org.opencontainers.image.revision"}} binary={{index .Labels "ieo.binary.ieo-supervisor.sha256"}}{{index .Labels "ieo.binary.ieo-coord.sha256"}}' localhost/ieo-poc/$i:$TAG)"
 done
 podman network create "$NET" >/dev/null
 PGPW=$(rnd)
@@ -69,7 +69,6 @@ s.pop("digest", None)
 s["digest"] = hashlib.sha256(json.dumps(s, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 json.dump(s, open(sys.argv[2], "w"), ensure_ascii=False)
 json.dump({"decision": "passed", "reason": "container test", "digest": s["digest"]}, open(sys.argv[3], "w"))
-print(s["digest"])
 PYEOF
 SD=$($PY -c 'import json,sys; print(json.load(open(sys.argv[1]))["digest"])' "$W/coord-etc/spec.json")
 for r in development guardrail; do
