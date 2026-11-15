@@ -1529,8 +1529,9 @@ fn pending_unreadable(why: &str) -> Response {
     resp(
         409,
         json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
-               "reason": format!("the pending tamper file cannot be read ({why}): a detection may be \
-                                  unreported; a person reconciles it"),
+               "reason": format!("the pending tamper file /state/pending-tamper.json cannot be read \
+                                  ({why}): a detection may be unreported; a person reconciles it \
+                                  (X-08 report §4) and repairs or removes the file"),
                "external_reconciliation_required": true}),
     )
 }

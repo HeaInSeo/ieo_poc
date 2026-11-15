@@ -49,7 +49,7 @@
 ## 3. 시험
 
 - `cargo fmt --all -- --check`, `cargo clippy --all-targets --locked -- -D warnings`: 통과.
-- `cargo test --locked --all-targets`(시험 DB 포함): 346 통과, 0 실패, 0 무시(커밋 1feebb1, PR #67). 그 기록은 후속(§6)의 9b63ce8 실행(349 통과)으로 [evidence/test.log](evidence/test.log)를 바꿨다. 이전 기록은 git 이력(PR #67의 이 파일)에 있다. 후속 검토는 [review-pr68-3724bc9.md](review-pr68-3724bc9.md)(제안 문구 안의 상대 링크가 풀리도록 보고와 같은 폴더에 보관).
+- `cargo test --locked --all-targets`(시험 DB 포함): 346 통과, 0 실패, 0 무시(커밋 1feebb1, PR #67). [evidence/test.log](evidence/test.log)는 그 뒤 후속(§6, 9b63ce8, 349 통과)과 사용자 결정 반영(§4, 350 통과) 때 새 실행으로 바꿨다. 지금 파일은 §4의 실행이다. 이전 기록은 git 이력(PR #67의 이 파일)에 있다. 후속 검토는 [review-pr68-3724bc9.md](review-pr68-3724bc9.md)(제안 문구 안의 상대 링크가 풀리도록 보고와 같은 폴더에 보관).
 - 변이 24개: 24개 모두 잡혔다([evidence/mutants.txt](evidence/mutants.txt)). 교정을 하나씩 되돌리고 해당 시험만 돌린 뒤 원래 코드로 복구했다. 정리(cleanup) 변이는 처음에 이를 지나지 않는 시험으로 돌려 살아남았고, 1feebb1의 시험으로 다시 돌려 잡혔다.
 
 ## 4. 사용자 결정 반영
@@ -70,6 +70,16 @@
 
 남은 사용자 결정은 없다.
 
+### 4.1 손상된 대기 파일의 사람 대조 절차(PR #70 검토 4e42bef L-2)
+
+역할이 start·reconnect에서 409 `EXTERNAL_RECONCILIATION_REQUIRED`(“the pending tamper file /state/pending-tamper.json cannot be read …”)로 멈추면 사람이 다음을 한다. 실제 호출을 다시 하기 전에 이 절차를 끝낸다.
+1. 역할 볼륨의 `/state/pending-tamper.json`을 그대로 보존 사본으로 복사한다(바이트를 바꾸지 않음).
+2. 내용을 읽는다. 사람이 탐지(옛 세션 id·새 세션 id·digest)를 알아볼 수 있으면 그 탐지가 코디네이터에 기록됐는지 확인한다: `GET /v0/repos/{repo}/roles/{role}/checkpoints/latest`의 `tamper_events`와, 역할 체크포인트 보관 사본(`/state/checkpoints/`)의 `config_tamper_detected`를 대조한다.
+3. 기록되지 않았으면 그 탐지를 올바른 JSON 객체로 다시 써서 대기로 남긴다. 다음 새 세션이 그것을 보고한다. 기록됐거나 탐지 내용이 없음을 확인했으면 파일을 지운다.
+4. 무엇을 보고 어떻게 했는지 진행 기록에 남기고, reconnect(대기가 있으면 새 세션 id 필요)나 start를 다시 한다.
+
+보존 사본 없이 지우지 않는다. 새 탐지가 손상 파일을 덮어쓸 때는 손상 사실이 남지 않는다(검토 4e42bef I-1). 사본을 남기는 기능은 넣지 않았고 한계로 둔다.
+
 ## 5. 범위 밖으로 남긴 것
 
 - 같은 검토들의 다른 지적(PR #49 L-c3-1·L-c3-5, PR #51 F9·F10)은 X-08 목록에 없어 다루지 않았다. PR #58 P-3의 4xx 부분은 PR #58에서 이미 시험이 있다.
@@ -86,8 +96,19 @@ PR #67 검토 681c1d3(승인, 낮음 2·정보 5)의 지적과 처리. 커밋 9b
 | I-1 `podman restart`의 `9>&-` 시험 없음 | **시험 추가.** 가짜 `podman restart`가 `/proc/self/fd/9`의 유무를 기록하고, 시험이 “fd9-closed”를 확인한다 | call_sh `the_restart_step_runs_only_when_every_guard_holds`(`9>&-`를 빼면 실패) |
 | I-2 `curl -f`만의 시험 없음 | **시험 보강.** 가짜 상태 서버의 401 응답 본문에도 상태 항목을 넣어, HTTP 상태(`-f`)로만 거절이 갈리게 했다 | 같은 시험(`-sf`를 `-s`로 바꾸면 실패) |
 | I-3 장부 세부(02-05 `next_action` 등) | 조정자가 장부에서 처리한다 | — |
-| I-4 (가) 객체가 아닌 대기 JSON에서 패닉 | **교정.** 두 번째 대기 읽기에도 객체만 받도록 걸렀다. 새 탐지가 없으면 손상 파일과 같게 “대기 없음”, 있으면 새 탐지로 덮어쓴다. 손상·비객체 파일의 처리는 뒤에 사용자가 “재개 거절”로 정했다(§4, 18d5d9e) | serve `a_pending_file_that_is_not_an_object_does_not_panic` |
+| I-4 (가) 객체가 아닌 대기 JSON에서 패닉 | **교정.** 두 번째 대기 읽기에도 객체만 받도록 걸렀다. 새 탐지가 없으면 손상 파일과 같게 “대기 없음”, 있으면 새 탐지로 덮어쓴다. 손상·비객체 파일의 처리는 뒤에 사용자가 “재개 거절”로 정했다(§4, 18d5d9e) | serve (당시) `a_pending_file_that_is_not_an_object_does_not_panic` | — 이 시험은 §4의 `an_unreadable_pending_file_stops_until_a_person_reconciles_it`로 대체됐다
 | I-4 (나) 정정 정리 뒤 빈 `children/`이 남음 | **교정하지 않음.** 복사 전 검사(`remeasure`)를 통과한 뒤의 쓰기 실패에서만 생긴다. 이 경로를 시험으로 재현할 값싼 방법이 없어(쓰기 오류 주입 필요), 시험 없는 정리 코드를 더하지 않았다. 빈 디렉터리는 장부 읽기에 쓰이지 않고 다음 정정이 그대로 쓴다 | — |
 | I-5 X-02 준비: 새 장부로 기존 역할 볼륨을 쓰면 모든 역할 확인 때문에 거절됨 | 운용 메모로 받는다. X-02 준비에서 새 볼륨을 쓰거나 조정 단계를 계획한다. 코드 변경 없음 | — |
 
 **사용자 결정 목록(§4) 갱신:** L-1은 교정했으므로 결정 항목이 아니다. 남은 결정은 Q-3, 손상·비객체 대기 파일의 처리(거절 또는 기록만), §4의 확인 세 가지다. 다음 실제 호출 전에는 `ieo-coord`도 9b63ce8 이후 병합본으로 바꿔야 L-1 교정이 효과를 낸다. 이전 코디네이터는 이 값을 주지 않으므로 대기가 남는 쪽(다시 보고)으로 동작한다. (이 결정들은 2026-11-15 사용자 결정으로 반영했다. §4)
+
+## 7. PR #70 검토 4e42bef 교정
+
+- M-1: 결정 기록에 계획 §4.3 표 전체(역할 몫·예산 검사·R2)를 옮겼다. 원장 resume.budget과 02-05 항목에도 역할 몫을 적었다.
+- M-2: 런타임 계약을 revision 10으로 올리고 머리말에 바뀐 점을 적었다. 원장 plan_and_spec도 revision 10.
+- L-1: 결정 기록 §2.2에 start도 거절하는 이유를 적었다.
+- L-2: 거절 사유에 파일 경로와 이 보고 §4를 넣었고, §4.1에 사람의 대조 절차를 적었다.
+- L-3: 원장의 낡은 “사용자 결정 대기” 문구와 X-08 next_action을 고쳤다.
+- I-1: 새 탐지가 손상 파일을 덮어쓸 때 사본을 남기지 않는 것은 한계로 둔다(§4.1).
+- I-2: §3·§6의 시험 수와 바뀐 시험 이름을 고쳤다. I-3: EARLY-01에 F4 규칙. I-4·I-5: 기록.
+- 시험: 바뀐 코드는 거절 사유 문자열뿐이다. ieo-supervisor 122 통과, 0 실패(evidence/test.log 끝). 전체는 새 head의 CI로 확인한다.

@@ -542,3 +542,6 @@ test special_files_are_never_opened ... ok
 test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 # exit 0
+
+# PR #70 correction 1 (review 4e42bef): only the refusal reason text in serve.rs changed.
+# ieo-supervisor re-run: fmt ok, clippy -p ieo-supervisor -D warnings ok, cargo test -p ieo-supervisor --all-targets: 122 passed, 0 failed (serve 35, caller 32). Full suite: CI on the new head.
