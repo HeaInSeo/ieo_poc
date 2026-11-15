@@ -90,8 +90,13 @@ def validate(root):
     # and the resume record keeps what a restart must re-read (work, blocks, budget, decisions, next step).
     want={x['task_id']:list(x['prerequisites']) for am in amends for x in am.get('extra_tasks',[])}
     for am in amends:
-        for c in am.get('extra_prerequisite_changes',[]):want[c['task_id']]+=c['added']
-    for x in state.get('extra_tasks',[]):assert x['prerequisites']==want[x['task_id']],('extra task prerequisites differ from the amendments',x['task_id'])
+        for c in am.get('extra_prerequisite_changes',[]):
+            assert c['task_id'] in want,('prerequisite change for an undefined extra task',c['task_id']);want[c['task_id']]+=c['added']
+    assert {x['task_id'] for x in state.get('extra_tasks',[])}==set(want),'an amendment-defined extra task is missing from the ledger'
+    known={t['task_id'] for t in state['tasks']}|set(want)
+    for x in state.get('extra_tasks',[]):
+        assert x['prerequisites']==want[x['task_id']],('extra task prerequisites differ from the amendments',x['task_id'])
+        assert set(x['prerequisites'])<=known,('extra task prerequisite is not a known task',x['task_id'])
     resume=state['resume'];assert all(resume.get(k) for k in ('current_work','blocking','budget','user_decisions','restart_procedure','next_action')),'resume misses a restart field'
     for d in resume['user_decisions']:
         ref=d.split(' ',1)[0]
