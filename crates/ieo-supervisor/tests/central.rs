@@ -195,7 +195,8 @@ fn answers_are_classified_alike_over_both_transports() {
     let f = fakes("classify");
     let stored = json!({"stored": true, "seq": 1, "checkpoint_sha256": "ab",
                         "tamper_recorded": false, "current_assignment": true});
-    let dup = json!({"duplicate": true, "seq": 1, "checkpoint_sha256": "ab"});
+    let dup = json!({"duplicate": true, "seq": 1, "checkpoint_sha256": "ab",
+                     "tamper_recorded": false});
     let gap = json!({"rejections": [{"code": "CHECKPOINT_SEQUENCE_GAP", "field": "seq",
         "message": "m", "correction": "c", "retryable_after_edit": true}]});
     let internal = json!({"code": "INTERNAL", "message": "database error"});
@@ -293,7 +294,8 @@ fn a_status_without_a_trailer_is_unknown_and_is_not_resent() {
         "checkpoint_sha256": "ab", "phase": "after_run", "session_id": "s", "assignment_id": "A",
         "generation": 1, "sprint_id": "P", "sprint_revision": 5, "spec_digest": "d",
         "target_sha": "t", "settings_digest": "e", "reported_by": "x",
-        "received_at": "2026-11-15T00:00:00Z", "tamper_events": 0, "current_assignment": true});
+        "received_at": "2026-11-15T00:00:00Z", "tamper_events": 0, "current_assignment": true,
+        "tamper_recorded": false});
     f.script(Script::Answer(200, rec.clone()));
     assert_eq!(f.grpc.latest("repo-a", "development"), Ok(Some(rec)));
 }

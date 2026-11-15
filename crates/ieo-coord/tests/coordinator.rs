@@ -3486,6 +3486,28 @@ fn central_checkpoints_keep_sequence_identity_and_tamper_reports() {
         (201, Some(false)),
         "{b}"
     );
+    // a duplicate says whether the stored report of its sequence recorded the event; latest
+    // says it for the latest checkpoint (review 681c1d3 L-1)
+    let mut t2 = tamper.clone();
+    t2["phase"] = json!("takeover");
+    let (st, b) = report("sup-dev-a", 2, &checkpoint(2, 0, &digest, t2));
+    assert_eq!(
+        (st, b["duplicate"].as_bool(), b["tamper_recorded"].as_bool()),
+        (200, Some(true), Some(true)),
+        "{b}"
+    );
+    let (st, b) = report("sup-dev-a", 3, &checkpoint(3, 0, &digest, tamper.clone()));
+    assert_eq!(
+        (st, b["duplicate"].as_bool(), b["tamper_recorded"].as_bool()),
+        (200, Some(true), Some(false)),
+        "{b}"
+    );
+    let (st, b) = e.get("operator", &format!("{CP}/latest"));
+    assert_eq!(
+        (st, b["tamper_recorded"].as_bool()),
+        (200, Some(false)),
+        "{b}"
+    );
     let mut bad = tamper.clone();
     bad["config_tamper_detected"]["new_session_id"] = json!("other");
     let (st, b) = report("sup-dev-a", 4, &checkpoint(4, 0, &digest, bad));

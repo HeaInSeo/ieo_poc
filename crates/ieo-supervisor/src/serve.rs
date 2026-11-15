@@ -358,8 +358,10 @@ impl Service {
                     {
                         let _ = std::fs::remove_file(cfg.staged_path());
                         self.mark_accepted(n, &crate::central::sha256(&staged));
-                        // its tamper report is in the central record now (review 802e4a1 N-1)
-                        if carries_tamper {
+                        // its tamper report counts only when the coordinator says this takeover
+                        // recorded it (review 802e4a1 N-1); a dropped event, or an answer that does
+                        // not say, keeps it pending for the next new session (review 681c1d3 L-1)
+                        if carries_tamper && l["tamper_recorded"] == true {
                             let _ = std::fs::remove_file(cfg.pending_tamper_path());
                         }
                     }
@@ -769,9 +771,12 @@ impl Service {
         };
         // a detected tamper not yet reported (its takeover was refused, stopped or lost) is
         // carried to the next new session and never resumed over (review accd6c8 M-2)
+        // only an object is a detection; anything else reads like an unreadable file (review
+        // 681c1d3 I-4: a JSON array here used to panic below)
         let pending = std::fs::read(self.cfg.pending_tamper_path())
             .ok()
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .filter(Value::is_object);
         let (session_id, resume, tamper) = match (pending, resume, tamper) {
             (Some(p), true, _) => {
                 let Some(new_sid) = s("new_session_id").filter(|x| safe_id(x)) else {
@@ -1164,10 +1169,10 @@ impl Service {
                 }
             };
             // the tamper is recorded with this takeover (review 802e4a1 N-1) — only when the
-            // coordinator says it recorded it (or holds this exact takeover already): an event
-            // it dropped (`tamper_recorded: false`) stays pending for the next new session
-            // (review 704330f P-2)
-            if job.tamper.is_some() && (a["tamper_recorded"] == true || a["duplicate"] == true) {
+            // coordinator says this takeover's report recorded it, a duplicate answer included:
+            // an event it dropped (`tamper_recorded: false`) or an answer that does not say stays
+            // pending for the next new session (reviews 704330f P-2, 681c1d3 L-1)
+            if job.tamper.is_some() && a["tamper_recorded"] == true {
                 let _ = std::fs::remove_file(cfg.pending_tamper_path());
             }
             if let Err(e) = write_local() {

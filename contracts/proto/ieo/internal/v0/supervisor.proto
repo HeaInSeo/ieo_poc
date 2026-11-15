@@ -159,7 +159,8 @@ message ReportCheckpointResponse {
   Outcome outcome = 1;
   uint64 seq = 2;
   string checkpoint_sha256 = 3;
-  // Set only when outcome is OUTCOME_STORED.
+  // OUTCOME_STORED: this report recorded a tamper event. OUTCOME_REPLAYED: the stored report of
+  // this sequence recorded one (false also when it carried none).
   bool tamper_recorded = 4;
   // Set only when outcome is OUTCOME_STORED.
   bool current_assignment = 5;
@@ -190,6 +191,8 @@ message GetLatestCheckpointResponse {
   string received_at = 15;
   uint64 tamper_events = 16;
   bool current_assignment = 17;
+  // The latest checkpoint's own report recorded a tamper event (an event stored with its seq).
+  bool tamper_recorded = 18;
 }
 
 // Carried in the binary trailer `ieo-error-bin` of a non-OK answer from the coordinator's handling
