@@ -6,14 +6,14 @@
 
 - **모델 호출:** 0회. 시험은 가짜 `claude`, 실제 PostgreSQL(시험 DB·컨테이너 안 일회용 DB), 저장된 원본 형 정의만 썼다. 예비 회차(개발 2·Guardrail 3)는 쓰지 않았고 실제 중간 정지도 하지 않았다.
 - **예산:** 바뀌지 않았다. 7/12회, 40.666초(집계 45초), billable 33,948, cache_read 121,189.
-- **코드:** 커밋 5f38ab9, 교정 1 ec64d19. 바꾼 곳은 다음과 같다.
+- **코드:** 커밋 5f38ab9, 교정 1 ec64d19, 교정 2 a1cfe78. 바꾼 곳은 다음과 같다.
   - supervisor: 새 모듈 `provider`·`central`, `serve` 연결
   - coordinator: 스키마 표 2개, API 3개, `roles` 공유 그룹
   - OpenAPI
   - 런타임 계약 revision 9(§13 항목 9·10)
-- **이미지:** 5b527c6(교정 1의 문서 커밋. 코드는 ec64d19와 같다)에서 릴리스 빌드했다([build-images-5b527c6.txt](evidence/build-images-5b527c6.txt)).
-  - `ieo-coord`: c47d6fe5…
-  - `ieo-supervisor`: 14b7739e…
+- **이미지:** a1cfe78(교정 2)에서 릴리스 빌드했다([build-images-a1cfe78.txt](evidence/build-images-a1cfe78.txt)).
+  - `ieo-coord`: c69c49a4…
+  - `ieo-supervisor`: ce807e09…
   - CLI: bfb3703a…(2.1.322, 바뀌지 않음)
 
 ## 1. 결과 요약
@@ -25,7 +25,7 @@
 | 4. 출처·관측 시각·신선도, 실행 중·재시작 뒤 미확인 | 구현·시험 | 모의 | §2 |
 | 9. 체크포인트 순번·digest·변조의 코디네이터 보고·저장 | 구현·시험 | 모의·실제 DB | §3 |
 | 9. 로컬↔중앙 대조, 불일치·누락·낡은 세대·순번 간격의 조치 | 구현·시험 | 모의·실제 DB | §3 |
-| 9. 코디네이터·역할 프로세스 재시작 뒤 대조 | 구현·시험 | 모의·실제 DB·컨테이너 | §3, [컨테이너 기록](evidence/images-fake-5b527c6.log) |
+| 9. 코디네이터·역할 프로세스 재시작 뒤 대조 | 구현·시험 | 모의·실제 DB·컨테이너 | §3, [컨테이너 기록](evidence/images-fake-a1cfe78.log) |
 | 9. 재개 판단에 사용(코디네이터 판정 API, supervisor의 기동 전 대조) | 구현·시험 | 모의·실제 DB | §3 |
 
 “모의”는 가짜 `claude`로 실행했다는 뜻이다. 실제 Claude 회차에서 이 경로를 지난 적은 없다. 실제 공급자의 거부·인증 오류 신호는 관측한 적이 없다(§2 한계).
@@ -69,7 +69,7 @@
     - 그룹 설정 거부 4가지
   - `tests/serve.rs::status_reports_the_section_7_fields_and_an_honest_safe_shutdown`: 계약 값으로 보고하고, 재시작 뒤에는 `unknown`과 이력만 낸다.
   - `ieo-coord tests/roles.rs::a_shared_quota_group_carries_a_usage_limit_to_every_member`: 그룹 전파, 관측 없음, 인증 오류 비전파, 그룹 분리, 기대 그룹 불일치, 연결 불가
-  - 컨테이너([기록](evidence/images-fake-5b527c6.log)): 두 역할 모두 `available` → 그룹 `available`. 개발이 거부된 창을 본 뒤에는 그룹 `usage_limit`, 영향 역할은 개발·Guardrail이다. Guardrail 자신의 최근 관측은 `available` 그대로다. 개발 컨테이너를 재시작하면 `unknown`(이전 `available`은 `current False`)이다.
+  - 컨테이너([기록](evidence/images-fake-a1cfe78.log)): 두 역할 모두 `available` → 그룹 `available`. 개발이 거부된 창을 본 뒤에는 그룹 `usage_limit`, 영향 역할은 개발·Guardrail이다. Guardrail 자신의 최근 관측은 `available` 그대로다. 개발 컨테이너를 재시작하면 `unknown`(이전 `available`은 `current False`)이다.
 - **수용 보고의 한계(검토 fa39d86 M-a) 처분.**
   - 계약 값으로 바꾸지 않던 것은 해소했다.
   - 실행 중 낡은 값은 해소했다. 실행 중에는 그 회차를 읽는다.
@@ -140,7 +140,7 @@ session_id만 저장하지 않는다. 저장하는 식별자는 다음과 같다
 | 재시작 뒤 보고 상태 | e2e 4 | 재시작한 서비스도 `checkpoint_reported: true`(교정 1) |
 | 회차 중 코디네이터 중단 | e2e 6 | 회차 뒤 보고 실패 → `checkpoint_reported: false`. 중단 중 재개 → 503 `NOT_OBSERVED`, 실행 없음. 복구 뒤 판단 → “아직 기록 안 됨”. 다음 재개가 보관 사본 1건을 먼저 보낸 뒤 실행(순번 8) |
 
-컨테이너([기록](evidence/images-fake-5b527c6.log), 이미지 5b527c6, UID 20000/20001/20002, PID 1) 순서:
+컨테이너([기록](evidence/images-fake-a1cfe78.log), 이미지 a1cfe78, UID 20000/20001/20002, PID 1) 순서:
 1. 등록·의미 검토·두 역할 배정
 2. 두 역할 첫 회차 → 중앙 순번 2·`resume_allowed`
 3. 코디네이터 컨테이너 재시작 → `resume_allowed`

@@ -1,6 +1,6 @@
 # 중단·재개 기록
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0030` · 원장 SHA-256 `e61c288d9f77ea85e8e382301d22f1b003cf9f177d14351673d9927e2d1fc154`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0030` · 원장 SHA-256 `38de3ad115e9231419c373d70a7823d29fb7febf3287d444e7af4eedafd6bf75`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -10,7 +10,7 @@
 | workspace | /opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public) |
 | branch_sha | main d33782890115161bbf3925185defb76af5205794 (이 PR 병합 전) |
 | plan_and_spec | v1.3.3-A1·A2·A3·A4·A5 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 9 |
-| running | 작업 PR(task/0204-provider-checkpoint). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:5b527c6(로컬). 실제 Claude 실행 없음 |
+| running | 작업 PR(task/0204-provider-checkpoint). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:a1cfe78(로컬). 실제 Claude 실행 없음 |
 | unresolved_external_effects | [] |
 | saved_reports | ["reports/tasks/01-02/runtime-contract-20261112/REPORT.md","reports/tasks/01-07/spec-contract-20261112/REPORT.md","reports/tasks/01-08/report-api-contract-20261112/REPORT.md","reports/tasks/01-03/decision-proposal-20261112/REPORT.md","reports/tasks/01-03/staged-freeze-20261112/REPORT.md","reports/workspace/validate-write-20261112/REPORT.md","reports/workspace/prereq-0203-fixes-20261112/REPORT.md","reports/tasks/01-04/first-probes-20261112/REPORT.md","reports/tasks/01-04/remaining-probes-20261112/REPORT.md","reports/workspace/test-env-assets-20261112/ASSETS.md","reports/workspace/harness-result-check-20261112/REPORT.md","reports/tasks/01-05/baseline-20261112/REPORT.md","reports/tasks/01-06/lab-20261112/REPORT.md","reports/tasks/02-01/collector-20261112/REPORT.md","reports/tasks/02-02/eval-20261112/REPORT.md","reports/tasks/02-03/coordinator-20261113/REPORT.md","reports/extra/X-01/notion-import-20261113/REPORT.md","reports/extra/X-01/followup-c1-c2-20261113/REPORT.md","reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md","reports/tasks/02-04/run-guard-20261114/PROGRESS.md","reports/tasks/02-04/role-container-20261114/PROGRESS.md","reports/workspace/regular-report-20261115/REPORT.md","reports/tasks/02-04/real-sessions-20261115/PROGRESS.md","reports/tasks/02-04/child-usage-20261115/PROGRESS.md","reports/tasks/02-04/real-sessions-20261115/RESULTS.md","reports/tasks/02-04/real-sessions-20261115/SUPPLEMENT.md","reports/tasks/02-04/images-20261115/PROGRESS.md","reports/tasks/02-04/acceptance-20261115/REPORT.md","reports/tasks/02-04/provider-checkpoint-20261115/PROGRESS.md"] |
 | pending_index_updates | 없음 |

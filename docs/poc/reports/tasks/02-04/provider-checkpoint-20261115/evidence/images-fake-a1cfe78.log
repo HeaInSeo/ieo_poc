@@ -1,7 +1,7 @@
-# 02-04 items 4 and 9 in containers, no model call · 2026-11-15T04:37:59Z · tag 5b527c6
-coordinator: id=cbc2f50e3b28f0ff520f2d7abf535029e08599e6e6ea94865b01decac79b1030 user=20000:20000 revision=5b527c66fd8adeebe4c211ddccf4211f00972f43 binary=c47d6fe58eaf2292ef3d05b7f3528bba125b5c70dda29666873b4a2f22057b46
-role-development: id=b9e98473568825b94e778162294d737996f926d5819b285c299b9e09af546ecc user=20001:20001 revision=5b527c66fd8adeebe4c211ddccf4211f00972f43 binary=14b7739e3c350835cf3e1ba16bbf9b01e0f4a45456d33322f4bab825aa075106
-role-guardrail: id=1b946768c550e70114944ff78acc2c9c32ea7e1d61199f4853c8590dbaba45d6 user=20002:20002 revision=5b527c66fd8adeebe4c211ddccf4211f00972f43 binary=14b7739e3c350835cf3e1ba16bbf9b01e0f4a45456d33322f4bab825aa075106
+# 02-04 items 4 and 9 in containers, no model call · 2026-11-15T04:55:36Z · tag a1cfe78
+coordinator: id=38fe97d6d4667fc9d6b6f83020a459ef353fa34ccefbd61db1fcb64b3f6a1421 user=20000:20000 revision=a1cfe78caf0816dc72e1eb20dc7ea4738c41a1b3 binary=c69c49a4fd318c74e4763abae200e6653c65380cf7c7d30504ec46d5f4915363
+role-development: id=501b5c4a5fe4d01a2ef036cb6bed6b7b4c79be13a74bcc5d46bd10fb3687a54d user=20001:20001 revision=a1cfe78caf0816dc72e1eb20dc7ea4738c41a1b3 binary=ce807e09abb5284e20e11a6ae2531de794b7618d64723d9e5c20c33045fcf526
+role-guardrail: id=c61be281d960fd679067e95c969af4173e7be88169f91e52dd6d7ebfb614c083 user=20002:20002 revision=a1cfe78caf0816dc72e1eb20dc7ea4738c41a1b3 binary=ce807e09abb5284e20e11a6ae2531de794b7618d64723d9e5c20c33045fcf526
 ## coordinator container (UID 20000, PID 1, its own test DB)
 pid1: /usr/local/bin/ieo-coord serve --listen  uid: 20000
 register 201 · semantic review 201 · assign development 201 guardrail 201
@@ -28,8 +28,8 @@ after development saw a rejected window:
 judgment: external_reconciliation_required ['checkpoint 4: local digest differs from the central record']
 development reconnect: 409 EXTERNAL_RECONCILIATION_REQUIRED
 ## SIGTERM to PID 1
-coordinator: podman stop 0.3 s, exit 0
-development: podman stop 0.2 s, exit 0
+coordinator: podman stop 0.4 s, exit 0
+development: podman stop 0.5 s, exit 0
 guardrail: podman stop 0.5 s, exit 0
 rows in the coordinator DB: checkpoints 6 · tamper events 0
 # done
