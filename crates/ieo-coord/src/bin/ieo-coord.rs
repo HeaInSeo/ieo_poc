@@ -1,9 +1,15 @@
 //! `ieo-coord migrate` | `ieo-coord serve --listen ADDR --tokens FILE --manifest FILE
-//!  --policy FILE [--bindings FILE] [--profiles FILE] [--roles FILE] [--workers N]`. The DB URL is read from `IEO_DB_URL`,
+//!  --policy FILE [--bindings FILE] [--profiles FILE] [--roles FILE] [--workers N]
+//!  [--grpc-listen ADDR [--grpc-workers N]]`. The DB URL is read from `IEO_DB_URL`,
 //!  or from the file named by `IEO_DB_URL_FILE`.
+//!
+//! `--grpc-listen` (X-04) also serves the internal gRPC API (`ieo.internal.v0.SupervisorService`
+//! and `grpc.health.v1.Health`) from the same process, with the same credentials, policy and
+//! database; without it the process is the HTTP server it was.
 
 use ieo_coord::api::{Ctx, migrate};
 use ieo_coord::auth::Credentials;
+use ieo_coord::grpc::{GrpcConfig, GrpcServer};
 use ieo_coord::http::{App, serve};
 use ieo_coord::policy;
 use postgres::{Config, NoTls};
@@ -131,11 +137,34 @@ fn run() -> Result<(), String> {
                     }
                 });
             }
-            serve(server, Arc::new(app), &cfg, workers)?;
+            let app = Arc::new(app);
+            let grpc = match arg(&args, "--grpc-listen") {
+                Some(g) => {
+                    let c = cfg.clone();
+                    let connect: ieo_coord::grpc::Connect =
+                        Arc::new(move || c.connect(NoTls).map_err(|e| e.to_string()));
+                    let grpc_cfg = GrpcConfig {
+                        workers: arg(&args, "--grpc-workers")
+                            .and_then(|w| w.parse().ok())
+                            .unwrap_or(4),
+                        ..GrpcConfig::default()
+                    };
+                    let s = GrpcServer::start(&g, Arc::clone(&app), connect, grpc_cfg)?;
+                    eprintln!("ieo-coord gRPC listening on {}", s.addr);
+                    Some(s)
+                }
+                None => None,
+            };
+            let served = serve(server, app, &cfg, workers);
+            // the gRPC side stops after the HTTP side (calls in progress finish first)
+            if let Some(g) = grpc {
+                g.stop();
+            }
+            served?;
             eprintln!("ieo-coord: stopped");
             Ok(())
         }
-        _ => Err("usage: ieo-coord migrate | serve --listen ADDR --tokens FILE --manifest FILE --policy FILE [--bindings FILE] [--profiles FILE] [--workers N]".into()),
+        _ => Err("usage: ieo-coord migrate | serve --listen ADDR --tokens FILE --manifest FILE --policy FILE [--bindings FILE] [--profiles FILE] [--workers N] [--grpc-listen ADDR [--grpc-workers N]]".into()),
     }
 }
 

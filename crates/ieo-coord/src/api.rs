@@ -395,6 +395,11 @@ pub fn unauthenticated() -> Resp {
     )
 }
 
+/// A one-rejection answer (`{"rejections": [...]}`), for a transport's own refusals.
+pub fn rejection(status: u16, code: &str, field: &str, message: &str, correction: &str) -> Resp {
+    one(status, code, field, message, correction)
+}
+
 /// The 404 answer for a path that names no operation.
 pub fn no_such_endpoint() -> Resp {
     problem(404, "NOT_FOUND", "no such endpoint")
