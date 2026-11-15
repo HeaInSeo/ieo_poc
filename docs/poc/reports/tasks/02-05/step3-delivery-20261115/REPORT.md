@@ -4,10 +4,10 @@
 | --- | --- |
 | 작업 | 02-05 구현 단계 3([계획](../plan-20261115/PLAN.md) §3 단계 3, §3.1 작업 표). 이월 C8·C12를 닫고 C1의 단계 3 몫을 한다 |
 | 착수 근거 | 계획 머리의 갱신 기록(사용자 결정 2026-11-15, X-08 검수 완료, 런타임 계약은 revision 11로 씀). 단계 1·2 병합(PR #72·#73) |
-| 검토 반영 | PR #73 검토 a349dc6 L-1(변이 R2·R4·R5를 잡는 기대값 확인), 단계 2 보고 §5의 이월(자기 배정 조회의 `last_delivery_id`·이미지·프로파일 기대값) |
-| 기준 커밋 | main 3701f6b. 구현 커밋 2c8fe8d, 증거 커밋 87956da |
+| 검토 반영 | PR #73 검토 a349dc6 L-1(변이 R2·R4·R5를 잡는 기대값 확인), 단계 2 보고 §5의 이월(자기 배정 조회의 `last_delivery_id`·이미지·프로파일 기대값). PR #74 검토 c11e734(변경 요청) M-1·L-1~L-3·I-1~I-5는 §7 |
+| 기준 커밋 | main 3701f6b. 구현 커밋 2c8fe8d(첫 증거 87956da). 검토 c11e734 교정 커밋 3f1b0a1, 다시 만든 증거는 이 보고를 고친 커밋에 있다(evidence/test.log 첫 줄이 3f1b0a1) |
 | 모델 호출 | 0회. 컨테이너·실제 회차 없음. 영속 PoC DB와 58090 코디네이터는 쓰지 않았다(일회성 시험 DB만) |
-| 상태 | 구현과 시험 완료, **독립 검토 전**. 같은 PR의 원장 snapshot이 이 단계를 기록한다 |
+| 상태 | 구현과 시험 완료. 검토 c11e734(변경 요청)를 교정했고 **재검토 전**이다. 같은 PR의 원장 snapshot이 이 단계를 기록한다 |
 
 ## 1. 더한 작업과 바뀐 동작
 
@@ -145,12 +145,12 @@
 - `crates/ieo-coord/tests/grpc.rs`(L-1): 같은 `observed_at`은 `stale_on_arrival: true`. 없는 날짜 셋(2026-02-30, 2025-02-29, 2026-04-31)은 400 `SCHEMA_VIOLATION`. 다른 세션의 takeover만 있는 첫 행동은 409 `CHECKPOINT_MISMATCH`.
 - `crates/ieo-coord/tests/operations.rs`: 경로와 실행 모양.
 
-결과([evidence/test.log](evidence/test.log), 커밋 2c8fe8d):
+결과(처음 실행, 커밋 2c8fe8d. 검토 교정 뒤의 결과는 §7.3):
 - `cargo fmt --all -- --check`, `cargo clippy --all-targets --locked -- -D warnings`: 통과.
 - buf lint·build·breaking(main 3701f6b 대비), `openapi-spec-validator`: 통과.
 - `cargo test --locked --all-targets`(시험 DB, `RUST_TEST_THREADS=4`): **365 통과, 0 실패**. 기준 358에 새 시험 7개(종단 2, serve 3, configdir 2)다. 02-04 호출자 시험 32개, `checkpoint_e2e` 2개는 고치지 않고 통과했다.
 
-변이 16개를 모두 잡았다([evidence/mutants.txt](evidence/mutants.txt)):
+변이 16개를 모두 잡았다(처음 실행. 교정 뒤 다시 돌린 결과는 §7.3과 [evidence/mutants.txt](evidence/mutants.txt)):
 - 전달 쪽 6개: `new_session` 없이 start, 머리 대조 제거, `unknown` 재조회 생략, 404를 수락으로, revision 한도 미적용, 이미지를 설정에서 받지 않음.
 - 예산 라이브러리 1개: 사람 확인 기록 검사 제거.
 - supervisor 쪽 4개: 재전송 내용 무시, 배정 대조 제거, 기대값 무시, 낡은 세대 판정 반전.
@@ -168,7 +168,7 @@
 
 ## 5. 계획과 다른 점, 결정이 필요한 것
 
-- **명시적 새 세션(`new_session`).** 계획 표에서는 `stale_generation`이면 부르지 않는다. 그러면 세대가 바뀐 뒤 중앙 기록이 있는 한 전달로는 새 세션을 시작할 길이 없다. 그래서 운영 주체가 명시하면 `resume_allowed`·`stale_generation`에서 start를 부르게 했다. 옛 세션은 재개하지 않는다. 런타임 계약의 기존 동작(새 세대에서 start는 허용)과 같다. 검토에서 확인을 바란다.
+- **명시적 새 세션(`new_session`).** 계획 표에서는 `stale_generation`이면 부르지 않는다. 그러면 세대가 바뀐 뒤 중앙 기록이 있는 한 전달로는 새 세션을 시작할 길이 없다. 그래서 운영 주체가 명시하면 `resume_allowed`와, 마지막 회차가 끝난(`after_run`) 낮은 세대의 `stale_generation`에서 start를 부르게 했다. 옛 세션은 재개하지 않는다. 낮은 세대의 끝나지 않은 회차(takeover·error)는 재개 판단 자체가 `external_reconciliation_required`이고 새 세션으로도 덮지 않는다(검토 c11e734 M-1, §7.1). 검토에서 확인을 바란다.
 - **재조회는 다시 보내지 않고 읽기만 한다.** 계획은 “같은 request_id로 재조회·재전송”이었다.
   - 다시 보내지 않는 이유: 답을 잃은 시도는 02-04 규칙대로 원장에 사람 확인 요청으로 남는다. 다시 보내면 supervisor가 받지 못한 요청을 예산 검사 없이 실행할 수 있다.
   - 그래서 재조회는 실행을 일으키지 않는 `GET /v0/role/attempts/{id}`다.
@@ -176,9 +176,10 @@
 - **답 유실 뒤 예산 정지.** 재조회가 `accepted`를 보여도 원장의 사람 확인 요청은 남는다. 그 예산의 다음 전달은 사람이 원장을 대조(보정 기록)할 때까지 멈춘다. 02-04 규칙 그대로이고 fail-closed다.
 - **배경 마무리.** 받아들인 회차의 계측·기록은 코디네이터 프로세스의 배경 스레드가 한다. 회차 중에 코디네이터가 재시작되면 진행 중 표식이 남아 다음 전달을 막는다. 사람이 대조하고, 0으로 세지 않는다.
 - **대상 SHA는 supervisor 쪽 대조에 넣지 않았다**(takeover 저장 조건이 이미 거부한다).
-- **재조회의 남는 틈.** 저장된 답 조회는 실행 시작과 같은 잠금을 잡는다. 그래도 아직 도착하지 않은 요청이 재조회 뒤에 도착하는 경우는 막지 못한다. 같은 호스트에서는 무시할 만하다.
+- **재조회의 남는 틈.** 저장된 답 조회는 실행 시작과 같은 잠금을 잡는다. 결과가 없는 전달은 요청 뒤 120초 동안 재조회하지 않고 409 `DELIVERY_IN_PROGRESS`로 답한다(§7.1 L-3). 그래도 120초 넘게 도착하지 않은 요청이 재조회 뒤에 도착하는 경우는 막지 못한다. 같은 호스트에서는 무시할 만하다.
 - **회차 한도.** revision의 `elapsed_seconds`·`total_tokens`로 회당 상한만 자른다. 배정의 남은 양은 단계 5다.
-- **새 코드 `ATTEMPT_ID_CONFLICT`**(추가).
+- **새 코드 `ATTEMPT_ID_CONFLICT`·`DELIVERY_IN_PROGRESS`**(추가).
+- **재개 판단 하나를 바꿨다**(검토 c11e734 M-1). compareCheckpoint와 전달의 판단에서, 같은 배정의 낮은 세대라도 마지막 기록이 `after_run`이 아니면 `stale_generation`이 아니라 `external_reconciliation_required`다. 두 판단 모두 재개를 막는다는 점은 같다. 달라지는 것은 판단 이름과 사유, 그리고 `new_session`이 그 위에서 시작하지 못한다는 점이다. 런타임 계약 revision 11 머리와 §13 항목 10에 적었다.
 - 사용자 결정이 필요한 것은 없다고 본다. 정책 파일·판정 규칙·기존 작업의 HTTP 동작은 바꾸지 않았다. 위의 `new_session`은 검토로 확인한다.
 
 ## 6. 한계
@@ -187,4 +188,40 @@
 - supervisor 재시작 뒤 같은 판단은 serve 시험(재시작 뒤 재전송)과 `checkpoint_e2e`가 덮는다. 전달 종단 시험은 코디네이터 재시작만 한다.
 - 전달 기록은 verified다. supervisor가 보내는 기록은 여전히 claim이다(런타임 계약 §2.1). 재개의 최종 근거는 단계 7의 GitHub 대조다.
 - 예산 설정은 02-04·X-02 이름만 받는다. 02-05 예산은 단계 8 전 별도 PR이다. 58090 코디네이터에는 전달 설정이 없어 실제 전달은 일어나지 않는다.
+- 검토 c11e734 I-1: 전달은 supervisor 호출 동안 코디네이터의 HTTP 작업자 하나와 그 DB 연결을 쥔다. supervisor의 start는 그동안 코디네이터에 자기 배정 조회·최신 체크포인트를 묻는다(HTTP 전송이면 다른 작업자가 답해야 한다). `--workers 1`이나 동시 전달 4개면 그 호출이 줄을 서다 supervisor 쪽 10초 제한에 걸린다. 결과는 `NOT_OBSERVED`(아무것도 시작 안 함)이거나, 30초를 넘으면 답 유실(fail-closed, 예산 정지)이다. 전달을 쓰는 코디네이터는 `--workers` 2 이상으로 둔다. 코드로 막지는 않았다.
+- 검토 c11e734 I-2: 회차 중 코디네이터 종료는 라이브러리 시험(`a_call_left_in_flight_blocks_until_reconciled`)만 덮는다. 전달 종단 시험은 회차 사이에서만 코디네이터를 재시작한다.
 - 시험 정리 기록: /home 사용률이 99%라 시험 DB 생성이 한 번 실패했다. 시험 DB(55432)에서 만든 프로세스가 끝난 `ieo_t_*` 데이터베이스 114개를 지웠다. 다른 세션이 남긴 것도 포함한다. 영속 DB(55433)와 58090은 건드리지 않았다. 증거 실행은 `RUST_TEST_THREADS=4`로 했다.
+
+## 7. 검토 c11e734 교정
+
+검토 원문은 원장 담당 커밋이 이 보고의 `reviews/`에 보관한다. 교정 커밋 3f1b0a1.
+
+### 7.1 항목별
+
+| 항목 | 처분 | 바꾼 것 | 시험 |
+| --- | --- | --- | --- |
+| M-1 `new_session`이 낮은 세대의 끝나지 않은 회차를 덮음 | 교정 | (1) `judge_resume`: 같은 배정의 낮은 세대에서 중앙 기록의 phase가 `after_run`이 아니면 `stale_generation`보다 먼저 `external_reconciliation_required`(사유 “the last run of the older generation g did not finish”). 다른 결과는 그대로다(같은 세대 미완료·다른 배정·높은 세대·`after_run`의 낮은 세대). 로컬 체크포인트는 이 판단 전에 순번·digest가 중앙과 같아야 하므로 phase도 같다. (2) 전달의 `choose_op`: `stale_generation`+`new_session`은 중앙 phase가 `after_run`일 때만 start(이중 확인) | 단위 `an_unfinished_run_of_an_older_generation_is_reconciliation`(7가지). 종단 단계 7: 낮은 세대 takeover + `new_session` → `external_reconciliation_required`·부르지 않음, 같은 세대의 `after_run` 뒤 → `stale_generation`(없으면 부르지 않음, 있으면 start) |
+| L-1 `lower`의 “올리지 않음”과 재조회 digest 보호에 시험 없음 | 교정 | `Admission::lower`는 두 조건을 먼저 확인하고 그 뒤에 바꾼다(거부는 아무것도 바꾸지 않음) | 단위 `lower_never_raises_a_limit`. 종단 10단계: supervisor가 같은 attempt_id로 다른 요청을 저장한 상태에서 답 유실 → 재조회는 `unknown`(“another request”), `accepted` 아님 |
+| L-2 `budget_plan.roles`와 설정 역할이 다를 수 있음 | 교정(닫는 쪽) | 예산 계획의 역할이 그 repo에 설정된 역할과 정확히 같지 않으면 `budget_refused`. 종단 시험은 guardrail 역할 서비스를 실제로 두고 계획에 넣었다(모든 역할의 유휴 확인) | 종단 9단계: guardrail을 뺀 계획으로 재기동 → `budget_refused`(“not the configured roles”), 호출 0 |
+| L-3 (a) 잠금 대기 뒤 낡은 판단 | 교정 | 예산 검사가 원장 잠금을 잡은 뒤 재개 판단을 다시 한다. 판단이나 연산이 달라졌으면 부르지 않고 `not_called`(첫 사유 “the judgment changed while the budget check waited”) | 종단 6b: 시험이 원장 잠금을 쥔 동안 전달이 기다리고, 그사이 로컬 체크포인트를 바꾼 뒤 잠금을 놓음 → `external_reconciliation_required`·`not_called`, 호출 0 |
+| L-3 (b) 진행 중 전달을 앞지르는 재조회 | 교정 | 결과 없는 전달이 요청 뒤 120초 안이면 같은 키 재전송은 409 `DELIVERY_IN_PROGRESS`이고 아무것도 기록하지 않는다. 재조회 행은 읽은 뒤 다른 결과가 기록되지 않았을 때만 더한다. 보낸 digest 기록이 없는 전달(트랜잭션 2 전 중단)의 재조회는 `accepted`로 치지 않는다 | 종단 6b: 진행 중 재전송 409, 원 전달이 끝난 뒤 같은 키는 저장된 결과(n=1) |
+| I-1 HTTP 작업자 점유 | 기록 | §6 | — |
+| I-2 회차 중 코디네이터 종료 시험 | 기록 | §6 | — |
+| I-3 문구 | 교정 | 내부 계약 §1.2 “이 작업을 위한 proto 변경 없음”, 런타임 계약 §14 항목 13(재조회 조건·digest·재판단·역할 일치), OpenAPI `refused`(202가 아닌 모든 답, 200 `replayed` 포함) | — |
+| I-4 200 `replayed`를 거부로 처리 | 명시 | 라이브러리가 200 `replayed`를 “다른 호출자가 먼저 받아들인 시도, 이 호출은 아무것도 시작하지 않음”이라는 사유로 거부 처리한다(같은 원장에서는 `admit`가 먼저 막으므로 생기지 않는다). OpenAPI에 적었다 | — |
+| I-5 a349dc6 I-5 미완 | 교정 | OpenAPI reportSessionStatus `session_id`에 `minLength: 1`. 단계 1 보고 §5의 원장 문장을 “같은 PR의 snapshot 0045가 기록했다”로 고침 | — |
+
+### 7.2 바뀐 계약
+
+- 런타임 계약 revision 11: 머리 기록에 판단 변경을 더하고, §13 항목 10의 `stale_generation` 문장에 예외를 붙이고, §14 항목 13을 고쳤다.
+- OpenAPI 0.11.0 안에서(아직 병합 전): `DELIVERY_IN_PROGRESS`, 재판단·역할 일치·재조회 조건 문장, compareCheckpoint의 `stale_generation` 정의, reportSessionStatus `session_id` `minLength`.
+- 내부 계약 §1.2·§14 문구.
+
+### 7.3 시험과 변이(교정 뒤)
+
+- [evidence/test.log](evidence/test.log)(커밋 3f1b0a1): fmt·clippy·buf·openapi-spec-validator 통과. `cargo test --locked --all-targets`(`RUST_TEST_THREADS=4`): **367 통과, 0 실패**. 365에 단위 시험 2개(`lower_never_raises_a_limit`, `an_unfinished_run_of_an_older_generation_is_reconciliation`)가 더해졌다. 전달 종단 시험(2개)은 6b·7·9·10단계 사례가 늘었다. 끝 집계는 전달 19, 결과 22, `accepted` 5, 실행 5, 체크포인트 행 12다.
+- 공유 대상 디렉터리에 검토자의 작업 트리에서 빌드된 `ieo-evidence` 시험 바이너리가 남아 있었다. 그 작업 트리가 지워져 fixture 경로를 찾지 못하는 실패(20건)가 한 번 났다. 시험 파일 시각을 갱신해 다시 빌드한 뒤 통과했다. 코드 문제는 아니다.
+- [evidence/mutants.txt](evidence/mutants.txt): 24개 중 23개를 잡았다.
+  - 처음의 16개(S3-D1은 `choose_op`에 맞게 다시 적음)를 다시 돌렸다. 모두 잡혔다.
+  - 교정에 대한 8개: R-M1a(판단 순서, 단위 시험이 잡음), R-M1b(같은 변이, 종단 시험이 잡음), R-L1a(`lower`가 올림, 검토의 M3), R-L1b(재조회 digest 무시, 검토의 M5), R-L2(역할 일치 검사 제거), R-L3a(재판단 제거), R-L3b1(진행 중 409 제거)는 잡혔다.
+  - R-L3b2(재조회 행을 다른 결과가 생긴 뒤에도 기록)는 살아남는다. 재조회가 전달을 읽은 뒤 행을 넣기 전에 다른 결과가 기록되는 순간이 필요하고, 결정적으로 만들 시험이 없다. 검토가 지적한 창은 진행 중 409가 닫고 그것은 R-L3b1이 확인한다. 이 검사는 남은 경합에 대한 보조 장치다.

@@ -1,6 +1,6 @@
-# 02-05 step 3 mutants: each applied alone to the code that became 2c8fe8d (before the final role_checkpoints count assertion was added to delivery_e2e; no source line the mutants touch changed), then the named test target; the file was restored after each. Columns: id | mutation | result | failing tests
-# targets: S3-D*/S3-B1 cargo test -p ieo-coord --test delivery_e2e; S3-S* -p ieo-supervisor --test serve; S3-C* -p ieo-supervisor --test supervisor; L1-* -p ieo-coord --test grpc supervisor_operations
-S3-D1 | delivery: stale_generation/resume_allowed start without new_session | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+# 02-05 step 3 mutants after review c11e734: each applied alone to the code of 3f1b0a1, then the named test target (RUST_TEST_THREADS=4 / --test-threads 1); the file was restored after each (git status clean of code afterwards). Columns: id | mutation | result | failing tests
+# targets: S3-D*/S3-B1/R-M1b/R-L1b/R-L2/R-L3* cargo test -p ieo-coord --test delivery_e2e; S3-S* -p ieo-supervisor --test serve; S3-C* -p ieo-supervisor --test supervisor; L1-* -p ieo-coord --test grpc supervisor_operations; R-M1a -p ieo-coord --lib unfinished; R-L1a -p ieo-supervisor --lib lower
+S3-D1 | delivery: stale_generation starts without new_session | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
 S3-D2 | delivery: no head check (request names any generation) | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
 S3-D3 | delivery: a stored unknown is answered as final (no re-query) | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
 S3-D4 | delivery: re-query 404 read as accepted | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
@@ -16,4 +16,13 @@ S3-C2 | configdir: directories are digested too (f73ac13 P3) | KILLED | an_empty
 L1-R2 | stale_on_arrival with > (equal time not stale) | KILLED | supervisor_operations_answer_the_assignment_and_store_claims
 L1-R4 | first action: any takeover of the assignment and generation | KILLED | supervisor_operations_answer_the_assignment_and_store_claims
 L1-R5 | calendar check weakened to 1..=31 | KILLED | supervisor_operations_answer_the_assignment_and_store_claims
-# 16 of 16 killed. The first run of S3-S1..L1-R5 stopped at a pattern that rustfmt had re-wrapped (S3-S1); the pattern was corrected and those nine were run again (above).
+R-M1a | judge_resume: an unfinished older generation is stale_generation again | KILLED | api::tests::an_unfinished_run_of_an_older_generation_is_reconciliation
+R-M1b | the same, against the delivery e2e | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+R-L1a | Admission::lower raises the billable room (review M3) | KILLED | caller::tests::lower_never_raises_a_limit
+R-L1b | re-query accepts a stored answer whatever its request digest (review M5) | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+R-L2 | budget plan roles not compared with the configured roles | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+R-L3a | no second judgment after admission | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+R-L3b1 | a young delivery without a result is re-queried (no 409 in progress) | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+R-L3b2 | a re-query row is recorded even if another result came meanwhile | SURVIVED | 
+# 23 of 24 killed. R-L3b2 survives: the re-query keeps its row out when another result was recorded since it read the delivery; that needs a result recorded between the re-query's read and its insert, which no deterministic test produces (the in-flight 409 that closes the reviewed window is tested: R-L3b1 killed).
+# S3-D1 is the first run's mutant restated for choose_op (stale_generation starting without new_session).
