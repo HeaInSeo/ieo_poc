@@ -10,6 +10,8 @@ publish = false
 [dependencies]
 ieo-spec = { path = "../ieo-spec" }
 ieo-report = { path = "../ieo-report" }
+# 02-05 step 3: the shared budget check of the delivery path (the 02-04 caller's code)
+ieo-supervisor = { path = "../ieo-supervisor" }
 hex = "0.4.3"
 postgres = { version = "0.19", features = ["with-serde_json-1"] }
 serde_json = "1.0.154"
@@ -24,8 +26,6 @@ tonic-health = "0.14"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "net"] }
 
 [dev-dependencies]
-# 02-04 decision item 9: the role service end to end against the coordinator (tests only)
-ieo-supervisor = { path = "../ieo-supervisor" }
 # X-04 regression: a relay that drops answers after commit
 tokio = { version = "1", features = ["io-util"] }
 

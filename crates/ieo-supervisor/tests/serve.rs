@@ -1289,6 +1289,18 @@ struct FakeCentral {
     lose: Arc<std::sync::atomic::AtomicBool>,
     reject: Arc<std::sync::atomic::AtomicBool>,
     dup: Arc<std::sync::atomic::AtomicBool>,
+    own: Own,
+}
+
+/// The fake's current assignment (getOwnAssignment, 02-05 step 3): `coord(0)` unless a test
+/// changes it.
+type Own = Arc<std::sync::Mutex<Value>>;
+
+fn own_of(generation: u64) -> Value {
+    let c = coord(generation);
+    json!({"assignment_id": c["assignment_id"], "generation": generation,
+           "sprint_id": c["sprint_id"], "sprint_revision": c["sprint_revision"],
+           "spec_digest": c["spec_digest"], "last_delivery_id": null, "expected_runtime": null})
 }
 
 /// The tamper events the fake recorded: new session id → seq of the report that recorded it.
@@ -1303,6 +1315,7 @@ struct Fake {
     lose: Arc<std::sync::atomic::AtomicBool>,
     reject: Arc<std::sync::atomic::AtomicBool>,
     dup: Arc<std::sync::atomic::AtomicBool>,
+    own: Own,
 }
 
 impl Fake {
@@ -1412,13 +1425,17 @@ impl ieo_proto::v0::supervisor_service_server::SupervisorService for Fake {
             )),
         }
     }
-    // 02-05 step 2 RPCs: the supervisor does not call them yet (step 3)
+    // 02-05 step 3: the supervisor compares a start's coordinator record with it
     async fn get_own_assignment(
         &self,
         _: tonic::Request<ieo_proto::v0::GetOwnAssignmentRequest>,
     ) -> Result<tonic::Response<ieo_proto::v0::GetOwnAssignmentResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("fake"))
+        let v = self.own.lock().expect("own").clone();
+        Ok(tonic::Response::new(ieo_proto::own_assignment_from_json(
+            &v,
+        )))
     }
+    // 02-05 step 2 RPCs the supervisor does not call yet (step 4)
     async fn record_first_action(
         &self,
         _: tonic::Request<ieo_proto::v0::RecordFirstActionRequest>,
@@ -1454,6 +1471,7 @@ fn fake_central(transport: &'static str) -> FakeCentral {
         lose: Arc::new(AtomicBool::new(false)),
         reject: Arc::new(AtomicBool::new(false)),
         dup: Arc::new(AtomicBool::new(false)),
+        own: Arc::new(std::sync::Mutex::new(own_of(0))),
     };
     let url = if transport == "grpc" {
         let (tx, rx) = std::sync::mpsc::channel();
@@ -1487,7 +1505,11 @@ fn fake_central(transport: &'static str) -> FakeCentral {
             for mut req in server.incoming_requests() {
                 let mut body = Vec::new();
                 let _ = std::io::Read::read_to_end(req.as_reader(), &mut body);
-                let (code, out) = f.answer(req.method().as_str(), &body);
+                let (code, out) = if req.url().ends_with("/assignment") {
+                    (200, f.own.lock().expect("own").clone())
+                } else {
+                    f.answer(req.method().as_str(), &body)
+                };
                 let _ = req.respond(
                     tiny_http::Response::from_string(out.to_string()).with_status_code(code),
                 );
@@ -1503,6 +1525,7 @@ fn fake_central(transport: &'static str) -> FakeCentral {
         lose: fake.lose,
         reject: fake.reject,
         dup: fake.dup,
+        own: fake.own,
     }
 }
 
@@ -1525,6 +1548,7 @@ macro_rules! over_both_transports {
 }
 
 over_both_transports!(
+    a_start_is_checked_against_the_coordinators_current_assignment,
     a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once,
     a_takeover_accepted_but_not_written_locally_is_adopted_next_time,
     a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending,
@@ -2117,4 +2141,141 @@ fn an_unreadable_pending_file_stops_until_a_person_reconciles_it(transport: &'st
         wait(&svc, "a2");
         assert!(!state.join("pending-tamper.json").exists());
     }
+}
+
+/// 02-05 step 3, runtime contract §7 (revision 11): the same attempt with the same content gets
+/// the stored answer and starts nothing; other content is `ID_CONTENT_CONFLICT`; the stored
+/// answer can be read without sending anything that could start a run.
+#[test]
+fn the_same_attempt_with_the_same_content_replays_the_stored_answer() {
+    let _serial = serial();
+    let (t, svc) = setup("replay");
+    let body = req("r1", "hi", json!({"session_id": "s1"}));
+    let (st, first) = call(&svc, "POST", "/v0/role/start", &body);
+    assert_eq!(st, 202, "{first}");
+    wait(&svc, "r1");
+    let runs = || {
+        std::fs::read_dir(t.0.join("state/runs"))
+            .map(|d| d.count())
+            .unwrap_or(0)
+    };
+    assert_eq!(runs(), 1);
+    // the same bytes, and the same JSON value in other bytes (key order, spacing)
+    let v: Value = serde_json::from_slice(&body).expect("j");
+    let pretty = serde_json::to_vec_pretty(&v).expect("j");
+    for b in [body.clone(), pretty] {
+        let (st, again) = call(&svc, "POST", "/v0/role/start", &b);
+        assert_eq!(st, 200, "{again}");
+        assert_eq!(again["replayed"], true);
+        assert_eq!(again["accepted"], first["accepted"]);
+    }
+    assert_eq!(runs(), 1, "a replay starts nothing");
+    // other content, or the other operation, under the same attempt
+    for (path, b) in [
+        (
+            "/v0/role/start",
+            req("r1", "other", json!({"session_id": "s1"})),
+        ),
+        ("/v0/role/reconnect", body.clone()),
+    ] {
+        let (st, b) = call(&svc, "POST", path, &b);
+        assert_eq!(
+            (st, b["code"].as_str()),
+            (409, Some("ID_CONTENT_CONFLICT")),
+            "{path} {b}"
+        );
+    }
+    // the stored answer by id; unknown and unsafe ids are not found
+    let (st, stored) = call(&svc, "GET", "/v0/role/attempts/r1", b"");
+    assert_eq!(st, 200, "{stored}");
+    assert_eq!(
+        (stored["attempt_id"].as_str(), stored["op"].as_str()),
+        (Some("r1"), Some("start"))
+    );
+    assert_eq!(stored["answer"]["accepted"], first["accepted"]);
+    assert_eq!(
+        stored["request_sha256"],
+        hex::encode(Sha256::digest(serde_json::to_vec(&v).expect("j")))
+    );
+    assert_eq!(call(&svc, "GET", "/v0/role/attempts/r2", b"").0, 404);
+    assert_eq!(call(&svc, "GET", "/v0/role/attempts/..", b"").0, 404);
+    // a refused request stores nothing: the same attempt id may be sent again
+    let (st, _) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("r3", "hi", json!({"coordinator": coord(1)})),
+    );
+    assert_eq!(st, 409);
+    assert_eq!(call(&svc, "GET", "/v0/role/attempts/r3", b"").0, 404);
+    // the stored answer survives a restart of the service
+    let svc2 = Arc::new(Service::new(svc_config(&t)));
+    let (st, again) = call(&svc2, "POST", "/v0/role/start", &body);
+    assert_eq!((st, again["replayed"].as_bool()), (200, Some(true)));
+    assert_eq!(runs(), 1);
+}
+
+/// 02-05 step 3: before anything starts, the supervisor compares the request's coordinator record
+/// with the coordinator's current assignment (getOwnAssignment) and the newest delivery's image
+/// and profile. A mismatch runs nothing.
+fn a_start_is_checked_against_the_coordinators_current_assignment(transport: &'static str) {
+    let (t, _) = setup("own-assignment");
+    let c = fake_central(transport);
+    let svc = svc_central(&t, &c);
+    let runs = || {
+        std::fs::read_dir(t.0.join("state/runs"))
+            .map(|d| d.count())
+            .unwrap_or(0)
+    };
+    let refused = |attempt: &str, coordinator: Value| {
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req(
+                attempt,
+                "hi",
+                json!({"session_id": "s1", "coordinator": coordinator}),
+            ),
+        );
+        (st, b["code"].as_str().map(str::to_string))
+    };
+    let reconcile = (409, Some("EXTERNAL_RECONCILIATION_REQUIRED".to_string()));
+    for (k, v) in [
+        ("assignment_id", json!("A2")),
+        ("sprint_id", json!("OTHER")),
+        ("sprint_revision", json!(4)),
+        ("spec_digest", json!("other")),
+        ("generation", json!(1)),
+    ] {
+        let mut cr = coord(0);
+        cr[k] = v;
+        assert_eq!(refused("o1", cr), reconcile, "{k}");
+    }
+    // the coordinator is at generation 1: generation 0 is stale
+    *c.own.lock().expect("own") = own_of(1);
+    assert_eq!(
+        refused("o1", coord(0)),
+        (409, Some("STALE_GENERATION".to_string()))
+    );
+    // the newest delivery expects an image and a profile: another one is refused
+    let mut own = own_of(0);
+    own["last_delivery_id"] = json!("D-1");
+    own["expected_runtime"] =
+        json!({"image_digest": "sha256:img", "profile_id": "dev", "profile_revision": 2});
+    *c.own.lock().expect("own") = own.clone();
+    assert_eq!(refused("o1", coord(0)), reconcile);
+    assert_eq!(runs(), 0, "nothing ran");
+    // the same image and profile: it runs
+    own["expected_runtime"]["profile_revision"] = json!(1);
+    *c.own.lock().expect("own") = own;
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("o1", "hi", json!({"session_id": "s1"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "o1");
+    assert_eq!(runs(), 1);
 }

@@ -1,12 +1,19 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.10.0
+  version: 0.11.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.11.0 (02-05 step 3, additive): deliverAssignment (`POST /v0/repos/{repo_id}/roles/{role}/deliveries`,
+    `roles:control`, `Idempotency-Key`; HTTP only): the coordinator records the request, judges resumption
+    (`compare`), runs the shared budget check, calls the role supervisor's start or reconnect with the coordinator
+    record and limits it builds from its database, and records the answer — or `unknown` when it was lost; the same
+    key again re-queries without starting anything. getOwnAssignment answers `last_delivery_id` and the new
+    `expected_runtime` (image and profile of that delivery). Rejection code `ATTEMPT_ID_CONFLICT`. No existing
+    operation's behaviour changes.
     0.10.0 (02-05 step 2, additive): three role-supervisor operations under the supervisor's own `checkpoint:report`
     credential of one (repo, role) (PLAN T1: only the supervisor holds coordinator credentials, no new scope):
     getOwnAssignment (`GET /v0/repos/{repo_id}/roles/{role}/assignment`), recordFirstAction
@@ -690,8 +697,11 @@ paths:
         Answers the current head of (repo, role) as the coordinator recorded it: assignment, generation,
         task, target SHA, sprint revision, its spec digest and `sources[]`, the revision's `limits`,
         `attempts_issued` for (sprint, task, role), the policy digest and issue time. Elapsed time and
-        token consumption are not metered by the coordinator yet (02-05 step 5); `last_delivery_id` is
-        null until deliveries are recorded (step 3). No head → 404 `NO_CURRENT_ASSIGNMENT`. An unknown
+        token consumption are not metered by the coordinator yet (02-05 step 5). `last_delivery_id` is the
+        newest deliverAssignment of this head (null without one) and `expected_runtime` the image digest and
+        profile it expects the role to run (null without one); the supervisor refuses a start or reconnect
+        whose coordinator record differs from this answer (runtime contract revision 11). No head → 404
+        `NO_CURRENT_ASSIGNMENT`. An unknown
         role → 404 `NOT_FOUND`. Order: 401 → 404 role → 403 → 404 no head.
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
@@ -704,7 +714,8 @@ paths:
               schema:
                 type: object
                 required: [repo_id, role, assignment_id, generation, task_id, target_sha, sprint_id, sprint_revision,
-                           spec_digest, sources, limits, attempts_issued, policy_digest, issued_at, last_delivery_id]
+                           spec_digest, sources, limits, attempts_issued, policy_digest, issued_at, last_delivery_id,
+                           expected_runtime]
                 properties:
                   repo_id: { type: string }
                   role: { type: string, enum: [development, guardrail] }
@@ -739,6 +750,16 @@ paths:
                   policy_digest: { type: string }
                   issued_at: { type: string, format: date-time }
                   last_delivery_id: { type: [string, 'null'] }
+                  expected_runtime:
+                    description: Image and profile of the newest delivery of this head (02-05 step 3)
+                    oneOf:
+                      - type: 'null'
+                      - type: object
+                        required: [image_digest, profile_id, profile_revision]
+                        properties:
+                          image_digest: { type: string }
+                          profile_id: { type: string }
+                          profile_revision: { type: integer, minimum: 0 }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
@@ -746,6 +767,91 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Problem' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /v0/repos/{repo_id}/roles/{role}/deliveries:
+    post:
+      tags: [coordinator]
+      operationId: deliverAssignment
+      summary: Deliver the current assignment to the role supervisor (02-05 step 3; HTTP only)
+      description: |
+        Scope `roles:control` for the repo (service or user credential; never an agent credential). There is
+        no gRPC form: the internal gRPC API serves supervisor operations only (contracts/ieo-internal-v0.md
+        §1.2). `Idempotency-Key` (8–128 bytes) is the delivery's request id within (repo, role).
+        Shape: (1) the request is recorded (`verified`, transaction 1) when `assignment_id`/`generation` are the
+        current head (else 409 `STALE_ASSIGNMENT`; no head → 404 `NO_CURRENT_ASSIGNMENT`; an `attempt_id` used
+        by another delivery → 409 `ATTEMPT_ID_CONFLICT`); (2) the resume judgment of compareCheckpoint:
+        `no_checkpoint` → `start`, `resume_allowed` → `reconnect` (`new_session: true` asks for `start` on
+        `resume_allowed` and `stale_generation` too); `already_running`, `external_reconciliation_required`,
+        `not_observed` and `stale_generation` without `new_session` call nothing (`outcome: not_called`);
+        (3) the shared budget check outside the role containers — the same code as the 02-04 host caller: the
+        ledger read fail-closed, a record that asks for a person, an unmeasured run, the no-extra-billing
+        observation, the budget and role-share limits, every service idle with its runs known; a refusal calls
+        nothing (`outcome: budget_refused`); (4) the supervisor's start or reconnect, outside any transaction,
+        with the coordinator record (assignment, generation, sprint revision, spec digest, image, profile), the
+        target SHA and the limits the coordinator builds from its database and configuration — never from the
+        request; the run's limits are also bounded by the revision's `elapsed_seconds` and `total_tokens`;
+        (5) the answer is recorded (transaction 2): `accepted` (202), `refused` (the supervisor's 4xx/5xx), or
+        `unknown` when the answer was lost (the budget ledger then asks for a person, as for the host caller).
+        An accepted run is finished, measured and charged in the background by the same library.
+        The same key with the same body answers the stored delivery (200); a stored `unknown` (or a missing
+        result) is re-queried first: the supervisor's stored answer for the attempt (`GET /v0/role/attempts/{id}`,
+        which never starts a run) is recorded as the next result (`accepted`, `not_accepted`, or `unknown`
+        again). The same key with another body → 409 `IDEMPOTENCY_KEY_CONFLICT`. A delivery is not a takeover:
+        the takeover is the supervisor's checkpoint report (02-05 step 4). `logical_name` (default
+        `<repo>-<role>`) is kept in the mapping record only; a reconnect resumes by the checkpoint's session id
+        (runtime contract §4.2, §10 item 5). Order: 401 → 404 role → 403 → 400 Idempotency-Key → 400 body →
+        404 no role configuration → transaction 1 → judgment → budget → supervisor → transaction 2.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 128 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [assignment_id, generation, attempt_id, session_id, prompt]
+              properties:
+                assignment_id: { type: string, minLength: 1, maxLength: 128 }
+                generation: { type: integer, minimum: 0 }
+                attempt_id: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$' }
+                session_id:
+                  description: The new session's id for a start (also the new id when a reconnect detects a tamper); never a resume key
+                  type: string
+                  pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'
+                prompt: { type: string, minLength: 1, maxLength: 65536 }
+                logical_name: { type: string, minLength: 1, maxLength: 128 }
+                new_session: { type: boolean, default: false }
+      responses:
+        '201':
+          description: The delivery recorded with its first result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+        '200':
+          description: The stored delivery (same key and body); a stored `unknown` was re-queried first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+        '400':
+          description: Missing Idempotency-Key or a body that is not the schema
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectionList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Unknown role, no role configuration (`NOT_FOUND`) or no current assignment (`NO_CURRENT_ASSIGNMENT`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: '`STALE_ASSIGNMENT`, `ATTEMPT_ID_CONFLICT` or `IDEMPOTENCY_KEY_CONFLICT`; nothing recorded'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectionList' }
         '500': { $ref: '#/components/responses/Internal' }
   /v0/repos/{repo_id}/roles/{role}/first-actions:
     post:
@@ -1184,6 +1290,49 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Problem' }
   schemas:
+    Delivery:
+      description: A delivery (02-05 step 3, `verified`) and its newest result
+      type: object
+      required: [delivery_id, request_id, repo_id, role, assignment_id, generation, attempt_id, session_id,
+                 logical_name, coordinator_record, target_sha, cause, requested_by, requested_at, evidence_level, result]
+      properties:
+        delivery_id: { type: string }
+        request_id: { type: string }
+        repo_id: { type: string }
+        role: { type: string, enum: [development, guardrail] }
+        assignment_id: { type: string }
+        generation: { type: integer, minimum: 0 }
+        attempt_id: { type: string }
+        session_id: { type: string }
+        logical_name: { type: string }
+        coordinator_record:
+          description: Built from the coordinator's database and role configuration
+          type: object
+          required: [generation, assignment_id, sprint_id, sprint_revision, spec_digest, image_digest, profile_id,
+                     profile_revision, task_id, limits]
+        target_sha: { type: string }
+        cause: { type: string, enum: [operator] }
+        requested_by: { type: string }
+        requested_at: { type: string, format: date-time }
+        evidence_level: { type: string, enum: [verified] }
+        result:
+          type: object
+          required: [n, decision, reasons, op, outcome, limits, sent_sha256, supervisor, requeried, recorded_at]
+          properties:
+            n: { type: integer, minimum: 1 }
+            decision: { type: [string, 'null'], enum: [resume_allowed, no_checkpoint, already_running, stale_generation, external_reconciliation_required, not_observed, null] }
+            reasons: { type: array }
+            op: { type: [string, 'null'], enum: [start, reconnect, null] }
+            outcome: { type: string, enum: [not_called, budget_refused, accepted, refused, unknown, not_accepted] }
+            limits: { type: [object, 'null'] }
+            sent_sha256: { type: [string, 'null'] }
+            supervisor:
+              type: [object, 'null']
+              properties:
+                http_status: { type: integer }
+                body: {}
+            requeried: { type: boolean }
+            recorded_at: { type: string, format: date-time }
     Problem:
       type: object
       additionalProperties: false
@@ -1208,7 +1357,7 @@ components:
                  STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH, OWNERSHIP_CONFLICT, PREREQUISITE_UNMET, LIMIT_REACHED,
                  SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
                  NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE,
-                 CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH]
+                 CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH, ATTEMPT_ID_CONFLICT]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

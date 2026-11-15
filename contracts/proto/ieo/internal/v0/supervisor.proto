@@ -235,8 +235,19 @@ message GetOwnAssignmentResponse {
   string policy_digest = 13;
   // RFC 3339.
   string issued_at = 14;
-  // Unset until the coordinator records deliveries (02-05 step 3).
+  // The newest delivery (deliverAssignment, 02-05 step 3) of the current assignment and
+  // generation to this (repo, role); unset when there is none.
   optional string last_delivery_id = 15;
+  // The image and profile that delivery expects the role to run (coordinator configuration,
+  // recorded with the delivery); unset when there is no delivery (02-05 step 3).
+  optional RuntimeExpectation expected_runtime = 16;
+}
+
+// = getOwnAssignment `expected_runtime`.
+message RuntimeExpectation {
+  string image_digest = 1;
+  string profile_id = 2;
+  uint64 profile_revision = 3;
 }
 
 // = SprintSpec v0 `sources[]` item.

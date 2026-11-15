@@ -1721,7 +1721,7 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
             "sprint_revision": 5, "spec_digest": digest, "sources": s["sources"],
             "limits": {"elapsed_seconds": 3600, "total_tokens": 100000, "correction_attempts": 3},
             "attempts_issued": 1, "policy_digest": e.app.ctx.policy.digest,
-            "last_delivery_id": null})
+            "last_delivery_id": null, "expected_runtime": null})
     );
     let (_, gr) = both("sup-gr-a", &own("repo-a", "guardrail"));
     assert_eq!(gr["code"], "NO_CURRENT_ASSIGNMENT", "{gr}");
@@ -1813,6 +1813,31 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
         (201, &json!(true), &Value::Null),
         "{r}"
     );
+    // expected values the transport comparison alone does not pin (PR #73 review a349dc6 L-1):
+    // R2: the same observed_at as a stored status is stale too ("at or before")
+    let same = status(
+        "st-000004",
+        &status_doc("2026-11-15T02:00:00Z", Some(("A1", 0))),
+    );
+    let (st, r) = write(&same);
+    assert_eq!((st, &r["stale_on_arrival"]), (201, &json!(true)), "{r}");
+    // R5: an impossible calendar day is a 400 before PostgreSQL sees it (never a 500)
+    for when in [
+        "2026-02-30T00:00:00Z",
+        "2025-02-29T00:00:00Z",
+        "2026-04-31T00:00:00Z",
+    ] {
+        let (st, r) = write(&status("st-000005", &status_doc(when, None)));
+        assert_eq!(
+            (st, r["rejections"][0]["code"].as_str()),
+            (400, Some("SCHEMA_VIOLATION")),
+            "{when} {r}"
+        );
+    }
+    // R4: a takeover of another session under the same assignment and generation is not this
+    // session's takeover
+    let (st, r) = write(&fa("A1", 0, "att-2", "s2"));
+    assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
     // claims only: no event, no sprint state change, no judgment input
     let mut db = e.db();
     let levels: Vec<String> = db
@@ -1825,7 +1850,7 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
         .iter()
         .map(|r| r.get(0))
         .collect();
-    assert_eq!(levels, ["claim", "claim", "claim"]);
+    assert_eq!(levels, ["claim", "claim", "claim", "claim"]);
     let after = (state(&e), e.counts());
     assert_eq!(after.0, before.0, "sprint state unchanged");
     let changed: Vec<&str> = before

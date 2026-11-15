@@ -106,6 +106,15 @@ fn routes_resolve_to_their_operations_and_shapes() {
             "/v0/coordinator/outbox/7/delivery",
             Some(Operation::Deliver { id: "7" }),
         ),
+        (
+            "POST",
+            "/v0/repos/r/roles/development/deliveries",
+            Some(Operation::DeliverAssignment {
+                repo: "r",
+                role: "development",
+            }),
+        ),
+        ("GET", "/v0/repos/r/roles/development/deliveries", None),
         ("GET", "/v0/agent/reports", None),
         ("GET", "/v0/repos/a/b/roles/x/checkpoints/latest", None),
     ];
@@ -118,6 +127,11 @@ fn routes_resolve_to_their_operations_and_shapes() {
     assert_eq!(
         shape("GET", "/v0/repos/r/roles/x/checkpoints/compare"),
         Some(Shape::CallThenTransaction)
+    );
+    // deliverAssignment (02-05 step 3): two transactions around the supervisor call
+    assert_eq!(
+        shape("POST", "/v0/repos/r/roles/development/deliveries"),
+        Some(Shape::Delivery)
     );
     // the five operations of the gRPC surface are one transaction each (contract §9)
     for (m, p) in [

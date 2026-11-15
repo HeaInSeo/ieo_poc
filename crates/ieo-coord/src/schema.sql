@@ -384,4 +384,58 @@ CREATE OR REPLACE TRIGGER role_first_actions_append_only BEFORE UPDATE OR DELETE
 CREATE OR REPLACE TRIGGER role_session_status_append_only BEFORE UPDATE OR DELETE ON role_session_status
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
+-- Deliveries of the current assignment to a role supervisor (02-05 step 3, deliverAssignment).
+-- What the coordinator itself did, so `verified`: the request as the operator sent it, the
+-- coordinator record and target SHA built from this database (never from the request), the
+-- logical session name (mapping record, runtime contract §4.2: never a resume key), and the
+-- cause (`operator`; 02-08 adds others). Key: the Idempotency-Key within (repo, role).
+CREATE TABLE IF NOT EXISTS role_deliveries (
+    delivery_id        text        PRIMARY KEY,
+    -- order of the deliveries (the newest is the one getOwnAssignment names)
+    seq                bigserial   NOT NULL UNIQUE,
+    repo_id            text        NOT NULL,
+    role               text        NOT NULL CHECK (role IN ('development', 'guardrail')),
+    request_id         text        NOT NULL,
+    body               jsonb       NOT NULL,
+    assignment_id      text        NOT NULL,
+    generation         bigint      NOT NULL,
+    attempt_id         text        NOT NULL,
+    session_id         text        NOT NULL,
+    logical_name       text        NOT NULL,
+    coordinator_record jsonb       NOT NULL,
+    target_sha         text        NOT NULL,
+    cause              text        NOT NULL DEFAULT 'operator' CHECK (cause IN ('operator')),
+    evidence_level     text        NOT NULL DEFAULT 'verified' CHECK (evidence_level = 'verified'),
+    requested_by       text        NOT NULL,
+    requested_at       timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (repo_id, role, request_id),
+    UNIQUE (repo_id, role, attempt_id),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
+);
+
+-- Each result of a delivery, in order (`n` from 1): the resume judgment, the budget check, the
+-- supervisor's answer, or `unknown` when the answer was lost; a re-query of an unknown result
+-- adds the next row. The newest row is the delivery's result.
+CREATE TABLE IF NOT EXISTS role_delivery_results (
+    delivery_id       text        NOT NULL REFERENCES role_deliveries (delivery_id),
+    n                 integer     NOT NULL CHECK (n >= 1),
+    decision          text,
+    reasons           jsonb       NOT NULL,
+    op                text        CHECK (op IN ('start', 'reconnect')),
+    outcome           text        NOT NULL CHECK (outcome IN ('not_called', 'budget_refused',
+                                      'accepted', 'refused', 'unknown', 'not_accepted')),
+    limits            jsonb,
+    sent_sha256       text,
+    supervisor_status integer,
+    supervisor_body   jsonb,
+    requeried         boolean     NOT NULL DEFAULT false,
+    recorded_at       timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (delivery_id, n)
+);
+
+CREATE OR REPLACE TRIGGER role_deliveries_append_only BEFORE UPDATE OR DELETE ON role_deliveries
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+CREATE OR REPLACE TRIGGER role_delivery_results_append_only BEFORE UPDATE OR DELETE ON role_delivery_results
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;
