@@ -88,7 +88,7 @@ fn svc_config(t: &Tmp) -> Config {
     let root = &t.0;
     Config::from_json(&json!({"role": "development", "repo": "sori",
         "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
-        "claude": root.join("fake-claude"), "budget": "02-04",
+        "claude": root.join("fake-claude"), "quota_group_id": "test-shared", "checkpoint_central": "local_only", "budget": "02-04",
         "share": {"max_runs": 8, "total_seconds": 9_600, "billable_tokens": 1_000_000,
                   "cache_read_tokens": 10_000_000}}))
     .expect("config")
@@ -924,7 +924,7 @@ fn runs_are_counted_by_attempt_directories_too_and_shares_are_bounded() {
     // R6: the share must be present and within the budget's caps
     let cfg = |share: Value| {
         let mut v = json!({"role": "guardrail", "repo": "r", "state": "/s", "etc": "/e",
-            "cred": "/c", "claude": "/x", "budget": "02-04"});
+            "cred": "/c", "claude": "/x", "quota_group_id": "test-shared", "checkpoint_central": "local_only", "budget": "02-04"});
         if !share.is_null() {
             v["share"] = share;
         }
@@ -972,7 +972,7 @@ fn the_largest_end_line_of_an_attempt_counts() {
 fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
     let (t, svc) = setup("status7");
     let s = svc.status();
-    assert_eq!(s["quota_group_id"], "unknown");
+    assert_eq!(s["quota_group_id"], "test-shared");
     assert_eq!(s["provider_status_or_unknown"], "unknown");
     assert!(s["last_actual_action_at"].is_null());
     assert_eq!(s["restored_checkpoint_ref"]["found"], false);
@@ -984,7 +984,7 @@ fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
     assert!(
         s["capability_gaps"]
             .as_array()
-            .is_some_and(|g| g.len() == 3),
+            .is_some_and(|g| g.len() == 4),
         "{s}"
     );
     call(
@@ -996,8 +996,10 @@ fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
     wait(&svc, "a1");
     let s = svc.status();
     assert_eq!(s["safe_shutdown"]["checkpoint_saved"], true, "{s}");
+    // the contract value, with the raw signal beside it (decision item 4)
+    assert_eq!(s["provider_status_or_unknown"], "available", "{s}");
     assert_eq!(
-        s["provider_status_or_unknown"]["overageStatus"], "rejected",
+        s["provider_status_detail"]["observation"]["source"]["overageStatus"], "rejected",
         "{s}"
     );
     assert!(s["last_actual_action_at"].is_string(), "{s}");
@@ -1008,6 +1010,14 @@ fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
     assert_eq!(cp["tracked"]["active_children"], false, "{cp}");
     // a service started on this volume names the checkpoint it found
     let again = Service::new(svc_config(&t));
+    // after a restart the earlier "available" is history, never the current status
+    let s2 = again.status();
+    assert_eq!(s2["provider_status_or_unknown"], "unknown", "{s2}");
+    assert_eq!(
+        s2["provider_status_before_start"]["observation"]["value"], "available",
+        "{s2}"
+    );
+    assert_eq!(s2["provider_status_before_start"]["current"], false, "{s2}");
     let r = &again.status()["restored_checkpoint_ref"];
     assert_eq!(
         (
@@ -1025,4 +1035,140 @@ fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
         Service::new(svc_config(&t)).status()["restored_checkpoint_ref"]["readable"],
         false
     );
+}
+
+// --- 02-04 decision item 4: provider status values, freshness, live run, restart ---
+
+/// A fake `claude` that prints `lines` (stream-json) and then sleeps `sleep` seconds.
+fn scripted_claude(t: &Tmp, name: &str, lines: &[&str], sleep: u32) -> PathBuf {
+    let p = t.0.join(name);
+    let mut body = String::from("#!/bin/sh\nhead -c 4096 >/dev/null\n");
+    for l in lines {
+        body += &format!("printf '%s\\n' '{l}'\n");
+    }
+    body += &format!("sleep {sleep}\n");
+    std::fs::write(&p, body).expect("fake");
+    let _ = std::process::Command::new("chmod")
+        .arg("+x")
+        .arg(&p)
+        .status();
+    p
+}
+
+fn svc_with(t: &Tmp, claude: &Path, max_age: u64) -> Arc<Service> {
+    let root = &t.0;
+    Arc::new(Service::new(
+        Config::from_json(&json!({"role": "development", "repo": "sori",
+            "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
+            "claude": claude, "budget": "02-04", "quota_group_id": "test-shared",
+            "checkpoint_central": "local_only", "provider_status_max_age_seconds": max_age,
+            "share": {"max_runs": 8, "total_seconds": 9_600, "billable_tokens": 1_000_000,
+                      "cache_read_tokens": 10_000_000}}))
+        .expect("config"),
+    ))
+}
+
+const RL_ALLOWED: &str = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","rateLimitType":"five_hour","overageStatus":"rejected","isUsingOverage":false}}"#;
+const RL_REJECTED: &str = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour","overageStatus":"rejected","isUsingOverage":false}}"#;
+const AUTH_ERR: &str =
+    r#"{"type":"assistant","error":"authentication_failed","message":{"id":"m0"}}"#;
+
+#[test]
+fn provider_status_maps_raw_signals_and_never_reuses_an_old_value() {
+    let (t, _) = setup("provider");
+    // 1. an allowed window → available
+    let ok = scripted_claude(&t, "ok", &[RL_ALLOWED], 0);
+    let svc = svc_with(&t, &ok, 600);
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "p1");
+    assert_eq!(svc.status()["provider_status_or_unknown"], "available");
+    // 2. while the next attempt runs, its own stream counts: a rejected window → usage_limit,
+    //    never the previous attempt's "available"
+    let limited = scripted_claude(&t, "limited", &[RL_REJECTED], 3);
+    let svc = svc_with(&t, &limited, 600);
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p2", "hi", json!({"session_id": "s2"})),
+    );
+    let t0 = Instant::now();
+    let s = loop {
+        let s = svc.status();
+        if s["provider_status_or_unknown"] == "usage_limit"
+            || t0.elapsed() > Duration::from_secs(10)
+        {
+            break s;
+        }
+        // before the event is written the running attempt has no signal: unknown, not available
+        assert_ne!(s["provider_status_or_unknown"], "available", "{s}");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(s["provider_status_or_unknown"], "usage_limit", "{s}");
+    assert!(!s["running"].is_null(), "observed during the run: {s}");
+    assert_eq!(
+        s["provider_status_detail"]["observation"]["source"]["status"],
+        "rejected"
+    );
+    // the service on this volume restarted: history only, current unknown
+    let again = svc_with(&t, &limited, 600);
+    assert_eq!(again.status()["provider_status_or_unknown"], "unknown");
+    wait(&svc, "p2");
+    // 3. an auth error outranks a later allowed window of the same run
+    let auth = scripted_claude(&t, "auth", &[RL_ALLOWED, AUTH_ERR, RL_ALLOWED], 0);
+    let svc = svc_with(&t, &auth, 600);
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p3", "hi", json!({"session_id": "s3"})),
+    );
+    wait(&svc, "p3");
+    assert_eq!(
+        svc.status()["provider_status_or_unknown"],
+        "auth_or_billing"
+    );
+    // 4. no signal at all → unknown (never available, never zero)
+    let silent = scripted_claude(&t, "silent", &[], 0);
+    let svc = svc_with(&t, &silent, 600);
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p4", "hi", json!({"session_id": "s4"})),
+    );
+    wait(&svc, "p4");
+    assert_eq!(svc.status()["provider_status_or_unknown"], "unknown");
+    // 5. an observation older than the maximum age is not current (age counted from the start)
+    let slow = scripted_claude(&t, "slow", &[RL_ALLOWED], 2);
+    let svc = svc_with(&t, &slow, 1);
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p5", "hi", json!({"session_id": "s5"})),
+    );
+    wait(&svc, "p5");
+    let s = svc.status();
+    assert_eq!(s["provider_status_or_unknown"], "unknown", "{s}");
+    assert_eq!(
+        s["provider_status_detail"]["observation"]["value"], "available",
+        "{s}"
+    );
+    // the quota group is the configured one; a missing or "unknown" group is refused
+    assert_eq!(s["quota_group_id"], "test-shared");
+    for q in [Value::Null, json!("unknown"), json!(""), json!("a b")] {
+        let mut v = json!({"role": "guardrail", "repo": "r", "state": "/s", "etc": "/e", "cred": "/c",
+            "claude": "/x", "budget": "02-04", "checkpoint_central": "local_only",
+            "share": {"max_runs": 1, "total_seconds": 1, "billable_tokens": 1, "cache_read_tokens": 1}});
+        if !q.is_null() {
+            v["quota_group_id"] = q.clone();
+        }
+        assert!(Config::from_json(&v).is_err(), "{q}");
+    }
 }

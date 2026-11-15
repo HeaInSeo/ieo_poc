@@ -10,6 +10,7 @@ use ieo_coord::http::{App, serve};
 use ieo_coord::policy;
 use postgres::{Client, Config, NoTls};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -88,7 +89,22 @@ type PrincipalRow = (
     Option<&'static str>,
 );
 
-const PRINCIPALS: [PrincipalRow; 17] = [
+const PRINCIPALS: [PrincipalRow; 19] = [
+    // role supervisors' checkpoint report credentials (02-04 decision item 9)
+    (
+        "sup-dev-a",
+        "agent",
+        &["checkpoint:report"],
+        &["repo-a"],
+        Some("development"),
+    ),
+    (
+        "sup-gr-a",
+        "agent",
+        &["checkpoint:report"],
+        &["repo-a"],
+        Some("guardrail"),
+    ),
     ("operator-norepo", "service", &["roles:control"], &[], None),
     ("operator", "service", &["roles:control"], &["repo-a"], None),
     (
@@ -345,6 +361,8 @@ impl Env {
             "judgments",
             "outbox",
             "history",
+            "role_checkpoints",
+            "role_tamper_events",
         ]
         .iter()
         .map(|t| {
@@ -3876,4 +3894,229 @@ fn repo_scope_role_control_needs_its_scope_and_reports_unreachable_roles() {
     // an agent credential is refused
     let (st, b) = env.post("dev-a", "/v0/repos/repo-a/stop", &json!({}));
     assert_eq!((st, b["code"].as_str()), (403, Some("SCOPE_DENIED")), "{b}");
+}
+
+// --- 02-04 decision item 9: the central checkpoint record ---
+
+fn checkpoint(seq: u64, generation: u64, digest: &str, extra: Value) -> String {
+    let mut c = json!({"format": "ieo-checkpoint/v0", "seq": seq, "repo_id": "repo-a",
+        "role": "development", "phase": "after_run", "session_id": "s1", "assignment_id": "A1",
+        "generation": generation, "sprint_id": "POC-01", "sprint_revision": 5, "spec_digest": digest,
+        "target_sha": SHA1, "image_digest": "sha256:img", "profile_id": "p", "profile_revision": 1,
+        "settings_digest": "e".repeat(64), "config_tamper_detected": null});
+    for (k, v) in extra.as_object().expect("obj") {
+        c[k] = v.clone();
+    }
+    serde_json::to_string_pretty(&c).expect("json")
+}
+
+const CP: &str = "/v0/repos/repo-a/roles/development/checkpoints";
+
+#[test]
+fn central_checkpoints_keep_sequence_identity_and_tamper_reports() {
+    let Some(e) = start() else { return };
+    let s = ready_sprint(&e, 3);
+    let digest = s["digest"].as_str().expect("digest").to_string();
+    let report = |who: &str, seq: u64, raw: &str| {
+        e.post(who, CP, &json!({"seq": seq, "checkpoint_json": raw}))
+    };
+    // no assignment yet
+    let c1 = checkpoint(1, 0, &digest, json!({"phase": "takeover"}));
+    let (st, b) = report("sup-dev-a", 1, &c1);
+    assert_eq!((st, code(&b)), (409, "NO_CURRENT_ASSIGNMENT".into()), "{b}");
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    // credentials: the model's report credential, another role's supervisor, a client
+    for (who, want) in [
+        ("dev-a", "SCOPE_DENIED"),
+        ("sup-gr-a", "ROLE_MISMATCH"),
+        ("operator", "SCOPE_DENIED"),
+    ] {
+        let (st, b) = report(who, 1, &c1);
+        assert_eq!((st, code(&b)), (403, want.into()), "{who}: {b}");
+    }
+    let (st, b) = e.get("sup-dev-a", &format!("{CP}/latest"));
+    assert_eq!((st, code(&b)), (404, "NO_CHECKPOINT".into()), "{b}");
+    // a gap before the first
+    let (st, b) = report("sup-dev-a", 2, &checkpoint(2, 0, &digest, json!({})));
+    assert_eq!(
+        (st, code(&b)),
+        (409, "CHECKPOINT_SEQUENCE_GAP".into()),
+        "{b}"
+    );
+    // stored; the digest is the coordinator's own over the exact bytes
+    let (st, b) = report("sup-dev-a", 1, &c1);
+    assert_eq!(st, 201, "{b}");
+    assert_eq!(
+        b["checkpoint_sha256"],
+        hex::encode(Sha256::digest(c1.as_bytes()))
+    );
+    // duplicate: same bytes → 200, nothing new; other bytes for the same seq → conflict
+    let before = e.counts();
+    let (st, b) = report("sup-dev-a", 1, &c1);
+    assert_eq!((st, b["duplicate"].as_bool()), (200, Some(true)), "{b}");
+    let (st, b) = report(
+        "sup-dev-a",
+        1,
+        &checkpoint(1, 0, &digest, json!({"phase": "error"})),
+    );
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    // identity against the current assignment: target SHA, spec digest, sprint revision,
+    // generation, another assignment, another repo, a seq that is not the checkpoint's own
+    for (extra, want) in [
+        (json!({"target_sha": SHA2}), "ASSIGNMENT_SHA_MISMATCH"),
+        (json!({"spec_digest": "0".repeat(64)}), "DIGEST_MISMATCH"),
+        (json!({"sprint_revision": 4}), "CHECKPOINT_MISMATCH"),
+        (json!({"generation": 5}), "CHECKPOINT_MISMATCH"),
+        (json!({"assignment_id": "A9"}), "CHECKPOINT_MISMATCH"),
+        (json!({"repo_id": "repo-b"}), "REPO_MISMATCH"),
+        (json!({"seq": 3}), "SCHEMA_VIOLATION"),
+        (json!({"phase": "running"}), "SCHEMA_VIOLATION"),
+        (json!({"format": "other"}), "SCHEMA_VIOLATION"),
+    ] {
+        let (st, b) = report("sup-dev-a", 2, &checkpoint(2, 0, &digest, extra.clone()));
+        assert_eq!(code(&b), want, "{extra}: {st} {b}");
+    }
+    assert_eq!(e.counts(), before, "refused reports leave no row");
+    // a tamper detection travels with the new session's checkpoints; recorded once
+    let tamper = json!({"config_tamper_detected": {"old_session_id": "s1", "new_session_id": "s2",
+        "checkpoint_digest": "a".repeat(64), "observed_digest": "b".repeat(64)}, "session_id": "s2"});
+    let mut t2 = tamper.clone();
+    t2["phase"] = json!("takeover");
+    let (st, b) = report("sup-dev-a", 2, &checkpoint(2, 0, &digest, t2));
+    assert_eq!(
+        (st, b["tamper_recorded"].as_bool()),
+        (201, Some(true)),
+        "{b}"
+    );
+    let (st, b) = report("sup-dev-a", 3, &checkpoint(3, 0, &digest, tamper.clone()));
+    assert_eq!(
+        (st, b["tamper_recorded"].as_bool()),
+        (201, Some(false)),
+        "{b}"
+    );
+    let mut bad = tamper.clone();
+    bad["config_tamper_detected"]["new_session_id"] = json!("other");
+    let (st, b) = report("sup-dev-a", 4, &checkpoint(4, 0, &digest, bad));
+    assert_eq!((st, code(&b)), (400, "SCHEMA_VIOLATION".into()), "{b}");
+    let (st, b) = e.get("operator", &format!("{CP}/latest"));
+    assert_eq!(st, 200, "{b}");
+    assert_eq!(
+        (
+            b["seq"].as_u64(),
+            b["tamper_events"].as_i64(),
+            b["session_id"].as_str()
+        ),
+        (Some(3), Some(1), Some("s2")),
+        "{b}"
+    );
+    assert_eq!(e.get("operator-norepo", &format!("{CP}/latest")).0, 403);
+    // a new generation of the assignment: the old one's checkpoints are stale
+    let (st, b) = assign(
+        &e,
+        "development",
+        "A1",
+        1,
+        "01-01",
+        SHA1,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    assert_eq!(st, 201, "{b}");
+    let (st, b) = report(
+        "sup-dev-a",
+        4,
+        &checkpoint(4, 0, &digest, json!({"session_id": "s2"})),
+    );
+    assert_eq!((st, code(&b)), (409, "STALE_ASSIGNMENT".into()), "{b}");
+    assert_eq!(
+        report(
+            "sup-dev-a",
+            4,
+            &checkpoint(4, 1, &digest, json!({"session_id": "s2"}))
+        )
+        .0,
+        201
+    );
+    // and the stored rows cannot be changed
+    let mut db = e.db();
+    assert!(
+        db.execute(
+            "UPDATE role_checkpoints SET phase = 'error' WHERE seq = 1",
+            &[]
+        )
+        .is_err()
+    );
+    assert!(db.execute("DELETE FROM role_tamper_events", &[]).is_err());
+}
+
+#[test]
+fn resume_judgment_compares_local_central_and_assignment() {
+    use ieo_coord::api::judge_resume;
+    let central = json!({"seq": 4, "checkpoint_sha256": "aa", "assignment_id": "A1", "generation": 2, "phase": "after_run"});
+    let head = ("A1".to_string(), 2i64);
+    let local = |seq: Value, sha: Value| json!({"running": null, "checkpoint_seq": seq, "checkpoint_sha256": sha});
+    let d = |c: Option<&Value>, h: Option<&(String, i64)>, l: &Value| judge_resume(c, h, Ok(l)).0;
+    assert_eq!(
+        d(Some(&central), Some(&head), &local(json!(4), json!("aa"))),
+        "resume_allowed"
+    );
+    assert_eq!(
+        d(None, Some(&head), &local(Value::Null, Value::Null)),
+        "no_checkpoint"
+    );
+    for l in [
+        local(json!(4), json!("bb")),
+        local(json!(3), json!("aa")),
+        local(json!(5), json!("aa")),
+        local(Value::Null, Value::Null),
+    ] {
+        assert_eq!(
+            d(Some(&central), Some(&head), &l),
+            "external_reconciliation_required",
+            "{l}"
+        );
+    }
+    assert_eq!(
+        d(None, Some(&head), &local(json!(1), json!("aa"))),
+        "external_reconciliation_required"
+    );
+    assert_eq!(
+        d(
+            Some(&central),
+            Some(&("A1".into(), 3)),
+            &local(json!(4), json!("aa"))
+        ),
+        "stale_generation"
+    );
+    assert_eq!(
+        d(
+            Some(&central),
+            Some(&("A2".into(), 2)),
+            &local(json!(4), json!("aa"))
+        ),
+        "external_reconciliation_required"
+    );
+    assert_eq!(
+        d(Some(&central), None, &local(json!(4), json!("aa"))),
+        "external_reconciliation_required"
+    );
+    let mut takeover = central.clone();
+    takeover["phase"] = json!("takeover");
+    assert_eq!(
+        d(Some(&takeover), Some(&head), &local(json!(4), json!("aa"))),
+        "external_reconciliation_required"
+    );
+    let mut running = local(json!(4), json!("aa"));
+    running["running"] = json!({"attempt_id": "x"});
+    assert_eq!(d(Some(&central), Some(&head), &running), "already_running");
+    assert_eq!(
+        judge_resume(Some(&central), Some(&head), Err(&"down".to_string())).0,
+        "not_observed"
+    );
 }

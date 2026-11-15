@@ -127,7 +127,7 @@ fn service(root: &Path, role: &str, kill: Option<&str>) -> Arc<Service> {
     )
     .expect("adapter");
     let mut v = json!({"role": role, "repo": "sori", "state": r.join("state"), "etc": etc,
-        "cred": cred, "claude": fake_claude(root), "budget": "02-04", "share": share(role)});
+        "cred": cred, "claude": fake_claude(root), "quota_group_id": "test-shared", "checkpoint_central": "local_only", "budget": "02-04", "share": share(role)});
     if let Some(k) = kill {
         v["kill"] = json!(k);
     }
@@ -577,7 +577,7 @@ fn the_caller_talks_to_the_service_over_http() {
         Config::from_json(
             &json!({"role": "development", "repo": "sori", "state": r.join("state"),
             "etc": r.join("etc"), "cred": r.join("cred"), "claude": t.0.join("fake-claude"),
-            "budget": "02-04", "share": share("development")}),
+            "quota_group_id": "test-shared", "checkpoint_central": "local_only", "budget": "02-04", "share": share("development")}),
         )
         .expect("cfg")
     };

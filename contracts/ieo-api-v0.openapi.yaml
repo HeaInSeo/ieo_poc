@@ -496,6 +496,105 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
           description: No role supervisors configured for this repo
+  /v0/repos/{repo_id}/roles/{role}/checkpoints:
+    post:
+      tags: [coordinator]
+      operationId: reportCheckpoint
+      summary: A role supervisor reports a checkpoint (runtime contract §2.1, §5-1, §5-6)
+      description: |
+        Credential: kind `agent` with scope `checkpoint:report`, bound to this repo and role (the
+        supervisor's report credential, not the model's). Body `{seq, checkpoint_json}`: the
+        sequence number and the exact checkpoint file. The coordinator computes the SHA-256 over
+        those bytes and stores the next checkpoint of the sequence linked to the current
+        assignment: `assignment_id`/`generation` must be the current head of (repo, role) — an
+        older generation → 409 `STALE_ASSIGNMENT`, another assignment → 409 `CHECKPOINT_MISMATCH`,
+        none → 409 `NO_CURRENT_ASSIGNMENT` — and its sprint revision (`CHECKPOINT_MISMATCH`),
+        spec digest (`DIGEST_MISMATCH`) and target SHA (`ASSIGNMENT_SHA_MISMATCH`) must match
+        that assignment. The same sequence with the same bytes → 200 duplicate (nothing changes);
+        other bytes → 409 `EVENT_CONTENT_CONFLICT`; a sequence past the next → 409
+        `CHECKPOINT_SEQUENCE_GAP`; a checkpoint naming another repo/role → 409 `REPO_MISMATCH`.
+        A `config_tamper_detected` object in the checkpoint is recorded once per new session.
+        Refused reports leave no row.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [seq, checkpoint_json]
+              properties:
+                seq: { type: integer, minimum: 1 }
+                checkpoint_json: { type: string, minLength: 1 }
+      responses:
+        '201':
+          description: Stored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [stored, seq, checkpoint_sha256, tamper_recorded]
+                properties:
+                  stored: { type: boolean }
+                  seq: { type: integer }
+                  checkpoint_sha256: { type: string }
+                  tamper_recorded: { type: boolean }
+        '200':
+          description: Duplicate of the stored checkpoint of this sequence
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+  /v0/repos/{repo_id}/roles/{role}/checkpoints/latest:
+    get:
+      tags: [coordinator]
+      operationId: latestCheckpoint
+      summary: The coordinator's latest checkpoint record of one role
+      description: |
+        The reporting supervisor itself (`checkpoint:report` for this repo and role) or a
+        `roles:control` client of the repo. 404 `NO_CHECKPOINT` when none is recorded.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+      responses:
+        '200':
+          description: Latest record (sequence, digest, phase, session, assignment, generation, sprint revision, digests, target SHA, tamper event count)
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No checkpoint recorded (`NO_CHECKPOINT`) or no such role
+  /v0/repos/{repo_id}/roles/{role}/checkpoints/compare:
+    get:
+      tags: [coordinator]
+      operationId: compareCheckpoint
+      summary: Resume judgment for one role from the central record (runtime contract §5-2)
+      description: |
+        Scope `roles:control` for the repo. Reads the supervisor's status and compares its local
+        checkpoint (sequence, SHA-256) with the central record, and the central record with the
+        current assignment. `decision`: `resume_allowed`, `no_checkpoint`, `already_running`,
+        `stale_generation`, `external_reconciliation_required` or `not_observed`, with `reasons`.
+        Read-only.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+      responses:
+        '200':
+          description: Judgment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repo_id, role, decision, reasons]
+                properties:
+                  repo_id: { type: string }
+                  role: { type: string }
+                  decision: { type: string, enum: [resume_allowed, no_checkpoint, already_running, stale_generation, external_reconciliation_required, not_observed] }
+                  reasons: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v0/health:
     get:
       tags: [coordinator]
@@ -814,7 +913,7 @@ components:
         code:
           type: string
           enum: [UNAUTHENTICATED, SCOPE_DENIED, REPO_SCOPE_DENIED, ROLE_MISMATCH, VERIFIED_FROM_AGENT_DENIED,
-                 AGENT_READ_DENIED, NOT_FOUND, SELF_REVIEW_DENIED, INTERNAL]
+                 AGENT_READ_DENIED, NOT_FOUND, SELF_REVIEW_DENIED, NO_CHECKPOINT, INTERNAL]
         message: { type: string, minLength: 1 }
     Rejection:
       type: object
@@ -829,7 +928,8 @@ components:
                  IDEMPOTENCY_KEY_CONFLICT, EVENT_CONTENT_CONFLICT, REPORT_SEMANTIC_VIOLATION, INVALID_CURSOR,
                  STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH, OWNERSHIP_CONFLICT, PREREQUISITE_UNMET, LIMIT_REACHED,
                  SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
-                 NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE]
+                 NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE,
+                 CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }
