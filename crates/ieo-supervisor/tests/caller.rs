@@ -49,7 +49,8 @@ impl Drop for Tmp {
 /// A fake `claude` whose session totals grow like the CLI's: the cumulative per session is kept
 /// in a file next to the script, and `modelUsage` reports it. Each run uses 3/7/20/10
 /// (input/output/cache_read/cache_creation). Prompt words: OVERAGE (a breaking rate-limit
-/// event), CHILD (leaves a background child), SLEEP.
+/// event), CHILD (leaves a background child), SLEEP, AGENTRUN (one child agent c1), with
+/// AGENTTWO a second child c2 like c1.
 fn fake_claude(dir: &Path) -> PathBuf {
     let p = dir.join("fake-claude");
     let cum = dir.join("cum");
@@ -63,6 +64,7 @@ sid=$(printf '%s\n' "$@" | awk 'prev=="--session-id"||prev=="--resume"{{print; e
 f="{cum}-$sid"
 set -- $(cat "$f" 2>/dev/null || echo 0 0 0 0)
 case "$prompt" in
+  *AGENTTWO*) i=$(($1+7)); o=$(($2+21)); r=$(($3+34)); c=$(($4+30));;
   *AGENTRUN*) i=$(($1+5)); o=$(($2+14)); r=$(($3+27)); c=$(($4+20));;
   *) i=$(($1+3)); o=$(($2+7)); r=$(($3+20)); c=$(($4+10));;
 esac
@@ -83,6 +85,13 @@ case "$prompt" in *AGENTRUN*)
   printf '{{"type":"assistant","message":{{"id":"m-agent-%s","usage":{{"input_tokens":0,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"content":[{{"type":"tool_use","id":"tu-%s","name":"Agent"}}]}}}}
 ' "$i" "$i"
   printf '{{"type":"user","message":{{"content":[{{"type":"tool_result","tool_use_id":"tu-%s"}}]}},"tool_use_result":{{"agentId":"c1","usage":{{"input_tokens":1,"output_tokens":2,"cache_creation_input_tokens":3,"cache_read_input_tokens":7}}}}}}
+' "$i";;
+esac
+case "$prompt" in *AGENTTWO*)
+  sed 's/c1/c2/g' "$t/agent-c1.jsonl" > "$t/agent-c2.jsonl"
+  printf '{{"type":"assistant","message":{{"id":"m-agent2-%s","usage":{{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"content":[{{"type":"tool_use","id":"tv-%s","name":"Agent"}}]}}}}
+' "$i" "$i"
+  printf '{{"type":"user","message":{{"content":[{{"type":"tool_result","tool_use_id":"tv-%s"}}]}},"tool_use_result":{{"agentId":"c2","usage":{{"input_tokens":1,"output_tokens":2,"cache_creation_input_tokens":3,"cache_read_input_tokens":7}}}}}}
 ' "$i";;
 esac
 case "$prompt" in *SLEEP*) sleep 60;; esac
@@ -1989,4 +1998,88 @@ fn a_run_at_its_time_limit_is_stopped_and_recorded() {
         .expect("c"),
     );
     assert!(why.contains("asks for a person"), "{why}");
+}
+
+/// Review 71e408a P1, the part "a refusal leaves nothing behind" with more than one child: a
+/// copy already made is removed again when a later one is refused.
+#[test]
+fn a_refused_correction_removes_the_copies_it_made() {
+    let _serial = serial();
+    let t = Tmp::new("x08-cleanup");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    // the measured case first: two children, both transcripts fetched, consistent
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "AGENTRUN AGENTTWO"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(
+        r["usage"]["attribution_check"], "consistent",
+        "{}",
+        r["usage"]
+    );
+    // the same with the transcripts not fetched: unmeasured, a person decides
+    let t = Tmp::new("x08-cleanup2");
+    let (a, p) = both(&t);
+    recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("c"),
+    );
+    let h = hook(&a, |_m, path, r| {
+        if path.contains("/children/") {
+            Ok((404, json!({"code": "NOT_FOUND"})))
+        } else {
+            r
+        }
+    });
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "reconnect", "d2", "s9", "AGENTRUN AGENTTWO"),
+            &h,
+            POLL,
+        )
+        .expect("c"),
+    );
+    assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{}", r["usage"]);
+    let kept = t.0.join("development/state/runs/d2/children");
+    let mut tr = BTreeMap::new();
+    tr.insert("c1".to_string(), kept.join("agent-c1.jsonl"));
+    tr.insert("c2".to_string(), kept.join("agent-c2.jsonl"));
+    // c2's place in the ledger already holds another file: c1 is copied first, then refused
+    let dir = t.0.join("ledger/children/d2");
+    std::fs::create_dir_all(&dir).expect("d");
+    std::fs::write(dir.join("agent-c2.jsonl"), "other\n").expect("w");
+    let e = caller::reevaluate(&p, "d2", &tr, "x").expect_err("refused");
+    assert!(
+        e.contains("already holds a different transcript of c2"),
+        "{e}"
+    );
+    assert!(
+        !dir.join("agent-c1.jsonl").exists(),
+        "the copy made before the refusal is removed"
+    );
+    assert_eq!(caller::raw_records(&p).expect("r").len(), 2);
+    // with the place free, both are copied and the correction holds
+    std::fs::remove_file(dir.join("agent-c2.jsonl")).expect("rm");
+    caller::reevaluate(&p, "d2", &tr, "x").expect("correct");
+    assert!(dir.join("agent-c1.jsonl").exists() && dir.join("agent-c2.jsonl").exists());
 }
