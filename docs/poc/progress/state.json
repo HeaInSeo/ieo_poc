@@ -359,7 +359,8 @@
         "reports/tasks/02-04/provider-checkpoint-20261115/evidence/build-images-a1cfe78.txt",
         "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr57-48b1d0e.md",
         "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr57-accd6c8.md",
-        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr57-802e4a1.md"
+        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr57-802e4a1.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr58-704330f.md"
       ],
       "next_action": "후속 PR(검토 802e4a1 비차단 지적, 진행 기록 9 §9)의 검토·CI·병합·main CI → 02-04 수용 기록(원장·STATUS, 사용자 결정 2026-11-15 §6) → X-03 → X-04 → 02-05. 항목 8(호출자 이월) 완료 전에는 다음 실제 호출·X-02 착수 금지. 예비 회차(개발 2·Guardrail 3) 미사용 유지",
       "unresolved": "사용자 결정 2026-11-15(User_Decisions_2026-11-15_0204-acceptance.md)로 수용 보고 §4 9건 처분: 4·9는 02-04 수용 전 완료(진행 기록 9, 검토 전), 1(02-03 이월: 배정 수준 한도 → 02-05, 실제 GitHub 수집·F4·N5 → GH1~GH5 뒤 연결 작업·EARLY-01, 판정 머리 F3 → 02-07), 2(코디네이터 start·reconnect → 02-05), 3(안전 종료: 자식 추적 04-05·외부 요청 02-05, 그때까지 미확인), 5(D3 실패 유지·재실행 없음), 6(실행 중 실제 정지 → 04-05, 실제 실행 전 결정안 보고), 7(예비 회차 미사용 유지), 8(호출자 이월: 다음 실제 호출·X-02 착수 전 필수 — 차단 조건). 이월은 완료가 아니며 수용 보고의 미충족 기록은 보존(진행 기록 9 §4 이월 대응표). 남은 한계(진행 기록 9 §5): 실제 Claude 회차는 항목 4·9 경로를 지나지 않음(모의), 공급자 거부·인증 오류 출력은 형 정의 기반 가정, 개발 컨테이너 같은 UID의 체크포인트 변경 가능(최종 근거 GitHub SHA·CI 대조는 02-05), worktree_head·자식·외부 요청 미추적, last_actual_action_at은 끝난 회차 기준. §7 이월: PR #54 검토 fa39d86 L-a 일부(미저장 체크포인트·30초 공동 대기 시험)·L-b·L-c, adf760e L-2 일부, 그 밖의 열린 이월(수용 보고 §7 표). 실행 바이너리 재빌드 재현 미확인."

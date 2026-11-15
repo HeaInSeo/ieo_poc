@@ -229,3 +229,11 @@ PR #57은 검토 802e4a1(approve)의 head 802e4a1에서 병합했다(12bf34f, ma
 | I-3 동시 기동 | `launch`를 한 번에 하나로 묶는다 |
 | I-4 표시·시험 | 로컬 쓰기 실패는 `LocalWriteFailed`로 표시한다. 5xx 보존과 로컬 쓰기 실패 경로를 실제 실행 경로로 시험한다(가짜 코디네이터): `a_takeover_accepted_but_not_written_locally_is_adopted_next_time` |
 
+PR #58 검토 704330f(approve)의 지적 처분(교정 1):
+
+| 지적 | 처분 |
+| --- | --- |
+| P-1 새로 탐지한 변조가 거부된 요청에서 사라짐(PR #58에서 생긴 회귀) | 탐지는 새 세션 id 확인 같은 거부보다 먼저 `pending-tamper.json`에 저장한다. 이미 대기 중인 탐지가 있으면 그것을 유지한다. 시험: `a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending` |
+| P-2 코디네이터가 `tamper_recorded: false`라고 답해도 대기 변조를 지움 | 이월(정보). 코디네이터는 새 세션 id마다 한 번 기록한다. 이전에 쓴 새 세션 id를 다시 쓰는 호출자 오류에서만 생긴다 |
+| P-3 I-2·4xx 경로의 전용 시험 없음 | 같은 시험에서 4xx 거부(대기 사본 삭제, 변조 대기 유지)와 로컬보다 새롭지 않은 대기 사본의 삭제를 확인한다 |
+

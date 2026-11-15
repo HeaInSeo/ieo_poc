@@ -729,19 +729,35 @@ impl Service {
                 }
                 Reconnect::Resume { session_id } => (session_id, true, None),
                 Reconnect::NewSession | Reconnect::TamperDetected { .. } => {
-                    let Some(new_sid) = s("new_session_id").filter(|x| safe_id(x)) else {
-                        return err(400, "SCHEMA_VIOLATION", "new_session_id required");
-                    };
-                    let tamper = match checkpoint::decide(cp.as_ref(), &record, &observed, None) {
+                    let detected = match checkpoint::decide(cp.as_ref(), &record, &observed, None) {
                         Reconnect::TamperDetected {
                             old_session_id,
                             checkpoint_digest,
                             observed_digest,
                         } => Some(json!({"config_tamper_detected": true,
-                            "old_session_id": old_session_id, "new_session_id": new_sid,
+                            "old_session_id": old_session_id, "new_session_id": null,
                             "checkpoint_digest": checkpoint_digest, "observed_digest": observed_digest})),
                         _ => None,
                     };
+                    // a fresh detection is kept on the volume before any refusal below, so a
+                    // refused request never loses it (review 704330f P-1); an earlier unreported
+                    // detection is kept as it is
+                    if let Some(d) = &detected
+                        && !self.cfg.pending_tamper_path().exists()
+                        && let Err(e) = crate::central::durable_write(
+                            &self.cfg.pending_tamper_path(),
+                            &serde_json::to_vec_pretty(d).unwrap_or_default(),
+                        )
+                    {
+                        return err(500, "INTERNAL", &format!("pending tamper: {e}"));
+                    }
+                    let Some(new_sid) = s("new_session_id").filter(|x| safe_id(x)) else {
+                        return err(400, "SCHEMA_VIOLATION", "new_session_id required");
+                    };
+                    let tamper = detected.map(|mut d| {
+                        d["new_session_id"] = json!(new_sid);
+                        d
+                    });
                     (new_sid, false, tamper)
                 }
             }
@@ -764,7 +780,8 @@ impl Service {
                 t["new_session_id"] = json!(new_sid);
                 (new_sid, false, Some(t))
             }
-            (Some(p), false, None) => {
+            // the pending (earlier or just saved) detection is the one reported
+            (Some(p), false, _) => {
                 let mut t = p;
                 t["new_session_id"] = json!(session_id);
                 (session_id, false, Some(t))
