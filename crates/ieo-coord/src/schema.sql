@@ -324,6 +324,9 @@ CREATE TABLE IF NOT EXISTS role_tamper_events (
     FOREIGN KEY (repo_id, role, seq) REFERENCES role_checkpoints (repo_id, role, seq)
 );
 
+-- a database created before the column existed (review accd6c8 Info)
+ALTER TABLE role_checkpoints ADD COLUMN IF NOT EXISTS current_assignment boolean NOT NULL DEFAULT true;
+
 CREATE OR REPLACE TRIGGER role_checkpoints_append_only BEFORE UPDATE OR DELETE ON role_checkpoints
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 CREATE OR REPLACE TRIGGER role_tamper_events_append_only BEFORE UPDATE OR DELETE ON role_tamper_events

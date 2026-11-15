@@ -86,6 +86,13 @@ fn repo_stop_sends_a_role_stop_to_each_and_reports_each_role() {
         u.iter().any(|x| x.contains("development: active_children")),
         "{u:?}"
     );
+    // a role that does not say its checkpoint was reported (missing field) is not reported
+    // (review 48b1d0e L-1: only an explicit true counts)
+    assert!(
+        u.iter()
+            .any(|x| x.contains("development: checkpoint not reported to the coordinator")),
+        "{u:?}"
+    );
     assert!(
         u.iter()
             .any(|x| x.contains("guardrail: pending_external_requests")),

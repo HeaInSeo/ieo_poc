@@ -84,7 +84,7 @@
    - 체크포인트에 `seq`(1부터 연속), `repo_id`, `role`, `config_tamper_detected`를 넣는다.
    - 순번은 보관 사본과 로컬 체크포인트 중 큰 값의 다음이다.
    - 사본을 `/state/checkpoints/<seq>.json`에 둔 뒤 `checkpoint.json`을 바꾼다.
-   - 파일 바이트를 그대로 코디네이터에 보고한다. takeover는 **먼저** 보고하고 받아들여진 뒤에만 로컬에 쓴다. after_run·error는 로컬에 먼저 쓰고 보고한다(교정 1, 검토 48b1d0e M-1).
+   - 파일 바이트를 그대로 코디네이터에 보고한다. takeover는 볼륨에 대기 사본을 둔 뒤 **먼저** 보고하고, 받아들여진 뒤에만 로컬에 쓴다. after_run·error는 로컬에 먼저 쓰고 보고한다. 로컬 쓰기는 `checkpoint.json` 다음 보관 사본 순서다(교정 1·2).
    - 보고 자격은 supervisor 전용 `checkpoint:report`(agent 종류, repo·역할 하나)다. 모델의 `agent:report` 자격과는 다르다.
 2. 코디네이터는 받은 바이트의 SHA-256을 직접 계산한다. 다음 순번만 `role_checkpoints`(추가 전용)에 저장한다.
    - 배정·세대가 (repo, 역할)의 현재 배정 머리와 같아야 한다. 그 배정의 sprint revision, 명세 digest, 대상 SHA와도 같아야 한다. 세대는 저장된 마지막 값보다 낮으면 안 된다.
@@ -100,9 +100,11 @@
    - 로컬이 앞서면 보관 사본을 순서대로 보내고 다시 맞춘다.
    - 다음 경우는 `EXTERNAL_RECONCILIATION_REQUIRED`다. 중앙이 앞섬, digest가 다름, 로컬이 없는데 중앙에 기록이 있음, 보관 사본이 없거나 다름.
    - 코디네이터에 닿지 않으면 `NOT_OBSERVED`이고 아무것도 시작하지 않는다.
-   - takeover 보고가 거부되거나 닿지 않으면 로컬에 아무것도 쓰지 않고 실행하지 않는다. 시도는 실행되지 않은 것으로 닫힌다(예산 원장 끝 행 0/0). 그래서 다음 기동이 막히지 않는다(교정 1).
-   - 회차 뒤 보고가 실패하면 상태의 `checkpoint_reported: false`로 드러난다. 마지막 보고 결과는 볼륨(`checkpoint-report.json`)에 남아 재시작 뒤에도 같다. repo 범위 stop은 명시적인 `true`만 보고됨으로 본다.
-   - 로컬 체크포인트가 보관 사본보다 정확히 하나 뒤면(두 파일 쓰기 사이의 중단) 보관 사본을 되살린 뒤 대조한다. 그 밖의 차이는 되살리지 않는다.
+   - takeover가 명확히 거부되면 대기 사본을 지우고 로컬에 아무것도 쓰지 않으며 실행하지 않는다. 시도는 실행되지 않은 것으로 닫힌다(예산 원장 끝 행 0/0). 다음 기동은 막히지 않는다(교정 1).
+   - 답을 받지 못했거나(연결 실패·시간 초과), 받아들여진 뒤 로컬 쓰기가 실패했거나, 그 사이에 멈추면 실행하지 않는다. 대기 사본은 남는다. 다음 기동은 코디네이터의 최신 기록이 정확히 그 사본(같은 순번·digest)이면 채택하고, 코디네이터에 없으면 버린다(교정 2, 검토 accd6c8 M-1r).
+   - 탐지된 설정 변조는 그것을 담은 takeover가 받아들여질 때까지 볼륨(`pending-tamper.json`)에 남는다. 그동안 reconnect는 재개하지 않고 새 세션을 요구한다(교정 2, M-2).
+   - 회차 뒤 보고가 실패하면 상태의 `checkpoint_reported: false`로 드러난다. `checkpoint_reported`는 중앙 기록이 이 체크포인트(순번·digest)를 가진 것으로 알려졌을 때만 true다(받아들여진 보고나 성공한 대조). 이 사실과 마지막 보고 결과는 볼륨(`checkpoint-report.json`)에 남아 재시작 뒤에도 같다. repo 범위 stop은 명시적인 `true`만 보고됨으로 본다.
+   - 보관 사본이 `checkpoint.json`보다 정확히 하나 뒤면(두 파일 쓰기 사이의 중단) 빠진 사본을 `checkpoint.json`에서 쓴다. `checkpoint.json`이 보관 사본보다 뒤인 경우(되돌림)는 되살리지 않는다(교정 2, L-3).
 4. 코디네이터의 재개 판단 `GET /v0/repos/{repo}/roles/{role}/checkpoints/compare`는 역할 상태의 로컬 순번·digest를 중앙 기록·현재 배정과 비교한다.
    - 결과는 `resume_allowed` / `no_checkpoint` / `already_running` / `stale_generation` / `external_reconciliation_required` / `not_observed` 중 하나다.
    - 마지막 기록이 `after_run`이 아니면 재개하지 않는다.
@@ -132,7 +134,9 @@ session_id만 저장하지 않는다. 저장하는 식별자는 다음과 같다
 | 로컬 불일치·누락·되돌림 | e2e 5, 컨테이너 | 세 경우 모두 409 `EXTERNAL_RECONCILIATION_REQUIRED`, 실행 없음. 코디네이터 판단도 같다 |
 | 거부된 takeover(잘못된 대상 SHA) | e2e 10 | 202 뒤 시도는 `CentralRefused`·실행 안 됨으로 닫힌다. 로컬 체크포인트·중앙 순번 그대로. 다음 올바른 기동 202(교정 1) |
 | 회차 도중 배정 세대 변경 | e2e 11 | 회차 뒤 체크포인트가 `current_assignment=false`로 기록된다(보고됨 true). 판단 `stale_generation`. 새 세대의 새 세션 기동 202, 순번 18(교정 1) |
-| 쓰기 중단(사본이 하나 앞섬) | `tests/serve.rs::a_checkpoint_one_behind_its_archive_is_restored_from_the_archive` | 하나 뒤면 되살려 재개, 둘 뒤면 거부(교정 1) |
+| 쓰기 중단·되돌림 | `tests/serve.rs::a_missing_archive_copy_is_written_and_a_rollback_is_not_hidden` | 빠진 보관 사본은 `checkpoint.json`에서 쓰고 재개, 한 단계 되돌린 `checkpoint.json`은 거부되고 그대로 남음(교정 2) |
+| 변조 뒤 takeover 거부 | e2e 12 | 거부 뒤 새 세션 없는 reconnect는 400, 새 세션 reconnect는 변조를 담아 시작, 변조 사건 2건(교정 2) |
+| takeover 답 유실 | e2e 13 | 코디네이터에 기록된 대기 사본을 다음 reconnect가 채택(“older”가 아님). 그 체크포인트가 takeover라 재개는 “did not finish”로 거부, 실행 없음(교정 2) |
 | 재시작 뒤 보고 상태 | e2e 4 | 재시작한 서비스도 `checkpoint_reported: true`(교정 1) |
 | 회차 중 코디네이터 중단 | e2e 6 | 회차 뒤 보고 실패 → `checkpoint_reported: false`. 중단 중 재개 → 503 `NOT_OBSERVED`, 실행 없음. 복구 뒤 판단 → “아직 기록 안 됨”. 다음 재개가 보관 사본 1건을 먼저 보낸 뒤 실행(순번 8) |
 
@@ -198,3 +202,15 @@ session_id만 저장하지 않는다. 저장하는 식별자는 다음과 같다
 | I-3 상태 잠금 안 파일 읽기 | 상태를 복사한 뒤 잠금을 풀고 읽는다 |
 | I-4 신선도 경계 | 미래의 시작 시각은 신선하지 않다(시험). 최대 나이보다 긴 회차는 실행 중 `unknown`(보수적, 모듈 문서에 적음) |
 
+## 8. 교정 2(검토 accd6c8)
+
+| 지적 | 처분 |
+| --- | --- |
+| M-1r 결과를 알 수 없는 takeover가 역할을 영구히 막음 | takeover를 볼륨에 대기 사본으로 둔 뒤 보고한다. 명확한 거부는 지운다. 답 유실·로컬 쓰기 실패·중단은 남기고, 다음 기동이 중앙 최신 기록과 같은지(순번·digest) 확인해 채택한다. 로컬 쓰기 실패는 실행 안 됨으로 닫는다. 이전 문서의 “닿지 않으면 다음 기동이 막히지 않는다”는 과장이었다. 시험: e2e 13 |
+| M-2 거부된 takeover가 변조 탐지를 지움 | 탐지된 변조를 `pending-tamper.json`에 두고, 그것을 담은 takeover가 받아들여질 때 지운다. 그동안 reconnect는 재개하지 않고 새 세션에 변조를 실어 보고한다. 기동 전 정지 경로도 같다. 시험: e2e 12 |
+| L-1 CI 실패(경쟁) | 거부된 창은 예산 감시가 곧바로 회차를 멈춘다. 실행 중 관측은 회차를 멈추지 않는 인증 오류와 3초 대기로 시험하고, 거부는 회차 뒤 값으로 확인한다. 6회 반복과 병렬 실행에서 통과 |
+| L-2 거부된 takeover 기록이 이전 체크포인트를 미보고로 바꿈 | `checkpoint_reported`는 중앙이 가진 것으로 알려진 순번·digest(`accepted`)로 판단한다. 대조로 다시 보낸 보고도 반영한다. 기록에 digest를 넣었다 |
+| L-3 되살리기가 한 단계 되돌림을 숨김 | 쓰기 순서를 `checkpoint.json` → 보관 사본으로 바꾸고, 빠진 보관 사본만 `checkpoint.json`에서 쓴다. 되돌림은 거부된다(e2e 5의 한 단계 되돌림, serve 시험). 쓰기는 원자적(임시 파일·fsync·rename) |
+| Info: 열 추가 | `ADD COLUMN IF NOT EXISTS`를 넣었다 |
+| Info: 다른 배정의 판단 | 문서를 고쳤다. 같은 배정의 새 세대면 `stale_generation`, 다른 배정이면 `external_reconciliation_required`다 |
+| Info: L-1(`!= true`) 시험 없음 | roles 시험이 필드 없는 역할을 “보고되지 않음”으로 보고하는지 확인한다 |

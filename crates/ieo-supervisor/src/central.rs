@@ -169,6 +169,19 @@ pub fn archived_max(dir: &Path) -> u64 {
         .unwrap_or(0)
 }
 
+/// Write `bytes` to `path` durably: temp file, fsync, rename, directory fsync.
+pub fn durable_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let dir = path.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(dir)?;
+    let tmp = path.with_extension("tmp");
+    let mut f = std::fs::File::create(&tmp)?;
+    f.write_all(bytes)?;
+    f.sync_all()?;
+    std::fs::rename(&tmp, path)?;
+    std::fs::File::open(dir)?.sync_all()
+}
+
 pub fn sha256(b: &[u8]) -> String {
     hex::encode(Sha256::digest(b))
 }

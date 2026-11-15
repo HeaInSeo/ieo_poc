@@ -1087,10 +1087,11 @@ fn provider_status_maps_raw_signals_and_never_reuses_an_old_value() {
     );
     wait(&svc, "p1");
     assert_eq!(svc.status()["provider_status_or_unknown"], "available");
-    // 2. while the next attempt runs, its own stream counts: a rejected window → usage_limit,
-    //    never the previous attempt's "available"
-    let limited = scripted_claude(&t, "limited", &[RL_REJECTED], 3);
-    let svc = svc_with(&t, &limited, 600);
+    // 2. while the next attempt runs, its own stream counts, never the previous attempt's
+    //    "available". An auth error does not stop the run, so the live window is the fake's
+    //    3 s sleep (review accd6c8 L-1: a rejected window stops the run within milliseconds)
+    let live = scripted_claude(&t, "live", &[AUTH_ERR], 3);
+    let svc = svc_with(&t, &live, 600);
     call(
         &svc,
         "POST",
@@ -1100,25 +1101,43 @@ fn provider_status_maps_raw_signals_and_never_reuses_an_old_value() {
     let t0 = Instant::now();
     let s = loop {
         let s = svc.status();
-        if s["provider_status_or_unknown"] == "usage_limit"
-            || t0.elapsed() > Duration::from_secs(10)
-        {
+        assert!(
+            !s["running"].is_null() || s["provider_status_or_unknown"] == "auth_or_billing",
+            "the run ended before its signal was seen live: {s}"
+        );
+        if s["provider_status_or_unknown"] == "auth_or_billing" {
             break s;
         }
         // before the event is written the running attempt has no signal: unknown, not available
         assert_ne!(s["provider_status_or_unknown"], "available", "{s}");
-        std::thread::sleep(Duration::from_millis(50));
+        assert!(t0.elapsed() < Duration::from_secs(10), "{s}");
+        std::thread::sleep(Duration::from_millis(20));
     };
-    assert_eq!(s["provider_status_or_unknown"], "usage_limit", "{s}");
     assert!(!s["running"].is_null(), "observed during the run: {s}");
+    assert_eq!(
+        s["provider_status_detail"]["observation"]["source"]["error"],
+        "authentication_failed"
+    );
+    // the service on this volume restarted: history only, current unknown
+    let again = svc_with(&t, &live, 600);
+    assert_eq!(again.status()["provider_status_or_unknown"], "unknown");
+    wait(&svc, "p2");
+    // a rejected window: the run is stopped by the budget guard and its status is usage_limit
+    let limited = scripted_claude(&t, "limited", &[RL_REJECTED], 3);
+    let svc = svc_with(&t, &limited, 600);
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p2b", "hi", json!({"session_id": "s2b"})),
+    );
+    wait(&svc, "p2b");
+    let s = svc.status();
+    assert_eq!(s["provider_status_or_unknown"], "usage_limit", "{s}");
     assert_eq!(
         s["provider_status_detail"]["observation"]["source"]["status"],
         "rejected"
     );
-    // the service on this volume restarted: history only, current unknown
-    let again = svc_with(&t, &limited, 600);
-    assert_eq!(again.status()["provider_status_or_unknown"], "unknown");
-    wait(&svc, "p2");
     // 3. an auth error outranks a later allowed window of the same run
     let auth = scripted_claude(&t, "auth", &[RL_ALLOWED, AUTH_ERR, RL_ALLOWED], 0);
     let svc = svc_with(&t, &auth, 600);
@@ -1173,11 +1192,12 @@ fn provider_status_maps_raw_signals_and_never_reuses_an_old_value() {
     }
 }
 
-/// A write stopped between the archive copy and `checkpoint.json` leaves the archive one ahead:
-/// the archived checkpoint is the latest and is restored before the reconnect decides (review
-/// 48b1d0e L-3). Without the repair the older `takeover` checkpoint would refuse the resume.
+/// `checkpoint.json` is written before its archive copy: a write stopped between the two leaves
+/// the archive one behind, and the copy is written from `checkpoint.json` before the next start
+/// (review accd6c8 L-3). A `checkpoint.json` older than its archive is never replaced: a
+/// rollback stays visible (here: the older `takeover` checkpoint refuses the resume).
 #[test]
-fn a_checkpoint_one_behind_its_archive_is_restored_from_the_archive() {
+fn a_missing_archive_copy_is_written_and_a_rollback_is_not_hidden() {
     let (t, svc) = setup("cp-repair");
     call(
         &svc,
@@ -1187,13 +1207,8 @@ fn a_checkpoint_one_behind_its_archive_is_restored_from_the_archive() {
     );
     wait(&svc, "r1");
     let archive = t.0.join("state/checkpoints");
-    let first = std::fs::read(archive.join(format!("{:020}.json", 1))).expect("archived 1");
-    let v: Value = serde_json::from_slice(&first).expect("j");
-    assert_eq!(
-        (v["seq"].as_u64(), v["phase"].as_str()),
-        (Some(1), Some("takeover"))
-    );
-    std::fs::write(t.0.join("state/checkpoint.json"), &first).expect("w");
+    let second = archive.join(format!("{:020}.json", 2));
+    std::fs::remove_file(&second).expect("rm archived 2");
     let (st, b) = call(
         &svc,
         "POST",
@@ -1201,11 +1216,14 @@ fn a_checkpoint_one_behind_its_archive_is_restored_from_the_archive() {
         &req("r2", "hi", json!({})),
     );
     assert_eq!(st, 202, "{b}");
-    assert_eq!(b["accepted"]["mode"], "resume", "{b}");
     wait(&svc, "r2");
-    // two behind is not a stopped write: no repair, the takeover checkpoint refuses
-    let first = std::fs::read(archive.join(format!("{:020}.json", 1))).expect("archived 1");
-    std::fs::write(t.0.join("state/checkpoint.json"), &first).expect("w");
+    assert!(
+        second.exists(),
+        "the archive copy was written from checkpoint.json"
+    );
+    // one step back (archive 4, checkpoint.json = archived 3, a takeover): refused, not restored
+    let third = std::fs::read(archive.join(format!("{:020}.json", 3))).expect("archived 3");
+    std::fs::write(t.0.join("state/checkpoint.json"), &third).expect("w");
     let (st, b) = call(
         &svc,
         "POST",
@@ -1216,5 +1234,9 @@ fn a_checkpoint_one_behind_its_archive_is_restored_from_the_archive() {
         (st, b["code"].as_str()),
         (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
         "{b}"
+    );
+    assert_eq!(
+        std::fs::read(t.0.join("state/checkpoint.json")).expect("r"),
+        third
     );
 }

@@ -389,8 +389,8 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
         "{b}"
     );
-    let older = std::fs::read(state.join("checkpoints").join(format!("{:020}.json", 2)))
-        .expect("archived 2");
+    let older = std::fs::read(state.join("checkpoints").join(format!("{:020}.json", 3)))
+        .expect("archived 3");
     std::fs::write(&cp_path, &older).expect("w");
     let (st, b) = role.call("POST", "/v0/role/reconnect", &req("a3", 0, "hi", json!({})));
     assert_eq!(
@@ -564,6 +564,89 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         "{l}"
     );
     assert_eq!(compare()["decision"], "resume_allowed");
+    // 12. a detected tamper whose takeover is refused stays pending: the next reconnect does
+    //     not resume over it and the tamper is reported with the next accepted takeover
+    //     (review accd6c8 M-2)
+    std::fs::write(state.join("claude/CLAUDE.md"), "injected again").expect("tamper");
+    let (st, b) = role.call("POST", "/v0/role/reconnect", &req("a12", 2, "hi",
+        json!({"new_session_id": "s6", "target_sha": "2222222222222222222222222222222222222222"})));
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(role.wait("a12")["last"]["stop"], "CentralRefused");
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/reconnect",
+        &req("a13", 2, "hi", json!({})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (400, Some("SCHEMA_VIOLATION")),
+        "{b}"
+    );
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/reconnect",
+        &req("a13", 2, "hi", json!({"new_session_id": "s6"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["mode"], "new", "{b}");
+    assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s5", "{b}");
+    role.wait("a13");
+    let l = latest();
+    assert_eq!(
+        (
+            l["seq"].as_u64(),
+            l["session_id"].as_str(),
+            l["tamper_events"].as_i64()
+        ),
+        (Some(20), Some("s6"), Some(2)),
+        "{l}"
+    );
+    assert!(!state.join("pending-tamper.json").exists());
+    // 13. a takeover the coordinator stored but whose answer was lost (crash, timeout): the
+    //     staged copy is adopted when the coordinator holds exactly it (review accd6c8 M-1r)
+    let mut lost: Value = serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("j");
+    lost["seq"] = json!(21);
+    lost["phase"] = json!("takeover");
+    lost["session_id"] = json!("s7");
+    lost["config_tamper_detected"] = Value::Null;
+    let lost = serde_json::to_string_pretty(&lost).expect("j");
+    let (st, b) = c(
+        "sup",
+        "POST",
+        "/v0/repos/repo-a/roles/development/checkpoints",
+        Some(&json!({"seq": 21, "checkpoint_json": lost})),
+    );
+    assert_eq!(st, 201, "{b}");
+    std::fs::write(state.join("checkpoint-staged.json"), &lost).expect("staged");
+    assert_eq!(compare()["decision"], "external_reconciliation_required");
+    // the next reconnect adopts it (no longer "older"); its phase is takeover, so the resume
+    // itself is refused as an unfinished run (§6), and nothing new runs
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/reconnect",
+        &req("a14", 2, "hi", json!({})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+    assert!(
+        b["reason"]
+            .as_str()
+            .is_some_and(|r| r.contains("did not finish")),
+        "{b}"
+    );
+    assert_eq!(std::fs::read_to_string(&cp_path).expect("cp"), lost);
+    assert!(!state.join("checkpoint-staged.json").exists());
+    assert!(!ran("a14"));
+    let j = compare();
+    assert!(
+        j["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("did not finish")),
+        "{j}"
+    );
     // the database holds the sequence without gaps or changes
     let mut db = {
         let mut c2 = cfg.clone();
@@ -577,7 +660,7 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         )
         .expect("q")
         .get(0);
-    assert_eq!(n, 18);
+    assert_eq!(n, 21);
     drop(db);
     coord.stop();
     let _ = std::fs::remove_dir_all(&dir);

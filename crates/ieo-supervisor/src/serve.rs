@@ -168,6 +168,14 @@ impl Config {
     fn report_record_path(&self) -> PathBuf {
         self.state.join("checkpoint-report.json")
     }
+    /// A takeover checkpoint reported but not yet known to be recorded.
+    fn staged_path(&self) -> PathBuf {
+        self.state.join("checkpoint-staged.json")
+    }
+    /// A detected config tamper not yet reported with an accepted takeover (§5-6).
+    fn pending_tamper_path(&self) -> PathBuf {
+        self.state.join("pending-tamper.json")
+    }
     /// Attempts started under this role's budget (append-only, on the persistent volume).
     fn attempts_path(&self) -> PathBuf {
         self.state.join("budget").join("attempts.jsonl")
@@ -190,8 +198,11 @@ struct State {
     running: Option<Value>,
     stop: Option<Arc<AtomicBool>>,
     last: Option<Value>,
-    /// The last central checkpoint report (sequence, answer or error).
+    /// The last central report's result (sequence, answer or error).
     central_last: Option<Value>,
+    /// The newest checkpoint known to be in the central record (`seq`, `sha256`): from an
+    /// accepted report or a successful comparison (review accd6c8 L-2).
+    central_accepted: Option<Value>,
 }
 
 pub struct Service {
@@ -286,13 +297,17 @@ impl Service {
                             "observation": o["provider"]})
             })
             .unwrap_or(Value::Null);
-        let central_last = std::fs::read(cfg.report_record_path())
+        let rec = std::fs::read(cfg.report_record_path())
             .ok()
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .unwrap_or(Value::Null);
+        let central_last = Some(rec["last"].clone()).filter(|v| v.is_object());
+        let central_accepted = Some(rec["accepted"].clone()).filter(|v| v.is_object());
         Service {
             cfg,
             state: Mutex::new(State {
                 central_last,
+                central_accepted,
                 ..State::default()
             }),
             restored,
@@ -300,26 +315,50 @@ impl Service {
         }
     }
 
-    /// The local checkpoint's bytes. A write stopped between the archive copy and
-    /// `checkpoint.json` leaves the archive exactly one ahead: then the archived one is the
-    /// latest and is restored (review 48b1d0e L-3). A missing `checkpoint.json` is not
-    /// restored (that stays a mismatch with the central record).
+    /// The local checkpoint's bytes, after two repairs (reviews 48b1d0e L-3, accd6c8 M-1r/L-3):
+    /// * a takeover staged for the coordinator whose answer was lost (timeout, crash, failed
+    ///   local write) is adopted when the coordinator's latest record is exactly it (same
+    ///   sequence and digest); a staged takeover the coordinator does not hold is dropped;
+    /// * `checkpoint.json` is written before its archive copy, so a write stopped between the
+    ///   two leaves the archive one behind: the missing copy is written from `checkpoint.json`.
+    ///   A `checkpoint.json` older than the archive is never replaced (a rollback stays visible).
     fn local_checkpoint(&self) -> Option<Vec<u8>> {
-        let raw = std::fs::read(self.cfg.checkpoint_path()).ok()?;
-        let seq = serde_json::from_slice::<Value>(&raw)
-            .ok()
-            .and_then(|c| c["seq"].as_u64());
-        let archive = self.cfg.checkpoint_archive();
-        let max = crate::central::archived_max(&archive);
-        if let Some(n) = seq
-            && max == n + 1
-            && let Ok(b) = std::fs::read(crate::central::archive_path(&archive, max))
-            && serde_json::from_slice::<Value>(&b)
+        let cfg = &self.cfg;
+        let archive = cfg.checkpoint_archive();
+        if let Ok(staged) = std::fs::read(cfg.staged_path()) {
+            let seq = serde_json::from_slice::<Value>(&staged)
                 .ok()
-                .is_some_and(|c| c["seq"] == max)
-            && std::fs::write(self.cfg.checkpoint_path(), &b).is_ok()
+                .and_then(|c| c["seq"].as_u64());
+            match (seq, cfg.central.latest(&cfg.repo, cfg.role_name())) {
+                (Some(n), Ok(Some(l)))
+                    if l["seq"].as_u64() == Some(n)
+                        && l["checkpoint_sha256"].as_str()
+                            == Some(crate::central::sha256(&staged).as_str()) =>
+                {
+                    if crate::central::durable_write(&cfg.checkpoint_path(), &staged).is_ok()
+                        && crate::central::durable_write(
+                            &crate::central::archive_path(&archive, n),
+                            &staged,
+                        )
+                        .is_ok()
+                    {
+                        let _ = std::fs::remove_file(cfg.staged_path());
+                        self.mark_accepted(n, &crate::central::sha256(&staged));
+                    }
+                }
+                (Some(n), Ok(l)) if l.as_ref().and_then(|l| l["seq"].as_u64()).unwrap_or(0) < n => {
+                    let _ = std::fs::remove_file(cfg.staged_path());
+                }
+                _ => {} // unreachable or other: kept; the comparison decides
+            }
+        }
+        let raw = std::fs::read(cfg.checkpoint_path()).ok()?;
+        if let Some(n) = serde_json::from_slice::<Value>(&raw)
+            .ok()
+            .and_then(|c| c["seq"].as_u64())
+            && crate::central::archived_max(&archive) + 1 == n
         {
-            return Some(b);
+            let _ = crate::central::durable_write(&crate::central::archive_path(&archive, n), &raw);
         }
         Some(raw)
     }
@@ -341,6 +380,7 @@ impl Service {
                 stop: None,
                 last: g.last.clone(),
                 central_last: g.central_last.clone(),
+                central_accepted: g.central_accepted.clone(),
             }
         };
         let raw = std::fs::read(self.cfg.checkpoint_path()).ok();
@@ -362,14 +402,16 @@ impl Service {
             };
         // the central record: the last report must have been accepted for this checkpoint
         let cp_seq = cp.as_ref().and_then(|c| c["seq"].as_u64());
+        // reported: the central record is known to hold exactly this checkpoint (sequence and
+        // digest), from an accepted report or a comparison — not from the last attempt only
         let reported = match (&self.cfg.central, cp_seq) {
             (crate::central::Central::LocalOnly, _) => json!("local_only"),
             (_, None) => json!(raw.is_none()),
-            (_, Some(n)) => json!(
-                st.central_last
-                    .as_ref()
-                    .is_some_and(|r| r["seq"] == n && r["ok"] == true)
-            ),
+            (_, Some(n)) => json!(st.central_accepted.as_ref().is_some_and(|a| {
+                a["seq"] == n
+                    && raw.as_ref().map(|b| crate::central::sha256(b)).as_deref()
+                        == a["sha256"].as_str()
+            })),
         };
         let safe = json!({
             "running": st.running.is_some(),
@@ -556,6 +598,12 @@ impl Service {
             Ok(c) => c,
             Err(r) => return resp(r.status, r.body),
         };
+        if central["compared"] == true
+            && let Some(n) = central["local_seq"].as_u64()
+            && let Ok(b) = std::fs::read(self.cfg.checkpoint_path())
+        {
+            self.mark_accepted(n, &crate::central::sha256(&b));
+        }
         // decide what runs
         let cp_raw = std::fs::read(self.cfg.checkpoint_path());
         let cp = cp_raw
@@ -677,6 +725,39 @@ impl Service {
                 }
             }
         };
+        // a detected tamper not yet reported (its takeover was refused, stopped or lost) is
+        // carried to the next new session and never resumed over (review accd6c8 M-2)
+        let pending = std::fs::read(self.cfg.pending_tamper_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+        let (session_id, resume, tamper) = match (pending, resume, tamper) {
+            (Some(p), true, _) => {
+                let Some(new_sid) = s("new_session_id").filter(|x| safe_id(x)) else {
+                    return err(
+                        400,
+                        "SCHEMA_VIOLATION",
+                        "new_session_id required: a detected config tamper is not yet reported",
+                    );
+                };
+                let mut t = p;
+                t["new_session_id"] = json!(new_sid);
+                (new_sid, false, Some(t))
+            }
+            (Some(p), false, None) => {
+                let mut t = p;
+                t["new_session_id"] = json!(session_id);
+                (session_id, false, Some(t))
+            }
+            (_, r, t) => (session_id, r, t),
+        };
+        if let Some(t) = &tamper
+            && let Err(e) = crate::central::durable_write(
+                &self.cfg.pending_tamper_path(),
+                &serde_json::to_vec_pretty(t).unwrap_or_default(),
+            )
+        {
+            return err(500, "INTERNAL", &format!("pending tamper: {e}"));
+        }
         let credential = match std::fs::read_to_string(self.cfg.cred.join("oauth_token")) {
             Ok(c) if !c.trim().is_empty() => c.trim().to_string(),
             _ => {
@@ -999,50 +1080,93 @@ impl Service {
             std::fs::File::open(dir)?.sync_all()
         };
         let central = cfg.central != crate::central::Central::LocalOnly;
-        // takeover: the coordinator first; a refusal writes nothing (fail closed, no leftover)
+        let write_local = || -> Result<(), String> {
+            // checkpoint.json first, then its archive copy (a stop between the two is repaired
+            // from checkpoint.json; review accd6c8 L-3)
+            durable(&cfg.checkpoint_path(), &cfg.state).map_err(|e| format!("checkpoint: {e}"))?;
+            durable(&crate::central::archive_path(&archive, seq), &archive)
+                .map_err(|e| format!("checkpoint archive: {e}"))
+        };
         if central && phase == "takeover" {
+            // the coordinator first. The takeover is staged on the volume until the answer is
+            // known: a lost answer, a crash or a failed local write is adopted later when the
+            // coordinator holds exactly it (review accd6c8 M-1r). A clear refusal drops it.
+            crate::central::durable_write(&cfg.staged_path(), &bytes)
+                .map_err(|e| format!("staged checkpoint: {e}"))?;
             let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
-            let refused = answer.as_ref().err().map(|r| r.body.clone());
-            self.record_report(seq, phase, &answer);
-            if refused.is_some() {
-                return Ok(refused);
+            self.record_report(seq, phase, &answer, &bytes);
+            if let Err(r) = answer {
+                if r.status != 503 {
+                    let _ = std::fs::remove_file(cfg.staged_path());
+                }
+                return Ok(Some(r.body));
+            }
+            if let Err(e) = write_local() {
+                // accepted centrally but not written: nothing runs; the staged copy is adopted
+                // on the next start
+                return Ok(Some(json!({"code": "LOCAL_WRITE_FAILED", "reason": e})));
+            }
+            let _ = std::fs::remove_file(cfg.staged_path());
+        } else {
+            write_local()?;
+            // a later phase that is not accepted stays unreported: the status says so and the
+            // next start sends it from the archive or stops for reconciliation
+            if central {
+                let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
+                self.record_report(seq, phase, &answer, &bytes);
             }
         }
-        // the archive first: a checkpoint.json always has its archived copy
-        durable(&crate::central::archive_path(&archive, seq), &archive)
-            .map_err(|e| format!("checkpoint archive: {e}"))?;
-        durable(&cfg.checkpoint_path(), &cfg.state).map_err(|e| format!("checkpoint: {e}"))?;
-        // a later phase that is not accepted stays unreported: the status says so and the next
-        // start sends it from the archive or stops for reconciliation
-        if central && phase != "takeover" {
-            let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
-            self.record_report(seq, phase, &answer);
+        // a tamper detection is reported once its takeover is recorded (review accd6c8 M-2)
+        if phase == "takeover" && job.tamper.is_some() {
+            let _ = std::fs::remove_file(cfg.pending_tamper_path());
         }
         Ok(None)
     }
 
+    /// The newest checkpoint known to be in the central record.
+    fn mark_accepted(&self, seq: u64, sha: &str) {
+        let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        st.central_accepted = Some(json!({"seq": seq, "sha256": sha}));
+        let rec = json!({"last": st.central_last, "accepted": st.central_accepted});
+        drop(st);
+        let _ = crate::central::durable_write(
+            &self.cfg.report_record_path(),
+            &serde_json::to_vec_pretty(&rec).unwrap_or_default(),
+        );
+    }
+
     /// Keep the last central report's result, in memory and on the volume (so a restarted
-    /// service still knows whether its checkpoint was reported — review 48b1d0e L-2).
+    /// service still knows whether its checkpoint was reported — review 48b1d0e L-2); an
+    /// accepted report also moves `central_accepted` (review accd6c8 L-2).
     fn record_report(
         &self,
         seq: u64,
         phase: &str,
         answer: &Result<Value, crate::central::Refusal>,
+        bytes: &[u8],
     ) {
+        let sha = crate::central::sha256(bytes);
         let rec = match answer {
-            Ok(v) => json!({"seq": seq, "phase": phase, "ok": true, "answer": v,
+            Ok(v) => json!({"seq": seq, "phase": phase, "ok": true, "sha256": sha, "answer": v,
                             "at": ieo_evidence::time::now()}),
-            Err(r) => json!({"seq": seq, "phase": phase, "ok": false, "status": r.status,
-                             "refusal": r.body, "at": ieo_evidence::time::now()}),
+            Err(r) => json!({"seq": seq, "phase": phase, "ok": false, "sha256": sha,
+                             "status": r.status, "refusal": r.body, "at": ieo_evidence::time::now()}),
         };
-        let _ = std::fs::write(
-            self.cfg.report_record_path(),
-            serde_json::to_vec_pretty(&rec).unwrap_or_default(),
-        );
         self.state
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .central_last = Some(rec);
+        if answer.is_ok() {
+            self.mark_accepted(seq, &sha);
+        } else {
+            let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            let rec = json!({"last": st.central_last, "accepted": st.central_accepted});
+            drop(st);
+            let _ = crate::central::durable_write(
+                &self.cfg.report_record_path(),
+                &serde_json::to_vec_pretty(&rec).unwrap_or_default(),
+            );
+        }
     }
 }
 
