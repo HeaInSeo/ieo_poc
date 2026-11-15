@@ -83,7 +83,7 @@
 1. supervisor가 체크포인트를 쓸 때마다 다음 순서로 처리한다.
    - 체크포인트에 `seq`(1부터 연속), `repo_id`, `role`, `config_tamper_detected`를 넣는다.
    - 순번은 보관 사본과 로컬 체크포인트 중 큰 값의 다음이다.
-   - 사본을 `/state/checkpoints/<seq>.json`에 둔 뒤 `checkpoint.json`을 바꾼다.
+   - `checkpoint.json`을 쓴 뒤 사본을 `/state/checkpoints/<seq>.json`에 둔다(교정 2).
    - 파일 바이트를 그대로 코디네이터에 보고한다. takeover는 볼륨에 대기 사본을 둔 뒤 **먼저** 보고하고, 받아들여진 뒤에만 로컬에 쓴다. after_run·error는 로컬에 먼저 쓰고 보고한다. 로컬 쓰기는 `checkpoint.json` 다음 보관 사본 순서다(교정 1·2).
    - 보고 자격은 supervisor 전용 `checkpoint:report`(agent 종류, repo·역할 하나)다. 모델의 `agent:report` 자격과는 다르다.
 2. 코디네이터는 받은 바이트의 SHA-256을 직접 계산한다. 다음 순번만 `role_checkpoints`(추가 전용)에 저장한다.
@@ -214,3 +214,26 @@ session_id만 저장하지 않는다. 저장하는 식별자는 다음과 같다
 | Info: 열 추가 | `ADD COLUMN IF NOT EXISTS`를 넣었다 |
 | Info: 다른 배정의 판단 | 문서를 고쳤다. 같은 배정의 새 세대면 `stale_generation`, 다른 배정이면 `external_reconciliation_required`다 |
 | Info: L-1(`!= true`) 시험 없음 | roles 시험이 필드 없는 역할을 “보고되지 않음”으로 보고하는지 확인한다 |
+
+## 9. 병합 뒤 후속(검토 802e4a1의 비차단 지적)
+
+PR #57은 검토 802e4a1(approve)의 head 802e4a1에서 병합했다(12bf34f, main CI 43679480078 success). 비차단 지적은 후속 PR에서 처리했다.
+
+| 지적 | 처분 |
+| --- | --- |
+| N-1 변조 하나가 두 번 기록됨 | takeover가 받아들여지는 즉시 대기 변조를 지운다(로컬 쓰기 실패 경로 포함). 변조를 담은 대기 사본을 채택할 때도 지운다. 시험: `a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once`(변조 보고 1건) |
+| N-2 대기 변조가 있을 때 변조된 session_id 재사용 | 변조 뒤 새 세션의 session_id가 변조된 세션과 같으면 400. 시험: `a_pending_tamper_needs_a_session_other_than_the_tampered_one` |
+| N-3 문서의 쓰기 순서·“사용량 0” 과장 | 계약 §13 항목 10과 §3을 고쳤다. 대기 사본을 쓰기 전이나 보고 도중에 멈추면 끝 행이 없고, 백스톱은 대조 전까지 다음 시작을 막는다 |
+| I-1 4xx가 아닌 답도 대기 사본을 지움 | 4xx만 지운다. 5xx와 답 없음은 남긴다. 시험: 위 첫 시험(502 뒤 보존·채택) |
+| I-2 채택이 더 새 로컬을 덮을 수 있음 | 대기 사본의 순번이 로컬보다 클 때만 채택하고, 아니면 버린다 |
+| I-3 동시 기동 | `launch`를 한 번에 하나로 묶는다 |
+| I-4 표시·시험 | 로컬 쓰기 실패는 `LocalWriteFailed`로 표시한다. 5xx 보존과 로컬 쓰기 실패 경로를 실제 실행 경로로 시험한다(가짜 코디네이터): `a_takeover_accepted_but_not_written_locally_is_adopted_next_time` |
+
+PR #58 검토 704330f(approve)의 지적 처분(교정 1):
+
+| 지적 | 처분 |
+| --- | --- |
+| P-1 새로 탐지한 변조가 거부된 요청에서 사라짐(PR #58에서 생긴 회귀) | 탐지는 새 세션 id 확인 같은 거부보다 먼저 `pending-tamper.json`에 저장한다. 이미 대기 중인 탐지가 있으면 그것을 유지한다. 시험: `a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending` |
+| P-2 코디네이터가 `tamper_recorded: false`라고 답해도 대기 변조를 지움 | 이월(정보). 코디네이터는 새 세션 id마다 한 번 기록한다. 이전에 쓴 새 세션 id를 다시 쓰는 호출자 오류에서만 생긴다 |
+| P-3 I-2·4xx 경로의 전용 시험 없음 | 같은 시험에서 4xx 거부(대기 사본 삭제, 변조 대기 유지)와 로컬보다 새롭지 않은 대기 사본의 삭제를 확인한다 |
+
