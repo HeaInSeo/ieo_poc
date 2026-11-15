@@ -1,0 +1,216 @@
+// ieo internal API v0: role supervisor -> coordinator (task X-03, contract draft).
+//
+// Description and rules: contracts/ieo-internal-v0.md. That document is part of this contract.
+//
+// - The gRPC path adds a transport. It does not define business rules. Every RPC goes through the
+//   coordinator's single operation table (X-04) to the same handling as the HTTP/JSON operation
+//   named in its comment (contracts/ieo-api-v0.openapi.yaml 0.8.0, operationId).
+// - Compatibility: package ieo.internal.v0 changes only additively. A field number is never reused.
+//   A removed field is listed as `reserved` (number and name). A change that old clients or old
+//   servers would misread goes to a new package (ieo.internal.v1).
+// - Authentication: metadata `authorization: Bearer <token>`, resolved by the same credential table
+//   and scopes as HTTP. Names inside messages are never trusted for authorization.
+// - Errors: a gRPC status (mapping table in the description, section 4) plus the binary trailer
+//   `ieo-error-bin` carrying a serialized `Error` with the HTTP status and the unchanged `code`
+//   and `rejections[]`.
+// - Health: the standard grpc.health.v1.Health service (no credential). It is not part of this
+//   package.
+
+syntax = "proto3";
+
+package ieo.internal.v0;
+
+// Calls a role supervisor makes to the coordinator. Coordinator-to-supervisor calls (role
+// status, stop, start, reconnect) are not in v0 (description, section 1.3).
+service SupervisorService {
+  // = submitAgentReport, POST /v0/agent/reports. Scope `agent:report` bound to (repo_id, role).
+  // Idempotency key: (event_id, event_revision) in the report, scoped to the credential's repo
+  // and role. No automatic resend; a resend by the caller carries the identical report
+  // (description, section 5).
+  rpc SubmitAgentReport(SubmitAgentReportRequest) returns (SubmitAgentReportResponse);
+
+  // = submitReproRequest, POST /v0/agent/repro-requests. Scope `agent:repro`, guardrail only.
+  // Idempotency key: request_id. No automatic resend; confirm with GetReproRequest.
+  rpc SubmitReproRequest(SubmitReproRequestRequest) returns (SubmitReproRequestResponse);
+
+  // = getReproRequest, GET /v0/agent/repro-requests/{request_id}. Read only.
+  rpc GetReproRequest(GetReproRequestRequest) returns (GetReproRequestResponse);
+
+  // = reportCheckpoint, POST /v0/repos/{repo_id}/roles/{role}/checkpoints. Scope
+  // `checkpoint:report` bound to (repo_id, role). Idempotency key: (repo_id, role, seq) with the
+  // exact bytes. No automatic resend; confirm with GetLatestCheckpoint (description, section 5).
+  rpc ReportCheckpoint(ReportCheckpointRequest) returns (ReportCheckpointResponse);
+
+  // = latestCheckpoint, GET /v0/repos/{repo_id}/roles/{role}/checkpoints/latest. Read only.
+  rpc GetLatestCheckpoint(GetLatestCheckpointRequest) returns (GetLatestCheckpointResponse);
+}
+
+// Whether the call created state or answered from a stored record (HTTP 201/202 vs 200).
+enum Outcome {
+  OUTCOME_UNSPECIFIED = 0;
+  // New record stored (HTTP 201 or 202).
+  OUTCOME_STORED = 1;
+  // The same key with the same content was already stored. Nothing changed (HTTP 200).
+  OUTCOME_REPLAYED = 2;
+}
+
+message SubmitAgentReportRequest {
+  // The ProgressReport v0 document (docs/poc/ProgressReport_v0.schema.json) as UTF-8 JSON, at
+  // most 1 MiB. Validated by that schema exactly as the HTTP body is. Duplicate detection
+  // compares parsed JSON values, so the HTTP and gRPC submissions of one report are the same
+  // report.
+  bytes report_json = 1;
+}
+
+message SubmitAgentReportResponse {
+  Outcome outcome = 1;
+  ClaimReceipt receipt = 2;
+}
+
+// = components.schemas.ClaimReceipt.
+message ClaimReceipt {
+  string event_id = 1;
+  uint64 event_revision = 2;
+  // RFC 3339, as stored.
+  string stored_at = 3;
+  // Always "claim": an agent submission is never verified.
+  string evidence_level = 4;
+  Disposition disposition = 5;
+  string assignment_id = 6;
+  uint64 generation = 7;
+  // The SHA the coordinator recorded for that assignment (never taken from the report).
+  string attributed_target_sha = 8;
+  // Evaluated at response time. A replay after the assignment moved on returns false.
+  bool counts_for_current_judgment = 9;
+}
+
+enum Disposition {
+  DISPOSITION_UNSPECIFIED = 0;
+  DISPOSITION_CURRENT = 1;
+  DISPOSITION_PRESERVED_LATE = 2;
+}
+
+// = components.schemas.ReproRequest. The adapter builds the same JSON value as the HTTP body.
+// An unset optional field stays absent.
+message SubmitReproRequestRequest {
+  string request_id = 1;
+  string repo_id = 2;
+  string assignment_id = 3;
+  uint64 generation = 4;
+  string target_sha = 5;
+  string bundle_digest = 6;
+  repeated string command = 7;
+  string expected = 8;
+  optional uint32 timeout_seconds = 9;
+}
+
+message SubmitReproRequestResponse {
+  Outcome outcome = 1;
+  ReproStatus status = 2;
+}
+
+message GetReproRequestRequest {
+  string request_id = 1;
+}
+
+message GetReproRequestResponse {
+  ReproStatus status = 1;
+}
+
+// = components.schemas.ReproStatus.
+message ReproStatus {
+  string request_id = 1;
+  ReproState state = 2;
+  string target_sha = 3;
+  optional string runner_image_digest = 4;
+  optional int32 exit_code = 5;
+  repeated string raw_log_refs = 6;
+  // RFC 3339.
+  optional string finished_at = 7;
+}
+
+enum ReproState {
+  REPRO_STATE_UNSPECIFIED = 0;
+  REPRO_STATE_QUEUED = 1;
+  REPRO_STATE_RUNNING = 2;
+  REPRO_STATE_FINISHED = 3;
+  REPRO_STATE_RUNNER_FAILED = 4;
+  REPRO_STATE_REJECTED_STALE_GENERATION = 5;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_DEVELOPMENT = 1;
+  ROLE_GUARDRAIL = 2;
+}
+
+message ReportCheckpointRequest {
+  string repo_id = 1;
+  Role role = 2;
+  // At least 1.
+  uint64 seq = 3;
+  // The exact checkpoint file bytes (UTF-8 JSON). The HTTP-equivalent JSON body must stay within
+  // 1 MiB (description, section 7.1). The coordinator computes the
+  // SHA-256 over these bytes, so the same file sent over HTTP or gRPC has the same digest.
+  bytes checkpoint_json = 4;
+}
+
+message ReportCheckpointResponse {
+  Outcome outcome = 1;
+  uint64 seq = 2;
+  string checkpoint_sha256 = 3;
+  // Set only when outcome is OUTCOME_STORED.
+  bool tamper_recorded = 4;
+  // Set only when outcome is OUTCOME_STORED.
+  bool current_assignment = 5;
+}
+
+message GetLatestCheckpointRequest {
+  string repo_id = 1;
+  Role role = 2;
+}
+
+// The latest central record. No record is NOT_FOUND with code NO_CHECKPOINT.
+message GetLatestCheckpointResponse {
+  string repo_id = 1;
+  Role role = 2;
+  uint64 seq = 3;
+  string checkpoint_sha256 = 4;
+  string phase = 5;
+  string session_id = 6;
+  string assignment_id = 7;
+  uint64 generation = 8;
+  string sprint_id = 9;
+  uint64 sprint_revision = 10;
+  string spec_digest = 11;
+  string target_sha = 12;
+  string settings_digest = 13;
+  string reported_by = 14;
+  // RFC 3339.
+  string received_at = 15;
+  uint64 tamper_events = 16;
+  bool current_assignment = 17;
+}
+
+// Carried in the binary trailer `ieo-error-bin` of a non-OK answer from the coordinator's handling
+// and of the adapter's size, path and checkpoint UTF-8 refusals (description, section 4.3). Deadline,
+// cancellation and transport failures carry no trailer. Without a trailer, and for any 500, the
+// outcome on the server is unknown (description, section 5).
+message Error {
+  // The HTTP status the same request gets on the HTTP path.
+  uint32 http_status = 1;
+  // Problem.code for 401, 403, 404 and 500 answers; empty when `rejections` is set.
+  string code = 2;
+  string message = 3;
+  // RejectionList.rejections for 400, 409 and 422 answers, unchanged.
+  repeated Rejection rejections = 4;
+}
+
+// = components.schemas.Rejection.
+message Rejection {
+  string code = 1;
+  string field = 2;
+  string message = 3;
+  string correction = 4;
+  bool retryable_after_edit = 5;
+}

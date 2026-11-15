@@ -1,0 +1,14 @@
+# X-03: lint and breaking-change rules for the internal gRPC contract (contracts/ieo-internal-v0.md §2).
+version: v2
+modules:
+  - path: .
+lint:
+  use:
+    - STANDARD
+  except:
+    # The package is ieo.internal.v0 (Plan_gRPC_Internal_API_v0.md §4 item 1, same major as the
+    # HTTP API v0). buf accepts only v1+ or v1alpha/beta as a version suffix.
+    - PACKAGE_VERSION_SUFFIX
+breaking:
+  use:
+    - WIRE_JSON

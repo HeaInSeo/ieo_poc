@@ -1,0 +1,77 @@
+# X-03 · gRPC 내부 API 계약과 분리 영향 확인
+
+| 항목 | 기록 |
+| --- | --- |
+| 계획·작업 | v1.3.3-A4 · 추가 작업 X-03(설계, 선행 02-03) · 73·12 완료 수 미산입 · 근거 [사용자 결정 2026-11-14 · gRPC](../../../../User_Decisions_2026-11-14_grpc.md), [계획](../../../../Plan_gRPC_Internal_API_v0.md) §4, [개정 A4](../../../../Amendment_v1.3.3-A4.md) |
+| 수용 기준 | 장부 §7 X-03 행 |
+| 산출물 | proto [`contracts/proto/ieo/internal/v0/supervisor.proto`](../../../../../../contracts/proto/ieo/internal/v0/supervisor.proto) · lint·호환 규칙 [`contracts/proto/buf.yaml`](../../../../../../contracts/proto/buf.yaml) · 계약 설명 [`contracts/ieo-internal-v0.md`](../../../../../../contracts/ieo-internal-v0.md) |
+| 검사 | `buf lint`·`buf build`·`protoc` 통과([evidence/proto-checks.txt](evidence/proto-checks.txt)) |
+| 모델 호출 | 0회. 실제 호출·예비 회차·결제 없음 |
+| 상태 | 계약 초안. 구현 없음(X-04). 독립 검토 [b8506fd 변경 요청](reviews/review-pr62-b8506fd.md)(M-1~M-4, L-1~L-4) → 교정 1(§5) → 재검토 [0de371c 승인](reviews/review-pr62-0de371c.md)(Low N-1~N-5) → 교정 2(§6) |
+
+## 1. 수용 기준 대응
+
+| 수용 기준(장부 §7 X-03) | 위치 |
+| --- | --- |
+| proto와 설명 | proto 파일 + 설명 문서. 설명 문서도 계약의 일부다 |
+| 서비스·메시지 정의, 버전 호환(필드 번호 재사용 금지, 비호환 변경은 새 패키지) | 설명 §1.1·§2. `ieo.internal.v0.SupervisorService`의 RPC 다섯 개. `reserved` 규칙과 `buf breaking`(WIRE_JSON) |
+| 인증과 역할별 권한(HTTP와 같은 자격·범위) | 설명 §3. metadata Bearer, 같은 `auth::Credentials`, 새 범위 없음 |
+| 상태 코드 대응과 기존 오류 code의 상세 사유 | 설명 §4. HTTP 상태 + `code`로 정하는 대응표, RPC별 `code` 표, trailer `ieo-error-bin`(`Error` 메시지) |
+| 작업별 재시도 가능 여부와 멱등(연결 실패만으로 재실행 금지, 재조회로 반영 확인) | 설명 §5. RPC별 표, “결과 불명”의 정의, 02-04 대기 사본 규칙과의 대응 |
+| 제한 시간과 취소(커밋 전 취소는 롤백, 커밋 뒤 끊김은 재조회) | 설명 §6. 서버 최대 처리 시간 15초(초안), 커밋 전 확인 |
+| 기존 HTTP/JSON 계약 유지, 업무 규칙 재정의 없음 | 설명 §1.4·§2. HTTP 계약·시험 변경 없음. JSON 문서는 바이트로 실어 같은 스키마로 검사 |
+| 미리 분리할 코드와 그 영향 | 설명 §9(main 3157c89에서 다시 확인) |
+
+## 2. 이번에 정한 것
+
+계획이 X-03에 넘긴 결정이다.
+
+1. **gRPC 표면**: 에이전트 보고, 재현 요청 제출·조회, 체크포인트 보고, 최신 체크포인트 조회. 계획 이후 02-04가 만든 체크포인트 작업 둘을 넣었다.
+2. **스프린트 상태·사건 조회는 넣지 않는다.** 에이전트 자격의 `/v0/sprints*` 금지를 유지한다. supervisor의 배정 정보는 02-05의 자기 배정 조회로 얻는다(설명 §1.2).
+3. **재현 요청의 supervisor 재사용**(PR #41 검토 b3cb083): 재사용한다. guardrail supervisor만, 지금의 `agent:repro`로(설명 §3).
+4. **새 작업의 HTTP 형태**: 02-05의 새 작업도 HTTP와 gRPC를 함께 둔다(설명 §1.4).
+5. **오류 상세 형식**: `google.rpc.Status` 대신 `ieo-error-bin` trailer에 HTTP 상태와 기존 `code`·`rejections[]`를 그대로 싣는다(설명 §4.3).
+6. **전송 쪽 동작**: 크기 상한, DB 연결 실패는 `UNAVAILABLE`, 헬스는 `grpc.health.v1`(설명 §7).
+7. **스트림**: v0에는 없다. 더할 때의 규칙만 정했다(설명 §8.1).
+
+## 3. 코드 읽기로 확인한 것
+
+계약을 쓰며 main 3157c89의 처리 코드를 다시 읽었다.
+- 같은 `code`가 작업에 따라 HTTP 상태가 다르다(`DIGEST_MISMATCH`: 등록 422, 체크포인트 409). 그래서 gRPC 상태를 `code`만으로 정하지 않고 HTTP 상태와 함께 정했다.
+- 검사 순서가 작업마다 다르다: 보고·재현 요청은 재조회·식별 검사가 형식 검사보다 먼저이고, 체크포인트는 본문 형식 → `REPO_MISMATCH` → 나머지 필드 형식 → 식별 → 배정 → 저장 뒤 변조 기록 형식 순서다. 크기 규칙은 전송 쪽(본문 1 MiB, 인증 전)과 처리 쪽(`checkpoint_json` 1 MiB, `MISSING_FIELD`) 두 겹이다. 커밋 실패도 500이므로 500은 결과 불명이다(검토 b8506fd M-1~M-3 반영).
+- 재현 요청에서 대상 SHA가 다르면 `ASSIGNMENT_SHA_MISMATCH`가 아니라 `STALE_ASSIGNMENT`다. 형식 검사(`SCHEMA_VIOLATION`)는 권한·식별 검사를 통과한 새 요청에만 한다.
+- 보고와 재현 요청의 중복 판정은 파싱한 JSON 값을 비교한다. 체크포인트의 digest는 받은 바이트로 계산한다. 두 사실이 “두 전송에서 같은 요청은 같은 요청”의 근거다(설명 §2).
+- 계획 §3 이후 `handle`에 작업별 실행 모양 차이가 생겼다: DB 없는 역할 제어, 트랜잭션 밖의 supervisor 호출 뒤 트랜잭션(`compare`). 작업 표가 이를 표현해야 한다(설명 §9).
+
+## 4. 넘기는 것과 한계
+
+- **X-04**: 작업 표 분리, tonic 어댑터, 커밋 전 확인, supervisor `CoordinatorClient` 경계, 공통 회귀(설명 §10), CI의 `buf lint`·`buf breaking`.
+- **02-05**: 새 작업(자기 배정 조회·인수, 세션 상태)을 작업 표에 추가(HTTP 형태). 이 서비스에 RPC를 추가하는 것은 X-04가 먼저 병합됐을 때만이고, 아니면 X-04의 몫이다. 토큰을 쥐는 프로세스의 분리.
+- **한계**(설명 §11): 라이브러리 지원은 아직 확인하지 않았다. 15초·재시도 값은 초안이다. 크기 초과 응답이 HTTP와 다르다. 오류 상세는 자체 trailer다. TLS는 정식 설계의 몫이다.
+- **검사의 범위**: lint·build는 정의의 형식만 확인한다. HTTP와 같은 동작인지는 구현(X-04)의 공통 회귀가 확인한다.
+- 02-05의 선행·수용 기준은 바꾸지 않는다. X-04가 늦으면 02-05는 HTTP로 진행한다.
+
+## 5. 교정 1(검토 b8506fd)
+
+| 지적 | 처리 |
+| --- | --- |
+| M-1 500을 롤백 확정으로 적음(커밋 실패도 500) | 설명 §4.1·§4.3·§5: 500은 결과 불명. 거부 확정은 trailer `http_status` 400~499뿐 |
+| M-2 검사 순서·`MISSING_FIELD` 누락 | 설명 §3 작업별 순서, §4.2에 `MISSING_FIELD` |
+| M-3 크기 규칙 차이 | 설명 §7.1: 어댑터가 HTTP와 같은 JSON 본문에 같은 1 MiB 상한을 인증 전에 적용. `report_json`의 유일한 상한. 처리 쪽 `MISSING_FIELD`는 그대로 |
+| M-4 자동 재시도 정책 추가 | 설명 §5: 상태를 바꾸는 RPC의 자동 재전송 없음. 자동은 읽기 전용 확인만. proto 주석도 고침 |
+| L-1 `event_revision` 범위 | `uint64` |
+| L-2 trailer·문장 시간 제한 | 설명 §4.3·§6.1: 서버가 만든 `DEADLINE_EXCEEDED`·`CANCELLED`는 trailer 없음, `57014`는 `DEADLINE_EXCEEDED`로 |
+| L-3 JSON 동일성 빈틈 | 설명 §2: 비 optional 필드는 늘 넣음, 명시적 `null`은 gRPC로 재전송 불가, UTF-8 아닌 문서 거부 |
+| L-4 02-05의 RPC 추가 조건 | 설명 §8.2·이 보고 §4: X-04가 먼저 병합됐을 때만 |
+| I-1~I-4 | 기준 SHA 병기, 헬스는 주기적 기록, 경로 매개변수·알 수 없는 역할 값, `buf breaking`은 첫 병합 뒤 |
+
+## 6. 교정 2(검토 0de371c, 승인·Low)
+
+| 지적 | 처리 |
+| --- | --- |
+| N-1 `ReportCheckpoint` 검사 순서 | 설명 §3에 나머지 필드 형식·저장 뒤 변조 기록 형식까지 |
+| N-2 `report_json` UTF-8 규칙 | 바이트를 바꾸지 않고 처리에 넘김. UTF-8 거부는 `checkpoint_json`만(인증 뒤) |
+| N-3 크기 안전 상한의 주장·거부 구분 | 설명 §7.1: 클라이언트 사전 계산이 규칙(넘으면 HTTP 400과 같이 거부 확정), 전송 상한은 안전 상한. proto 주석 |
+| N-4 경로 매개변수 | 빈 값은 처리에 그대로(HTTP와 같은 답), `/`는 인증 뒤 `NOT_FOUND` |
+| N-5 02-05에 결정을 맡긴 문구 | 설명 §1.4·§5: 02-05의 수용 기준을 바꾸지 않음, 보고 재전송 규칙은 이 계약 범위 밖이며 정해지기 전에는 다시 보내지 않음 |
+| I-6 어댑터 검사 순서 | 설명 §7.0, §7.2는 §5를 따름 |
