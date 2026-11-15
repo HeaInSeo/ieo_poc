@@ -760,6 +760,17 @@ fn e2e(transport: &str) {
     let ch = chain(0);
     assert_eq!(ch["first_actions"].as_array().map(Vec::len), Some(1));
     assert_eq!(link(&ch, &d3_id)["first_action"], "none");
+    // C1: the delivery named session s9; the reconnect resumed the checkpoint's session s1, and
+    // the takeover records that session (never the delivery's or a logical name)
+    let t3 = ch["takeovers"]
+        .as_array()
+        .expect("t")
+        .iter()
+        .find(|t| t["delivery_id"] == d3_id.as_str())
+        .cloned()
+        .expect("takeover of d3");
+    assert_eq!(t3["session_id"], "s1", "{t3}");
+    assert_eq!(d3["session_id"], "s9");
     assert_eq!(link(&ch, &d3_id)["taken_over"], true);
     // the last actual action is still the one of a1
     assert_eq!(
