@@ -7,7 +7,7 @@
 | 산출물 | proto [`contracts/proto/ieo/internal/v0/supervisor.proto`](../../../../../../contracts/proto/ieo/internal/v0/supervisor.proto) · lint·호환 규칙 [`contracts/proto/buf.yaml`](../../../../../../contracts/proto/buf.yaml) · 계약 설명 [`contracts/ieo-internal-v0.md`](../../../../../../contracts/ieo-internal-v0.md) |
 | 검사 | `buf lint`·`buf build`·`protoc` 통과([evidence/proto-checks.txt](evidence/proto-checks.txt)) |
 | 모델 호출 | 0회. 실제 호출·예비 회차·결제 없음 |
-| 상태 | 계약 초안. 구현 없음(X-04). 독립 검토 [b8506fd 변경 요청](reviews/review-pr62-b8506fd.md)(M-1~M-4, L-1~L-4) → 교정 1(§5) → 재검토 [0de371c 승인](reviews/review-pr62-0de371c.md)(Low N-1~N-5) → 교정 2(§6) |
+| 상태 | 계약 초안. 구현 없음(X-04). 독립 검토 [b8506fd 변경 요청](reviews/review-pr62-b8506fd.md)(M-1~M-4, L-1~L-4) → 교정 1(§5) → 재검토 [0de371c 승인](reviews/review-pr62-0de371c.md)(Low N-1~N-5) → 교정 2(§6) → [8e3e817 승인](reviews/review-pr62-8e3e817.md) → 병합 0c243ee, **검수 완료**(§7). 수용 기록 PR #63 검토 [d1c86c5 승인](review-pr63-d1c86c5.md)(제안 문구 안의 상대 링크가 풀리도록 보고와 같은 폴더에 보관) |
 
 ## 1. 수용 기준 대응
 

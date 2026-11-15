@@ -1,0 +1,69 @@
+# X-04 checks — env: IEO_TEST_DB_URL (throwaway test DB, port 55432), CARGO_PROFILE_DEV_DEBUG=0; no model calls
+date: 2026-11-15T18:55:20+09:00
+head 3887382
+fmt rc=0
+    Finished `dev` profile [unoptimized] target(s) in 0.25s
+clippy rc=0
+     Running unittests src/lib.rs (<scratchpad>/target-x04/debug/deps/ieo_coord-095b99a5902ddf99)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/ieo-coord.rs (<scratchpad>/target-x04/debug/deps/ieo_coord-f69db28067fea024)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/checkpoint_e2e.rs (<scratchpad>/target-x04/debug/deps/checkpoint_e2e-2b7c6bed7980ae8f)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.62s
+     Running tests/coordinator.rs (<scratchpad>/target-x04/debug/deps/coordinator-653445e64f415ea1)
+test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.62s
+     Running tests/grpc.rs (<scratchpad>/target-x04/debug/deps/grpc-a9f2653cc9a3df7a)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.57s
+     Running tests/operations.rs (<scratchpad>/target-x04/debug/deps/operations-f449085ab9e0ca77)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/roles.rs (<scratchpad>/target-x04/debug/deps/roles-ad382ddf260ee950)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+     Running tests/shutdown.rs (<scratchpad>/target-x04/debug/deps/shutdown-a01ad4b48f3898bc)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+     Running unittests src/lib.rs (<scratchpad>/target-x04/debug/deps/ieo_evidence-d77531b468e3c398)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/bin/ieo-evidence.rs (<scratchpad>/target-x04/debug/deps/ieo_evidence-fe38560a34fa754b)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/collector.rs (<scratchpad>/target-x04/debug/deps/collector-5dc3280d53c24d40)
+test result_without_usage_fields_is_unmeasured ... ok
+test result_is_error_is_failure_unless_expected ... ok
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.03s
+     Running unittests src/lib.rs (<scratchpad>/target-x04/debug/deps/ieo_notion-3895cd797aa7f42a)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/ieo-notion.rs (<scratchpad>/target-x04/debug/deps/ieo_notion-c16a7d5027712fa4)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/importer.rs (<scratchpad>/target-x04/debug/deps/importer-49884dbf2e389f67)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (<scratchpad>/target-x04/debug/deps/ieo_proto-d66e54db9f326233)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (<scratchpad>/target-x04/debug/deps/ieo_report-6fc72d8e35aedbde)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/report_contract.rs (<scratchpad>/target-x04/debug/deps/report_contract-4a8ae455e445b58c)
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (<scratchpad>/target-x04/debug/deps/ieo_spec-d0b80b777c2fc140)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/ieo-spec.rs (<scratchpad>/target-x04/debug/deps/ieo_spec-d550a258d7bc51ae)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/conversion.rs (<scratchpad>/target-x04/debug/deps/conversion-3cc581338e5a50b7)
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/registration.rs (<scratchpad>/target-x04/debug/deps/registration-879a100149d27185)
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running unittests src/lib.rs (<scratchpad>/target-x04/debug/deps/ieo_supervisor-207c9c0f3d37b2bf)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/bin/ieo-role-call.rs (<scratchpad>/target-x04/debug/deps/ieo_role_call-6b4e515846c98faa)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/ieo-supervisor.rs (<scratchpad>/target-x04/debug/deps/ieo_supervisor-e611b81695c6acff)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/caller.rs (<scratchpad>/target-x04/debug/deps/caller-aeb06807cc1d53e1)
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.52s
+     Running tests/central.rs (<scratchpad>/target-x04/debug/deps/central-5dc628f7d6dce8c6)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+     Running tests/run_guard.rs (<scratchpad>/target-x04/debug/deps/run_guard-32c0f3b0acbce939)
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s
+     Running tests/serve.rs (<scratchpad>/target-x04/debug/deps/serve-d1fe532b4874bed6)
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.58s
+     Running tests/supervisor.rs (<scratchpad>/target-x04/debug/deps/supervisor-42f47433f8984bd4)
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test done
+
+total: passed 332 failed 0 ignored 0
