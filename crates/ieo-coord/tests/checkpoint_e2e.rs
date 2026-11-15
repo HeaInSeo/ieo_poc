@@ -241,7 +241,7 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
             "claude": claude, "budget": "02-04", "quota_group_id": "anthropic-shared-0104",
             "checkpoint_central": {"url": format!("http://127.0.0.1:{port}"),
                                    "token_file": root.join("cred/coordinator_token")},
-            "share": {"max_runs": 8, "total_seconds": 9_600, "billable_tokens": 1_000_000,
+            "share": {"max_runs": 12, "total_seconds": 9_600, "billable_tokens": 1_000_000,
                       "cache_read_tokens": 10_000_000}}))
         .expect("role config")
     };
@@ -363,6 +363,8 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
     assert_eq!(compare()["decision"], "resume_allowed");
     // 4. the role process restarts on its volume: compared again before the resume
     role.restart(role_cfg());
+    // the restarted service still knows its checkpoint was reported (review 48b1d0e L-2)
+    assert_eq!(role.status()["safe_shutdown"]["checkpoint_reported"], true);
     let (st, b) = role.call("POST", "/v0/role/reconnect", &req("a2", 0, "hi", json!({})));
     assert_eq!(st, 202, "{b}");
     assert_eq!(b["accepted"]["mode"], "resume", "{b}");
@@ -387,8 +389,8 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
         "{b}"
     );
-    let older = std::fs::read(state.join("checkpoints").join(format!("{:020}.json", 3)))
-        .expect("archived 3");
+    let older = std::fs::read(state.join("checkpoints").join(format!("{:020}.json", 2)))
+        .expect("archived 2");
     std::fs::write(&cp_path, &older).expect("w");
     let (st, b) = role.call("POST", "/v0/role/reconnect", &req("a3", 0, "hi", json!({})));
     assert_eq!(
@@ -471,6 +473,97 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         "{b}"
     );
     assert!(!ran("a6"));
+    // 9. a new session under the current generation starts normally
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/start",
+        &req("a7", 1, "hi", json!({"session_id": "s3"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    role.wait("a7");
+    let l = latest();
+    assert_eq!(
+        (l["seq"].as_u64(), l["current_assignment"].as_bool()),
+        (Some(12), Some(true)),
+        "{l}"
+    );
+    // 10. a takeover the coordinator refuses (wrong target SHA): nothing is written locally,
+    //     nothing runs, the attempt ends as not spawned, and the next start is not blocked
+    //     (review 48b1d0e M-1)
+    let before = std::fs::read(&cp_path).expect("cp");
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/start",
+        &req(
+            "a8",
+            1,
+            "hi",
+            json!({"session_id": "s4", "target_sha": "2222222222222222222222222222222222222222"}),
+        ),
+    );
+    assert_eq!(st, 202, "{b}");
+    let s = role.wait("a8");
+    assert_eq!(
+        (s["last"]["spawned"].as_bool(), s["last"]["stop"].as_str()),
+        (Some(false), Some("CentralRefused")),
+        "{s}"
+    );
+    assert_eq!(
+        std::fs::read(&cp_path).expect("cp"),
+        before,
+        "no local checkpoint for a refused takeover"
+    );
+    assert_eq!(latest()["seq"], 12);
+    assert_eq!(compare()["decision"], "resume_allowed");
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/start",
+        &req("a9", 1, "hi", json!({"session_id": "s4"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    role.wait("a9");
+    assert_eq!(latest()["seq"], 14);
+    // 11. the assignment moves on during a run: the run's after_run is recorded as no longer
+    //     current, the judgment is stale_generation, a new session under the new generation
+    //     starts (review 48b1d0e M-1)
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/reconnect",
+        &req("a10", 1, "SLEEP", json!({})),
+    );
+    assert_eq!(st, 202, "{b}");
+    std::thread::sleep(Duration::from_millis(500));
+    assert_eq!(
+        assign(2, json!({"assignment_id": "A1", "generation": 1})).0,
+        201
+    );
+    let s = role.wait("a10");
+    assert_eq!(s["safe_shutdown"]["checkpoint_reported"], true, "{s}");
+    let l = latest();
+    assert_eq!(
+        (
+            l["seq"].as_u64(),
+            l["phase"].as_str(),
+            l["current_assignment"].as_bool()
+        ),
+        (Some(16), Some("after_run"), Some(false)),
+        "{l}"
+    );
+    assert_eq!(compare()["decision"], "stale_generation");
+    let (st, b) = role.call(
+        "POST",
+        "/v0/role/start",
+        &req("a11", 2, "hi", json!({"session_id": "s5"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    role.wait("a11");
+    let l = latest();
+    assert_eq!(
+        (l["seq"].as_u64(), l["current_assignment"].as_bool()),
+        (Some(18), Some(true)),
+        "{l}"
+    );
+    assert_eq!(compare()["decision"], "resume_allowed");
     // the database holds the sequence without gaps or changes
     let mut db = {
         let mut c2 = cfg.clone();
@@ -484,7 +577,7 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         )
         .expect("q")
         .get(0);
-    assert_eq!(n, 10);
+    assert_eq!(n, 18);
     drop(db);
     coord.stop();
     let _ = std::fs::remove_dir_all(&dir);

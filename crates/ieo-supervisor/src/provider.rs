@@ -19,6 +19,8 @@
 //! (the conservative end), and a status older than the configured maximum age is reported as
 //! `unknown` with the last observation kept beside it. Nothing observed before the service
 //! (re)started is current: after a restart the status is `unknown` until a new run observes one.
+//! A run longer than the maximum age reports `unknown` while it runs, even when its signal is
+//! recent (conservative), and a start time in the future is not fresh.
 //! "Not observed" is never `available` and never zero usage.
 
 use serde_json::{Value, json};
@@ -118,9 +120,11 @@ pub fn current(
             json!({"reason": "nothing observed since this service started", "observation": null}),
         );
     };
+    // a start time in the future (clock skew) is not a fresh observation (review 48b1d0e I-4)
     let age = o["observed_not_before"]
         .as_str()
         .and_then(unix_of)
+        .filter(|t| *t <= now_unix + 60)
         .map(|t| now_unix.saturating_sub(t));
     let value = o["value"].as_str().unwrap_or("unknown");
     let (out, reason) = match age {
@@ -160,6 +164,9 @@ pub fn unix_of(t: &str) -> Option<u64> {
         return None;
     }
     // days from civil (Howard Hinnant)
+    if y == 0 {
+        return None;
+    }
     let (y, m) = if mo <= 2 {
         (y - 1, mo + 9)
     } else {
@@ -269,5 +276,10 @@ mod tests {
         let mut bad = o.clone();
         bad["observed_not_before"] = json!("yesterday");
         assert_eq!(current(Some(&bad), t0, 600, false).0, "unknown");
+        // a start in the future is not fresh; year 0 is not a time (review 48b1d0e I-1, I-4)
+        let mut future = o.clone();
+        future["observed_not_before"] = json!("2026-11-15T01:00:00Z");
+        assert_eq!(current(Some(&future), t0, 600, false).0, "unknown");
+        assert_eq!(unix_of("0000-01-01T00:00:00Z"), None);
     }
 }

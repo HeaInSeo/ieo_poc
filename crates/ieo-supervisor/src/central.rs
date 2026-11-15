@@ -113,7 +113,7 @@ impl Central {
         match self.call("GET", &format!("{}/latest", Self::path(repo, role)), None)? {
             (200, v) => Ok(Some(v)),
             (404, v) if v["code"] == "NO_CHECKPOINT" => Ok(None),
-            (st, v) => Err(format!("latest answered {st}: {}", v["code"])),
+            (st, v) => Err(format!("latest answered {st}: {}", code_of(&v))),
         }
     }
 
@@ -125,11 +125,20 @@ impl Central {
             Ok((200 | 201, v)) => Ok(v),
             Ok((st, v)) => Err(reconcile(format!(
                 "the coordinator refused checkpoint {seq} ({st} {})",
-                v["code"]
+                code_of(&v)
             ))
             .with("coordinator_answer", v)),
         }
     }
+}
+
+/// The error code of a coordinator answer: `code`, or the first rejection's (review 48b1d0e L-4).
+fn code_of(v: &Value) -> String {
+    v["code"]
+        .as_str()
+        .or_else(|| v["rejections"][0]["code"].as_str())
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 impl Refusal {

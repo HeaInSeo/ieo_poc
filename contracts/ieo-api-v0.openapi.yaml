@@ -447,6 +447,12 @@ paths:
         Required scope `roles:control` for `repo_id`; agent credentials are refused. Each role is
         reported separately: `{reachable, status}` or `{reachable: false, error}` or the
         supervisor's own HTTP status. Adapter tokens are read per call and never returned.
+        `quota_groups` (runtime contract §13 item 9): `groups[]` per `quota_group_id` with
+        `roles`, `provider_status_or_unknown` (`usage_limit` if any member reports it, else
+        `available` if any member observed it, else `unknown`), `affected_roles` (every member
+        under `usage_limit`), `auth_or_billing_roles` (not spread to the group) and
+        `member_status`; `mismatches[]` lists roles whose reported group differs from the
+        `quota_group_id` configured for them in `--roles` (or that report none).
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
       responses:
@@ -456,10 +462,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [repo_id, roles]
+                required: [repo_id, roles, quota_groups]
                 properties:
                   repo_id: { type: string }
                   roles: { type: object }
+                  quota_groups:
+                    type: object
+                    required: [groups, mismatches]
+                    properties:
+                      groups: { type: array, items: { type: object } }
+                      mismatches: { type: array, items: { type: object } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
@@ -473,8 +485,10 @@ paths:
         Required scope `roles:control` for `repo_id`. Sends a role-scope `stop` to each role
         supervisor (never one role through the other), waits up to 30 s for each to run nothing,
         and returns each role's safe-shutdown report. `safe_shutdown_confirmed` is true only when
-        every role answered, runs nothing, has its checkpoint saved, and reports no active
-        children and no pending external requests; otherwise `unconfirmed` lists the reasons
+        every role answered, runs nothing, has its checkpoint saved and reported to the
+        coordinator (`checkpoint_reported: true`; false, missing or `local_only` is not
+        reported), and reports no active children and no pending external requests; otherwise
+        `unconfirmed` lists the reasons
         (the supervisors report children and external requests as `not_tracked`, so it is
         unconfirmed until they track them).
       parameters:
@@ -513,8 +527,11 @@ paths:
         that assignment. The same sequence with the same bytes → 200 duplicate (nothing changes);
         other bytes → 409 `EVENT_CONTENT_CONFLICT`; a sequence past the next → 409
         `CHECKPOINT_SEQUENCE_GAP`; a checkpoint naming another repo/role → 409 `REPO_MISMATCH`.
-        A `config_tamper_detected` object in the checkpoint is recorded once per new session.
-        Refused reports leave no row.
+        One exception to "current head": an `after_run`/`error` checkpoint that continues the
+        stored `takeover` of the same session, assignment and generation is stored with
+        `current_assignment: false` when the assignment moved on during the run (a takeover must
+        always be current). A `config_tamper_detected` object in the checkpoint is recorded once
+        per new session. Refused reports leave no row. An unknown role → 404 `NOT_FOUND`.
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
         - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
@@ -536,8 +553,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [stored, seq, checkpoint_sha256, tamper_recorded]
+                required: [stored, seq, checkpoint_sha256, tamper_recorded, current_assignment]
                 properties:
+                  current_assignment: { type: boolean }
                   stored: { type: boolean }
                   seq: { type: integer }
                   checkpoint_sha256: { type: string }
@@ -547,6 +565,8 @@ paths:
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Unknown role (`NOT_FOUND`)
         '409': { $ref: '#/components/responses/Rejected' }
   /v0/repos/{repo_id}/roles/{role}/checkpoints/latest:
     get:
@@ -561,7 +581,7 @@ paths:
         - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
       responses:
         '200':
-          description: Latest record (sequence, digest, phase, session, assignment, generation, sprint revision, digests, target SHA, tamper event count)
+          description: Latest record (sequence, digest, phase, session, assignment, generation, current_assignment, sprint revision, digests, target SHA, tamper event count)
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
@@ -576,7 +596,8 @@ paths:
         checkpoint (sequence, SHA-256) with the central record, and the central record with the
         current assignment. `decision`: `resume_allowed`, `no_checkpoint`, `already_running`,
         `stale_generation`, `external_reconciliation_required` or `not_observed`, with `reasons`.
-        Read-only.
+        Read-only. The supervisor is asked before the database reads, which run under the same
+        lock as the reports. An unknown role → 404 `NOT_FOUND`.
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
         - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
@@ -595,6 +616,8 @@ paths:
                   reasons: { type: array, items: { type: string } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Unknown role (`NOT_FOUND`)
   /v0/health:
     get:
       tags: [coordinator]

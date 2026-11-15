@@ -1172,3 +1172,49 @@ fn provider_status_maps_raw_signals_and_never_reuses_an_old_value() {
         assert!(Config::from_json(&v).is_err(), "{q}");
     }
 }
+
+/// A write stopped between the archive copy and `checkpoint.json` leaves the archive one ahead:
+/// the archived checkpoint is the latest and is restored before the reconnect decides (review
+/// 48b1d0e L-3). Without the repair the older `takeover` checkpoint would refuse the resume.
+#[test]
+fn a_checkpoint_one_behind_its_archive_is_restored_from_the_archive() {
+    let (t, svc) = setup("cp-repair");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("r1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "r1");
+    let archive = t.0.join("state/checkpoints");
+    let first = std::fs::read(archive.join(format!("{:020}.json", 1))).expect("archived 1");
+    let v: Value = serde_json::from_slice(&first).expect("j");
+    assert_eq!(
+        (v["seq"].as_u64(), v["phase"].as_str()),
+        (Some(1), Some("takeover"))
+    );
+    std::fs::write(t.0.join("state/checkpoint.json"), &first).expect("w");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("r2", "hi", json!({})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["mode"], "resume", "{b}");
+    wait(&svc, "r2");
+    // two behind is not a stopped write: no repair, the takeover checkpoint refuses
+    let first = std::fs::read(archive.join(format!("{:020}.json", 1))).expect("archived 1");
+    std::fs::write(t.0.join("state/checkpoint.json"), &first).expect("w");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("r3", "hi", json!({})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+}

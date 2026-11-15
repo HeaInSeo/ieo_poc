@@ -166,7 +166,9 @@ pub fn stop(roles: &Value, repo: &str, wait: Duration, poll: Duration) -> (u16, 
                     reasons.push(format!("{r}: still running after {} s", wait.as_secs()));
                 }
                 // the central record must hold the saved checkpoint (§2.1, decision item 9)
-                if safe["checkpoint_reported"] == false {
+                // anything but an explicit true (false, missing, "local_only") is not reported
+                // (review 48b1d0e L-1)
+                if safe["checkpoint_reported"] != true {
                     reasons.push(format!("{r}: checkpoint not reported to the coordinator"));
                 }
                 if safe["checkpoint_saved"] != true {

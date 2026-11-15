@@ -340,7 +340,13 @@ pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Re
             run(db, &|tx| latest_checkpoint(tx, who, repo, role))
         }
         ("GET", ["v0", "repos", repo, "roles", role, "checkpoints", "compare"]) => {
-            run(db, &|tx| compare_checkpoint(tx, ctx, who, repo, role))
+            // authorization first; the supervisor is asked outside the database transaction
+            // (review 48b1d0e I-2)
+            if let Err(r) = need_compare(who, repo, role) {
+                return r;
+            }
+            let local = role_status(ctx, repo, role);
+            run(db, &|tx| compare_checkpoint(tx, repo, role, &local))
         }
         ("POST", ["v0", "coordinator", "evidence"]) => run(db, &|tx| ingest(tx, who, req)),
         ("POST", ["v0", "coordinator", "judgments"]) => run(db, &|tx| judge(tx, ctx, who, req)),
@@ -3256,7 +3262,8 @@ fn latest_row(tx: &mut Transaction, repo: &str, role: &str) -> Result<Option<Val
     let row = tx.query_opt(
         "SELECT seq, checkpoint_sha256, phase, session_id, assignment_id, generation, sprint_id,
                 sprint_revision, spec_digest, target_sha, settings_digest, reported_by, iso(received_at),
-                (SELECT count(*) FROM role_tamper_events t WHERE t.repo_id = c.repo_id AND t.role = c.role)
+                (SELECT count(*) FROM role_tamper_events t WHERE t.repo_id = c.repo_id AND t.role = c.role),
+                current_assignment
          FROM role_checkpoints c WHERE repo_id = $1 AND role = $2 ORDER BY seq DESC LIMIT 1",
         &[&repo, &role],
     )?;
@@ -3268,7 +3275,7 @@ fn latest_row(tx: &mut Transaction, repo: &str, role: &str) -> Result<Option<Val
                "sprint_revision": r.get::<_, i64>(7), "spec_digest": r.get::<_, String>(8),
                "target_sha": r.get::<_, String>(9), "settings_digest": r.get::<_, String>(10),
                "reported_by": r.get::<_, String>(11), "received_at": r.get::<_, String>(12),
-               "tamper_events": r.get::<_, i64>(13)})
+               "tamper_events": r.get::<_, i64>(13), "current_assignment": r.get::<_, bool>(14)})
     }))
 }
 
@@ -3278,7 +3285,8 @@ fn latest_row(tx: &mut Transaction, repo: &str, role: &str) -> Result<Option<Val
 /// cannot exist (the sequence is contiguous); a later one than the next → 409
 /// `CHECKPOINT_SEQUENCE_GAP`. Its identity must match the current assignment of this repo and
 /// role (generation, sprint revision and digest, target SHA) and never go below the last stored
-/// generation.
+/// generation — except the later checkpoints of a run whose takeover was recorded under the
+/// then-current assignment: they are stored with `current_assignment = false`.
 fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str, req: &Req) -> R {
     need_role(role)?;
     need_reporter(who, repo, role)?;
@@ -3393,12 +3401,9 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
             "reconnect under the current assignment",
         ));
     }
-    // the current assignment of this repo and role, and what it binds (§5-2)
+    // the current assignment of this repo and role (§5-2)
     let head = tx.query_opt(
-        "SELECT a.assignment_id, a.generation, a.sprint_id, a.sprint_revision, a.target_sha, s.digest
-         FROM assignment_heads h JOIN assignments a ON (a.assignment_id, a.generation) = (h.assignment_id, h.generation)
-         JOIN sprint_revisions s ON (s.sprint_id, s.revision) = (a.sprint_id, a.sprint_revision)
-         WHERE h.repo_id = $1 AND h.role = $2",
+        "SELECT assignment_id, generation FROM assignment_heads WHERE repo_id = $1 AND role = $2",
         &[&repo, &role],
     )?;
     let Some(h) = head else {
@@ -3411,7 +3416,19 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
         ));
     };
     let (h_aid, h_gen): (String, i64) = (h.get(0), h.get(1));
-    if aid != h_aid || i64_of(generation) != h_gen {
+    let is_current = aid == h_aid && i64_of(generation) == h_gen;
+    // a run that started under the then-current assignment ends under it: its later
+    // checkpoints (after_run, error) continue the stored takeover of the same session and are
+    // recorded as no longer current, so a reassignment during a run does not leave the role
+    // with a checkpoint nobody can record (review 48b1d0e M-1). A takeover must be current.
+    let continues = phase != "takeover"
+        && latest.as_ref().is_some_and(|l| {
+            l["phase"] == "takeover"
+                && l["session_id"] == session.as_str()
+                && l["assignment_id"] == aid.as_str()
+                && l["generation"].as_u64() == Some(generation)
+        });
+    if !is_current && !continues {
         let stale = aid == h_aid && i64_of(generation) < h_gen;
         return Err(one(
             409,
@@ -3425,11 +3442,28 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
             "reconnect under the current assignment",
         ));
     }
+    // what the named assignment binds: issued for this repo and role, its sprint revision,
+    // spec digest and target SHA
+    let named = tx.query_opt(
+        "SELECT a.sprint_id, a.sprint_revision, a.target_sha, s.digest
+         FROM assignments a JOIN sprint_revisions s ON (s.sprint_id, s.revision) = (a.sprint_id, a.sprint_revision)
+         WHERE a.assignment_id = $1 AND a.generation = $2 AND a.repo_id = $3 AND a.role = $4",
+        &[&aid, &i64_of(generation), &repo, &role],
+    )?;
+    let Some(h) = named else {
+        return Err(one(
+            409,
+            "CHECKPOINT_MISMATCH",
+            "checkpoint_json.assignment_id",
+            "the assignment was not issued for this repo and role",
+            "reconnect under the current assignment",
+        ));
+    };
     let checks: [(&str, bool); 4] = [
-        ("sprint_id", sprint == h.get::<_, String>(2)),
-        ("sprint_revision", i64_of(sprint_rev) == h.get::<_, i64>(3)),
-        ("target_sha", target == h.get::<_, String>(4)),
-        ("spec_digest", spec_digest == h.get::<_, String>(5)),
+        ("sprint_id", sprint == h.get::<_, String>(0)),
+        ("sprint_revision", i64_of(sprint_rev) == h.get::<_, i64>(1)),
+        ("target_sha", target == h.get::<_, String>(2)),
+        ("spec_digest", spec_digest == h.get::<_, String>(3)),
     ];
     if let Some((k, _)) = checks.iter().find(|(_, same)| !same) {
         let code = match *k {
@@ -3441,18 +3475,18 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
             409,
             code,
             &format!("checkpoint_json.{k}"),
-            &format!("{k} differs from the current assignment"),
+            &format!("{k} differs from the assignment"),
             "reconnect under the current assignment",
         ));
     }
     tx.execute(
         "INSERT INTO role_checkpoints (repo_id, role, seq, checkpoint_sha256, phase, session_id, assignment_id,
             generation, sprint_id, sprint_revision, spec_digest, target_sha, image_digest, profile_id,
-            profile_revision, settings_digest, checkpoint, reported_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
+            profile_revision, settings_digest, checkpoint, reported_by, current_assignment)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)",
         &[&repo, &role, &i64_of(seq), &sha, &phase, &session, &aid, &i64_of(generation), &sprint,
           &i64_of(sprint_rev), &spec_digest, &target, &image, &profile, &i64_of(profile_rev), &settings,
-          &cp, &who.name],
+          &cp, &who.name, &is_current],
     )?;
     // a tamper detection travels with the new session's checkpoints (§5-6); recorded once
     let tamper = &cp["config_tamper_detected"];
@@ -3496,7 +3530,8 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
     )?;
     ok(
         201,
-        json!({"stored": true, "seq": seq, "checkpoint_sha256": sha, "tamper_recorded": tamper_recorded}),
+        json!({"stored": true, "seq": seq, "checkpoint_sha256": sha, "tamper_recorded": tamper_recorded,
+               "current_assignment": is_current}),
     )
 }
 
@@ -3530,7 +3565,7 @@ fn latest_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str)
 /// digest) with the central record, and the central record with the current assignment.
 /// `decision`: `resume_allowed`, `no_checkpoint` (a new session may start), `already_running`,
 /// `stale_generation`, `external_reconciliation_required` or `not_observed`. Read-only.
-fn compare_checkpoint(tx: &mut Transaction, ctx: &Ctx, who: &Caller, repo: &str, role: &str) -> R {
+fn need_compare(who: &Caller, repo: &str, role: &str) -> Result<(), Resp> {
     need_role(role)?;
     need_client_scope(who, "roles:control", false)?;
     if !who.in_repo(repo) {
@@ -3540,23 +3575,36 @@ fn compare_checkpoint(tx: &mut Transaction, ctx: &Ctx, who: &Caller, repo: &str,
             "repo not in this credential's scope",
         ));
     }
+    Ok(())
+}
+
+/// The role supervisor's status, or why it was not observed.
+fn role_status(ctx: &Ctx, repo: &str, role: &str) -> Result<Value, String> {
+    let target = &ctx.roles[repo][role];
+    if !target.is_object() {
+        return Err("no role supervisor configured for this repo and role".into());
+    }
+    match crate::roles::call(target, "GET", "/v0/role/status") {
+        Ok((200, s)) => Ok(s),
+        Ok((st, _)) => Err(format!("the supervisor answered {st}")),
+        Err(e) => Err(e),
+    }
+}
+
+fn compare_checkpoint(
+    tx: &mut Transaction,
+    repo: &str,
+    role: &str,
+    local: &Result<Value, String>,
+) -> R {
+    // the same lock as the reports: the central record does not move between the reads
+    lock(tx, &format!("checkpoint:{repo}:{role}"))?;
     let central = latest_row(tx, repo, role)?;
     let head = tx.query_opt(
         "SELECT assignment_id, generation FROM assignment_heads WHERE repo_id = $1 AND role = $2",
         &[&repo, &role],
     )?;
     let head = head.map(|h| (h.get::<_, String>(0), h.get::<_, i64>(1)));
-    let target = &ctx.roles[repo][role];
-    let status = if target.is_object() {
-        crate::roles::call(target, "GET", "/v0/role/status")
-    } else {
-        Err("no role supervisor configured for this repo and role".into())
-    };
-    let local = match &status {
-        Ok((200, s)) => Ok(s.clone()),
-        Ok((st, _)) => Err(format!("the supervisor answered {st}")),
-        Err(e) => Err(e.clone()),
-    };
     let (decision, reasons) = judge_resume(central.as_ref(), head.as_ref(), local.as_ref());
     ok(
         200,

@@ -302,6 +302,8 @@ CREATE TABLE IF NOT EXISTS role_checkpoints (
     settings_digest   text        NOT NULL,
     checkpoint        jsonb       NOT NULL,
     reported_by       text        NOT NULL,
+    -- false: a later checkpoint of a run whose assignment moved on during the run
+    current_assignment boolean    NOT NULL,
     received_at       timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (repo_id, role, seq),
     FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)

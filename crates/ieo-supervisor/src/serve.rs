@@ -164,6 +164,10 @@ impl Config {
     fn checkpoint_archive(&self) -> PathBuf {
         self.state.join("checkpoints")
     }
+    /// The last central report's result (kept across restarts).
+    fn report_record_path(&self) -> PathBuf {
+        self.state.join("checkpoint-report.json")
+    }
     /// Attempts started under this role's budget (append-only, on the persistent volume).
     fn attempts_path(&self) -> PathBuf {
         self.state.join("budget").join("attempts.jsonl")
@@ -282,12 +286,42 @@ impl Service {
                             "observation": o["provider"]})
             })
             .unwrap_or(Value::Null);
+        let central_last = std::fs::read(cfg.report_record_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
         Service {
             cfg,
-            state: Mutex::new(State::default()),
+            state: Mutex::new(State {
+                central_last,
+                ..State::default()
+            }),
             restored,
             previous_provider,
         }
+    }
+
+    /// The local checkpoint's bytes. A write stopped between the archive copy and
+    /// `checkpoint.json` leaves the archive exactly one ahead: then the archived one is the
+    /// latest and is restored (review 48b1d0e L-3). A missing `checkpoint.json` is not
+    /// restored (that stays a mismatch with the central record).
+    fn local_checkpoint(&self) -> Option<Vec<u8>> {
+        let raw = std::fs::read(self.cfg.checkpoint_path()).ok()?;
+        let seq = serde_json::from_slice::<Value>(&raw)
+            .ok()
+            .and_then(|c| c["seq"].as_u64());
+        let archive = self.cfg.checkpoint_archive();
+        let max = crate::central::archived_max(&archive);
+        if let Some(n) = seq
+            && max == n + 1
+            && let Ok(b) = std::fs::read(crate::central::archive_path(&archive, max))
+            && serde_json::from_slice::<Value>(&b)
+                .ok()
+                .is_some_and(|c| c["seq"] == max)
+            && std::fs::write(self.cfg.checkpoint_path(), &b).is_ok()
+        {
+            return Some(b);
+        }
+        Some(raw)
     }
 
     fn authorized(&self, bearer: Option<&str>) -> bool {
@@ -299,7 +333,16 @@ impl Service {
     }
 
     pub fn status(&self) -> Value {
-        let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        // a copy of the state: files are read without holding the lock (review 48b1d0e I-3)
+        let st = {
+            let g = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            State {
+                running: g.running.clone(),
+                stop: None,
+                last: g.last.clone(),
+                central_last: g.central_last.clone(),
+            }
+        };
         let raw = std::fs::read(self.cfg.checkpoint_path()).ok();
         let cp = raw
             .as_ref()
@@ -507,7 +550,7 @@ impl Service {
             &self.cfg.central,
             &self.cfg.repo,
             self.cfg.role_name(),
-            std::fs::read(self.cfg.checkpoint_path()).ok().as_deref(),
+            self.local_checkpoint().as_deref(),
             &self.cfg.checkpoint_archive(),
         ) {
             Ok(c) => c,
@@ -746,7 +789,21 @@ impl Service {
         }
         // §5-1: a checkpoint at takeover, after the stop check, before anything runs (a crash mid-run then names this
         // session); again after the run, and on errors
-        self.write_checkpoint(job, &report.digest, None, false, "takeover")?;
+        if let Some(refusal) =
+            self.write_checkpoint(job, &report.digest, None, false, "takeover")?
+        {
+            // the coordinator did not take the takeover: nothing was written and nothing runs;
+            // the attempt ends as not spawned (0/0 in the budget ledger, review 48b1d0e M-1)
+            let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
+                "mode": if job.resume { "resume" } else { "new" },
+                "stop": "CentralRefused", "stopped_by_guard": false, "spawned": false,
+                "central_refusal": refusal, "tamper": job.tamper});
+            let _ = std::fs::write(
+                dir.join("outcome.json"),
+                serde_json::to_vec_pretty(&v).unwrap_or_default(),
+            );
+            return Ok(v);
+        }
         let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
         let mut cmd = Command::new(&cfg.claude);
         cmd.args(&argv).current_dir(cfg.cwd());
@@ -843,6 +900,12 @@ impl Service {
 
     /// Write the §5-1 checkpoint durably (temp file, fsync, rename, directory fsync). `phase`
     /// records when it was written (`takeover`, `after_run`, `error`).
+    ///
+    /// With a central record, a `takeover` checkpoint is reported **before** it is written
+    /// locally: if the coordinator refuses it (or cannot be reached), nothing is written and
+    /// `Ok(Some(refusal))` is returned, so the attempt ends without spawning and leaves no
+    /// local checkpoint the coordinator does not have (review 48b1d0e M-1). Later phases are
+    /// written first (the run happened) and reported after.
     fn write_checkpoint(
         &self,
         job: &Job,
@@ -850,7 +913,7 @@ impl Service {
         stdout: Option<&Path>,
         exited: bool,
         phase: &str,
-    ) -> Result<(), String> {
+    ) -> Result<Option<Value>, String> {
         let cfg = &self.cfg;
         let c = &job.coord;
         let n = |k: &str| c[k].as_u64().unwrap_or_default();
@@ -913,7 +976,13 @@ impl Service {
         // identity for the central record (§2.1, §5-1): repo, role, sequence; and the tamper
         // event of this session's start, reported with its checkpoints (§5-6)
         let archive = cfg.checkpoint_archive();
-        let seq = crate::central::archived_max(&archive) + 1;
+        // the next number after both the archive and the local checkpoint (review 48b1d0e L-3)
+        let local_seq = std::fs::read(cfg.checkpoint_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|c| c["seq"].as_u64())
+            .unwrap_or(0);
+        let seq = crate::central::archived_max(&archive).max(local_seq) + 1;
         cp["seq"] = json!(seq);
         cp["repo_id"] = json!(cfg.repo);
         cp["role"] = json!(cfg.role_name());
@@ -929,34 +998,51 @@ impl Service {
             std::fs::rename(&tmp, path)?;
             std::fs::File::open(dir)?.sync_all()
         };
+        let central = cfg.central != crate::central::Central::LocalOnly;
+        // takeover: the coordinator first; a refusal writes nothing (fail closed, no leftover)
+        if central && phase == "takeover" {
+            let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
+            let refused = answer.as_ref().err().map(|r| r.body.clone());
+            self.record_report(seq, phase, &answer);
+            if refused.is_some() {
+                return Ok(refused);
+            }
+        }
         // the archive first: a checkpoint.json always has its archived copy
         durable(&crate::central::archive_path(&archive, seq), &archive)
             .map_err(|e| format!("checkpoint archive: {e}"))?;
         durable(&cfg.checkpoint_path(), &cfg.state).map_err(|e| format!("checkpoint: {e}"))?;
-        if cfg.central == crate::central::Central::LocalOnly {
-            return Ok(());
+        // a later phase that is not accepted stays unreported: the status says so and the next
+        // start sends it from the archive or stops for reconciliation
+        if central && phase != "takeover" {
+            let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
+            self.record_report(seq, phase, &answer);
         }
-        let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
-        let rec = match &answer {
+        Ok(None)
+    }
+
+    /// Keep the last central report's result, in memory and on the volume (so a restarted
+    /// service still knows whether its checkpoint was reported — review 48b1d0e L-2).
+    fn record_report(
+        &self,
+        seq: u64,
+        phase: &str,
+        answer: &Result<Value, crate::central::Refusal>,
+    ) {
+        let rec = match answer {
             Ok(v) => json!({"seq": seq, "phase": phase, "ok": true, "answer": v,
                             "at": ieo_evidence::time::now()}),
             Err(r) => json!({"seq": seq, "phase": phase, "ok": false, "status": r.status,
                              "refusal": r.body, "at": ieo_evidence::time::now()}),
         };
+        let _ = std::fs::write(
+            self.cfg.report_record_path(),
+            serde_json::to_vec_pretty(&rec).unwrap_or_default(),
+        );
         self.state
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .central_last = Some(rec);
-        // nothing runs on a takeover the coordinator does not know (fail closed); a later
-        // report that fails leaves the checkpoint unreported: the status says so and the next
-        // start sends it from the archive or stops for reconciliation
-        match answer {
-            Err(r) if phase == "takeover" => Err(format!(
-                "central checkpoint report {seq} failed: {}",
-                r.body
-            )),
-            _ => Ok(()),
-        }
     }
 }
 
