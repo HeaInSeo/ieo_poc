@@ -562,6 +562,18 @@ paths:
                   tamper_recorded: { type: boolean }
         '200':
           description: Duplicate of the stored checkpoint of this sequence
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [duplicate, seq, checkpoint_sha256, tamper_recorded]
+                properties:
+                  duplicate: { type: boolean }
+                  seq: { type: integer }
+                  checkpoint_sha256: { type: string }
+                  tamper_recorded:
+                    type: boolean
+                    description: The stored report of this sequence recorded a tamper event
         '400': { $ref: '#/components/responses/Rejected' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -581,7 +593,7 @@ paths:
         - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
       responses:
         '200':
-          description: Latest record (sequence, digest, phase, session, assignment, generation, current_assignment, sprint revision, digests, target SHA, tamper event count)
+          description: Latest record (sequence, digest, phase, session, assignment, generation, current_assignment, sprint revision, digests, target SHA, tamper event count, and `tamper_recorded` — whether this checkpoint's own report recorded a tamper event)
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':

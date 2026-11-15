@@ -25,3 +25,12 @@ Q-2: exists() instead of readable: KILLED (rc 101)
 M4: arm back to (Some(p), false, None): KILLED (rc 101)
 done
 
+
+# review 681c1d3 follow-up (commit 9b63ce8): each fix reverted alone, the named test run, the source restored
+L-1 adoption clears regardless: KILLED (rc 101)
+L-1 duplicate clears regardless: KILLED (rc 101)
+I-4 non-object pending accepted: KILLED (rc 101)
+I-1 fd 9 inherited by podman restart: KILLED (rc 101)
+I-2 curl -s instead of -sf: KILLED (rc 101)
+coord: latest tamper_recorded always true: KILLED (rc 101)
+coord: duplicate tamper_recorded always true: KILLED (rc 101)

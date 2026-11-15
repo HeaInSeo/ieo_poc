@@ -23,7 +23,8 @@ impl Drop for Tmp {
 }
 
 /// A role service's status endpoint: answers the current status to the right bearer, 401
-/// otherwise.
+/// otherwise. The 401 body also carries the status fields, so only the HTTP status (`curl -f`)
+/// tells it apart (review 681c1d3 I-2).
 struct Stub {
     port: u16,
     status: Arc<Mutex<Value>>,
@@ -40,7 +41,9 @@ fn stub(status: Value) -> Stub {
                 h.field.equiv("Authorization") && h.value.as_str() == format!("Bearer {TOKEN}")
             });
             let (code, body) = if !authorized {
-                (401, json!({"code": "UNAUTHORIZED"}))
+                let mut b = s.lock().expect("s").clone();
+                b["code"] = json!("UNAUTHORIZED");
+                (401, b)
             } else if req.url() == "/v0/role/status" {
                 (200, s.lock().expect("s").clone())
             } else {
@@ -105,7 +108,8 @@ impl Setup {
                           "adapter_token_file": w.join("adapter.token"), "share": share}}});
         std::fs::write(w.join("plan.json"), plan.to_string()).expect("plan");
         // podman: the port of each container, a restart that notes whether caller.lock is held
-        // while it runs, and PID 1's command line
+        // while it runs and whether it inherited the lock's descriptor 9 (review 681c1d3 I-1: a
+        // long-lived helper holding it would block every later call), and PID 1's command line
         let podman = w.join("stub/podman");
         std::fs::write(
             &podman,
@@ -114,7 +118,8 @@ impl Setup {
 case "$1" in
   port) case "$2" in *development*) echo "0.0.0.0:{dev}";; *) echo "0.0.0.0:{gr}";; esac;;
   restart) if flock -n "{w}/ledger/caller.lock" true; then held=free; else held=held; fi
-           echo "restart $* lock-$held" >> "{w}/restarts.log";;
+           if [ -e /proc/self/fd/9 ]; then fd=fd9-inherited; else fd=fd9-closed; fi
+           echo "restart $* lock-$held $fd" >> "{w}/restarts.log";;
   exec) printf 'ieo-supervisor\0serve\0';;
 esac
 "#,
@@ -175,7 +180,9 @@ fn the_restart_step_runs_only_when_every_guard_holds() {
     let log = s.restarts();
     assert_eq!(log.lines().count(), 1, "{log}");
     assert!(
-        log.contains("ieo-rt-fixture0204-development") && log.contains("lock-held"),
+        log.contains("ieo-rt-fixture0204-development")
+            && log.contains("lock-held")
+            && log.contains("fd9-closed"),
         "{log}"
     );
     let summary: Value = serde_json::from_str(

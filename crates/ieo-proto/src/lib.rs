@@ -243,7 +243,8 @@ pub fn repro_to_json(r: &ReproStatus) -> Value {
            "exit_code": r.exit_code, "raw_log_refs": r.raw_log_refs, "finished_at": r.finished_at})
 }
 
-/// The checkpoint report's JSON answer → message (200 `{duplicate, seq, checkpoint_sha256}`,
+/// The checkpoint report's JSON answer → message (200 `{duplicate, seq, checkpoint_sha256,
+/// tamper_recorded}`,
 /// 201 `{stored, seq, checkpoint_sha256, tamper_recorded, current_assignment}`).
 pub fn checkpoint_answer_from_json(http_status: u16, v: &Value) -> ReportCheckpointResponse {
     ReportCheckpointResponse {
@@ -258,7 +259,8 @@ pub fn checkpoint_answer_from_json(http_status: u16, v: &Value) -> ReportCheckpo
 /// The same JSON the HTTP path answers, from the message.
 pub fn checkpoint_answer_to_json(r: &ReportCheckpointResponse) -> Value {
     if r.outcome == Outcome::Replayed as i32 {
-        json!({"duplicate": true, "seq": r.seq, "checkpoint_sha256": r.checkpoint_sha256})
+        json!({"duplicate": true, "seq": r.seq, "checkpoint_sha256": r.checkpoint_sha256,
+               "tamper_recorded": r.tamper_recorded})
     } else {
         json!({"stored": true, "seq": r.seq, "checkpoint_sha256": r.checkpoint_sha256,
                "tamper_recorded": r.tamper_recorded, "current_assignment": r.current_assignment})
@@ -285,6 +287,7 @@ pub fn latest_from_json(v: &Value) -> GetLatestCheckpointResponse {
         received_at: s(&v["received_at"]),
         tamper_events: u(&v["tamper_events"]),
         current_assignment: v["current_assignment"].as_bool().unwrap_or_default(),
+        tamper_recorded: v["tamper_recorded"].as_bool().unwrap_or_default(),
     }
 }
 
@@ -295,7 +298,8 @@ pub fn latest_to_json(r: &GetLatestCheckpointResponse) -> Value {
            "sprint_revision": r.sprint_revision, "spec_digest": r.spec_digest,
            "target_sha": r.target_sha, "settings_digest": r.settings_digest,
            "reported_by": r.reported_by, "received_at": r.received_at,
-           "tamper_events": r.tamper_events, "current_assignment": r.current_assignment})
+           "tamper_events": r.tamper_events, "current_assignment": r.current_assignment,
+           "tamper_recorded": r.tamper_recorded})
 }
 
 /// The HTTP-equivalent body of `SubmitReproRequest` (§2): every non-optional field always, an
@@ -422,7 +426,8 @@ mod tests {
             "checkpoint_sha256": "ab", "phase": "after_run", "session_id": "s",
             "assignment_id": "A", "generation": 1, "sprint_id": "P", "sprint_revision": 5,
             "spec_digest": "d", "target_sha": "t", "settings_digest": "e", "reported_by": "x",
-            "received_at": "2026-11-15T00:00:00Z", "tamper_events": 0, "current_assignment": true});
+            "received_at": "2026-11-15T00:00:00Z", "tamper_events": 0, "current_assignment": true,
+            "tamper_recorded": false});
         assert_eq!(latest_to_json(&latest_from_json(&latest)), latest);
         let stored = json!({"stored": true, "seq": 2, "checkpoint_sha256": "ab",
                             "tamper_recorded": false, "current_assignment": true});
@@ -430,7 +435,8 @@ mod tests {
             checkpoint_answer_to_json(&checkpoint_answer_from_json(201, &stored)),
             stored
         );
-        let dup = json!({"duplicate": true, "seq": 2, "checkpoint_sha256": "ab"});
+        let dup = json!({"duplicate": true, "seq": 2, "checkpoint_sha256": "ab",
+                         "tamper_recorded": true});
         assert_eq!(
             checkpoint_answer_to_json(&checkpoint_answer_from_json(200, &dup)),
             dup

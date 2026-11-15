@@ -3460,7 +3460,9 @@ fn latest_row(tx: &mut Transaction, repo: &str, role: &str) -> Result<Option<Val
         "SELECT seq, checkpoint_sha256, phase, session_id, assignment_id, generation, sprint_id,
                 sprint_revision, spec_digest, target_sha, settings_digest, reported_by, iso(received_at),
                 (SELECT count(*) FROM role_tamper_events t WHERE t.repo_id = c.repo_id AND t.role = c.role),
-                current_assignment
+                current_assignment,
+                EXISTS (SELECT 1 FROM role_tamper_events t
+                        WHERE t.repo_id = c.repo_id AND t.role = c.role AND t.seq = c.seq)
          FROM role_checkpoints c WHERE repo_id = $1 AND role = $2 ORDER BY seq DESC LIMIT 1",
         &[&repo, &role],
     )?;
@@ -3472,7 +3474,8 @@ fn latest_row(tx: &mut Transaction, repo: &str, role: &str) -> Result<Option<Val
                "sprint_revision": r.get::<_, i64>(7), "spec_digest": r.get::<_, String>(8),
                "target_sha": r.get::<_, String>(9), "settings_digest": r.get::<_, String>(10),
                "reported_by": r.get::<_, String>(11), "received_at": r.get::<_, String>(12),
-               "tamper_events": r.get::<_, i64>(13), "current_assignment": r.get::<_, bool>(14)})
+               "tamper_events": r.get::<_, i64>(13), "current_assignment": r.get::<_, bool>(14),
+               "tamper_recorded": r.get::<_, bool>(15)})
     }))
 }
 
@@ -3565,9 +3568,19 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
             )?
             .get(0);
         if stored == sha {
+            // whether this checkpoint's own report recorded a tamper event: a supervisor clears
+            // its pending detection only on `true` (review 681c1d3 L-1)
+            let tamper_recorded: bool = tx
+                .query_one(
+                    "SELECT EXISTS (SELECT 1 FROM role_tamper_events
+                                    WHERE repo_id=$1 AND role=$2 AND seq=$3)",
+                    &[&repo, &role, &i64_of(seq)],
+                )?
+                .get(0);
             return ok(
                 200,
-                json!({"duplicate": true, "seq": seq, "checkpoint_sha256": sha}),
+                json!({"duplicate": true, "seq": seq, "checkpoint_sha256": sha,
+                       "tamper_recorded": tamper_recorded}),
             );
         }
         return Err(one(

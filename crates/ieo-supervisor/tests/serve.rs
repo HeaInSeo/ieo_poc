@@ -1275,8 +1275,10 @@ fn a_missing_archive_copy_is_written_and_a_rollback_is_not_hidden() {
 
 /// A fake central record: stores reported checkpoints in order and answers `latest`. With
 /// `lose` set, the next report is stored but answered with a server error (an answer the
-/// supervisor cannot trust). Like the coordinator, it records a tamper event once per new
-/// session id and says so in `tamper_recorded`. X-04: the same record is served over HTTP or gRPC
+/// supervisor cannot trust); with `dup` set, the next report is stored but answered as a
+/// duplicate. Like the coordinator, it records a tamper event once per new session id, says so in
+/// `tamper_recorded`, and says in `latest` (and a duplicate answer) whether that checkpoint's own
+/// report recorded one. X-04: the same record is served over HTTP or gRPC
 /// (`ieo.internal.v0`, the status and `ieo-error-bin` trailer of the coordinator's adapter); every
 /// test that uses it runs once per transport.
 struct FakeCentral {
@@ -1286,10 +1288,11 @@ struct FakeCentral {
     events: Events,
     lose: Arc<std::sync::atomic::AtomicBool>,
     reject: Arc<std::sync::atomic::AtomicBool>,
+    dup: Arc<std::sync::atomic::AtomicBool>,
 }
 
-/// New session ids of the tamper events the fake recorded.
-type Events = Arc<std::sync::Mutex<std::collections::BTreeSet<String>>>;
+/// The tamper events the fake recorded: new session id → seq of the report that recorded it.
+type Events = Arc<std::sync::Mutex<std::collections::BTreeMap<String, u64>>>;
 
 type Store = Arc<std::sync::Mutex<Vec<(u64, String, Value)>>>;
 
@@ -1299,16 +1302,29 @@ struct Fake {
     events: Events,
     lose: Arc<std::sync::atomic::AtomicBool>,
     reject: Arc<std::sync::atomic::AtomicBool>,
+    dup: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Fake {
+    fn recorded_by(&self, seq: u64) -> bool {
+        self.events
+            .lock()
+            .expect("events")
+            .values()
+            .any(|n| *n == seq)
+    }
+
     /// The fake's answer, as HTTP status and body, to `GET latest` or a report body.
     fn answer(&self, method: &str, body: &[u8]) -> (u16, Value) {
         use std::sync::atomic::Ordering;
         let mut s = self.store.lock().expect("store");
         if method == "GET" {
             return match s.last() {
-                Some((n, sha, _)) => (200, json!({"seq": n, "checkpoint_sha256": sha})),
+                Some((n, sha, _)) => (
+                    200,
+                    json!({"seq": n, "checkpoint_sha256": sha,
+                           "tamper_recorded": self.recorded_by(*n)}),
+                ),
                 None => (404, json!({"code": "NO_CHECKPOINT"})),
             };
         }
@@ -1329,15 +1345,20 @@ impl Fake {
             let cp: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
             // ON CONFLICT (repo, role, new_session_id) DO NOTHING
             let t = &cp["config_tamper_detected"];
-            let tamper_recorded = !t.is_null()
-                && self
-                    .events
-                    .lock()
-                    .expect("events")
-                    .insert(t["new_session_id"].as_str().unwrap_or_default().to_string());
+            let tamper_recorded = !t.is_null() && {
+                let mut ev = self.events.lock().expect("events");
+                let id = t["new_session_id"].as_str().unwrap_or_default().to_string();
+                !ev.contains_key(&id) && ev.insert(id, seq).is_none()
+            };
             s.push((seq, sha.clone(), cp));
             if self.lose.swap(false, Ordering::SeqCst) {
                 (502, json!({"code": "BAD_GATEWAY"}))
+            } else if self.dup.swap(false, Ordering::SeqCst) {
+                (
+                    200,
+                    json!({"duplicate": true, "seq": seq, "checkpoint_sha256": sha,
+                           "tamper_recorded": tamper_recorded}),
+                )
             } else {
                 (
                     201,
@@ -1413,6 +1434,7 @@ fn fake_central(transport: &'static str) -> FakeCentral {
         events: Arc::new(std::sync::Mutex::new(Default::default())),
         lose: Arc::new(AtomicBool::new(false)),
         reject: Arc::new(AtomicBool::new(false)),
+        dup: Arc::new(AtomicBool::new(false)),
     };
     let url = if transport == "grpc" {
         let (tx, rx) = std::sync::mpsc::channel();
@@ -1461,6 +1483,7 @@ fn fake_central(transport: &'static str) -> FakeCentral {
         store: fake.store,
         lose: fake.lose,
         reject: fake.reject,
+        dup: fake.dup,
     }
 }
 
@@ -1487,6 +1510,7 @@ over_both_transports!(
     a_takeover_accepted_but_not_written_locally_is_adopted_next_time,
     a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending,
     a_tamper_the_coordinator_did_not_record_stays_pending,
+    an_unrecorded_tamper_stays_pending_after_a_duplicate_or_an_adopted_takeover,
 );
 
 fn svc_central(t: &Tmp, c: &FakeCentral) -> Arc<Service> {
@@ -1847,7 +1871,7 @@ fn a_tamper_the_coordinator_did_not_record_stays_pending(transport: &'static str
     assert_eq!(b["accepted"]["mode"], "new", "{b}");
     assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s3", "{b}");
     assert!(!state.join("pending-tamper.json").exists());
-    assert!(c.events.lock().expect("e").contains("s5"));
+    assert!(c.events.lock().expect("e").contains_key("s5"));
 }
 
 /// Review ae65f0c Q-2 and acceptance §4: an earlier pending detection is kept over a fresh one
@@ -1956,4 +1980,104 @@ fn an_older_pending_detection_is_kept_and_an_unreadable_one_is_replaced() {
         "{b}"
     );
     wait(&svc, "r2");
+}
+
+/// Review 681c1d3 L-1: the other two paths that cleared a pending tamper — a duplicate answer to
+/// the takeover, and the adoption of a staged takeover whose answer was lost — clear it only when
+/// the coordinator says that takeover's report recorded the event. Here the event is dropped
+/// (the new session id was used by an earlier event, the P-2 case), so it stays pending.
+fn an_unrecorded_tamper_stays_pending_after_a_duplicate_or_an_adopted_takeover(
+    transport: &'static str,
+) {
+    use std::sync::atomic::Ordering;
+    for path in ["duplicate", "adopted"] {
+        let (t, _) = setup(&format!("tamper-l1-{path}"));
+        let c = fake_central(transport);
+        let svc = svc_central(&t, &c);
+        let state = t.0.join("state");
+        let send = |attempt: &str, op: &str, extra: Value| {
+            call(
+                &svc,
+                "POST",
+                &format!("/v0/role/{op}"),
+                &req(attempt, "hi", extra),
+            )
+        };
+        let run = |attempt: &str, op: &str, extra: Value| {
+            let (st, b) = send(attempt, op, extra);
+            assert_eq!(st, 202, "{path} {attempt}: {b}");
+            wait(&svc, attempt)
+        };
+        run("v1", "start", json!({"session_id": "s1"}));
+        std::fs::write(state.join("claude/CLAUDE.md"), "injected").expect("tamper");
+        run("v2", "reconnect", json!({"new_session_id": "s2"}));
+        assert!(!state.join("pending-tamper.json").exists());
+        run("v3", "start", json!({"session_id": "s3"}));
+        std::fs::write(state.join("claude/CLAUDE.md"), "injected again").expect("tamper");
+        // the takeover carrying the second detection reuses s2: stored, event dropped
+        if path == "duplicate" {
+            c.dup.store(true, Ordering::SeqCst);
+            run("v4", "reconnect", json!({"new_session_id": "s2"}));
+        } else {
+            c.lose.store(true, Ordering::SeqCst);
+            let last = run("v4", "reconnect", json!({"new_session_id": "s2"}));
+            assert_eq!(last["stop"], "CentralRefused", "{last}");
+            assert!(state.join("checkpoint-staged.json").exists());
+            // the next request adopts the staged takeover (the coordinator holds exactly it)
+            let (st, b) = send("v5", "reconnect", json!({"new_session_id": "s5"}));
+            assert_eq!(st, 409, "{b}");
+            assert!(!state.join("checkpoint-staged.json").exists(), "adopted");
+        }
+        assert_eq!(
+            c.events.lock().expect("e").len(),
+            1,
+            "{path}: the event was dropped"
+        );
+        let pending: Value = serde_json::from_slice(
+            &std::fs::read(state.join("pending-tamper.json"))
+                .unwrap_or_else(|_| panic!("{path}: the detection must stay pending")),
+        )
+        .expect("j");
+        assert_eq!(pending["old_session_id"], "s3", "{path}: {pending}");
+    }
+}
+
+/// Review 681c1d3 I-4: a pending file holding JSON that is not an object (an array) is read like
+/// an unreadable one: no panic, and a fresh detection replaces it.
+#[test]
+fn a_pending_file_that_is_not_an_object_does_not_panic() {
+    let _serial = serial();
+    let (t, svc) = setup("tamper-array");
+    let state = t.0.join("state");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "a1");
+    // no fresh detection: answered as with an unreadable file, not a panic
+    std::fs::write(state.join("pending-tamper.json"), "[1, 2]").expect("w");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("a2", "hi", json!({"new_session_id": "s2"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["mode"], "resume", "{b}");
+    wait(&svc, "a2");
+    // with a fresh detection: it replaces the array
+    std::fs::write(state.join("pending-tamper.json"), "[1, 2]").expect("w");
+    std::fs::write(state.join("claude/CLAUDE.md"), "injected").expect("tamper");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("a3", "hi", json!({"new_session_id": "s3"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["mode"], "new", "{b}");
+    assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s1", "{b}");
+    wait(&svc, "a3");
 }
