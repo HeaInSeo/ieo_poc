@@ -1208,10 +1208,13 @@ fn a_statement_past_the_deadline_rolls_back_as_deadline_exceeded() {
     let st = r.expect_err("deadline");
     assert_eq!(st.code(), Code::DeadlineExceeded, "{st:?}");
     assert!(ieo_proto::error_from_status(&st).is_none(), "no trailer");
+    // the server's own answer (rolled back before its handling deadline), not the client's
+    // timer: a timing bound alone has only the 50 ms margin (PR #64 review c6c0656 L-1)
     assert!(
-        took < Duration::from_millis(600),
-        "answered before the deadline: {took:?}"
+        st.message().contains("rolled back"),
+        "answered by the server: {st:?}"
     );
+    assert!(took < Duration::from_secs(5), "bounded: {took:?}");
     release(lock);
     assert_eq!(checkpoints(&e), 0, "rolled back");
     // the server's own limit applies without a client deadline (15 s by default; 700 ms here)

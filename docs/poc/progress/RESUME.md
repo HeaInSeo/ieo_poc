@@ -1,6 +1,6 @@
 # 중단·재개 기록
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0037` · 원장 SHA-256 `7bb5415e3e94c56db1f2e3b44f1d09c7244883094e873b48fadba2db00077214`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0037` · 원장 SHA-256 `754be073e6c12316b9d5cbe1f9888b5926f8e9adf12b4d0fb521e84fdc9f9217`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | last_verified_stage | 02-03 검수 완료, 02-04 검수 완료(12/73 · 0/12), X-01 검수 완료·후속 병합, gRPC 계획 A4, P28 개정 A5, 항목 8 담당 X-08 개정 A6(PR #61 병합 0779850), X-03 검수 완료(0c243ee) |
 | workspace | /opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public) |
-| branch_sha | main 493b712ee4594c9c6d24c0ec66bfb682a117392c (PR #63 병합 = X-03 수용 기록, main CI success; 이 X-04 PR 병합 전) |
+| branch_sha | main 493b712ee4594c9c6d24c0ec66bfb682a117392c (PR #63 병합 = X-03 수용 기록, main CI 43697454428 success; 이 X-04 PR 병합 전) |
 | plan_and_spec | v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 9 |
 | running | X-04 구현 PR(feat/x04-grpc). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:a1cfe78(로컬). 실제 Claude 실행 없음 |
 | unresolved_external_effects | [] |
