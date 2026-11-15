@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0037",
-  "snapshot_created_at": "2026-11-15T18:54:38+09:00",
-  "last_actual_work_observed_at": "2026-11-15T18:54:38+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0038",
+  "snapshot_created_at": "2026-11-15T20:12:23+09:00",
+  "last_actual_work_observed_at": "2026-11-15T20:12:23+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 구현 PR · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건)",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건)",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -2019,7 +2019,8 @@
     "2026-11-15 사용자 지시(User_Decisions_2026-11-15_resume.md, 개정 A6): 압축 뒤 재개. 예산·차단 조건 유지, 항목 8 담당 작업 X-08 명시, PR #60 검토 N-1~N-3 반영, 재개 절차를 resume.restart_procedure와 재발 방지 대응표 §1.11에 고정. 새 결정·새 예산 없음",
     "main CI 기록: 43694942714(0779850, PR #61 병합 = 개정 A6·재개 기록) success",
     "main CI 기록: 43696890495(0c243ee, PR #62 병합 = X-03 계약) success",
-    "main CI 기록: 43697454428(493b712, PR #63 병합 = X-03 수용 기록) success"
+    "main CI 기록: 43697454428(493b712, PR #63 병합 = X-03 수용 기록) success",
+    "main CI 기록: 43707470907(84c9668, PR #64 병합 = X-04) success"
   ],
   "events": [
     {
@@ -2575,14 +2576,25 @@
       "evidence": [
         "reports/extra/X-04/grpc-path-20261115/REPORT.md"
       ]
+    },
+    {
+      "event_id": "X-04-ACCEPTED-20261115",
+      "event_revision": 1,
+      "task_id": "X-04",
+      "observed_at": "2026-11-15T20:12:23+09:00",
+      "state": "X-04 검수 완료: PR #64 병합 84c9668(검토 c6c0656 변경 요청·835f583 approve, 검토 2/4·교정 1/3), main CI 43707470907 success. gRPC는 선택, HTTP 기본. 12/73·0/12 불변. 모델 호출 0",
+      "evidence": [
+        "reports/extra/X-04/grpc-path-20261115/REPORT.md",
+        "reports/extra/X-04/grpc-path-20261115/reviews/review-pr64-835f583.md"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-03 검수 완료, 02-04 검수 완료(12/73 · 0/12), X-01 검수 완료·후속 병합, gRPC 계획 A4, P28 개정 A5, 항목 8 담당 X-08 개정 A6(PR #61 병합 0779850), X-03 검수 완료(0c243ee)",
+    "last_verified_stage": "02-03 검수 완료, 02-04 검수 완료(12/73 · 0/12), X-01 검수 완료·후속 병합, gRPC 계획 A4, P28 개정 A5, 항목 8 담당 X-08 개정 A6(PR #61 병합 0779850), X-03 검수 완료(0c243ee), X-04 검수 완료(84c9668)",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main 493b712ee4594c9c6d24c0ec66bfb682a117392c (PR #63 병합 = X-03 수용 기록, main CI 43697454428 success; 이 X-04 PR 병합 전)",
+    "branch_sha": "main 84c9668c3f1f39b013a3c25ac9c8098acaedf9db (PR #64 병합 = X-04, main CI 43707470907 success; 이 수용 기록 PR 병합 전)",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 9",
-    "running": "X-04 구현 PR(feat/x04-grpc). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:a1cfe78(로컬). 실제 Claude 실행 없음",
+    "running": "X-04 수용 기록 PR(report/x04-accepted). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:a1cfe78(로컬). 실제 Claude 실행 없음",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2619,9 +2631,9 @@
       "reports/extra/X-04/grpc-path-20261115/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "X-04 PR 검토·병합 → X-04 검수 기록 → 02-05. X-08(항목 8)은 모델 호출 없이 그 사이에 하고 첫 실제 모델 호출 전에 병합. PR은 하나씩",
+    "next_action": "X-04 수용 기록 PR 병합 확인 → 02-05 착수(모델 호출 없는 부분부터) · X-08(항목 8)은 모델 호출 없이 하고 첫 실제 모델 호출 전에 병합. PR은 하나씩",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다.",
-    "current_work": "원장 current_task·next_task는 주 작업만 담을 수 있어 02-05로 둔다. 진행 중: 추가 작업 X-04(gRPC 구현·공통 회귀, 02-05 전에 끝내는 목표, 02-05의 선행 아님), 구현 PR 검토 단계. X-04 완료 조건: 장부 §7 X-04 수용 기준 — X-03 계약대로 gRPC 경로 추가, 업무 규칙 재사용, 기존 HTTP 시험 통과, HTTP·gRPC 공통 회귀(인증·권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 재전송 중복 반영 방지). 계획 §6에 따라 supervisor 클라이언트 전환도 X-04 범위(장부 기준에는 없음). 독립 검토 승인·필수 CI 3개·승인 head 조건 병합·병합 SHA main CI",
+    "current_work": "current_task·next_task = 02-05. X-04 수용 기록 PR(report/x04-accepted) 병합 뒤 02-05 착수. 02-05 완료 조건: 장부의 02-05 수용 기준과 02-05 unresolved의 02-04 이월(배정 수준 한도 집행, 코디네이터 start·reconnect 호출과 중앙 compare, 외부 요청 추적, GitHub SHA·CI 대조, 02-03·X-01 이월 규칙 결정). 실제 모델 호출이 필요한 부분은 X-08 병합 뒤. 독립 검토 승인·필수 CI 3개·승인 head 조건 병합·병합 SHA main CI",
     "blocking": "X-08 병합 전: X-02 착수와 모든 후속 실제 모델 호출 금지(02-05 실제 회차 포함). 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지",
     "budget": "02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 병합과 X-02 남은 조건 뒤에만",
     "user_decisions": [
@@ -2753,18 +2765,19 @@
       "prerequisites": [
         "X-03"
       ],
-      "status": "진행",
-      "last_observed_at": "2026-11-15T18:54:38+09:00",
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-15T20:12:23+09:00",
       "latest_report": "reports/extra/X-04/grpc-path-20261115/REPORT.md",
-      "result_state": "구현: 작업 표(Operation·dispatch, 동작 변경 없음)·커밋 전 확인, ieo-coord --grpc-listen(tonic 0.14, protox 빌드 생성, 작업자 풀, deadline·취소·57014, ieo-error-bin, tonic-health), crate ieo-proto(상태 대응·trailer·변환), supervisor CoordinatorClient(HTTP 기본·gRPC 선택, 4xx/결과 불명 분류 한 곳, 자동 재전송 없음), HTTP·gRPC 공통 회귀(실제 PostgreSQL, 94회 동등 시나리오·교차 재전송·커밋 뒤 응답 유실·롤백·옛 세대), 계약 §12 수정(X-03 검토 P-1·P-2·I-7~I-10), CI 비필수 buf 작업. 검토 c6c0656 변경 요청(M-1 CI의 serve 시험 경합 → 직렬화, L-1 시간 여유) → 교정 1(검토 1/4·교정 1/3). 모델 호출 0",
-      "verification_level": "unverified",
+      "result_state": "구현: 작업 표(Operation·dispatch, 동작 변경 없음)·커밋 전 확인, ieo-coord --grpc-listen(tonic 0.14, protox 빌드 생성, 작업자 풀, deadline·취소·57014, ieo-error-bin, tonic-health), crate ieo-proto(상태 대응·trailer·변환), supervisor CoordinatorClient(HTTP 기본·gRPC 선택, 4xx/결과 불명 분류 한 곳, 자동 재전송 없음), HTTP·gRPC 공통 회귀(실제 PostgreSQL, 94회 동등 시나리오·교차 재전송·커밋 뒤 응답 유실·롤백·옛 세대), 계약 §12 수정(X-03 검토 P-1·P-2·I-7~I-10), CI 비필수 buf 작업. 검토 c6c0656 변경 요청(M-1 CI의 serve 시험 경합 → 직렬화, L-1 시간 여유) → 교정 1 → 835f583 approve(검토 2/4·교정 1/3). 승인 head 병합 84c9668, main CI 43707470907 success. 검수 완료(추가 작업, 73·12 미산입). 모델 호출 0",
+      "verification_level": "verified",
       "evidence": [
         "reports/extra/X-04/grpc-path-20261115/REPORT.md",
         "reports/extra/X-04/grpc-path-20261115/evidence/test.log",
-        "reports/extra/X-04/grpc-path-20261115/reviews/review-pr64-c6c0656.md"
+        "reports/extra/X-04/grpc-path-20261115/reviews/review-pr64-c6c0656.md",
+        "reports/extra/X-04/grpc-path-20261115/reviews/review-pr64-835f583.md"
       ],
-      "next_action": "독립 검토·필수 CI·승인 head 병합·main CI → 검수 기록 → 02-05",
-      "unresolved": "공통 회귀: 인증·역할 권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 연결 중단 뒤 재전송 중복 반영 방지(전송 성공과 실제 반영의 불일치 포함) · 02-05의 선행·수용 기준은 바꾸지 않음: X-04가 준비되지 않으면 02-05는 HTTP로 진행 · supervisor 쪽 gRPC 클라이언트(02-05가 HTTP로 먼저 진행했으면 그 전환 포함)도 X-04 범위 · PR #41 검토 b3cb083: X-04 PR 설명·보고에 supervisor 클라이언트 전환을 명시(장부 수용 기준에는 없음) · X-03 계약 검토 8e3e817에서 넘긴 입력(reports/extra/X-03/grpc-contract-20261115/REPORT.md §7): P-1 빈 request_id·?·# 경로 값은 인증 뒤 404, P-2 RESOURCE_EXHAUSTED 규칙 하나로·사전 계산에 경로 값 길이·대기 사본 처리, I-7 §3의 format·순번 400, I-8 사전 계산 직렬화·from_utf8_lossy 차이, I-9 보고 §2 4번 문구, I-10 trailer 목록에 DB UNAVAILABLE. 계약 설명을 구현과 함께 고친다"
+      "next_action": "없음(02-05로). X-05·X-06은 각자의 선행대로",
+      "unresolved": "공통 회귀: 인증·역할 권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 연결 중단 뒤 재전송 중복 반영 방지(전송 성공과 실제 반영의 불일치 포함) · 02-05의 선행·수용 기준은 바꾸지 않음: X-04가 준비되지 않으면 02-05는 HTTP로 진행 · supervisor 쪽 gRPC 클라이언트(02-05가 HTTP로 먼저 진행했으면 그 전환 포함)도 X-04 범위 · PR #41 검토 b3cb083: X-04 PR 설명·보고에 supervisor 클라이언트 전환을 명시(장부 수용 기준에는 없음) · X-03 계약 검토 8e3e817에서 넘긴 입력(reports/extra/X-03/grpc-contract-20261115/REPORT.md §7): P-1 빈 request_id·?·# 경로 값은 인증 뒤 404, P-2 RESOURCE_EXHAUSTED 규칙 하나로·사전 계산에 경로 값 길이·대기 사본 처리, I-7 §3의 format·순번 400, I-8 사전 계산 직렬화·from_utf8_lossy 차이, I-9 보고 §2 4번 문구, I-10 trailer 목록에 DB UNAVAILABLE. 계약 설명을 구현과 함께 고친다 · 수용 뒤 비차단(보고 §5): L-3 deadline 시험의 50ms 응답 여유, I-7 시험 기록의 기준 커밋, 교정 1 표의 L-2·I-1~I-6"
     },
     {
       "task_id": "X-05",

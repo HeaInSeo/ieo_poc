@@ -7,7 +7,7 @@
 | 계약 | [`contracts/ieo-internal-v0.md`](../../../../../../contracts/ieo-internal-v0.md)(X-03, 이번 구현으로 고친 곳은 그 문서 §12) |
 | 시험 | [evidence/test.log](evidence/test.log): fmt·clippy(-D warnings)·전체 시험(시험 DB 사용) |
 | 모델 호출 | 0회. 실제 호출·예비 회차·결제 없음. 영속 PoC DB(55433)와 코디네이터 서비스는 건드리지 않음 |
-| 상태 | 독립 검토 [c6c0656 변경 요청](reviews/review-pr64-c6c0656.md)(M-1 CI 실패: 시험 경합) → 교정 1(§4) |
+| 상태 | 독립 검토 [c6c0656 변경 요청](reviews/review-pr64-c6c0656.md)(M-1 CI 실패: 시험 경합) → 교정 1(§4) → [835f583 승인](reviews/review-pr64-835f583.md) → 병합 84c9668, **검수 완료**(§5) |
 
 ## 1. 구현
 
@@ -52,7 +52,7 @@
 | 지적 | 처리 |
 | --- | --- |
 | M-1 CI의 `ieo-supervisor --test serve` 실패(409 `ALREADY_RUNNING`) | 원인: 세션 잠금은 O_CLOEXEC 파일의 flock이다. 다른 시험 스레드가 띄운 프로세스가 exec 전까지 설명자를 공유해 방금 푼 잠금이 잡힌 것처럼 보인다. 이 PR이 두 전송 변형으로 시험 수를 늘려 경합이 잦아졌다. `tests/serve.rs`의 모든 시험을 `tests/caller.rs`와 같은 직렬화 잠금으로 묶었다. 고친 뒤 `serve` 20회 반복 실패 0 |
-| L-1 deadline 시험의 50ms 여유 | 시간 경계 대신 서버가 만든 답(“rolled back” 메시지)인지 확인하고, 상한은 5초로 넓혔다 |
+| L-1 deadline 시험의 50ms 여유 | 서버가 만든 답(“rolled back” 메시지)인지 확인하고, 상한은 5초로 넓혔다. 다만 서버가 문장 시간 제한 뒤 50ms(`ANSWER_MARGIN`) 안에 답해야 하는 조건은 남는다(검토 835f583 L-3, §5) |
 | L-2 작업자 panic 뒤 교체 없음, I-2 커밋 중 57014는 `INTERNAL`, I-6 작업자 join 없음 | HTTP 작업자와 같은 동작이고 클라이언트는 결과 불명으로 다룬다. 바꾸지 않고 기록한다 |
 | I-1 종단 상태 확인이 서버와 같은 함수 사용 | 409 나눔 등은 `ieo-proto` 단위 표가 고정한다. 기록 |
 | I-3 `Shape`는 문서용 | 기록 |
@@ -60,3 +60,13 @@
 | I-5 main 493b712 CI 번호 | 원장 기록에 43697454428 |
 
 시험 기록을 다시 만들었다(evidence/test.log, 332 통과·실패 0). 그 사이 공유 빌드 캐시가 지워진 작업 트리 경로를 담아 `ieo-evidence` 시험 18건이 실패한 일이 있었다. 해당 crate를 다시 빌드해 해결했고, 코드 문제가 아니다(재발 방지 대응표 §1.10과 같은 계열).
+
+## 5. 수용(검토 835f583 승인)
+
+- PR #64: 검토 c6c0656 변경 요청(M-1) → 교정 1 → [835f583 승인](reviews/review-pr64-835f583.md). 검토 2/4·교정 1/3. 필수 CI 3개와 비필수 proto 작업 성공(run 43706567018). 승인 head 병합 84c9668, main CI 43707470907 success.
+- 장부 §7 X-04 수용 기준과 계획 §6의 supervisor 클라이언트 전환이 §2대로 충족됐다. X-04를 **검수 완료**로 기록한다. 추가 작업이므로 73·12 완료 수에 넣지 않는다.
+- **남은 비차단 지적**:
+  - L-3: deadline 시험은 느린 기계에서 서버가 시간 제한 뒤 50ms 안에 답하지 못하면 tonic의 `CANCELLED`로 실패할 수 있다. 시간 여유는 deadline 길이와 무관하다. 흔들리면 시험용 `GrpcConfig`로 여유를 넓힌다.
+  - I-7: evidence/test.log는 “c6c0656 + 작업 트리”에서 기록했다. 835f583의 검토 실행과 CI가 같은 결과(332 통과)다.
+  - 교정 1 표의 L-2·I-1~I-6(기록만 함).
+- **다음**: 02-05. gRPC는 선택(`--grpc-listen`, `checkpoint_central.transport`)이고 HTTP가 기본이다. X-05·X-06은 이 작업 범위가 아니다.
