@@ -1,0 +1,31 @@
+# 02-04 images, no model call · 2026-11-15T00:14:56Z · tag 8fca0a0
+## images (labels, user, binaries inside)
+coordinator: id=6e72eb395044d1b750f888dc0dd821e6f41d0a1f5d3c22285cbd7e20f67ecf42 digest=sha256:b7d4e320b3be92efe8ee1d288ace6a2b94b6e6da38ed9913bb02d370ea23ca16 user=20000:20000 revision=8fca0a0bc81e08b707b694ce668b00d833c01a4a
+role-development: id=4ad022b64119c0cedf6ab6a30e6e5d4bf70f4bd2c16c6d6a08eb6ff40b8897e8 digest=sha256:cbbe12486ae8e93588395ad31b293bd6ce8e99e6c9d6cacdf510d516e5a7949b user=20001:20001 revision=8fca0a0bc81e08b707b694ce668b00d833c01a4a
+role-guardrail: id=774fe638af8fc26162fca3e6dcafa1e0225351ce3d960bf871545d0cf89d7931 digest=sha256:55b5490421bfa4b8e4c3cbbc704edee472014051f4019b24773964e1ea3bd0ce user=20002:20002 revision=8fca0a0bc81e08b707b694ce668b00d833c01a4a
+coordinator: ieo-coord in image = label
+role-development: supervisor and claude in image = labels
+role-guardrail: supervisor and claude in image = labels
+## coordinator container (UID 20000, PID 1, its own test DB)
+pid1: /usr/local/bin/ieo-coord serve --listen  uid: 20000
+request without credential: 401
+DB password in inspect env: 0 · in argv: 0 · in PID 1 environment: 0
+schema migrated (tables): 15
+## repo-scope control through the coordinator
+development start 202 · guardrail start (long run) 202
+status via coordinator: {'development': (True, False), 'guardrail': (True, True)} (reachable, running)
+repo stop: {'development': (200, False, True), 'guardrail': (202, False, True)} (stop status, running after, checkpoint saved)
+safe_shutdown_confirmed: False
+  unconfirmed: development: active_children "not_tracked"
+  unconfirmed: development: pending_external_requests "not_tracked"
+  unconfirmed: guardrail: active_children "not_tracked"
+  unconfirmed: guardrail: pending_external_requests "not_tracked"
+repo stop took 0.5 s
+guardrail g1 outcome: Requested cleanup_failed False
+processes left in the guardrail container besides PID 1: 0
+## SIGTERM to PID 1
+coordinator: podman stop 0.3 s, exit 0
+development: podman stop 0.3 s, exit 0
+guardrail: podman stop 0.4 s, exit 0
+coordinator log: ieo-coord: stopping (signal) ieo-coord: stopped 
+# done

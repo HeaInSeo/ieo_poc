@@ -1,0 +1,17 @@
+# 02-04 coordinator container: ieo-coord as PID 1, UID 20000 (runtime contract §2 U3).
+# The base is the digest-pinned image the role containers use (no new base pulled).
+# Configuration is mounted read-only at /etc/ieo/coord. The DB URL comes from a mounted secret
+# file named by IEO_DB_URL_FILE (never in argv, the image or the container environment).
+# Built by build-images.sh.
+FROM docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c
+ARG REVISION
+ARG COORD_SHA256
+LABEL org.opencontainers.image.revision="${REVISION}" \
+      ieo.component="coordinator" \
+      ieo.binary.ieo-coord.sha256="${COORD_SHA256}"
+COPY ieo-coord /usr/local/bin/ieo-coord
+USER 20000:20000
+ENTRYPOINT ["/usr/local/bin/ieo-coord", "serve", "--listen", "0.0.0.0:8090", \
+            "--tokens", "/etc/ieo/coord/tokens.json", \
+            "--manifest", "/etc/ieo/coord/Console_Coordinator_Sprints_v0.json", \
+            "--policy", "/etc/ieo/coord/judgment-policy-v0.json"]

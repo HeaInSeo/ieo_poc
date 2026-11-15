@@ -78,13 +78,20 @@ fn setup(name: &str) -> (Tmp, Arc<Service>) {
         hex::encode(Sha256::digest(TOKEN.as_bytes())),
     )
     .expect("adapter");
-    let cfg = Config::from_json(&json!({"role": "development", "repo": "sori",
-        "state": root.join("state"), "etc": etc, "cred": cred,
-        "claude": fake_claude(root), "budget": "02-04",
+    fake_claude(root);
+    let cfg = svc_config(&t);
+    (t, Arc::new(Service::new(cfg)))
+}
+
+/// The configuration `setup` uses, for a second service on the same volume.
+fn svc_config(t: &Tmp) -> Config {
+    let root = &t.0;
+    Config::from_json(&json!({"role": "development", "repo": "sori",
+        "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
+        "claude": root.join("fake-claude"), "budget": "02-04",
         "share": {"max_runs": 8, "total_seconds": 9_600, "billable_tokens": 1_000_000,
                   "cache_read_tokens": 10_000_000}}))
-    .expect("config");
-    (t, Arc::new(Service::new(cfg)))
+    .expect("config")
 }
 
 fn coord(generation: u64) -> Value {
@@ -957,4 +964,65 @@ fn the_largest_end_line_of_an_attempt_counts() {
     let broken = json!({"attempt_id": "a1", "end": {"unknown": true}});
     write_ledger(&t, &[start, end, broken]);
     assert!(refused(&svc, "a2", json!({})).contains("reconcile"));
+}
+
+// --- review adf760e (PR #54): §7 status fields and the safe-shutdown report ---
+
+#[test]
+fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
+    let (t, svc) = setup("status7");
+    let s = svc.status();
+    assert_eq!(s["quota_group_id"], "unknown");
+    assert_eq!(s["provider_status_or_unknown"], "unknown");
+    assert!(s["last_actual_action_at"].is_null());
+    assert_eq!(s["restored_checkpoint_ref"]["found"], false);
+    assert_eq!(s["safe_shutdown"]["active_children"], "not_tracked");
+    assert_eq!(
+        s["safe_shutdown"]["pending_external_requests"],
+        "not_tracked"
+    );
+    assert!(
+        s["capability_gaps"]
+            .as_array()
+            .is_some_and(|g| g.len() == 3),
+        "{s}"
+    );
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "a1");
+    let s = svc.status();
+    assert_eq!(s["safe_shutdown"]["checkpoint_saved"], true, "{s}");
+    assert_eq!(
+        s["provider_status_or_unknown"]["overageStatus"], "rejected",
+        "{s}"
+    );
+    assert!(s["last_actual_action_at"].is_string(), "{s}");
+    // the checkpoint says what it does not track
+    let cp: Value =
+        serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
+            .expect("j");
+    assert_eq!(cp["tracked"]["active_children"], false, "{cp}");
+    // a service started on this volume names the checkpoint it found
+    let again = Service::new(svc_config(&t));
+    let r = &again.status()["restored_checkpoint_ref"];
+    assert_eq!(
+        (
+            r["found"].as_bool(),
+            r["session_id"].as_str(),
+            r["phase"].as_str()
+        ),
+        (Some(true), Some("s1"), Some("after_run")),
+        "{r}"
+    );
+    // an unreadable checkpoint is not a saved one
+    std::fs::write(t.0.join("state/checkpoint.json"), "{not json").expect("w");
+    assert_eq!(svc.status()["safe_shutdown"]["checkpoint_saved"], false);
+    assert_eq!(
+        Service::new(svc_config(&t)).status()["restored_checkpoint_ref"]["readable"],
+        false
+    );
 }

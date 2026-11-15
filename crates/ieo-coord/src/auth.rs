@@ -52,7 +52,9 @@ pub fn token_digest(token: &str) -> String {
 }
 
 const AGENT_SCOPES: [&str; 2] = ["agent:report", "agent:repro"];
-const CLIENT_SCOPES: [&str; 9] = [
+const CLIENT_SCOPES: [&str; 10] = [
+    // repo-scope status/stop of the role supervisors (runtime contract §7, 02-04)
+    "roles:control",
     "sprints:register",
     "sprints:read",
     "review:semantic",

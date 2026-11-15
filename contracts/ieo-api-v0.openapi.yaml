@@ -438,6 +438,64 @@ paths:
         '500': { $ref: '#/components/responses/Internal' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v0/repos/{repo_id}/roles:
+    get:
+      tags: [coordinator]
+      operationId: getRepoRoles
+      summary: Status of both role supervisors of a repo (runtime contract §7)
+      description: |
+        Required scope `roles:control` for `repo_id`; agent credentials are refused. Each role is
+        reported separately: `{reachable, status}` or `{reachable: false, error}` or the
+        supervisor's own HTTP status. Adapter tokens are read per call and never returned.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Both roles' reports
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repo_id, roles]
+                properties:
+                  repo_id: { type: string }
+                  roles: { type: object }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No role supervisors configured for this repo
+  /v0/repos/{repo_id}/stop:
+    post:
+      tags: [coordinator]
+      operationId: stopRepo
+      summary: Repo-scope stop (runtime contract §7)
+      description: |
+        Required scope `roles:control` for `repo_id`. Sends a role-scope `stop` to each role
+        supervisor (never one role through the other), waits up to 30 s for each to run nothing,
+        and returns each role's safe-shutdown report. `safe_shutdown_confirmed` is true only when
+        every role answered, runs nothing, has its checkpoint saved, and reports no active
+        children and no pending external requests; otherwise `unconfirmed` lists the reasons
+        (the supervisors report children and external requests as `not_tracked`, so it is
+        unconfirmed until they track them).
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Each role's stop result and safe-shutdown report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repo_id, roles, safe_shutdown_confirmed, unconfirmed]
+                properties:
+                  repo_id: { type: string }
+                  roles: { type: object }
+                  safe_shutdown_confirmed: { type: boolean }
+                  unconfirmed: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No role supervisors configured for this repo
   /v0/health:
     get:
       tags: [coordinator]

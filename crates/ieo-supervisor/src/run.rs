@@ -649,6 +649,10 @@ pub fn charge_reported(
         serde_json::json!({"state": "unmeasured", "reason": reason,
                            "guard_observed": observed, "collector_reported": collected_run})
     };
+    // a collected value that is not an object is no measurement (PR #40 review 23fee80)
+    if !collected_run.is_object() {
+        return unmeasured("collector value is not an object".into());
+    }
     if !exited {
         return unmeasured(format!(
             "stopped by the run guard ({stop}); a result written after the stop is not trusted"

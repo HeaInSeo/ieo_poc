@@ -15,6 +15,8 @@ postgres = { version = "0.19", features = ["with-serde_json-1"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
 tiny_http = "0.12"
+signal-hook = "0.3"
+ureq = { version = "2", default-features = false, features = ["json"] }
 
 [lints]
 workspace = true
