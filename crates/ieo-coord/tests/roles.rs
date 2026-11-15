@@ -143,3 +143,94 @@ fn status_reads_both_roles_with_the_adapter_token() {
     assert_eq!(b["roles"]["development"]["http_status"], 401, "{b}");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+#[test]
+fn both_roles_get_their_stop_before_either_is_waited_for() {
+    // M-1: guardrail's stop arrives while development is still stopping
+    let d = tmp("order");
+    let (dev, dev_seen) = fake("development", 1_000, json!("not_tracked"));
+    let (gr, gr_seen) = fake("guardrail", 100, json!("not_tracked"));
+    let r = roles(&dev, &gr, &d);
+    let t0 = std::time::Instant::now();
+    let h = std::thread::spawn(move || {
+        ieo_coord::roles::stop(
+            &r,
+            "repo-a",
+            Duration::from_secs(5),
+            Duration::from_millis(50),
+        )
+    });
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(
+        gr_seen
+            .lock()
+            .expect("s")
+            .iter()
+            .any(|x| x == "POST /v0/role/stop"),
+        "guardrail not stopped yet"
+    );
+    assert!(
+        t0.elapsed() < Duration::from_millis(900),
+        "the check ran too late to tell"
+    );
+    let (_, b) = h.join().expect("join");
+    assert_eq!(b["roles"]["development"]["running_after"], false, "{b}");
+    assert!(
+        dev_seen
+            .lock()
+            .expect("s")
+            .iter()
+            .any(|x| x == "POST /v0/role/stop")
+    );
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn a_refused_stop_is_reported_without_waiting() {
+    // M-1: a token mismatch (401) is not polled for the whole wait
+    let d = tmp("refused");
+    let (dev, _) = fake("development", 0, json!([]));
+    let (gr, _) = fake("guardrail", 0, json!([]));
+    let r = roles(&dev, &gr, &d);
+    std::fs::write(d.join("token"), "wrong").expect("w");
+    let t0 = std::time::Instant::now();
+    let (_, b) = ieo_coord::roles::stop(
+        &r,
+        "repo-a",
+        Duration::from_secs(10),
+        Duration::from_millis(50),
+    );
+    assert!(
+        t0.elapsed() < Duration::from_secs(3),
+        "waited for a refused stop"
+    );
+    assert_eq!(b["roles"]["development"]["http_status"], 401, "{b}");
+    assert_eq!(b["safe_shutdown_confirmed"], false);
+    let u: Vec<String> = serde_json::from_value(b["unconfirmed"].clone()).expect("u");
+    assert!(
+        u.iter()
+            .any(|x| x.contains("development: stop or status answered 401")),
+        "{u:?}"
+    );
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn an_unreachable_role_is_not_waited_for() {
+    let d = tmp("nowait");
+    let (dev, _) = fake("development", 0, json!([]));
+    let r = roles(&dev, "http://127.0.0.1:9", &d);
+    let t0 = std::time::Instant::now();
+    let (_, b) = ieo_coord::roles::stop(
+        &r,
+        "repo-a",
+        Duration::from_secs(10),
+        Duration::from_millis(50),
+    );
+    assert!(
+        t0.elapsed() < Duration::from_secs(5),
+        "waited for an unreachable role"
+    );
+    assert_eq!(b["roles"]["guardrail"]["reachable"], false, "{b}");
+    let _ = std::fs::remove_dir_all(&d);
+}

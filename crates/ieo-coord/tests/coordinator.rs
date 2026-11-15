@@ -88,7 +88,8 @@ type PrincipalRow = (
     Option<&'static str>,
 );
 
-const PRINCIPALS: [PrincipalRow; 16] = [
+const PRINCIPALS: [PrincipalRow; 17] = [
+    ("operator-norepo", "service", &["roles:control"], &[], None),
     ("operator", "service", &["roles:control"], &["repo-a"], None),
     (
         "importer",
@@ -3867,4 +3868,12 @@ fn repo_scope_role_control_needs_its_scope_and_reports_unreachable_roles() {
     );
     let (st, b) = env.get("operator", "/v0/repos/repo-z/roles");
     assert_eq!(st, 403, "{b}");
+    // a credential with the scope but no repos reaches no repo (review adf760e B1)
+    let (st, b) = env.get("operator-norepo", "/v0/repos/repo-a/roles");
+    assert_eq!((st, b["code"].as_str()), (403, Some("SCOPE_DENIED")), "{b}");
+    let (st, _) = env.post("operator-norepo", "/v0/repos/repo-a/stop", &json!({}));
+    assert_eq!(st, 403);
+    // an agent credential is refused
+    let (st, b) = env.post("dev-a", "/v0/repos/repo-a/stop", &json!({}));
+    assert_eq!((st, b["code"].as_str()), (403, Some("SCOPE_DENIED")), "{b}");
 }

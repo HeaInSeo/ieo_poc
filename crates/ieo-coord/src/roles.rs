@@ -12,7 +12,10 @@ use std::time::{Duration, Instant};
 
 pub const ROLES: [&str; 2] = ["development", "guardrail"];
 
-fn call(target: &Value, method: &str, path: &str) -> Result<(u16, Value), String> {
+/// An answer from a role supervisor: HTTP status and body, or why it could not be reached.
+type Answer = Result<(u16, Value), String>;
+
+fn call(target: &Value, method: &str, path: &str) -> Answer {
     let url = target["url"].as_str().ok_or("role url missing")?;
     let file = target["adapter_token_file"]
         .as_str()
@@ -76,21 +79,25 @@ pub fn stop(roles: &Value, repo: &str, wait: Duration, poll: Duration) -> (u16, 
     };
     let mut out = serde_json::Map::new();
     let mut reasons: Vec<String> = Vec::new();
-    for r in ROLES {
-        let sent = call(&t[r], "POST", "/v0/role/stop");
-        let t0 = Instant::now();
-        // a role the stop could not reach is reported at once, not waited for
-        let last = if let Err(e) = &sent {
-            Err(e.clone())
-        } else {
-            loop {
+    // the stop goes to both roles first (neither waits for the other, review adf760e M-1); a
+    // stop that did not reach a role or was refused is reported at once, not waited for
+    let sent: Vec<(&str, Answer)> = ROLES
+        .iter()
+        .map(|r| (*r, call(&t[*r], "POST", "/v0/role/stop")))
+        .collect();
+    let t0 = Instant::now();
+    for (r, sent) in sent {
+        let last = match &sent {
+            Err(e) => Err(e.clone()),
+            Ok((st, b)) if *st != 200 && *st != 202 => Ok((*st, b.clone())),
+            Ok(_) => loop {
                 let s = call(&t[r], "GET", "/v0/role/status");
                 match &s {
                     Ok((200, v)) if v["running"].is_null() => break s,
                     _ if t0.elapsed() >= wait => break s,
                     _ => std::thread::sleep(poll),
                 }
-            }
+            },
         };
         let report = match (&sent, &last) {
             (Ok((st, _)), Ok((200, v))) => {
@@ -117,7 +124,7 @@ pub fn stop(roles: &Value, repo: &str, wait: Duration, poll: Duration) -> (u16, 
                 json!({"reachable": false, "error": e})
             }
             (_, Ok((st, b))) => {
-                reasons.push(format!("{r}: status {st}"));
+                reasons.push(format!("{r}: stop or status answered {st}"));
                 json!({"http_status": st, "body": b})
             }
         };

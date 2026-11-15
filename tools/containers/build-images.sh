@@ -6,6 +6,9 @@
 set -euo pipefail
 COMMIT=$1; TARGET=$2; PROFILE=${3:-release}
 CLAUDE=${CLAUDE_BIN:-/opt/rust/ieo_poc_probe/bin/claude-2.1.322}
+# the Claude Code CLI the runtime contract and 01-04 used (2.1.322)
+CLAUDE_SHA=${CLAUDE_SHA256:-bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478}
+[ "$(sha256sum "$CLAUDE" | cut -c1-64)" = "$CLAUDE_SHA" ] || { echo "the claude CLI is not the expected file ($CLAUDE_SHA)"; exit 1; }
 cd "$(git rev-parse --show-toplevel)"
 [ "$(git rev-parse HEAD)" = "$(git rev-parse "$COMMIT")" ] || { echo "HEAD is not $COMMIT"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "the worktree has local changes"; exit 1; }

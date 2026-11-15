@@ -16,6 +16,7 @@ cleanup() {
   podman secret rm ieo-img-db-url >/dev/null 2>&1; podman network rm "$NET" >/dev/null 2>&1
 }
 cleanup
+trap 'cleanup; rm -f "$W/adapter.header" "$W/coord-etc/adapter.token" "$W/coord-etc/operator.header"' EXIT
 podman unshare rm -rf "$W"; mkdir -p "$W/coord-etc" "$W/fake"; touch "$W/.images-fake"
 echo "# 02-04 images, no model call · $(date -u +%FT%TZ) · tag $TAG"
 echo "## images (labels, user, binaries inside)"

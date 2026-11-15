@@ -38,6 +38,8 @@ pub struct Config {
     pub claude: PathBuf,
     /// Program used to signal process groups.
     pub kill: String,
+    /// Provider quota group of this role's credential (§3, §7 status), if known.
+    pub quota_group_id: Option<String>,
     /// The approved budget this role's runs belong to (user decision 2026-11-13 ①): the service
     /// refuses runs beyond its caps on its own (a backstop; exact accounting is the caller's).
     pub budget: crate::budget::Budget,
@@ -80,6 +82,7 @@ impl Config {
             cred: s("cred")?.into(),
             claude: s("claude")?.into(),
             kill: v["kill"].as_str().unwrap_or("kill").to_string(),
+            quota_group_id: v["quota_group_id"].as_str().map(str::to_owned),
             budget: match v["budget"].as_str() {
                 Some("02-04") => crate::budget::BUDGET_0204,
                 Some("X-02") => crate::budget::BUDGET_X02,
@@ -156,6 +159,8 @@ struct State {
 pub struct Service {
     cfg: Config,
     state: Mutex<State>,
+    /// The checkpoint found when the service started (§7 `restored_checkpoint_ref`).
+    restored: Value,
 }
 
 pub struct Response {
@@ -200,6 +205,21 @@ fn safe_id(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
+/// The provider status the run's stream last reported (`rate_limit_event`), or null.
+fn provider_status(stdout: &Path) -> Value {
+    let text = std::fs::read_to_string(stdout).unwrap_or_default();
+    text.lines()
+        .rev()
+        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .find(|v| v["type"] == "rate_limit_event")
+        .map(|v| {
+            let i = &v["rate_limit_info"];
+            json!({"status": i["status"], "overageStatus": i["overageStatus"],
+                   "isUsingOverage": i["isUsingOverage"]})
+        })
+        .unwrap_or(Value::Null)
+}
+
 /// The last `result` event's session totals, for the next resumed run's base (§11 item 7).
 fn session_cumulative(stdout: &Path) -> Value {
     let text = std::fs::read_to_string(stdout).unwrap_or_default();
@@ -216,9 +236,19 @@ fn session_cumulative(stdout: &Path) -> Value {
 
 impl Service {
     pub fn new(cfg: Config) -> Service {
+        let restored = match std::fs::read(cfg.checkpoint_path()) {
+            Err(_) => json!({"found": false}),
+            Ok(b) => match serde_json::from_slice::<Value>(&b) {
+                Ok(c) => json!({"found": true, "session_id": c["session_id"], "phase": c["phase"],
+                    "session_cumulative_attempt": c["session_cumulative_attempt"],
+                    "sha256": hex::encode(Sha256::digest(&b))}),
+                Err(_) => json!({"found": true, "readable": false}),
+            },
+        };
         Service {
             cfg,
             state: Mutex::new(State::default()),
+            restored,
         }
     }
 
@@ -232,24 +262,40 @@ impl Service {
 
     pub fn status(&self) -> Value {
         let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let cp = std::fs::read(self.cfg.checkpoint_path())
-            .ok()
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+        let raw = std::fs::read(self.cfg.checkpoint_path()).ok();
+        let cp = raw
+            .as_ref()
+            .and_then(|b| serde_json::from_slice::<Value>(b).ok());
         // §7 safe-shutdown report: what this role can say about its own state. Active children
         // and pending external requests are not tracked yet (PROGRESS §1): reported as such,
-        // never as zero, so a stop that depends on them stays unconfirmed.
+        // never as zero, so a stop that depends on them stays unconfirmed. An unreadable
+        // checkpoint is not a saved one.
         let phase = cp
             .as_ref()
             .and_then(|c| c["phase"].as_str().map(str::to_owned));
+        let saved = st.running.is_none()
+            && match (&raw, &cp) {
+                (None, _) => true,
+                (Some(_), None) => false,
+                (Some(_), Some(_)) => phase.as_deref() == Some("after_run"),
+            };
         let safe = json!({
             "running": st.running.is_some(),
             "checkpoint_phase": phase,
-            "checkpoint_saved": st.running.is_none() && phase.as_deref().is_none_or(|p| p == "after_run"),
+            "checkpoint_saved": saved,
             "active_children": "not_tracked",
             "pending_external_requests": "not_tracked",
         });
+        let last = st.last.as_ref();
         json!({"role": self.cfg.role_name(), "repo": self.cfg.repo,
-               "running": st.running, "last": st.last, "checkpoint": cp, "safe_shutdown": safe})
+               "running": st.running, "last": st.last, "checkpoint": cp, "safe_shutdown": safe,
+               // §7 status fields
+               "quota_group_id": self.cfg.quota_group_id.as_deref().unwrap_or("unknown"),
+               "provider_status_or_unknown": last.and_then(|l| l.get("provider_status")).filter(|v| !v.is_null()).cloned().unwrap_or(json!("unknown")),
+               "last_actual_action_at": last.and_then(|l| l.get("ended_at")).cloned().unwrap_or(Value::Null),
+               "restored_checkpoint_ref": self.restored,
+               "capability_gaps": ["active_children not tracked", "pending_external_requests not tracked",
+                                   "worktree_head not tracked"]})
     }
 
     /// Handle one request. `bearer` is the token from `Authorization: Bearer …`.
@@ -640,6 +686,8 @@ impl Service {
             "mode": if job.resume { "resume" } else { "new" },
             "stop": format!("{:?}", outcome.stop),
             "stopped_by_guard": outcome.stop != Stop::Exited,
+            "ended_at": ieo_evidence::time::now(),
+            "provider_status": provider_status(&stdout),
             "exit_code": outcome.exit_code, "elapsed_ms": outcome.elapsed.as_millis() as u64,
             "observed": {"billable_lower_bound": outcome.observed.billable,
                          "cache_read_lower_bound": outcome.observed.cache_read,
@@ -732,6 +780,9 @@ impl Service {
         });
         let mut cp = cp;
         cp["phase"] = json!(phase);
+        // the empty lists above are not observations: these are not tracked yet (§7 report)
+        cp["tracked"] = json!({"active_children": false, "pending_external_requests": false,
+                               "worktree_head": false});
         // the resume base (§11 item 7): this run's own result if it wrote one; otherwise, on a
         // resume, the previous base of the same session carried forward with the attempt it
         // came from (the caller checks it is the run actually resumed); else unknown

@@ -279,7 +279,8 @@ pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Re
             if let Err(r) = need_client_scope(who, "roles:control", false) {
                 return r;
             }
-            if !who.repos.is_empty() && !who.repos.contains(*repo) {
+            // an empty repo list is no repo, as everywhere else (review adf760e B1)
+            if !who.in_repo(repo) {
                 return problem(403, "SCOPE_DENIED", "repo outside the credential's repos");
             }
             let (status, body) = if req.method == "GET" {
