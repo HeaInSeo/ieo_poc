@@ -1,0 +1,32 @@
+# old codes: the same new test inputs against the base code (main c5464f5 crates/ieo-coord/src/api.rs, plus a no-op check_bindings stub so the tests compile).
+# Not committed code. The tests' assert_eq! was shadowed by a no-op macro so every case runs and prints its answer;
+# refused() kept its 'status >= 400' assertion (a panic = an accepted request). The c2 test was then rerun with that assertion removed too.
+# The c2 test panicked on c2n2-0001 (201 under the base code: C2 is a new rule), so its cases were printed by the second run.
+test c2_a_binding_sprint_id_is_reserved_for_its_repo ... U2-CASE c2n2-0001 -> 201 
+thread 'c2_a_binding_sprint_id_is_reserved_for_its_repo' (3190330) panicked at crates/ieo-coord/tests/coordinator.rs:3649:5:
+test n2_a_re_gated_page_keeps_an_unchanged_executable_copy_refused ... U2-CASE n2-copy-04 -> 409 IMPORT_GATED
+U2-CASE n2-copy-05 -> 409 IMPORT_GATED
+test u2_an_imported_sprint_with_a_01_07_error_gets_the_01_07_code_first ... U2-CASE u2-c-0001 -> 409 EVENT_CONTENT_CONFLICT
+U2-CASE u2-c-0002 -> 409 EVENT_CONTENT_CONFLICT
+U2-CASE u2-d-0001 -> 409 EVENT_CONTENT_CONFLICT
+U2-CASE u2-f-0001 -> 400 MISSING_FIELD
+U2-CASE u2-r-0001 -> 409 SPRINT_REPO_CONFLICT
+test u2_an_older_revision_of_an_imported_sprint_gets_the_revision_code_first ... U2-CASE u2-a-0001 -> 409 EVENT_CONTENT_CONFLICT
+U2-CASE u2-a-0002 -> 409 EVENT_CONTENT_CONFLICT
+U2-CASE u2-b-0001 -> 409 EVENT_CONTENT_CONFLICT
+U2-CASE u2-o-0001 -> 409 EVENT_CONTENT_CONFLICT
+test u2_ownership_covers_every_outcome_the_01_07_checks_accept ... U2-CASE u2-m1-0001 -> 409 EVENT_CONTENT_CONFLICT
+U2-CASE u2-m1-0005 -> 409 EVENT_CONTENT_CONFLICT
+test u2_the_import_gate_follows_the_01_07_checks_and_the_repo_rule ... U2-CASE u2-g-0001 -> 409 IMPORT_GATED
+U2-CASE u2-g-0002 -> 409 IMPORT_GATED
+U2-CASE u2-g-0003 -> 409 IMPORT_INCOMPLETE
+U2-CASE u2-g-0004 -> 409 IMPORT_INCOMPLETE
+U2-CASE u2-g-0005 -> 409 IMPORT_GATED
+U2-CASE u2-g-0006 -> 409 IMPORT_GATED
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 69 filtered out; finished in 7.43s
+error: test failed, to rerun pass `-p ieo-coord --test coordinator`
+test c2_a_binding_sprint_id_is_reserved_for_its_repo ... U2-CASE c2n2-0001 -> 201 
+U2-CASE c2n2-0002 -> 201 
+U2-CASE c2n2-0003 -> 400 MISSING_FIELD
+U2-CASE c2n2-0006 -> 201 
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 74 filtered out; finished in 1.27s
