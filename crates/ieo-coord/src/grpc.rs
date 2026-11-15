@@ -22,8 +22,10 @@ use crate::api::{self, Abort, Operation, Req, Resp, TxGuard};
 use crate::http::{App, body_too_large, db_unavailable};
 use ieo_proto::v0::supervisor_service_server::{SupervisorService, SupervisorServiceServer};
 use ieo_proto::v0::{
-    GetLatestCheckpointRequest, GetLatestCheckpointResponse, GetReproRequestRequest,
-    GetReproRequestResponse, ReportCheckpointRequest, ReportCheckpointResponse,
+    GetLatestCheckpointRequest, GetLatestCheckpointResponse, GetOwnAssignmentRequest,
+    GetOwnAssignmentResponse, GetReproRequestRequest, GetReproRequestResponse,
+    RecordFirstActionRequest, RecordFirstActionResponse, ReportCheckpointRequest,
+    ReportCheckpointResponse, ReportSessionStatusRequest, ReportSessionStatusResponse,
     SubmitAgentReportRequest, SubmitAgentReportResponse, SubmitReproRequestRequest,
     SubmitReproRequestResponse,
 };
@@ -212,6 +214,21 @@ enum Rpc {
         repo: String,
         role: &'static str,
     },
+    OwnAssignment {
+        repo: String,
+        role: &'static str,
+    },
+    FirstAction {
+        repo: String,
+        role: &'static str,
+        body: Vec<u8>,
+    },
+    SessionStatus {
+        repo: String,
+        role: &'static str,
+        key: String,
+        status: Vec<u8>,
+    },
 }
 
 impl Rpc {
@@ -222,12 +239,17 @@ impl Rpc {
             Rpc::GetRepro { id } => Operation::GetRepro { id },
             Rpc::ReportCheckpoint { repo, role, .. } => Operation::ReportCheckpoint { repo, role },
             Rpc::LatestCheckpoint { repo, role } => Operation::LatestCheckpoint { repo, role },
+            Rpc::OwnAssignment { repo, role } => Operation::OwnAssignment { repo, role },
+            Rpc::FirstAction { repo, role, .. } => Operation::RecordFirstAction { repo, role },
+            Rpc::SessionStatus { repo, role, .. } => Operation::ReportSessionStatus { repo, role },
         }
     }
 
     fn method(&self) -> &'static str {
         match self {
-            Rpc::GetRepro { .. } | Rpc::LatestCheckpoint { .. } => "GET",
+            Rpc::GetRepro { .. } | Rpc::LatestCheckpoint { .. } | Rpc::OwnAssignment { .. } => {
+                "GET"
+            }
             _ => "POST",
         }
     }
@@ -244,6 +266,15 @@ impl Rpc {
             Rpc::LatestCheckpoint { repo, role } => {
                 format!("/v0/repos/{repo}/roles/{role}/checkpoints/latest")
             }
+            Rpc::OwnAssignment { repo, role } => {
+                format!("/v0/repos/{repo}/roles/{role}/assignment")
+            }
+            Rpc::FirstAction { repo, role, .. } => {
+                format!("/v0/repos/{repo}/roles/{role}/first-actions")
+            }
+            Rpc::SessionStatus { repo, role, .. } => {
+                format!("/v0/repos/{repo}/roles/{role}/session-status")
+            }
         }
     }
 
@@ -251,9 +282,20 @@ impl Rpc {
     fn body(&self) -> Vec<u8> {
         match self {
             Rpc::SubmitReport { report } => report.clone(),
-            Rpc::SubmitRepro { body } => body.clone(),
+            Rpc::SubmitRepro { body } | Rpc::FirstAction { body, .. } => body.clone(),
+            Rpc::SessionStatus { status, .. } => status.clone(),
             Rpc::ReportCheckpoint { seq, raw, .. } => ieo_proto::checkpoint_request_body(*seq, raw),
-            Rpc::GetRepro { .. } | Rpc::LatestCheckpoint { .. } => Vec::new(),
+            Rpc::GetRepro { .. } | Rpc::LatestCheckpoint { .. } | Rpc::OwnAssignment { .. } => {
+                Vec::new()
+            }
+        }
+    }
+
+    /// The HTTP `Idempotency-Key` header the request stands for (an empty field: no header).
+    fn idempotency_key(&self) -> Option<&str> {
+        match self {
+            Rpc::SessionStatus { key, .. } if !key.is_empty() => Some(key),
+            _ => None,
         }
     }
 
@@ -264,7 +306,11 @@ impl Rpc {
         let clean = |v: &str| !v.contains(['/', '?', '#']);
         match self {
             Rpc::GetRepro { id } => !id.is_empty() && clean(id),
-            Rpc::ReportCheckpoint { repo, .. } | Rpc::LatestCheckpoint { repo, .. } => clean(repo),
+            Rpc::ReportCheckpoint { repo, .. }
+            | Rpc::LatestCheckpoint { repo, .. }
+            | Rpc::OwnAssignment { repo, .. }
+            | Rpc::FirstAction { repo, .. }
+            | Rpc::SessionStatus { repo, .. } => clean(repo),
             Rpc::SubmitReport { .. } | Rpc::SubmitRepro { .. } => true,
         }
     }
@@ -316,7 +362,7 @@ fn adapt(
         method: rpc.method(),
         path: &path,
         query: "",
-        idempotency_key: None,
+        idempotency_key: rpc.idempotency_key(),
         body: &body,
     };
     match api::dispatch(db, &app.ctx, Some(who), Some(rpc.operation()), &req, guard) {
@@ -446,6 +492,54 @@ impl SupervisorService for Coordinator {
         };
         let r = self.execute(&request, rpc).await?;
         Ok(Response::new(ieo_proto::latest_from_json(&r.body)))
+    }
+
+    async fn get_own_assignment(
+        &self,
+        request: Request<GetOwnAssignmentRequest>,
+    ) -> Result<Response<GetOwnAssignmentResponse>, Status> {
+        let m = request.get_ref();
+        let rpc = Rpc::OwnAssignment {
+            repo: m.repo_id.clone(),
+            role: ieo_proto::role_name(m.role),
+        };
+        let r = self.execute(&request, rpc).await?;
+        Ok(Response::new(ieo_proto::own_assignment_from_json(&r.body)))
+    }
+
+    async fn record_first_action(
+        &self,
+        request: Request<RecordFirstActionRequest>,
+    ) -> Result<Response<RecordFirstActionResponse>, Status> {
+        let m = request.get_ref();
+        let rpc = Rpc::FirstAction {
+            repo: m.repo_id.clone(),
+            role: ieo_proto::role_name(m.role),
+            body: serde_json::to_vec(&ieo_proto::first_action_request_json(m)).unwrap_or_default(),
+        };
+        let r = self.execute(&request, rpc).await?;
+        Ok(Response::new(RecordFirstActionResponse {
+            outcome: ieo_proto::outcome_of(r.status) as i32,
+            receipt: Some(ieo_proto::first_action_receipt_from_json(&r.body)),
+        }))
+    }
+
+    async fn report_session_status(
+        &self,
+        request: Request<ReportSessionStatusRequest>,
+    ) -> Result<Response<ReportSessionStatusResponse>, Status> {
+        let m = request.get_ref();
+        let rpc = Rpc::SessionStatus {
+            repo: m.repo_id.clone(),
+            role: ieo_proto::role_name(m.role),
+            key: m.idempotency_key.clone(),
+            status: m.status_json.clone(),
+        };
+        let r = self.execute(&request, rpc).await?;
+        Ok(Response::new(ReportSessionStatusResponse {
+            outcome: ieo_proto::outcome_of(r.status) as i32,
+            receipt: Some(ieo_proto::session_status_receipt_from_json(&r.body)),
+        }))
     }
 }
 

@@ -1,11 +1,11 @@
-# ieo 내부 API v0 · gRPC 계약 설명 (X-03 계약, X-04 구현 반영)
+# ieo 내부 API v0 · gRPC 계약 설명 (X-03 계약, X-04 구현 반영, 02-05 단계 2 추가)
 
 | 항목 | 기록 |
 | --- | --- |
 | 작업 | X-03 gRPC 내부 API 계약과 분리 영향 확인(개정 A4, 장부 §7 수용 기준) |
 | 정의 파일 | [`proto/ieo/internal/v0/supervisor.proto`](proto/ieo/internal/v0/supervisor.proto) · lint·호환 규칙 [`proto/buf.yaml`](proto/buf.yaml). 이 문서도 계약의 일부다 |
-| 근거 | [gRPC 내부 API 계획 v0](../docs/poc/Plan_gRPC_Internal_API_v0.md) §1·§3·§4, [사용자 결정 2026-11-14 · gRPC](../docs/poc/User_Decisions_2026-11-14_grpc.md), HTTP 계약 [`ieo-api-v0.openapi.yaml`](ieo-api-v0.openapi.yaml) 0.8.0, 코드 main 3157c89(작성)·0779850(검토 기준, crates·contracts 차이 없음) |
-| 상태 | X-03 계약에 X-04 구현의 확인 결과를 반영했다(바뀐 문장은 §12). 구현: `crates/ieo-proto`(생성 코드·상태 대응), `crates/ieo-coord/src/grpc.rs`(어댑터), `crates/ieo-supervisor/src/central.rs`(클라이언트). 분산·복구 시험은 X-05·X-06. 이 문서는 업무 규칙을 새로 정하지 않는다. 업무 규칙은 같은 이름의 HTTP 작업과 `ieo_coord::api`의 처리다 |
+| 근거 | [gRPC 내부 API 계획 v0](../docs/poc/Plan_gRPC_Internal_API_v0.md) §1·§3·§4, [사용자 결정 2026-11-14 · gRPC](../docs/poc/User_Decisions_2026-11-14_grpc.md), HTTP 계약 [`ieo-api-v0.openapi.yaml`](ieo-api-v0.openapi.yaml) 0.8.0, 코드 main 3157c89(작성)·0779850(검토 기준, crates·contracts 차이 없음). 02-05 단계 2: [02-05 계획](../docs/poc/reports/tasks/02-05/plan-20261115/PLAN.md) §2.5(T1)·§3.1, OpenAPI 0.10.0, 기준 main 089fb95 |
+| 상태 | X-03 계약에 X-04 구현의 확인 결과를 반영했다(바뀐 문장은 §12). 구현: `crates/ieo-proto`(생성 코드·상태 대응), `crates/ieo-coord/src/grpc.rs`(어댑터), `crates/ieo-supervisor/src/central.rs`(클라이언트). 분산·복구 시험은 X-05·X-06. 02-05 단계 2가 RPC 셋(`GetOwnAssignment`·`RecordFirstAction`·`ReportSessionStatus`)을 추가로 더했다(바뀐 문장은 §13). 이 문서는 업무 규칙을 새로 정하지 않는다. 업무 규칙은 같은 이름의 HTTP 작업과 `ieo_coord::api`의 처리다 |
 
 ## 1. 범위
 
@@ -20,12 +20,15 @@ supervisor(역할 Pod의 실행 관리 서비스)가 코디네이터에 하는 �
 | `GetReproRequest` | `GET /v0/agent/repro-requests/{request_id}` (getReproRequest) | 그 요청 repo의 guardrail 자격 | 없음 |
 | `ReportCheckpoint` | `POST /v0/repos/{repo_id}/roles/{role}/checkpoints` (reportCheckpoint) | agent, `checkpoint:report`, (repo, role)에 묶임 | 있음(체크포인트 행) |
 | `GetLatestCheckpoint` | `GET …/checkpoints/latest` (latestCheckpoint) | 보고한 supervisor 자신(`checkpoint:report`) 또는 repo의 `roles:control` | 없음 |
+| `GetOwnAssignment` (02-05) | `GET /v0/repos/{repo_id}/roles/{role}/assignment` (getOwnAssignment) | agent, `checkpoint:report`, (repo, role)에 묶임 | 없음 |
+| `RecordFirstAction` (02-05) | `POST /v0/repos/{repo_id}/roles/{role}/first-actions` (recordFirstAction) | agent, `checkpoint:report`, (repo, role)에 묶임 | 있음(첫 행동 claim 행) |
+| `ReportSessionStatus` (02-05) | `POST /v0/repos/{repo_id}/roles/{role}/session-status` (reportSessionStatus) | agent, `checkpoint:report`, (repo, role)에 묶임 | 있음(세션 상태 이력 claim 행) |
 
 헬스 확인은 표준 `grpc.health.v1.Health`다(§7.3).
 
 ### 1.2 넣지 않는 작업
 
-- **스프린트 상태·사건 조회**(`GET /v0/sprints/{id}/state`, `…/events`). 계획 §1이 미결로 둔 질문이다: supervisor가 이 조회를 쓸 수 있는가. **v0에서는 넣지 않는다.** 에이전트 자격의 `/v0/sprints*` 금지(403 `AGENT_READ_DENIED`, 역할은 서로를 보지 않는다)를 그대로 둔다. supervisor가 필요한 자기 배정 정보는 02-05가 만들 자기 배정 조회로 얻는다(§8).
+- **스프린트 상태·사건 조회**(`GET /v0/sprints/{id}/state`, `…/events`). 계획 §1이 미결로 둔 질문이다: supervisor가 이 조회를 쓸 수 있는가. **v0에서는 넣지 않는다.** 에이전트 자격의 `/v0/sprints*` 금지(403 `AGENT_READ_DENIED`, 역할은 서로를 보지 않는다)를 그대로 둔다. supervisor가 필요한 자기 배정 정보는 02-05가 만든 자기 배정 조회(`GetOwnAssignment`)로 얻는다(§8.2).
 - **`compareCheckpoint`**(`GET …/checkpoints/compare`). `roles:control` 클라이언트(코디네이터 쪽 운영 주체)의 작업이다. supervisor는 `GetLatestCheckpoint`로 중앙 기록을 읽고 스스로 대조한다(02-04 `central::compare`).
 - 사람·등록자·배정자용 작업 전부: 명세 등록·변환, 의미 검토, Notion 가져오기, 예외 승인, 배정, 증거 입력, 판정, outbox, repo 역할 상태·정지. HTTP/JSON에만 둔다.
 
@@ -44,10 +47,10 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 - **패키지**: `ieo.internal.v0`. HTTP API v0과 같은 주 버전이다. buf의 `PACKAGE_VERSION_SUFFIX` 규칙은 v1부터만 받으므로 이 한 규칙만 예외로 둔다(`buf.yaml`). 나머지는 buf `STANDARD` lint를 통과한다.
 - **필드 번호를 다시 쓰지 않는다.** 필드를 지우면 번호와 이름을 `reserved`로 막는다. enum 값도 같다. enum의 0은 `…_UNSPECIFIED`이고 업무 값으로 쓰지 않는다.
 - **v0 안에서는 추가만 한다.** 새 필드는 없을 때의 의미가 옛 동작과 같아야 한다. 옛 클라이언트나 옛 서버가 잘못 읽을 변경(의미 변경, 필수화, 타입 변경, 번호 변경)은 새 패키지 `ieo.internal.v1`로 한다. 호환 검사는 `buf breaking`의 `WIRE_JSON` 규칙이다. X-04가 CI에서 main 대비로 돌린다.
-- **JSON 문서는 바이트로 싣는다.** `report_json`(ProgressReport v0)과 `checkpoint_json`(체크포인트 파일)은 각자의 JSON 스키마·규칙이 정본이다. proto로 다시 정의하지 않는다. 두 전송이 같은 문서를 같은 규칙으로 검사한다.
+- **JSON 문서는 바이트로 싣는다.** `report_json`(ProgressReport v0), `checkpoint_json`(체크포인트 파일), `status_json`(02-05 세션 상태, HTTP 본문 그대로)은 각자의 JSON 스키마·규칙이 정본이다. proto로 다시 정의하지 않는다. 두 전송이 같은 문서를 같은 규칙으로 검사한다.
   - 보고의 중복 판정은 파싱한 JSON 값을 비교한다. HTTP로 보낸 보고와 gRPC로 보낸 같은 보고는 같은 보고다.
   - 체크포인트의 SHA-256은 받은 바이트로 계산한다. 같은 파일은 어느 전송으로 보내도 digest가 같다.
-- **작은 요청은 타입이 있는 필드로 싣는다**(`SubmitReproRequestRequest`). 어댑터는 HTTP 본문과 **같은 JSON 값**을 만든다. 재현 요청의 중복 판정도 파싱한 JSON 값을 비교하므로, 이 규칙이 깨지면 같은 요청이 `EVENT_CONTENT_CONFLICT`가 된다. X-04 공통 회귀가 확인한다.
+- **작은 요청은 타입이 있는 필드로 싣는다**(`SubmitReproRequestRequest`, 02-05의 `RecordFirstActionRequest`). 어댑터는 HTTP 본문과 **같은 JSON 값**을 만든다. 재현 요청의 중복 판정도 파싱한 JSON 값을 비교하므로, 이 규칙이 깨지면 같은 요청이 `EVENT_CONTENT_CONFLICT`가 된다. X-04 공통 회귀가 확인한다.
   - `optional`이 아닌 필드는 기본값(빈 문자열·0·빈 목록)이어도 **늘 JSON에 넣는다**. 설정하지 않은 `optional` 필드는 JSON에서 빠진다.
   - gRPC로는 명시적 `null`을 보낼 수 없다. HTTP로 `"timeout_seconds": null`을 넣어 저장한 요청을 gRPC로 다시 보내면 다른 JSON 값이 되어 `EVENT_CONTENT_CONFLICT`다. 그 요청의 결과 확인은 `GetReproRequest`로 한다(§5).
   - `report_json`은 HTTP 본문 그 자체이므로 바이트를 **바꾸지 않고** 처리에 넘긴다. UTF-8이 아니어도 HTTP와 같이 처리가 판단한다(401 → 403 → 400 `SCHEMA_VIOLATION`, field `""`).
@@ -59,14 +62,17 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 
 - **자격 전달**: metadata `authorization: Bearer <token>`. HTTP의 `Authorization` 헤더와 같은 값이다.
 - **해석**: HTTP와 같은 `auth::Credentials`(토큰 digest → 주체·종류·범위·repo·role)를 쓴다. gRPC용 별도 자격·범위를 만들지 않는다. 메시지 안의 이름(repo_id, role, 보고의 actor)은 권한에 쓰지 않는다.
-- **supervisor 주체**: 종류 `agent`, 하나의 (repo, role)에 묶인 자격이다. 범위는 지금 있는 에이전트 범위 셋만 쓴다: `agent:report`, `agent:repro`(guardrail 전용), `checkpoint:report`. 새 범위는 만들지 않는다.
+- **supervisor 주체**: 종류 `agent`, 하나의 (repo, role)에 묶인 자격이다. 범위는 지금 있는 에이전트 범위 셋만 쓴다: `agent:report`, `agent:repro`(guardrail 전용), `checkpoint:report`. 새 범위는 만들지 않는다. 02-05(계획 §2.5 T1)부터 `checkpoint:report`는 그 (repo, role)의 **supervisor 범위**다: 체크포인트 보고·최신 조회에 더해 자기 배정 조회, 첫 행동 기록, 세션 상태 보고를 덮는다.
   - PR #41 검토 b3cb083의 질문(재현 요청을 supervisor가 재사용하는가)의 답: 재사용한다. guardrail 역할의 supervisor만 `agent:repro`로 부른다. development 자격은 HTTP와 같이 거부된다.
-  - 어느 프로세스가 어느 토큰을 쥐는가(모델 프로세스와 supervisor의 분리)는 02-05의 배정·인수 연결에서 정한다. 이 계약은 “HTTP가 받는 자격만 gRPC도 받는다”만 정한다.
+  - 어느 프로세스가 어느 토큰을 쥐는가: **supervisor만 코디네이터 자격을 쥔다**(02-05 계획 §2.5 T1). 모델 프로세스 환경에는 넣지 않는다(런타임 계약 §4.3 허용 목록). 같은 UID 프로세스가 그 파일을 읽을 수 있다는 한계(런타임 계약 §2.1)는 그대로이므로, supervisor가 이 범위로 남기는 첫 행동·세션 상태도 claim이다. 이 계약은 “HTTP가 받는 자격만 gRPC도 받는다”만 정한다.
 - **검사 순서**: 작업마다 처리 코드가 정하고, gRPC는 같은 처리를 부르므로 순서가 같다. OpenAPI 머리말의 일반 순서(401 → 403/409 → 400 → 409 → 422)와 다른 작업이 있다(main 0779850):
   - `SubmitAgentReport`: 401 → 범위·역할(403) → 본문 파싱(400) → 저장된 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`)·배정 확인(409) → 형식(400)·의미(422). 재조회와 식별 검사가 형식 검사보다 먼저다.
   - `SubmitReproRequest`: 401 → 범위·역할(403) → 본문 파싱(400) → 재조회(200)·내용 충돌·현재 배정(409) → 새 요청만 형식(400 `MISSING_FIELD`·`SCHEMA_VIOLATION`).
   - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(`seq`·`checkpoint_json`, JSON 파싱, `format`이 `ieo-checkpoint/v0`인지, `seq`가 1 이상이고 체크포인트 자신의 `seq`와 같은지, 모두 400) → 체크포인트의 repo·역할 불일치(409 `REPO_MISMATCH`) → 나머지 체크포인트 필드 형식(400) → 잠금 → 순번·내용 식별(200·409 `EVENT_CONTENT_CONFLICT`·`CHECKPOINT_SEQUENCE_GAP`) → 배정 대조(409) → 저장 → `config_tamper_detected` 형식(400, 롤백). 그래서 repo가 다르고 `phase`가 빠진 체크포인트는 400이 아니라 409이고, repo가 다르고 `format`이나 `seq`가 틀린 체크포인트는 400이다.
   - `GetReproRequest`·`GetLatestCheckpoint`: 401 → (`GetLatestCheckpoint`만 역할 이름 404) → 권한(403) → 없음(404).
+  - `GetOwnAssignment`(02-05): 401 → 역할 이름(404) → 범위·repo·역할(403) → 현재 배정 없음(404 `NO_CURRENT_ASSIGNMENT`).
+  - `RecordFirstAction`(02-05): 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(400) → 잠금 → 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`) → 그 (repo, role)에 발급된 배정인지(409 `STALE_ASSIGNMENT`) → 그 세션의 takeover 체크포인트가 그 배정·세대로 저장됐는지(409 `CHECKPOINT_MISMATCH`) → 저장.
+  - `ReportSessionStatus`(02-05): 401 → 역할 이름(404) → 범위·repo·역할(403) → 멱등 키(400 `MISSING_FIELD`) → 본문 형식(400) → 잠금 → 같은 키의 재조회(200)·내용 충돌(409 `IDEMPOTENCY_KEY_CONFLICT`) → 이름 붙인 배정이 그 (repo, role)에 발급됐는지(409 `STALE_ASSIGNMENT`) → 저장.
   - **HTTP 전송 쪽**의 본문 크기 검사(400)는 인증보다 먼저다. gRPC 어댑터도 같은 크기 검사를 인증 전에 한다(§7.1).
 - **역할 값과 경로 매개변수**: `ROLE_UNSPECIFIED`와 정의되지 않은 숫자 값은 알 수 없는 역할이다. HTTP의 알 수 없는 역할과 같이 처리가 `NOT_FOUND`(`NOT_FOUND`)로 답한다(인증 뒤). 경로 조각이 되는 값(`repo_id`, `request_id`)은 이렇게 다룬다(X-03 검토 8e3e817 P-1).
   - 빈 `repo_id`는 안쪽 경로 조각이다. HTTP도 빈 안쪽 조각을 같은 작업으로 읽으므로 어댑터는 그대로 처리에 넘기고, 같은 답(예: 403 `REPO_SCOPE_DENIED`)이 나온다.
@@ -106,8 +112,11 @@ gRPC 상태는 **같은 요청이 HTTP에서 받을 상태 코드와 `code`**로
 | `GetReproRequest` | `UNAUTHENTICATED` · `REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `NOT_FOUND`(404, 권한 검사 뒤) · `INTERNAL` |
 | `ReportCheckpoint` | `UNAUTHENTICATED` · `NOT_FOUND`(404, 알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `MISSING_FIELD`·`SCHEMA_VIOLATION`(400, `checkpoint_json` 1 MiB 초과는 `MISSING_FIELD`) · `EVENT_CONTENT_CONFLICT`(409 → `ALREADY_EXISTS`) · `CHECKPOINT_SEQUENCE_GAP`·`STALE_ASSIGNMENT`·`CHECKPOINT_MISMATCH`·`NO_CURRENT_ASSIGNMENT`·`DIGEST_MISMATCH`·`ASSIGNMENT_SHA_MISMATCH`·`REPO_MISMATCH`(409) · `INTERNAL` |
 | `GetLatestCheckpoint` | `UNAUTHENTICATED` · `NOT_FOUND`(알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `NO_CHECKPOINT`(404) · `INTERNAL` |
+| `GetOwnAssignment` | `UNAUTHENTICATED` · `NOT_FOUND`(알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `NO_CURRENT_ASSIGNMENT`(404) · `INTERNAL` |
+| `RecordFirstAction` | `UNAUTHENTICATED` · `NOT_FOUND`(알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `MISSING_FIELD`·`SCHEMA_VIOLATION`(400, `kind` 미지정·`observed_at`이 UTC RFC 3339가 아님 포함) · `EVENT_CONTENT_CONFLICT`(409 → `ALREADY_EXISTS`) · `STALE_ASSIGNMENT`·`CHECKPOINT_MISMATCH`(409) · `INTERNAL` |
+| `ReportSessionStatus` | `UNAUTHENTICATED` · `NOT_FOUND`(알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `MISSING_FIELD`(400, 멱등 키 없음·8바이트 미만, 상태 항목 없음)·`SCHEMA_VIOLATION`(400) · `IDEMPOTENCY_KEY_CONFLICT`(409 → `ALREADY_EXISTS`) · `STALE_ASSIGNMENT`(409) · `INTERNAL` |
 
-이 표는 main 3157c89의 처리 코드를 읽어 만들었고 0779850에서 검토했다. 모든 작업에 어댑터의 본문 크기 거부(400 `SCHEMA_VIOLATION`, §7.1)가 더해지고, `GetReproRequest`·`ReportCheckpoint`·`GetLatestCheckpoint`에는 경로 값 거부(404 `NOT_FOUND`, §3), `ReportCheckpoint`에는 UTF-8 거부(400 `SCHEMA_VIOLATION`, §2)가 더해진다. DB 연결 실패는 모든 작업에서 `UNAVAILABLE`이다(§7.2). 정본은 처리 코드이고, X-04 공통 회귀가 두 전송의 상태·`code`가 같은지 확인한다.
+이 표는 main 3157c89의 처리 코드를 읽어 만들었고 0779850에서 검토했다(02-05 세 행은 단계 2 코드에서). 모든 작업에 어댑터의 본문 크기 거부(400 `SCHEMA_VIOLATION`, §7.1)가 더해지고, `GetReproRequest`·`ReportCheckpoint`·`GetLatestCheckpoint`와 02-05의 세 RPC에는 경로 값 거부(404 `NOT_FOUND`, §3), `ReportCheckpoint`에는 UTF-8 거부(400 `SCHEMA_VIOLATION`, §2)가 더해진다. DB 연결 실패는 모든 작업에서 `UNAVAILABLE`이다(§7.2). 정본은 처리 코드이고, X-04 공통 회귀가 두 전송의 상태·`code`가 같은지 확인한다.
 
 ### 4.3 상세 사유: `ieo-error-bin`
 
@@ -130,6 +139,9 @@ gRPC 상태는 **같은 요청이 HTTP에서 받을 상태 코드와 `code`**로
 | `GetReproRequest` | — | 다시 부른다 | — |
 | `ReportCheckpoint` | (repo, role, seq) + 바이트 | **`GetLatestCheckpoint`로 확인**(자동 확인 가능). 최신 seq·SHA가 보낸 것과 같으면 반영됨. 아니면 결과 불명을 호출자에게 돌려준다. 다시 보낼지는 02-04 규칙(대기 사본 유지, 다음 기동의 채택 판단)이 정한다. 그 밖의 불일치는 외부 대조(`EXTERNAL_RECONCILIATION_REQUIRED`) | 같은 seq에 다른 바이트(→ `ALREADY_EXISTS`). 확인 없이 다음 seq로 넘어가기 |
 | `GetLatestCheckpoint` | — | 다시 부른다 | — |
+| `GetOwnAssignment` | — | 다시 부른다 | — |
+| `RecordFirstAction` | (assignment_id, generation, attempt_id), 자격의 (repo, role) 안 | 결과 불명을 호출자에게 돌려준다. 다시 보낼 때는 **같은 필드**만: 저장돼 있으면 `OUTCOME_REPLAYED`와 저장된 영수증이고 상태 변화가 없다. 실행 중 보고가 실패해도 회차를 멈추지 않고 after_run 체크포인트로 채우는 규칙은 02-05 단계 4가 정한다 | 같은 키에 다른 오프셋·세션·시각(→ `ALREADY_EXISTS`). 첫 행동은 회차마다 하나다 |
+| `ReportSessionStatus` | `idempotency_key`(HTTP `Idempotency-Key`, 8~128바이트), 자격의 (repo, role) 안 | 결과 불명을 호출자에게 돌려준다. 다시 보낼 때는 같은 키·같은 상태만: 저장돼 있으면 `OUTCOME_REPLAYED`. 새 관측은 새 키로 보낸다(이력 추가이고, 늦게 도착한 옛 관측은 `stale_on_arrival`로 남을 뿐 현재 값이 되지 않는다) | 같은 키에 다른 상태(→ `ALREADY_EXISTS`) |
 
 - **자동 재시도하지 않는 상태**: `INVALID_ARGUMENT`, `UNAUTHENTICATED`, `PERMISSION_DENIED`, `NOT_FOUND`, `ALREADY_EXISTS`, `FAILED_PRECONDITION`, `RESOURCE_EXHAUSTED`, `OUT_OF_RANGE`. 고치거나 다시 읽은 뒤의 새 판단으로만 다시 보낸다. `ABORTED`는 다시 읽고 판단한다.
 - **자동 재전송을 더하지 않는다**(사용자 결정 2026-11-14 §7 “자동 재시도를 추가하지 않는다”). gRPC 클라이언트는 상태를 바꾸는 RPC를 스스로 다시 보내지 않는다. 지금 02-04 HTTP 클라이언트도 자동 재전송을 하지 않는다.
@@ -204,7 +216,7 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 
 ### 8.2 02-05의 새 작업
 
-계획 §1이 02-05 범위로 둔 작업은 자기 배정 조회·인수, 세션 상태 보고다. 지금은 HTTP에도 없다. 02-05가 이 작업을 만들 때:
+계획 §1이 02-05 범위로 둔 작업은 자기 배정 조회·인수, 세션 상태 보고다. **02-05 단계 2에서 만들었다**: `GetOwnAssignment`·`RecordFirstAction`·`ReportSessionStatus`(§1.1, X-04가 먼저 병합됐으므로 HTTP·gRPC를 함께). 인수는 새 RPC가 아니라 기존 `ReportCheckpoint`의 takeover에 싣는다(02-05 계획 §3.1, 단계 4). 아래는 X-03 때 정한 규칙이고 단계 2가 따랐다.
 
 - 업무 규칙과 HTTP 형태를 먼저 정하고, 작업 표에 한 번 넣는다.
 - **X-04가 먼저 병합됐으면** `SupervisorService`에 RPC를 **추가**한다(새 필드 번호, v0 안). 아니면 02-05는 HTTP 형태만 만들고, RPC 추가는 X-04가 맡는다. 상태를 바꾸는 작업은 요청에 `idempotency_key`(HTTP `Idempotency-Key`와 같은 규칙, 8~128자)를 두거나 (assignment_id, generation)을 키로 쓴다. 재시도 표(§5)와 `code` 표(§4.2)에 행을 더한다.
@@ -240,7 +252,7 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 
 ## 11. 남은 결정과 한계
 
-- **토큰을 쥐는 프로세스**(모델 프로세스와 supervisor의 분리)는 02-05에서 정한다(§3).
+- **토큰을 쥐는 프로세스**(모델 프로세스와 supervisor의 분리)는 02-05 계획 §2.5 T1로 정했다: supervisor만 쥔다(§3). 같은 UID 프로세스가 읽을 수 있는 한계는 남는다.
 - **코디네이터 → supervisor 방향의 gRPC**는 이 계약 범위가 아니다. 필요하면 별도 결정으로 다룬다(§1.3).
 - **TLS·상호 인증**은 정식 설계의 몫이다. kind 시험의 평문은 시험 환경에서만 쓴다(§7.4).
 - **전송 상한을 넘는 메시지**는 gRPC에서 trailer 없는 거부(tonic 0.14 `OUT_OF_RANGE`, 다른 구현 `RESOURCE_EXHAUSTED`)이고 결과 불명으로 다룬다. 같은 바이트의 HTTP 요청은 400일 수도 아닐 수도 있다(경로 값은 HTTP 본문에 들지 않는다). 사전 계산(§7.1)을 지킨 클라이언트는 닿지 않고, 그 범위에서 두 전송의 답은 같다.
@@ -268,3 +280,20 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 | §9 | 같은 바이너리(`--grpc-listen`), 코드 생성(`protox`, protoc 없음) | X-04 설계 결정 |
 | §10·§11 | 확인할 것과 한계를 확인 결과로 고쳤다 | 구현 |
 | proto `Error` 주석 | trailer를 싣는 어댑터 답에 DB 연결 실패를 넣고, 크기 상한 초과를 trailer 없는 상태로 적었다 | I-10·P-2 |
+
+## 13. 02-05 단계 2에서 바꾼 문장
+
+02-05 단계 2(계획 §3 단계 2, C13)가 RPC 셋을 **추가**했다. 기존 다섯 RPC의 필드 번호·타입·동작은 바꾸지 않았다(`buf breaking` main 대비 통과). 업무 규칙은 같은 이름의 HTTP 작업(OpenAPI 0.10.0)과 `ieo_coord::api`의 처리에 한 번만 있다.
+
+| 절 | 바뀐 내용 | 이유 |
+| --- | --- | --- |
+| 머리 표 | 근거에 02-05 계획·OpenAPI 0.10.0, 상태에 단계 2 추가 | 추가 RPC |
+| §1.1 | `GetOwnAssignment`·`RecordFirstAction`·`ReportSessionStatus` 행 | 02-05 계획 §3.1 작업 표 |
+| §1.2 | 자기 배정 조회가 생겼음을 적었다 | 단계 2 |
+| §2 | `status_json`을 바이트로 싣는 문서에, `RecordFirstActionRequest`를 타입 필드 요청에 넣었다 | 세션 상태는 §7 항목을 그대로 싣는 문서이고 단계 6이 목록 모양을 바꿀 수 있다. 첫 행동은 작은 요청이다 |
+| §3 | `checkpoint:report`를 (repo, role)의 supervisor 범위로 적고, 토큰을 쥐는 프로세스(T1)를 정했다. 새 RPC 셋의 검사 순서 | 02-05 계획 §2.5 T1 |
+| §4.2 | 새 RPC 셋의 `code` 행 | 단계 2 코드 |
+| §5 | 새 RPC 셋의 재시도·멱등 행 | §8.2 규칙(상태를 바꾸는 작업은 키를 둔다) |
+| §8.2 | 단계 2에서 만들었음을 적었다 | 단계 2 |
+| §11 | 토큰을 쥐는 프로세스를 결정됨으로 고쳤다 | T1 |
+

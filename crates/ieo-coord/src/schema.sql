@@ -332,4 +332,56 @@ CREATE OR REPLACE TRIGGER role_checkpoints_append_only BEFORE UPDATE OR DELETE O
 CREATE OR REPLACE TRIGGER role_tamper_events_append_only BEFORE UPDATE OR DELETE ON role_tamper_events
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
+-- 02-05 step 2: facts a role supervisor reports with its `checkpoint:report` credential. Claims,
+-- never completion signals (PLAN §1.1, T1). Append-only.
+--
+-- The first actual action of one attempt, observed in its stream (runtime contract §7 status
+-- `last_actual_action_at`). Key (repo, role, assignment, generation, attempt). Recorded only for a
+-- session whose takeover checkpoint is stored under that assignment and generation.
+CREATE TABLE IF NOT EXISTS role_first_actions (
+    repo_id            text        NOT NULL,
+    role               text        NOT NULL CHECK (role IN ('development', 'guardrail')),
+    assignment_id      text        NOT NULL,
+    generation         bigint      NOT NULL,
+    attempt_id         text        NOT NULL,
+    session_id         text        NOT NULL,
+    event_offset       bigint      NOT NULL CHECK (event_offset >= 0),
+    observed_at        timestamptz NOT NULL,
+    kind               text        NOT NULL CHECK (kind IN ('tool_use', 'text')),
+    body               jsonb       NOT NULL,
+    evidence_level     text        NOT NULL DEFAULT 'claim' CHECK (evidence_level = 'claim'),
+    -- false: the assignment moved on after the takeover of this session
+    current_assignment boolean     NOT NULL,
+    reported_by        text        NOT NULL,
+    received_at        timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (repo_id, role, assignment_id, generation, attempt_id),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
+);
+
+-- Session status history (runtime contract §7 status items), one row per idempotency key of the
+-- reporting (repo, role). `stale_on_arrival`: a status observed at or before an already stored one
+-- (never read as the current value).
+CREATE TABLE IF NOT EXISTS role_session_status (
+    repo_id            text        NOT NULL,
+    role               text        NOT NULL CHECK (role IN ('development', 'guardrail')),
+    idempotency_key    text        NOT NULL,
+    status             jsonb       NOT NULL,
+    observed_at        timestamptz NOT NULL,
+    assignment_id      text,
+    generation         bigint,
+    -- NULL when the status names no assignment
+    current_assignment boolean,
+    stale_on_arrival   boolean     NOT NULL,
+    evidence_level     text        NOT NULL DEFAULT 'claim' CHECK (evidence_level = 'claim'),
+    reported_by        text        NOT NULL,
+    received_at        timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (repo_id, role, idempotency_key),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
+);
+
+CREATE OR REPLACE TRIGGER role_first_actions_append_only BEFORE UPDATE OR DELETE ON role_first_actions
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+CREATE OR REPLACE TRIGGER role_session_status_append_only BEFORE UPDATE OR DELETE ON role_session_status
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;

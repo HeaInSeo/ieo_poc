@@ -4,7 +4,7 @@
 //
 // - The gRPC path adds a transport. It does not define business rules. Every RPC goes through the
 //   coordinator's single operation table (X-04) to the same handling as the HTTP/JSON operation
-//   named in its comment (contracts/ieo-api-v0.openapi.yaml 0.8.0, operationId).
+//   named in its comment (contracts/ieo-api-v0.openapi.yaml 0.10.0, operationId).
 // - Compatibility: package ieo.internal.v0 changes only additively. A field number is never reused.
 //   A removed field is listed as `reserved` (number and name). A change that old clients or old
 //   servers would misread goes to a new package (ieo.internal.v1).
@@ -43,6 +43,23 @@ service SupervisorService {
 
   // = latestCheckpoint, GET /v0/repos/{repo_id}/roles/{role}/checkpoints/latest. Read only.
   rpc GetLatestCheckpoint(GetLatestCheckpointRequest) returns (GetLatestCheckpointResponse);
+
+  // = getOwnAssignment, GET /v0/repos/{repo_id}/roles/{role}/assignment (02-05 step 2). Scope
+  // `checkpoint:report` bound to (repo_id, role): the supervisor's own credential, never the
+  // model's. Read only. No current assignment is NOT_FOUND with code NO_CURRENT_ASSIGNMENT.
+  rpc GetOwnAssignment(GetOwnAssignmentRequest) returns (GetOwnAssignmentResponse);
+
+  // = recordFirstAction, POST /v0/repos/{repo_id}/roles/{role}/first-actions (02-05 step 2).
+  // Scope `checkpoint:report` bound to (repo_id, role). Idempotency key: (assignment_id,
+  // generation, attempt_id) within that (repo, role). A claim, never a completion signal. No
+  // automatic resend; a resend carries the identical fields (description, section 5).
+  rpc RecordFirstAction(RecordFirstActionRequest) returns (RecordFirstActionResponse);
+
+  // = reportSessionStatus, POST /v0/repos/{repo_id}/roles/{role}/session-status (02-05 step 2).
+  // Scope `checkpoint:report` bound to (repo_id, role). Idempotency key: `idempotency_key` (the
+  // HTTP Idempotency-Key) within that (repo, role). A claim. No automatic resend; a resend
+  // carries the same key and the same status bytes.
+  rpc ReportSessionStatus(ReportSessionStatusRequest) returns (ReportSessionStatusResponse);
 }
 
 // Whether the call created state or answered from a stored record (HTTP 201/202 vs 200).
@@ -193,6 +210,116 @@ message GetLatestCheckpointResponse {
   bool current_assignment = 17;
   // The latest checkpoint's own report recorded a tamper event (an event stored with its seq).
   bool tamper_recorded = 18;
+}
+
+message GetOwnAssignmentRequest {
+  string repo_id = 1;
+  Role role = 2;
+}
+
+// = the getOwnAssignment JSON answer. The limits are those of the assignment's sprint revision;
+// consumption is not metered by the coordinator yet (02-05 step 5).
+message GetOwnAssignmentResponse {
+  string repo_id = 1;
+  Role role = 2;
+  string assignment_id = 3;
+  uint64 generation = 4;
+  string task_id = 5;
+  string target_sha = 6;
+  string sprint_id = 7;
+  uint64 sprint_revision = 8;
+  string spec_digest = 9;
+  repeated SpecSource sources = 10;
+  AssignmentLimits limits = 11;
+  uint64 attempts_issued = 12;
+  string policy_digest = 13;
+  // RFC 3339.
+  string issued_at = 14;
+  // Unset until the coordinator records deliveries (02-05 step 3).
+  optional string last_delivery_id = 15;
+}
+
+// = SprintSpec v0 `sources[]` item.
+message SpecSource {
+  string kind = 1;
+  string ref = 2;
+  string revision = 3;
+  string digest = 4;
+  optional string observed_at = 5;
+}
+
+// = SprintSpec v0 `limits` (an unset field is null there).
+message AssignmentLimits {
+  optional uint64 elapsed_seconds = 1;
+  optional uint64 total_tokens = 2;
+  optional uint64 correction_attempts = 3;
+}
+
+// The adapter builds the same JSON value as the HTTP body: every field, always.
+message RecordFirstActionRequest {
+  string repo_id = 1;
+  Role role = 2;
+  string assignment_id = 3;
+  uint64 generation = 4;
+  string attempt_id = 5;
+  string session_id = 6;
+  // Offset of the event in the attempt's stream.
+  uint64 event_offset = 7;
+  // RFC 3339 UTC, the supervisor's clock (stream events carry no time).
+  string observed_at = 8;
+  FirstActionKind kind = 9;
+}
+
+enum FirstActionKind {
+  FIRST_ACTION_KIND_UNSPECIFIED = 0;
+  FIRST_ACTION_KIND_TOOL_USE = 1;
+  FIRST_ACTION_KIND_TEXT = 2;
+}
+
+message RecordFirstActionResponse {
+  Outcome outcome = 1;
+  FirstActionReceipt receipt = 2;
+}
+
+message FirstActionReceipt {
+  string assignment_id = 1;
+  uint64 generation = 2;
+  string attempt_id = 3;
+  string session_id = 4;
+  // Always "claim".
+  string evidence_level = 5;
+  // As stored: false when the assignment had moved on after the session's takeover.
+  bool current_assignment = 6;
+  // RFC 3339.
+  string received_at = 7;
+}
+
+message ReportSessionStatusRequest {
+  string repo_id = 1;
+  Role role = 2;
+  // = HTTP Idempotency-Key, 8 to 128 bytes.
+  string idempotency_key = 3;
+  // The session status as UTF-8 JSON: the HTTP body, unchanged (description, section 2).
+  bytes status_json = 4;
+}
+
+message ReportSessionStatusResponse {
+  Outcome outcome = 1;
+  SessionStatusReceipt receipt = 2;
+}
+
+message SessionStatusReceipt {
+  string idempotency_key = 1;
+  // The status's own observed_at.
+  string observed_at = 2;
+  // Always "claim".
+  string evidence_level = 3;
+  // A status observed at or before an already stored one: history only, never current.
+  bool stale_on_arrival = 4;
+  // Unset when the status names no assignment.
+  optional bool current_assignment = 5;
+  // RFC 3339.
+  string received_at = 6;
 }
 
 // Carried in the binary trailer `ieo-error-bin` of a non-OK answer from the coordinator's handling

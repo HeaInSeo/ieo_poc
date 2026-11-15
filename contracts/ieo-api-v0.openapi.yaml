@@ -1,12 +1,19 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.9.0
+  version: 0.10.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.10.0 (02-05 step 2, additive): three role-supervisor operations under the supervisor's own `checkpoint:report`
+    credential of one (repo, role) (PLAN T1: only the supervisor holds coordinator credentials, no new scope):
+    getOwnAssignment (`GET /v0/repos/{repo_id}/roles/{role}/assignment`), recordFirstAction
+    (`POST …/first-actions`, key (assignment_id, generation, attempt_id)) and reportSessionStatus
+    (`POST …/session-status`, `Idempotency-Key`). Their records are claims, never completion signals. The same
+    operations are RPCs of `ieo.internal.v0.SupervisorService` (contracts/ieo-internal-v0.md). Problem code
+    `NO_CURRENT_ASSIGNMENT` (404 of getOwnAssignment). No existing operation changes.
     0.9.0 (02-05, in progress; step 1 U2/C2): registerSprint states its full check order (sprint repo → 01-07 →
     import ownership → import gate → store). The import ownership and gate checks now follow the 01-07 checks and
     still apply to every outcome those accept (201, 200 `ALREADY_REGISTERED`, 200 `SUPERSEDED`): the set of refused
@@ -27,7 +34,12 @@ info:
     - `coordinator_to_client` data is `verified`; agent submissions are stored as `claim` only.
     - The CLI test client uses only these endpoints. No UI is built in the PoC.
     - Check order: 401 (credential) → 403/409 (scope, role, current assignment) → 400 (format) → 409 (identity) → 422 (reference/binding).
-    - Agent credentials carry only `agent:*` scopes; every `/v0/sprints*` endpoint answers 403 `AGENT_READ_DENIED` to them.
+    - Agent credentials carry only agent scopes, each bound to one (repo, role): `agent:report`, `agent:repro`
+      (guardrail only) and the role supervisor's `checkpoint:report`. `checkpoint:report` is the supervisor scope of
+      that (repo, role): its checkpoints (report, latest), its own assignment, the first action of its attempts and
+      its session status. Only the supervisor process holds it, never the model process (runtime contract §4.3;
+      a same-UID process can still read it, so what it records is a claim). Every `/v0/sprints*` endpoint answers
+      403 `AGENT_READ_DENIED` to agent credentials.
 servers:
   - url: http://127.0.0.1:8080
     description: PoC local (same-host phase); real binding decided in 01-04
@@ -666,6 +678,202 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
           description: Unknown role (`NOT_FOUND`)
+  /v0/repos/{repo_id}/roles/{role}/assignment:
+    get:
+      tags: [agent]
+      operationId: getOwnAssignment
+      summary: The role supervisor reads its own current assignment (02-05 step 2)
+      description: |
+        Credential: kind `agent` with scope `checkpoint:report`, bound to this repo and role (the
+        supervisor's credential, not the model's). Other credentials → 403 (`SCOPE_DENIED` without the
+        scope, `REPO_SCOPE_DENIED` for another repo, `ROLE_MISMATCH` for the other role). Read only.
+        Answers the current head of (repo, role) as the coordinator recorded it: assignment, generation,
+        task, target SHA, sprint revision, its spec digest and `sources[]`, the revision's `limits`,
+        `attempts_issued` for (sprint, task, role), the policy digest and issue time. Elapsed time and
+        token consumption are not metered by the coordinator yet (02-05 step 5); `last_delivery_id` is
+        null until deliveries are recorded (step 3). No head → 404 `NO_CURRENT_ASSIGNMENT`. An unknown
+        role → 404 `NOT_FOUND`. Order: 401 → 404 role → 403 → 404 no head.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+      responses:
+        '200':
+          description: The current assignment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repo_id, role, assignment_id, generation, task_id, target_sha, sprint_id, sprint_revision,
+                           spec_digest, sources, limits, attempts_issued, policy_digest, issued_at, last_delivery_id]
+                properties:
+                  repo_id: { type: string }
+                  role: { type: string, enum: [development, guardrail] }
+                  assignment_id: { type: string }
+                  generation: { type: integer, minimum: 0 }
+                  task_id: { type: string }
+                  target_sha: { type: string }
+                  sprint_id: { type: string }
+                  sprint_revision: { type: integer, minimum: 1 }
+                  spec_digest: { type: string }
+                  sources:
+                    description: The revision's SprintSpec v0 `sources[]`, unchanged
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, ref, revision, digest, observed_at]
+                      properties:
+                        kind: { type: string }
+                        ref: { type: string }
+                        revision: { type: string }
+                        digest: { type: string }
+                        observed_at: { type: [string, 'null'] }
+                  limits:
+                    description: The revision's limits (null where unbound)
+                    type: object
+                    required: [elapsed_seconds, total_tokens, correction_attempts]
+                    properties:
+                      elapsed_seconds: { type: [integer, 'null'] }
+                      total_tokens: { type: [integer, 'null'] }
+                      correction_attempts: { type: [integer, 'null'] }
+                  attempts_issued: { type: integer, minimum: 0 }
+                  policy_digest: { type: string }
+                  issued_at: { type: string, format: date-time }
+                  last_delivery_id: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No current assignment (`NO_CURRENT_ASSIGNMENT`) or unknown role (`NOT_FOUND`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /v0/repos/{repo_id}/roles/{role}/first-actions:
+    post:
+      tags: [agent]
+      operationId: recordFirstAction
+      summary: The role supervisor records the first actual action of one attempt (02-05 step 2, claim)
+      description: |
+        Credential and refusals as getOwnAssignment. Body: the attempt's (assignment_id, generation,
+        attempt_id), its session_id, the stream offset of the first actual action (`event_offset`), the
+        supervisor's observation time (`observed_at`, RFC 3339 UTC `…Z`: stream events carry no time) and
+        `kind` (`tool_use` or `text`). Stored as a claim (`evidence_level: claim`); never a completion signal
+        and never an input of a verdict.
+        Idempotency key: (assignment_id, generation, attempt_id) within the credential's (repo, role). The
+        same body again → 200 with the stored receipt (nothing changes); another body under the key → 409
+        `EVENT_CONTENT_CONFLICT`. A new record needs: the assignment issued to this (repo, role) (else 409
+        `STALE_ASSIGNMENT`) and a stored `takeover` checkpoint of that session under that assignment and
+        generation (else 409 `CHECKPOINT_MISMATCH`). Like the later checkpoints of a run, a first action
+        recorded after the assignment moved on is kept with `current_assignment: false`.
+        Order: 401 → 404 role → 403 → 400 format → 409 key → 409 assignment, takeover. Refusals leave no row.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [assignment_id, generation, attempt_id, session_id, event_offset, observed_at, kind]
+              properties:
+                assignment_id: { type: string, minLength: 1, maxLength: 128 }
+                generation: { type: integer, minimum: 0 }
+                attempt_id: { type: string, minLength: 1, maxLength: 128 }
+                session_id: { type: string, minLength: 1, maxLength: 256 }
+                event_offset: { type: integer, minimum: 0 }
+                observed_at: { type: string, format: date-time, description: 'UTC, ending in Z' }
+                kind: { type: string, enum: [tool_use, text] }
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FirstActionReceipt' }
+        '200':
+          description: The same first action was already recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FirstActionReceipt' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Unknown role (`NOT_FOUND`)
+        '409': { $ref: '#/components/responses/Rejected' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /v0/repos/{repo_id}/roles/{role}/session-status:
+    post:
+      tags: [agent]
+      operationId: reportSessionStatus
+      summary: The role supervisor reports its session status (02-05 step 2, claim)
+      description: |
+        Credential and refusals as getOwnAssignment. Body: the runtime contract §7 status items, every one
+        present (`null` where not known): `observed_at` (RFC 3339 UTC `…Z`, the supervisor's clock),
+        `lifecycle` (`idle`, `running`, `stopping`), `session_id`, `assignment_id` and `generation` (both
+        or neither), `quota_group_id`, `provider_status_or_unknown`, `last_actual_action_at`,
+        `checkpoint_seq` and `checkpoint_sha256` (both or neither), `pending_external_requests` and
+        `active_children` (`"not_tracked"` or a list of objects; never 0 for not tracked). Appended to the
+        coordinator's status history of (repo, role) as a claim, so the last report and its time stay
+        visible when the supervisor cannot be reached. A status observed at or before an already stored one
+        is kept with `stale_on_arrival: true` and is never read as the current value. A named assignment
+        must have been issued to this (repo, role) (else 409 `STALE_ASSIGNMENT`); an earlier one is kept
+        with `current_assignment: false` (null when none is named).
+        Idempotency: the `Idempotency-Key` header (8–128 bytes; missing → 400 `MISSING_FIELD`) within the
+        credential's (repo, role). The same status (as a JSON value) again → 200 with the stored receipt;
+        another status under the key → 409 `IDEMPOTENCY_KEY_CONFLICT`.
+        Order: 401 → 404 role → 403 → 400 key → 400 format → 409 key → 409 assignment. Refusals leave no row.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [observed_at, lifecycle, session_id, assignment_id, generation, quota_group_id,
+                         provider_status_or_unknown, last_actual_action_at, checkpoint_seq, checkpoint_sha256,
+                         pending_external_requests, active_children]
+              properties:
+                observed_at: { type: string, format: date-time, description: 'UTC, ending in Z' }
+                lifecycle: { type: string, enum: [idle, running, stopping] }
+                session_id: { type: [string, 'null'], maxLength: 256 }
+                assignment_id: { type: [string, 'null'], maxLength: 128 }
+                generation: { type: [integer, 'null'], minimum: 0 }
+                quota_group_id: { type: string, minLength: 1, maxLength: 128 }
+                provider_status_or_unknown: { type: string, minLength: 1, maxLength: 64 }
+                last_actual_action_at: { type: [string, 'null'], format: date-time }
+                checkpoint_seq: { type: [integer, 'null'], minimum: 1 }
+                checkpoint_sha256: { type: [string, 'null'], pattern: '^[a-f0-9]{64}$' }
+                pending_external_requests:
+                  oneOf:
+                    - { type: string, const: not_tracked }
+                    - { type: array, items: { type: object } }
+                active_children:
+                  oneOf:
+                    - { type: string, const: not_tracked }
+                    - { type: array, items: { type: object } }
+      responses:
+        '201':
+          description: Appended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionStatusReceipt' }
+        '200':
+          description: The same status under the same key was already stored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionStatusReceipt' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Unknown role (`NOT_FOUND`)
+        '409': { $ref: '#/components/responses/Rejected' }
+        '500': { $ref: '#/components/responses/Internal' }
   /v0/health:
     get:
       tags: [coordinator]
@@ -984,7 +1192,7 @@ components:
         code:
           type: string
           enum: [UNAUTHENTICATED, SCOPE_DENIED, REPO_SCOPE_DENIED, ROLE_MISMATCH, VERIFIED_FROM_AGENT_DENIED,
-                 AGENT_READ_DENIED, NOT_FOUND, SELF_REVIEW_DENIED, NO_CHECKPOINT, INTERNAL]
+                 AGENT_READ_DENIED, NOT_FOUND, SELF_REVIEW_DENIED, NO_CHECKPOINT, NO_CURRENT_ASSIGNMENT, INTERNAL]
         message: { type: string, minLength: 1 }
     Rejection:
       type: object
@@ -1045,6 +1253,31 @@ components:
             semantic_review_required: { type: array, items: { type: string } }
             unresolved_bindings: { type: array, items: { type: string } }
         registration: { $ref: '#/components/schemas/RegistrationResult' }
+    FirstActionReceipt:
+      type: object
+      additionalProperties: false
+      required: [assignment_id, generation, attempt_id, session_id, evidence_level, current_assignment, received_at]
+      properties:
+        assignment_id: { type: string }
+        generation: { type: integer }
+        attempt_id: { type: string }
+        session_id: { type: string }
+        evidence_level: { type: string, const: claim }
+        current_assignment:
+          type: boolean
+          description: As stored; false when the assignment had moved on after the session's takeover
+        received_at: { type: string, format: date-time }
+    SessionStatusReceipt:
+      type: object
+      additionalProperties: false
+      required: [idempotency_key, observed_at, evidence_level, stale_on_arrival, current_assignment, received_at]
+      properties:
+        idempotency_key: { type: string }
+        observed_at: { type: string, format: date-time }
+        evidence_level: { type: string, const: claim }
+        stale_on_arrival: { type: boolean }
+        current_assignment: { type: [boolean, 'null'] }
+        received_at: { type: string, format: date-time }
     ClaimReceipt:
       type: object
       additionalProperties: false

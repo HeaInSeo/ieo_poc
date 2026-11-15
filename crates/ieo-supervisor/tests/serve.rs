@@ -1412,6 +1412,25 @@ impl ieo_proto::v0::supervisor_service_server::SupervisorService for Fake {
             )),
         }
     }
+    // 02-05 step 2 RPCs: the supervisor does not call them yet (step 3)
+    async fn get_own_assignment(
+        &self,
+        _: tonic::Request<ieo_proto::v0::GetOwnAssignmentRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::GetOwnAssignmentResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("fake"))
+    }
+    async fn record_first_action(
+        &self,
+        _: tonic::Request<ieo_proto::v0::RecordFirstActionRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::RecordFirstActionResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("fake"))
+    }
+    async fn report_session_status(
+        &self,
+        _: tonic::Request<ieo_proto::v0::ReportSessionStatusRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::ReportSessionStatusResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("fake"))
+    }
     async fn get_latest_checkpoint(
         &self,
         _: tonic::Request<ieo_proto::v0::GetLatestCheckpointRequest>,

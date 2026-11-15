@@ -4,7 +4,7 @@
 //! * the generated `ieo.internal.v0` messages, client and server (built from the .proto by
 //!   protox at build time, no protoc);
 //! * the HTTP → gRPC status table (§4.1) and the `ieo-error-bin` trailer (§4.3);
-//! * the JSON ↔ message conversions of the five operations: the coordinator answers in JSON
+//! * the JSON ↔ message conversions of the operations: the coordinator answers in JSON
 //!   (the HTTP body), the adapter carries the same values as typed fields, and a client that
 //!   needs the HTTP shape back (the supervisor's records) gets the same JSON.
 //!
@@ -19,8 +19,9 @@ pub mod v0 {
 }
 
 use v0::{
-    ClaimReceipt, Disposition, GetLatestCheckpointResponse, Outcome, Rejection,
-    ReportCheckpointResponse, ReproState, ReproStatus, Role,
+    AssignmentLimits, ClaimReceipt, Disposition, FirstActionKind, FirstActionReceipt,
+    GetLatestCheckpointResponse, GetOwnAssignmentResponse, Outcome, Rejection,
+    ReportCheckpointResponse, ReproState, ReproStatus, Role, SessionStatusReceipt, SpecSource,
 };
 
 /// The fully qualified service name (health service names, §7.3).
@@ -331,6 +332,131 @@ pub fn body_too_large_json() -> Value {
         "retryable_after_edit": true}]})
 }
 
+// ---------------------------------------------------------------------------
+// 02-05 step 2: the supervisor's own assignment, first action and session status
+// ---------------------------------------------------------------------------
+
+fn opt_s(v: &Value) -> Option<String> {
+    v.as_str().map(str::to_string)
+}
+
+fn opt_u(v: &Value) -> Option<u64> {
+    v.as_u64()
+}
+
+/// getOwnAssignment JSON → message.
+pub fn own_assignment_from_json(v: &Value) -> GetOwnAssignmentResponse {
+    let l = &v["limits"];
+    GetOwnAssignmentResponse {
+        repo_id: s(&v["repo_id"]),
+        role: role_of(v["role"].as_str().unwrap_or_default()) as i32,
+        assignment_id: s(&v["assignment_id"]),
+        generation: u(&v["generation"]),
+        task_id: s(&v["task_id"]),
+        target_sha: s(&v["target_sha"]),
+        sprint_id: s(&v["sprint_id"]),
+        sprint_revision: u(&v["sprint_revision"]),
+        spec_digest: s(&v["spec_digest"]),
+        sources: v["sources"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|x| SpecSource {
+                kind: s(&x["kind"]),
+                r#ref: s(&x["ref"]),
+                revision: s(&x["revision"]),
+                digest: s(&x["digest"]),
+                observed_at: opt_s(&x["observed_at"]),
+            })
+            .collect(),
+        limits: Some(AssignmentLimits {
+            elapsed_seconds: opt_u(&l["elapsed_seconds"]),
+            total_tokens: opt_u(&l["total_tokens"]),
+            correction_attempts: opt_u(&l["correction_attempts"]),
+        }),
+        attempts_issued: u(&v["attempts_issued"]),
+        policy_digest: s(&v["policy_digest"]),
+        issued_at: s(&v["issued_at"]),
+        last_delivery_id: opt_s(&v["last_delivery_id"]),
+    }
+}
+
+pub fn own_assignment_to_json(r: &GetOwnAssignmentResponse) -> Value {
+    let l = r.limits.unwrap_or_default();
+    json!({"repo_id": r.repo_id, "role": role_name(r.role), "assignment_id": r.assignment_id,
+           "generation": r.generation, "task_id": r.task_id, "target_sha": r.target_sha,
+           "sprint_id": r.sprint_id, "sprint_revision": r.sprint_revision,
+           "spec_digest": r.spec_digest,
+           "sources": r.sources.iter().map(|x| json!({"kind": x.kind, "ref": x.r#ref,
+               "revision": x.revision, "digest": x.digest, "observed_at": x.observed_at}))
+               .collect::<Vec<_>>(),
+           "limits": {"elapsed_seconds": l.elapsed_seconds, "total_tokens": l.total_tokens,
+                      "correction_attempts": l.correction_attempts},
+           "attempts_issued": r.attempts_issued, "policy_digest": r.policy_digest,
+           "issued_at": r.issued_at, "last_delivery_id": r.last_delivery_id})
+}
+
+/// `tool_use` / `text` / `""` (unspecified or unknown: refused by the handler as on HTTP).
+pub fn first_action_kind_name(k: i32) -> &'static str {
+    match FirstActionKind::try_from(k) {
+        Ok(FirstActionKind::ToolUse) => "tool_use",
+        Ok(FirstActionKind::Text) => "text",
+        _ => "",
+    }
+}
+
+pub fn first_action_kind_of(name: &str) -> FirstActionKind {
+    match name {
+        "tool_use" => FirstActionKind::ToolUse,
+        "text" => FirstActionKind::Text,
+        _ => FirstActionKind::Unspecified,
+    }
+}
+
+/// The HTTP-equivalent body of `RecordFirstAction` (§2): every field, always.
+pub fn first_action_request_json(r: &v0::RecordFirstActionRequest) -> Value {
+    json!({"assignment_id": r.assignment_id, "generation": r.generation,
+           "attempt_id": r.attempt_id, "session_id": r.session_id,
+           "event_offset": r.event_offset, "observed_at": r.observed_at,
+           "kind": first_action_kind_name(r.kind)})
+}
+
+pub fn first_action_receipt_from_json(v: &Value) -> FirstActionReceipt {
+    FirstActionReceipt {
+        assignment_id: s(&v["assignment_id"]),
+        generation: u(&v["generation"]),
+        attempt_id: s(&v["attempt_id"]),
+        session_id: s(&v["session_id"]),
+        evidence_level: s(&v["evidence_level"]),
+        current_assignment: v["current_assignment"].as_bool().unwrap_or_default(),
+        received_at: s(&v["received_at"]),
+    }
+}
+
+pub fn first_action_receipt_to_json(r: &FirstActionReceipt) -> Value {
+    json!({"assignment_id": r.assignment_id, "generation": r.generation,
+           "attempt_id": r.attempt_id, "session_id": r.session_id,
+           "evidence_level": r.evidence_level, "current_assignment": r.current_assignment,
+           "received_at": r.received_at})
+}
+
+pub fn session_status_receipt_from_json(v: &Value) -> SessionStatusReceipt {
+    SessionStatusReceipt {
+        idempotency_key: s(&v["idempotency_key"]),
+        observed_at: s(&v["observed_at"]),
+        evidence_level: s(&v["evidence_level"]),
+        stale_on_arrival: v["stale_on_arrival"].as_bool().unwrap_or_default(),
+        current_assignment: v["current_assignment"].as_bool(),
+        received_at: s(&v["received_at"]),
+    }
+}
+
+pub fn session_status_receipt_to_json(r: &SessionStatusReceipt) -> Value {
+    json!({"idempotency_key": r.idempotency_key, "observed_at": r.observed_at,
+           "evidence_level": r.evidence_level, "stale_on_arrival": r.stale_on_arrival,
+           "current_assignment": r.current_assignment, "received_at": r.received_at})
+}
+
 /// Parse a `grpc-timeout` metadata value (`<= 8 digits><H|M|S|m|u|n>`).
 pub fn parse_grpc_timeout(v: &str) -> Option<std::time::Duration> {
     use std::time::Duration;
@@ -444,5 +570,37 @@ mod tests {
         let repro = json!({"request_id": "r", "state": "queued", "target_sha": "t",
             "runner_image_digest": null, "exit_code": null, "raw_log_refs": [], "finished_at": null});
         assert_eq!(repro_to_json(&repro_from_json(&repro)), repro);
+        let own = json!({"repo_id": "r", "role": "development", "assignment_id": "A",
+            "generation": 2, "task_id": "01-01", "target_sha": "t", "sprint_id": "P",
+            "sprint_revision": 5, "spec_digest": "d",
+            "sources": [{"kind": "k", "ref": "x", "revision": "1", "digest": "e",
+                         "observed_at": null},
+                        {"kind": "k", "ref": "y", "revision": "2", "digest": "f",
+                         "observed_at": "2026-11-15T00:00:00Z"}],
+            "limits": {"elapsed_seconds": 3600, "total_tokens": null, "correction_attempts": 3},
+            "attempts_issued": 1, "policy_digest": "p", "issued_at": "2026-11-15T00:00:00Z",
+            "last_delivery_id": null});
+        assert_eq!(own_assignment_to_json(&own_assignment_from_json(&own)), own);
+        let fa = json!({"assignment_id": "A", "generation": 0, "attempt_id": "a1",
+            "session_id": "s1", "evidence_level": "claim", "current_assignment": false,
+            "received_at": "2026-11-15T00:00:00Z"});
+        assert_eq!(
+            first_action_receipt_to_json(&first_action_receipt_from_json(&fa)),
+            fa
+        );
+        for cur in [json!(true), json!(false), Value::Null] {
+            let ss = json!({"idempotency_key": "k-000001", "observed_at": "2026-11-15T00:00:00Z",
+                "evidence_level": "claim", "stale_on_arrival": true, "current_assignment": cur,
+                "received_at": "2026-11-15T00:00:00Z"});
+            assert_eq!(
+                session_status_receipt_to_json(&session_status_receipt_from_json(&ss)),
+                ss
+            );
+        }
+        for k in ["tool_use", "text"] {
+            assert_eq!(first_action_kind_name(first_action_kind_of(k) as i32), k);
+        }
+        assert_eq!(first_action_kind_name(0), "");
+        assert_eq!(first_action_kind_name(99), "");
     }
 }
