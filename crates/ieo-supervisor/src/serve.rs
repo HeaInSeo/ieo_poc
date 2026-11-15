@@ -771,12 +771,18 @@ impl Service {
         };
         // a detected tamper not yet reported (its takeover was refused, stopped or lost) is
         // carried to the next new session and never resumed over (review accd6c8 M-2)
-        // only an object is a detection; anything else reads like an unreadable file (review
-        // 681c1d3 I-4: a JSON array here used to panic below)
-        let pending = std::fs::read(self.cfg.pending_tamper_path())
-            .ok()
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
-            .filter(Value::is_object);
+        // only an object is a detection. A pending file that cannot be read, does not parse or
+        // is not an object may hide an unreported detection: nothing starts and the file stays
+        // for a person (user decision 2026-11-15, X-08; reviews ae65f0c Q-2, 681c1d3 I-4). A
+        // fresh detection has already replaced such a file above.
+        let pending = match std::fs::read(self.cfg.pending_tamper_path()) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Ok(b) => match serde_json::from_slice::<Value>(&b) {
+                Ok(v) if v.is_object() => Some(v),
+                _ => return pending_unreadable("it is not a JSON object"),
+            },
+            Err(e) => return pending_unreadable(&e.to_string()),
+        };
         let (session_id, resume, tamper) = match (pending, resume, tamper) {
             (Some(p), true, _) => {
                 let Some(new_sid) = s("new_session_id").filter(|x| safe_id(x)) else {
@@ -1515,6 +1521,19 @@ pub fn serve(cfg: Config, listen: &str) -> Result<(), String> {
         let bytes = serde_json::to_vec(&r.body).unwrap_or_default();
         let _ = req.respond(tiny_http::Response::from_data(bytes).with_status_code(r.status));
     }
+}
+
+/// A pending tamper file that cannot be read as a detection: refused for a person to reconcile
+/// (the file is kept).
+fn pending_unreadable(why: &str) -> Response {
+    resp(
+        409,
+        json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+               "reason": format!("the pending tamper file /state/pending-tamper.json cannot be read \
+                                  ({why}): a detection may be unreported; a person reconciles it \
+                                  (X-08 report §4) and repairs or removes the file"),
+               "external_reconciliation_required": true}),
+    )
 }
 
 #[cfg(test)]

@@ -1511,6 +1511,7 @@ over_both_transports!(
     a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending,
     a_tamper_the_coordinator_did_not_record_stays_pending,
     an_unrecorded_tamper_stays_pending_after_a_duplicate_or_an_adopted_takeover,
+    an_unreadable_pending_file_stops_until_a_person_reconciles_it,
 );
 
 fn svc_central(t: &Tmp, c: &FakeCentral) -> Arc<Service> {
@@ -2042,42 +2043,59 @@ fn an_unrecorded_tamper_stays_pending_after_a_duplicate_or_an_adopted_takeover(
     }
 }
 
-/// Review 681c1d3 I-4: a pending file holding JSON that is not an object (an array) is read like
-/// an unreadable one: no panic, and a fresh detection replaces it.
-#[test]
-fn a_pending_file_that_is_not_an_object_does_not_panic() {
-    let _serial = serial();
-    let (t, svc) = setup("tamper-array");
-    let state = t.0.join("state");
-    call(
-        &svc,
-        "POST",
-        "/v0/role/start",
-        &req("a1", "hi", json!({"session_id": "s1"})),
-    );
-    wait(&svc, "a1");
-    // no fresh detection: answered as with an unreadable file, not a panic
-    std::fs::write(state.join("pending-tamper.json"), "[1, 2]").expect("w");
-    let (st, b) = call(
-        &svc,
-        "POST",
-        "/v0/role/reconnect",
-        &req("a2", "hi", json!({"new_session_id": "s2"})),
-    );
-    assert_eq!(st, 202, "{b}");
-    assert_eq!(b["accepted"]["mode"], "resume", "{b}");
-    wait(&svc, "a2");
-    // with a fresh detection: it replaces the array
-    std::fs::write(state.join("pending-tamper.json"), "[1, 2]").expect("w");
-    std::fs::write(state.join("claude/CLAUDE.md"), "injected").expect("tamper");
-    let (st, b) = call(
-        &svc,
-        "POST",
-        "/v0/role/reconnect",
-        &req("a3", "hi", json!({"new_session_id": "s3"})),
-    );
-    assert_eq!(st, 202, "{b}");
-    assert_eq!(b["accepted"]["mode"], "new", "{b}");
-    assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s1", "{b}");
-    wait(&svc, "a3");
+/// User decision 2026-11-15 (X-08; reviews ae65f0c Q-2, 681c1d3 I-4): a pending tamper file
+/// that does not read as a detection (corrupt bytes, or JSON that is not an object) stops every
+/// start and reconnect with `EXTERNAL_RECONCILIATION_REQUIRED` and is kept, unless a fresh
+/// detection replaces it. Before the decision it read as "no pending" and the session resumed.
+fn an_unreadable_pending_file_stops_until_a_person_reconciles_it(transport: &'static str) {
+    for content in ["{not json", "[1, 2]", "\"text\""] {
+        let (t, _) = setup("tamper-unreadable-stop");
+        let c = fake_central(transport);
+        let svc = svc_central(&t, &c);
+        let state = t.0.join("state");
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req("a1", "hi", json!({"session_id": "s1"})),
+        );
+        assert_eq!(st, 202, "{b}");
+        wait(&svc, "a1");
+        std::fs::write(state.join("pending-tamper.json"), content).expect("w");
+        for (op, extra) in [
+            ("reconnect", json!({"new_session_id": "s2"})),
+            ("start", json!({"session_id": "s2"})),
+        ] {
+            let (st, b) = call(
+                &svc,
+                "POST",
+                &format!("/v0/role/{op}"),
+                &req("a2", "hi", extra),
+            );
+            assert_eq!(
+                (st, b["code"].as_str()),
+                (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+                "{content} {op}: {b}"
+            );
+            assert_eq!(
+                std::fs::read_to_string(state.join("pending-tamper.json")).expect("kept"),
+                content,
+                "the file is kept for a person"
+            );
+        }
+        assert!(!state.join("runs/a2").exists(), "nothing started");
+        // a fresh detection replaces the file and is reported with a new session
+        std::fs::write(state.join("claude/CLAUDE.md"), "injected").expect("tamper");
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/reconnect",
+            &req("a2", "hi", json!({"new_session_id": "s2"})),
+        );
+        assert_eq!(st, 202, "{content}: {b}");
+        assert_eq!(b["accepted"]["mode"], "new", "{b}");
+        assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s1", "{b}");
+        wait(&svc, "a2");
+        assert!(!state.join("pending-tamper.json").exists());
+    }
 }

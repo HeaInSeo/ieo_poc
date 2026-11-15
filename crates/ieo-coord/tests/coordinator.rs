@@ -3480,6 +3480,13 @@ fn central_checkpoints_keep_sequence_identity_and_tamper_reports() {
         (201, Some(true)),
         "{b}"
     );
+    // latest says the seq-2 takeover's own report recorded the event (review 3724bc9 I-1)
+    let (st, b) = e.get("operator", &format!("{CP}/latest"));
+    assert_eq!(
+        (st, b["seq"].as_u64(), b["tamper_recorded"].as_bool()),
+        (200, Some(2), Some(true)),
+        "{b}"
+    );
     let (st, b) = report("sup-dev-a", 3, &checkpoint(3, 0, &digest, tamper.clone()));
     assert_eq!(
         (st, b["tamper_recorded"].as_bool()),
