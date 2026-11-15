@@ -51,7 +51,9 @@ pub fn token_digest(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
 
-const AGENT_SCOPES: [&str; 2] = ["agent:report", "agent:repro"];
+// `checkpoint:report`: a role supervisor's report credential (runtime contract §2.1, §5-1); bound
+// to one repo and role like the agent credentials, held by the supervisor (not the model)
+const AGENT_SCOPES: [&str; 3] = ["agent:report", "agent:repro", "checkpoint:report"];
 const CLIENT_SCOPES: [&str; 10] = [
     // repo-scope status/stop of the role supervisors (runtime contract §7, 02-04)
     "roles:control",

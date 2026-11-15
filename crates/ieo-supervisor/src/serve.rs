@@ -38,8 +38,15 @@ pub struct Config {
     pub claude: PathBuf,
     /// Program used to signal process groups.
     pub kill: String,
-    /// Provider quota group of this role's credential (§3, §7 status), if known.
-    pub quota_group_id: Option<String>,
+    /// Provider quota group of this role's credential (§3, §7 status), set explicitly: roles
+    /// whose credentials share a provider limit carry the same id (01-04 P3: shared).
+    pub quota_group_id: String,
+    /// Why the group is what it is (e.g. the 01-04 P3 verdict), reported with the status.
+    pub quota_group_basis: Option<String>,
+    /// Maximum age (seconds) of a provider observation reported as current.
+    pub provider_max_age: u64,
+    /// The central checkpoint record (§2.1, §5-2): the coordinator, or `local_only` for tests.
+    pub central: crate::central::Central,
     /// The approved budget this role's runs belong to (user decision 2026-11-13 ①): the service
     /// refuses runs beyond its caps on its own (a backstop; exact accounting is the caller's).
     pub budget: crate::budget::Budget,
@@ -82,7 +89,28 @@ impl Config {
             cred: s("cred")?.into(),
             claude: s("claude")?.into(),
             kill: v["kill"].as_str().unwrap_or("kill").to_string(),
-            quota_group_id: v["quota_group_id"].as_str().map(str::to_owned),
+            quota_group_id: match v["quota_group_id"].as_str() {
+                Some(q)
+                    if !q.is_empty()
+                        && q.len() <= 128
+                        && q != "unknown"
+                        && q.chars().all(|c| {
+                            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':')
+                        }) =>
+                {
+                    q.to_string()
+                }
+                _ => {
+                    return Err("config.quota_group_id required: 1-128 of [A-Za-z0-9._:-], not \"unknown\" \
+                         (§3/§7: roles sharing a provider limit use the same id)"
+                        .into());
+                }
+            },
+            quota_group_basis: v["quota_group_basis"].as_str().map(str::to_owned),
+            provider_max_age: v["provider_status_max_age_seconds"]
+                .as_u64()
+                .unwrap_or(crate::provider::DEFAULT_MAX_AGE_SECONDS),
+            central: crate::central::Central::from_json(&v["checkpoint_central"])?,
             budget: match v["budget"].as_str() {
                 Some("02-04") => crate::budget::BUDGET_0204,
                 Some("X-02") => crate::budget::BUDGET_X02,
@@ -132,6 +160,22 @@ impl Config {
     fn checkpoint_path(&self) -> PathBuf {
         self.state.join("checkpoint.json")
     }
+    /// Every checkpoint written, by sequence number (the source of late central reports).
+    fn checkpoint_archive(&self) -> PathBuf {
+        self.state.join("checkpoints")
+    }
+    /// The last central report's result (kept across restarts).
+    fn report_record_path(&self) -> PathBuf {
+        self.state.join("checkpoint-report.json")
+    }
+    /// A takeover checkpoint reported but not yet known to be recorded.
+    fn staged_path(&self) -> PathBuf {
+        self.state.join("checkpoint-staged.json")
+    }
+    /// A detected config tamper not yet reported with an accepted takeover (§5-6).
+    fn pending_tamper_path(&self) -> PathBuf {
+        self.state.join("pending-tamper.json")
+    }
     /// Attempts started under this role's budget (append-only, on the persistent volume).
     fn attempts_path(&self) -> PathBuf {
         self.state.join("budget").join("attempts.jsonl")
@@ -154,6 +198,11 @@ struct State {
     running: Option<Value>,
     stop: Option<Arc<AtomicBool>>,
     last: Option<Value>,
+    /// The last central report's result (sequence, answer or error).
+    central_last: Option<Value>,
+    /// The newest checkpoint known to be in the central record (`seq`, `sha256`): from an
+    /// accepted report or a successful comparison (review accd6c8 L-2).
+    central_accepted: Option<Value>,
 }
 
 pub struct Service {
@@ -161,6 +210,9 @@ pub struct Service {
     state: Mutex<State>,
     /// The checkpoint found when the service started (§7 `restored_checkpoint_ref`).
     restored: Value,
+    /// The newest provider observation of an attempt before this service started: shown as
+    /// history, never as the current status.
+    previous_provider: Value,
 }
 
 pub struct Response {
@@ -205,21 +257,6 @@ fn safe_id(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// The provider status the run's stream last reported (`rate_limit_event`), or null.
-fn provider_status(stdout: &Path) -> Value {
-    let text = std::fs::read_to_string(stdout).unwrap_or_default();
-    text.lines()
-        .rev()
-        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .find(|v| v["type"] == "rate_limit_event")
-        .map(|v| {
-            let i = &v["rate_limit_info"];
-            json!({"status": i["status"], "overageStatus": i["overageStatus"],
-                   "isUsingOverage": i["isUsingOverage"]})
-        })
-        .unwrap_or(Value::Null)
-}
-
 /// The last `result` event's session totals, for the next resumed run's base (§11 item 7).
 fn session_cumulative(stdout: &Path) -> Value {
     let text = std::fs::read_to_string(stdout).unwrap_or_default();
@@ -245,11 +282,85 @@ impl Service {
                 Err(_) => json!({"found": true, "readable": false}),
             },
         };
+        // the newest attempt outcome on the volume (attempt ids are not ordered; the outcome's
+        // end time is)
+        let previous_provider = std::fs::read_dir(cfg.runs())
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .filter_map(|e| std::fs::read(e.path().join("outcome.json")).ok())
+            .filter_map(|b| serde_json::from_slice::<Value>(&b).ok())
+            .filter(|o| o["provider"].is_object() && o["ended_at"].is_string())
+            .max_by(|a, b| a["ended_at"].as_str().cmp(&b["ended_at"].as_str()))
+            .map(|o| {
+                json!({"current": false, "reason": "observed before this service started",
+                            "observation": o["provider"]})
+            })
+            .unwrap_or(Value::Null);
+        let rec = std::fs::read(cfg.report_record_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .unwrap_or(Value::Null);
+        let central_last = Some(rec["last"].clone()).filter(|v| v.is_object());
+        let central_accepted = Some(rec["accepted"].clone()).filter(|v| v.is_object());
         Service {
             cfg,
-            state: Mutex::new(State::default()),
+            state: Mutex::new(State {
+                central_last,
+                central_accepted,
+                ..State::default()
+            }),
             restored,
+            previous_provider,
         }
+    }
+
+    /// The local checkpoint's bytes, after two repairs (reviews 48b1d0e L-3, accd6c8 M-1r/L-3):
+    /// * a takeover staged for the coordinator whose answer was lost (timeout, crash, failed
+    ///   local write) is adopted when the coordinator's latest record is exactly it (same
+    ///   sequence and digest); a staged takeover the coordinator does not hold is dropped;
+    /// * `checkpoint.json` is written before its archive copy, so a write stopped between the
+    ///   two leaves the archive one behind: the missing copy is written from `checkpoint.json`.
+    ///   A `checkpoint.json` older than the archive is never replaced (a rollback stays visible).
+    fn local_checkpoint(&self) -> Option<Vec<u8>> {
+        let cfg = &self.cfg;
+        let archive = cfg.checkpoint_archive();
+        if let Ok(staged) = std::fs::read(cfg.staged_path()) {
+            let seq = serde_json::from_slice::<Value>(&staged)
+                .ok()
+                .and_then(|c| c["seq"].as_u64());
+            match (seq, cfg.central.latest(&cfg.repo, cfg.role_name())) {
+                (Some(n), Ok(Some(l)))
+                    if l["seq"].as_u64() == Some(n)
+                        && l["checkpoint_sha256"].as_str()
+                            == Some(crate::central::sha256(&staged).as_str()) =>
+                {
+                    if crate::central::durable_write(&cfg.checkpoint_path(), &staged).is_ok()
+                        && crate::central::durable_write(
+                            &crate::central::archive_path(&archive, n),
+                            &staged,
+                        )
+                        .is_ok()
+                    {
+                        let _ = std::fs::remove_file(cfg.staged_path());
+                        self.mark_accepted(n, &crate::central::sha256(&staged));
+                    }
+                }
+                (Some(n), Ok(l)) if l.as_ref().and_then(|l| l["seq"].as_u64()).unwrap_or(0) < n => {
+                    let _ = std::fs::remove_file(cfg.staged_path());
+                }
+                _ => {} // unreachable or other: kept; the comparison decides
+            }
+        }
+        let raw = std::fs::read(cfg.checkpoint_path()).ok()?;
+        if let Some(n) = serde_json::from_slice::<Value>(&raw)
+            .ok()
+            .and_then(|c| c["seq"].as_u64())
+            && crate::central::archived_max(&archive) + 1 == n
+        {
+            let _ = crate::central::durable_write(&crate::central::archive_path(&archive, n), &raw);
+        }
+        Some(raw)
     }
 
     fn authorized(&self, bearer: Option<&str>) -> bool {
@@ -261,7 +372,17 @@ impl Service {
     }
 
     pub fn status(&self) -> Value {
-        let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        // a copy of the state: files are read without holding the lock (review 48b1d0e I-3)
+        let st = {
+            let g = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            State {
+                running: g.running.clone(),
+                stop: None,
+                last: g.last.clone(),
+                central_last: g.central_last.clone(),
+                central_accepted: g.central_accepted.clone(),
+            }
+        };
         let raw = std::fs::read(self.cfg.checkpoint_path()).ok();
         let cp = raw
             .as_ref()
@@ -279,23 +400,69 @@ impl Service {
                 (Some(_), None) => false,
                 (Some(_), Some(_)) => phase.as_deref() == Some("after_run"),
             };
+        // the central record: the last report must have been accepted for this checkpoint
+        let cp_seq = cp.as_ref().and_then(|c| c["seq"].as_u64());
+        // reported: the central record is known to hold exactly this checkpoint (sequence and
+        // digest), from an accepted report or a comparison — not from the last attempt only
+        let reported = match (&self.cfg.central, cp_seq) {
+            (crate::central::Central::LocalOnly, _) => json!("local_only"),
+            (_, None) => json!(raw.is_none()),
+            (_, Some(n)) => json!(st.central_accepted.as_ref().is_some_and(|a| {
+                a["seq"] == n
+                    && raw.as_ref().map(|b| crate::central::sha256(b)).as_deref()
+                        == a["sha256"].as_str()
+            })),
+        };
         let safe = json!({
             "running": st.running.is_some(),
             "checkpoint_phase": phase,
             "checkpoint_saved": saved,
+            "checkpoint_reported": reported,
             "active_children": "not_tracked",
             "pending_external_requests": "not_tracked",
         });
         let last = st.last.as_ref();
+        // §7 provider status: only what this service observed, and only while fresh; a running
+        // attempt is read live, never replaced by the previous attempt's value
+        let live = st.running.as_ref().map(|r| {
+            let a = r["attempt_id"].as_str().unwrap_or_default();
+            let text = std::fs::read_to_string(self.cfg.runs().join(a).join("stdout.jsonl"))
+                .unwrap_or_default();
+            crate::provider::observation(&text, a, r["started_at"].as_str().unwrap_or(""), None)
+        });
+        let obs = match (&live, last) {
+            (Some(l), _) => Some(l.clone()),
+            (None, Some(l)) => l.get("provider").filter(|v| v.is_object()).cloned(),
+            (None, None) => None,
+        };
+        let (provider, provider_detail) = crate::provider::current(
+            obs.as_ref(),
+            crate::provider::now_unix(),
+            self.cfg.provider_max_age,
+            live.is_some(),
+        );
+        let mut gaps = vec![
+            "active_children not tracked",
+            "pending_external_requests not tracked",
+            "worktree_head not tracked",
+        ];
+        if self.cfg.central == crate::central::Central::LocalOnly {
+            gaps.push("central checkpoint comparison off (local_only)");
+        }
         json!({"role": self.cfg.role_name(), "repo": self.cfg.repo,
                "running": st.running, "last": st.last, "checkpoint": cp, "safe_shutdown": safe,
+               "checkpoint_seq": cp_seq,
+               "checkpoint_sha256": raw.as_ref().map(|b| crate::central::sha256(b)),
+               "central_checkpoint": {"mode": self.cfg.central.mode(), "last_report": st.central_last},
                // §7 status fields
-               "quota_group_id": self.cfg.quota_group_id.as_deref().unwrap_or("unknown"),
-               "provider_status_or_unknown": last.and_then(|l| l.get("provider_status")).filter(|v| !v.is_null()).cloned().unwrap_or(json!("unknown")),
+               "quota_group_id": self.cfg.quota_group_id,
+               "quota_group_basis": self.cfg.quota_group_basis,
+               "provider_status_or_unknown": provider,
+               "provider_status_detail": provider_detail,
+               "provider_status_before_start": self.previous_provider,
                "last_actual_action_at": last.and_then(|l| l.get("ended_at")).cloned().unwrap_or(Value::Null),
                "restored_checkpoint_ref": self.restored,
-               "capability_gaps": ["active_children not tracked", "pending_external_requests not tracked",
-                                   "worktree_head not tracked"]})
+               "capability_gaps": gaps})
     }
 
     /// Handle one request. `bearer` is the token from `Authorization: Bearer …`.
@@ -418,6 +585,25 @@ impl Service {
                 json!({"code": "ALREADY_RUNNING", "status": self.status()}),
             );
         }
+        // the central record first (§2.1, §5-2): the local checkpoint must match the
+        // coordinator's latest one (missing reports are sent from the archive) before anything
+        // starts, a new session included (its checkpoints continue the sequence)
+        let central = match crate::central::compare(
+            &self.cfg.central,
+            &self.cfg.repo,
+            self.cfg.role_name(),
+            self.local_checkpoint().as_deref(),
+            &self.cfg.checkpoint_archive(),
+        ) {
+            Ok(c) => c,
+            Err(r) => return resp(r.status, r.body),
+        };
+        if central["compared"] == true
+            && let Some(n) = central["local_seq"].as_u64()
+            && let Ok(b) = std::fs::read(self.cfg.checkpoint_path())
+        {
+            self.mark_accepted(n, &crate::central::sha256(&b));
+        }
         // decide what runs
         let cp_raw = std::fs::read(self.cfg.checkpoint_path());
         let cp = cp_raw
@@ -539,6 +725,39 @@ impl Service {
                 }
             }
         };
+        // a detected tamper not yet reported (its takeover was refused, stopped or lost) is
+        // carried to the next new session and never resumed over (review accd6c8 M-2)
+        let pending = std::fs::read(self.cfg.pending_tamper_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+        let (session_id, resume, tamper) = match (pending, resume, tamper) {
+            (Some(p), true, _) => {
+                let Some(new_sid) = s("new_session_id").filter(|x| safe_id(x)) else {
+                    return err(
+                        400,
+                        "SCHEMA_VIOLATION",
+                        "new_session_id required: a detected config tamper is not yet reported",
+                    );
+                };
+                let mut t = p;
+                t["new_session_id"] = json!(new_sid);
+                (new_sid, false, Some(t))
+            }
+            (Some(p), false, None) => {
+                let mut t = p;
+                t["new_session_id"] = json!(session_id);
+                (session_id, false, Some(t))
+            }
+            (_, r, t) => (session_id, r, t),
+        };
+        if let Some(t) = &tamper
+            && let Err(e) = crate::central::durable_write(
+                &self.cfg.pending_tamper_path(),
+                &serde_json::to_vec_pretty(t).unwrap_or_default(),
+            )
+        {
+            return err(500, "INTERNAL", &format!("pending tamper: {e}"));
+        }
         let credential = match std::fs::read_to_string(self.cfg.cred.join("oauth_token")) {
             Ok(c) if !c.trim().is_empty() => c.trim().to_string(),
             _ => {
@@ -567,7 +786,8 @@ impl Service {
         }
         let stop = Arc::new(AtomicBool::new(false));
         let info = json!({"attempt_id": attempt, "session_id": session_id, "mode":
-            if resume { "resume" } else { "new" }, "tamper": tamper});
+            if resume { "resume" } else { "new" }, "tamper": tamper,
+            "started_at": ieo_evidence::time::now(), "central": central});
         st.running = Some(info.clone());
         st.stop = Some(stop.clone());
         drop(st);
@@ -586,6 +806,7 @@ impl Service {
                 "target_sha": req["target_sha"].as_str().unwrap_or("unknown")}),
             tamper,
             stop,
+            started_at: info["started_at"].as_str().unwrap_or_default().to_string(),
         };
         std::thread::spawn(move || me.execute(job));
         resp(202, json!({"accepted": info}))
@@ -649,7 +870,21 @@ impl Service {
         }
         // §5-1: a checkpoint at takeover, after the stop check, before anything runs (a crash mid-run then names this
         // session); again after the run, and on errors
-        self.write_checkpoint(job, &report.digest, None, false, "takeover")?;
+        if let Some(refusal) =
+            self.write_checkpoint(job, &report.digest, None, false, "takeover")?
+        {
+            // the coordinator did not take the takeover: nothing was written and nothing runs;
+            // the attempt ends as not spawned (0/0 in the budget ledger, review 48b1d0e M-1)
+            let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
+                "mode": if job.resume { "resume" } else { "new" },
+                "stop": "CentralRefused", "stopped_by_guard": false, "spawned": false,
+                "central_refusal": refusal, "tamper": job.tamper});
+            let _ = std::fs::write(
+                dir.join("outcome.json"),
+                serde_json::to_vec_pretty(&v).unwrap_or_default(),
+            );
+            return Ok(v);
+        }
         let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
         let mut cmd = Command::new(&cfg.claude);
         cmd.args(&argv).current_dir(cfg.cwd());
@@ -687,7 +922,9 @@ impl Service {
             "stop": format!("{:?}", outcome.stop),
             "stopped_by_guard": outcome.stop != Stop::Exited,
             "ended_at": ieo_evidence::time::now(),
-            "provider_status": provider_status(&stdout),
+            "provider": crate::provider::observation(
+                &std::fs::read_to_string(&stdout).unwrap_or_default(),
+                &job.attempt, &job.started_at, Some(&ieo_evidence::time::now())),
             "exit_code": outcome.exit_code, "elapsed_ms": outcome.elapsed.as_millis() as u64,
             "observed": {"billable_lower_bound": outcome.observed.billable,
                          "cache_read_lower_bound": outcome.observed.cache_read,
@@ -744,6 +981,12 @@ impl Service {
 
     /// Write the §5-1 checkpoint durably (temp file, fsync, rename, directory fsync). `phase`
     /// records when it was written (`takeover`, `after_run`, `error`).
+    ///
+    /// With a central record, a `takeover` checkpoint is reported **before** it is written
+    /// locally: if the coordinator refuses it (or cannot be reached), nothing is written and
+    /// `Ok(Some(refusal))` is returned, so the attempt ends without spawning and leaves no
+    /// local checkpoint the coordinator does not have (review 48b1d0e M-1). Later phases are
+    /// written first (the run happened) and reported after.
     fn write_checkpoint(
         &self,
         job: &Job,
@@ -751,7 +994,7 @@ impl Service {
         stdout: Option<&Path>,
         exited: bool,
         phase: &str,
-    ) -> Result<(), String> {
+    ) -> Result<Option<Value>, String> {
         let cfg = &self.cfg;
         let c = &job.coord;
         let n = |k: &str| c[k].as_u64().unwrap_or_default();
@@ -811,17 +1054,119 @@ impl Service {
         };
         cp["session_cumulative"] = cum;
         cp["session_cumulative_attempt"] = from;
-        let path = cfg.checkpoint_path();
-        let tmp = path.with_extension("json.tmp");
-        let write = || -> std::io::Result<()> {
+        // identity for the central record (§2.1, §5-1): repo, role, sequence; and the tamper
+        // event of this session's start, reported with its checkpoints (§5-6)
+        let archive = cfg.checkpoint_archive();
+        // the next number after both the archive and the local checkpoint (review 48b1d0e L-3)
+        let local_seq = std::fs::read(cfg.checkpoint_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|c| c["seq"].as_u64())
+            .unwrap_or(0);
+        let seq = crate::central::archived_max(&archive).max(local_seq) + 1;
+        cp["seq"] = json!(seq);
+        cp["repo_id"] = json!(cfg.repo);
+        cp["role"] = json!(cfg.role_name());
+        cp["config_tamper_detected"] = job.tamper.clone().unwrap_or(Value::Null);
+        let bytes = serde_json::to_vec_pretty(&cp).unwrap_or_default();
+        let durable = |path: &Path, dir: &Path| -> std::io::Result<()> {
             use std::io::Write;
+            std::fs::create_dir_all(dir)?;
+            let tmp = path.with_extension("json.tmp");
             let mut f = std::fs::File::create(&tmp)?;
-            f.write_all(&serde_json::to_vec_pretty(&cp).unwrap_or_default())?;
+            f.write_all(&bytes)?;
             f.sync_all()?;
-            std::fs::rename(&tmp, &path)?;
-            std::fs::File::open(&cfg.state)?.sync_all()
+            std::fs::rename(&tmp, path)?;
+            std::fs::File::open(dir)?.sync_all()
         };
-        write().map_err(|e| format!("checkpoint: {e}"))
+        let central = cfg.central != crate::central::Central::LocalOnly;
+        let write_local = || -> Result<(), String> {
+            // checkpoint.json first, then its archive copy (a stop between the two is repaired
+            // from checkpoint.json; review accd6c8 L-3)
+            durable(&cfg.checkpoint_path(), &cfg.state).map_err(|e| format!("checkpoint: {e}"))?;
+            durable(&crate::central::archive_path(&archive, seq), &archive)
+                .map_err(|e| format!("checkpoint archive: {e}"))
+        };
+        if central && phase == "takeover" {
+            // the coordinator first. The takeover is staged on the volume until the answer is
+            // known: a lost answer, a crash or a failed local write is adopted later when the
+            // coordinator holds exactly it (review accd6c8 M-1r). A clear refusal drops it.
+            crate::central::durable_write(&cfg.staged_path(), &bytes)
+                .map_err(|e| format!("staged checkpoint: {e}"))?;
+            let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
+            self.record_report(seq, phase, &answer, &bytes);
+            if let Err(r) = answer {
+                if r.status != 503 {
+                    let _ = std::fs::remove_file(cfg.staged_path());
+                }
+                return Ok(Some(r.body));
+            }
+            if let Err(e) = write_local() {
+                // accepted centrally but not written: nothing runs; the staged copy is adopted
+                // on the next start
+                return Ok(Some(json!({"code": "LOCAL_WRITE_FAILED", "reason": e})));
+            }
+            let _ = std::fs::remove_file(cfg.staged_path());
+        } else {
+            write_local()?;
+            // a later phase that is not accepted stays unreported: the status says so and the
+            // next start sends it from the archive or stops for reconciliation
+            if central {
+                let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
+                self.record_report(seq, phase, &answer, &bytes);
+            }
+        }
+        // a tamper detection is reported once its takeover is recorded (review accd6c8 M-2)
+        if phase == "takeover" && job.tamper.is_some() {
+            let _ = std::fs::remove_file(cfg.pending_tamper_path());
+        }
+        Ok(None)
+    }
+
+    /// The newest checkpoint known to be in the central record.
+    fn mark_accepted(&self, seq: u64, sha: &str) {
+        let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        st.central_accepted = Some(json!({"seq": seq, "sha256": sha}));
+        let rec = json!({"last": st.central_last, "accepted": st.central_accepted});
+        drop(st);
+        let _ = crate::central::durable_write(
+            &self.cfg.report_record_path(),
+            &serde_json::to_vec_pretty(&rec).unwrap_or_default(),
+        );
+    }
+
+    /// Keep the last central report's result, in memory and on the volume (so a restarted
+    /// service still knows whether its checkpoint was reported — review 48b1d0e L-2); an
+    /// accepted report also moves `central_accepted` (review accd6c8 L-2).
+    fn record_report(
+        &self,
+        seq: u64,
+        phase: &str,
+        answer: &Result<Value, crate::central::Refusal>,
+        bytes: &[u8],
+    ) {
+        let sha = crate::central::sha256(bytes);
+        let rec = match answer {
+            Ok(v) => json!({"seq": seq, "phase": phase, "ok": true, "sha256": sha, "answer": v,
+                            "at": ieo_evidence::time::now()}),
+            Err(r) => json!({"seq": seq, "phase": phase, "ok": false, "sha256": sha,
+                             "status": r.status, "refusal": r.body, "at": ieo_evidence::time::now()}),
+        };
+        self.state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .central_last = Some(rec);
+        if answer.is_ok() {
+            self.mark_accepted(seq, &sha);
+        } else {
+            let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            let rec = json!({"last": st.central_last, "accepted": st.central_accepted});
+            drop(st);
+            let _ = crate::central::durable_write(
+                &self.cfg.report_record_path(),
+                &serde_json::to_vec_pretty(&rec).unwrap_or_default(),
+            );
+        }
     }
 }
 
@@ -988,6 +1333,8 @@ struct Job {
     coord: Value,
     tamper: Option<Value>,
     stop: Arc<AtomicBool>,
+    /// When the attempt was accepted (the lower bound of its provider observation's time).
+    started_at: String,
 }
 
 impl Service {
@@ -1118,7 +1465,7 @@ mod tests {
         let _ = Command::new("chmod").arg("+x").arg(&prog).status();
         let cfg = Config::from_json(&json!({"role": "guardrail", "repo": "r",
             "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
-            "claude": prog, "budget": "02-04",
+            "claude": prog, "quota_group_id": "test-shared", "checkpoint_central": "local_only", "budget": "02-04",
             "share": {"max_runs": 1, "total_seconds": 100, "billable_tokens": 1, "cache_read_tokens": 1}}))
         .expect("cfg");
         let svc = Service::new(cfg);
@@ -1138,6 +1485,7 @@ mod tests {
             coord: json!({}),
             tamper: None,
             stop: Arc::new(AtomicBool::new(true)),
+            started_at: ieo_evidence::time::now(),
         };
         svc.execute(job);
         let v = svc.status()["last"].clone();

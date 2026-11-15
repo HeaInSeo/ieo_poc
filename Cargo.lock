@@ -547,6 +547,7 @@ dependencies = [
  "hex",
  "ieo-report",
  "ieo-spec",
+ "ieo-supervisor",
  "postgres",
  "serde_json",
  "sha2",

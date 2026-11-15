@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0029",
-  "snapshot_created_at": "2026-11-15T09:41:10+09:00",
-  "last_actual_work_observed_at": "2026-11-15T09:28:08+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0030",
+  "snapshot_created_at": "2026-11-15T13:24:53+09:00",
+  "last_actual_work_observed_at": "2026-11-15T13:24:53+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 진행(실제 세션 시험 7회 완료: D3 사용량 정정 뒤 D4~D6, 수용 판단 전) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 진행(실제 세션 시험 7회 완료, 사용자 수용 결정 (나): 항목 4·9 구현·검토 중, 수용 전) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -286,9 +286,9 @@
       "group": "핵심",
       "kind": "구현",
       "status": "진행",
-      "last_observed_at": "2026-11-15T09:28:08+09:00",
-      "latest_report": "reports/tasks/02-04/acceptance-20261115/REPORT.md",
-      "result_state": "진행 기록 1(수용 아님): crates/ieo-supervisor — 역할 인자(Edit(//…)만, session_id 재개), 허용 목록 환경, CLAUDE_CONFIG_DIR 지시성 digest·변조 탐지·정리(링크·특수 파일·읽기 오류 닫힌 실패), flock 세션 잠금, §5-1 체크포인트·재연결 결정, 결정 ① 예산 가드(미계측·넘침 중지, 추가 과금 없음 조건 미확인 시 보류). 시험 20건. PR #31 bc55edf approve(검토 3/4·교정 2/3) → 병합 0f446d6, PR #32 aeab3d9 approve(검토 2/4·교정 1/3) → 병합 3426c77, main CI run 43441103331(0f446d6)·43442655596(3426c77) success. 모델 호출 0(02-04 예산 사용 0) · 진행 기록 2(수용 아님): 실행 중 예산 집행 run::run(회차·전체 시간 마감과 그룹 정리, 관측 사용량·추가 사용량 신호 정지, 정지 뒤 출력 복사, kill 실패 보고)과 run::charge(guard가 멈춘 회차는 언제나 미계측), Limits::for_next(budget::next 감쌈). 모델 없는 시험 25건·변이 27/27. 한계: 관측 후 정지이며 공급자 측 제한 아님, 관측 사용량은 하한, 최종값은 result에서만. PR #40 3103933·d2989f7·5136d66 changes requested → 23fee80 approve(검토 4/4·교정 3/3) → 병합 ccf7291, main CI run 43590448077 success. 모델 호출 0 · 진행 기록 3(수용 아님): 역할 컨테이너의 supervisor 서비스(PID 1) — 어댑터 start/reconnect/stop/status(Bearer 해시 인증), 매 실행 전 CLAUDE_CONFIG_DIR 정리, 체크포인트 3단계(takeover·after_run·error, fsync)와 끝나지 않은 회차 재개 거부, 세션당 단일 실행, SIGTERM 처리·고아 거두기, 역할별 예산 몫(개발 8회·9,600초·1M·10M, Guardrail 4회·4,800초·0.5M·5M, 합 = 승인)과 닫힌 회차 기록, stop grace 6초. 가짜 Claude 컨테이너 시험(U3 배치·(a) 정리·(c) 재개·볼륨 복원·(b) 변조·단일 실행·stop·Guardrail 인자·실행 중 SIGTERM·가장 느린 정지 8.4초) 통과, 작업 공간 시험 252건. PR #47 88a4535·6975d5f changes requested → 475b409 approve(검토 3/4·교정 2/3) → 병합 2d13d16, main CI run 43613181714 success. 모델 호출 0 · 진행 기록 4(수용 아님): 컨테이너 밖 예산 집행 호출자 ieo-role-call(두 역할 전체 기록을 닫힌 쪽으로 읽음, 역할 몫·회당 창 축소, 무추가결제 세 출처(과거 관측 stream·자격 형식과 실행 환경·이번 실행 신호, 시점별), 진행 중 표식·서비스 마지막 회차와 체크포인트 회차 대조, 계측기와 run::charge_reported, 미계측·실패·결과 실패는 stop_required, 자동 재시도 없음)와 실제 회차 계획 RUN_PLAN(D1·G1·R1·D2~D6, 모델 호출 7회·예비 5회). 컨테이너 예행(가짜 Claude·가짜 자격) 8개 확인과 거부 3건 통과, 호출자 변이 11/11, 작업 공간 시험 273건. PR #49 c4620d2·f90f5b5 changes requested → dc11612 approve(검토 3/4·교정 2/3) → 병합 ca08c76, main CI run 43621679774 success. 모델 호출 0 · 진행 기록 5(수용 아님): 실제 D3(자식이 있는 재개)가 사용량 미계측으로 중단 → 원인 tool_use_result.usage = 자식 마지막 응답만(CLI 2.1.322) → 사용자 결정 2026-11-15(세션 증가분 차감, 집계 교정 먼저) → 자식 전사의 응답별 확정 사용량 합으로 교정(런타임 계약 revision 8 §12), 정정 줄·읽을 때 재집계 검증, D3 재생 consistent 10/224/2,613/35,662. PR #51 608b367 approve·12c9a21 changes requested·71e408a approve(검토 3/4·교정 2/3) → 병합 d41e70f, main CI 43651860463 success. 모델 호출 0 · 진행 기록 6(실제 세션 시험 결과, 수용 판단 전): D1·G1·R1·D2·D4·D5·D6 합격, D3 답 기대값 불충족(3 대신 4, Read 표시와 기대값 모호함으로 봄, 기대값·실패 보존). §10 항목 1~3·§11 항목 7 실제 확인(D1~D5 몫 합 = D5 누적), 항목 4·5·실행 중 정지는 모의. 예산 7/12회·40.666초(셈 45초)·billable 33,948·cache_read 121,189, 모든 회차 overageStatus rejected · 진행 기록 7(보완, 수용 판단 전, 모델 호출 0): D3 요약의 잘못된 “자식 없음”을 summarize.py v2로 교정(present·confirmed_none·unknown, 출처·생성기 버전), 회귀 시험 CI 편입, 일곱 요약 v2 재생성(v1 유지). D4 압축 예외 근거(부모 0·자식 없음·차이 모두 0 이상, 귀속하지 못한 몫은 압축 가능성이 크나 호출별 기록 없음), D1~D5 합 검산은 귀속 입증이 아님. 실행 바이너리·이미지·재시작 가드·체크포인트를 당시 작업 기록 발췌와 현재 재조회로 연결(재빌드 해시 재현은 미확인), 다섯 재개 조건 표. D3 답 불충족은 계획 기준 불충족으로 유지, 계약 §10 항목 3 (c) 판정에는 영향 없다고 판단(최종은 수용 검토). 실행 중 실제 정지는 04-05(P05-R) 범위로 정리하고 결정안 작성 · 진행 기록 8(수용 아님, 모델 호출 0): 코디네이터 PID 1 종료 처리·DB 비밀 파일·기동 검사(X-01 U3), repo 범위 상태·정지(계약 §7, 각 역할 안전 종료 보고, 자식·외부 요청은 not_tracked로 미확인), supervisor safe_shutdown 보고와 §7 상태 항목, 코디네이터·역할별 이미지(커밋·바이너리 해시 라벨)와 별도 시험 환경 컨테이너 시험(가짜 Claude), charge 비객체 미계측·Y1/Y4/Y7 시험, 이월 항목 정리(닫음·남음·담당·수용 영향) · 수용 보고(판단 전): 02-04.accept 조건별 상태(supervisor·U3·공유 볼륨 충족, 코디네이터 PID 1 충족(모의), 외부 영속 저장소 복원(코디네이터 쪽 없음)·어댑터 연결·§7 repo 범위 stop·status 항목 부분 충족, 02-03 이월 미충족(이동 제안 확인 전)), 계약 §10·§11 충족(항목 4·5는 모의), D3 답 불충족 유지, 사용자 결정 9건(02-03 이월 이동 제안 등). PR #54 adf760e changes requested → fa39d86 approve(검토 2/4·교정 1/3) → 병합 6aaf427, main CI 43657932256 success. 병합 커밋 이미지 재시험(바이너리 해시가 검토 커밋과 같음)",
+      "last_observed_at": "2026-11-15T13:24:53+09:00",
+      "latest_report": "reports/tasks/02-04/provider-checkpoint-20261115/PROGRESS.md",
+      "result_state": "진행 기록 1(수용 아님): crates/ieo-supervisor — 역할 인자(Edit(//…)만, session_id 재개), 허용 목록 환경, CLAUDE_CONFIG_DIR 지시성 digest·변조 탐지·정리(링크·특수 파일·읽기 오류 닫힌 실패), flock 세션 잠금, §5-1 체크포인트·재연결 결정, 결정 ① 예산 가드(미계측·넘침 중지, 추가 과금 없음 조건 미확인 시 보류). 시험 20건. PR #31 bc55edf approve(검토 3/4·교정 2/3) → 병합 0f446d6, PR #32 aeab3d9 approve(검토 2/4·교정 1/3) → 병합 3426c77, main CI run 43441103331(0f446d6)·43442655596(3426c77) success. 모델 호출 0(02-04 예산 사용 0) · 진행 기록 2(수용 아님): 실행 중 예산 집행 run::run(회차·전체 시간 마감과 그룹 정리, 관측 사용량·추가 사용량 신호 정지, 정지 뒤 출력 복사, kill 실패 보고)과 run::charge(guard가 멈춘 회차는 언제나 미계측), Limits::for_next(budget::next 감쌈). 모델 없는 시험 25건·변이 27/27. 한계: 관측 후 정지이며 공급자 측 제한 아님, 관측 사용량은 하한, 최종값은 result에서만. PR #40 3103933·d2989f7·5136d66 changes requested → 23fee80 approve(검토 4/4·교정 3/3) → 병합 ccf7291, main CI run 43590448077 success. 모델 호출 0 · 진행 기록 3(수용 아님): 역할 컨테이너의 supervisor 서비스(PID 1) — 어댑터 start/reconnect/stop/status(Bearer 해시 인증), 매 실행 전 CLAUDE_CONFIG_DIR 정리, 체크포인트 3단계(takeover·after_run·error, fsync)와 끝나지 않은 회차 재개 거부, 세션당 단일 실행, SIGTERM 처리·고아 거두기, 역할별 예산 몫(개발 8회·9,600초·1M·10M, Guardrail 4회·4,800초·0.5M·5M, 합 = 승인)과 닫힌 회차 기록, stop grace 6초. 가짜 Claude 컨테이너 시험(U3 배치·(a) 정리·(c) 재개·볼륨 복원·(b) 변조·단일 실행·stop·Guardrail 인자·실행 중 SIGTERM·가장 느린 정지 8.4초) 통과, 작업 공간 시험 252건. PR #47 88a4535·6975d5f changes requested → 475b409 approve(검토 3/4·교정 2/3) → 병합 2d13d16, main CI run 43613181714 success. 모델 호출 0 · 진행 기록 4(수용 아님): 컨테이너 밖 예산 집행 호출자 ieo-role-call(두 역할 전체 기록을 닫힌 쪽으로 읽음, 역할 몫·회당 창 축소, 무추가결제 세 출처(과거 관측 stream·자격 형식과 실행 환경·이번 실행 신호, 시점별), 진행 중 표식·서비스 마지막 회차와 체크포인트 회차 대조, 계측기와 run::charge_reported, 미계측·실패·결과 실패는 stop_required, 자동 재시도 없음)와 실제 회차 계획 RUN_PLAN(D1·G1·R1·D2~D6, 모델 호출 7회·예비 5회). 컨테이너 예행(가짜 Claude·가짜 자격) 8개 확인과 거부 3건 통과, 호출자 변이 11/11, 작업 공간 시험 273건. PR #49 c4620d2·f90f5b5 changes requested → dc11612 approve(검토 3/4·교정 2/3) → 병합 ca08c76, main CI run 43621679774 success. 모델 호출 0 · 진행 기록 5(수용 아님): 실제 D3(자식이 있는 재개)가 사용량 미계측으로 중단 → 원인 tool_use_result.usage = 자식 마지막 응답만(CLI 2.1.322) → 사용자 결정 2026-11-15(세션 증가분 차감, 집계 교정 먼저) → 자식 전사의 응답별 확정 사용량 합으로 교정(런타임 계약 revision 8 §12), 정정 줄·읽을 때 재집계 검증, D3 재생 consistent 10/224/2,613/35,662. PR #51 608b367 approve·12c9a21 changes requested·71e408a approve(검토 3/4·교정 2/3) → 병합 d41e70f, main CI 43651860463 success. 모델 호출 0 · 진행 기록 6(실제 세션 시험 결과, 수용 판단 전): D1·G1·R1·D2·D4·D5·D6 합격, D3 답 기대값 불충족(3 대신 4, Read 표시와 기대값 모호함으로 봄, 기대값·실패 보존). §10 항목 1~3·§11 항목 7 실제 확인(D1~D5 몫 합 = D5 누적), 항목 4·5·실행 중 정지는 모의. 예산 7/12회·40.666초(셈 45초)·billable 33,948·cache_read 121,189, 모든 회차 overageStatus rejected · 진행 기록 7(보완, 수용 판단 전, 모델 호출 0): D3 요약의 잘못된 “자식 없음”을 summarize.py v2로 교정(present·confirmed_none·unknown, 출처·생성기 버전), 회귀 시험 CI 편입, 일곱 요약 v2 재생성(v1 유지). D4 압축 예외 근거(부모 0·자식 없음·차이 모두 0 이상, 귀속하지 못한 몫은 압축 가능성이 크나 호출별 기록 없음), D1~D5 합 검산은 귀속 입증이 아님. 실행 바이너리·이미지·재시작 가드·체크포인트를 당시 작업 기록 발췌와 현재 재조회로 연결(재빌드 해시 재현은 미확인), 다섯 재개 조건 표. D3 답 불충족은 계획 기준 불충족으로 유지, 계약 §10 항목 3 (c) 판정에는 영향 없다고 판단(최종은 수용 검토). 실행 중 실제 정지는 04-05(P05-R) 범위로 정리하고 결정안 작성 · 진행 기록 8(수용 아님, 모델 호출 0): 코디네이터 PID 1 종료 처리·DB 비밀 파일·기동 검사(X-01 U3), repo 범위 상태·정지(계약 §7, 각 역할 안전 종료 보고, 자식·외부 요청은 not_tracked로 미확인), supervisor safe_shutdown 보고와 §7 상태 항목, 코디네이터·역할별 이미지(커밋·바이너리 해시 라벨)와 별도 시험 환경 컨테이너 시험(가짜 Claude), charge 비객체 미계측·Y1/Y4/Y7 시험, 이월 항목 정리(닫음·남음·담당·수용 영향) · 수용 보고(판단 전): 02-04.accept 조건별 상태(supervisor·U3·공유 볼륨 충족, 코디네이터 PID 1 충족(모의), 외부 영속 저장소 복원(코디네이터 쪽 없음)·어댑터 연결·§7 repo 범위 stop·status 항목 부분 충족, 02-03 이월 미충족(이동 제안 확인 전)), 계약 §10·§11 충족(항목 4·5는 모의), D3 답 불충족 유지, 사용자 결정 9건(02-03 이월 이동 제안 등). PR #54 adf760e changes requested → fa39d86 approve(검토 2/4·교정 1/3) → 병합 6aaf427, main CI 43657932256 success. 병합 커밋 이미지 재시험(바이너리 해시가 검토 커밋과 같음) · 진행 기록 9(수용 아님, 사용자 결정 2026-11-15 (나)): 항목 4 공급자 상태 값 대응(available·usage_limit·auth_or_billing·unknown, 출처·관측 시각·신선도, 실행 중 실시간·재시작 뒤 unknown)과 quota_group_id 필수·공유 그룹 전파, 항목 9 체크포인트 순번·digest·변조의 코디네이터 보고·저장(role_checkpoints·role_tamper_events, 배정·세대·sprint revision·명세 digest·대상 SHA 연결)과 기동 전 로컬↔중앙 대조·코디네이터 재개 판단. 실제 DB·가짜 런타임 시험(정상·중복·간격·충돌·불일치·변조·낡은 세대·코디네이터·역할 재시작·늦은 보고), 이미지 a1cfe78 컨테이너 시험(교정 2 반영). 런타임 계약 revision 9(§13 항목 9·10). 재발 방지 대응표. 모델 호출 0",
       "verification_level": "unverified",
       "evidence": [
         "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md",
@@ -351,10 +351,15 @@
         "reports/tasks/02-04/images-20261115/reviews/review-pr54-fa39d86.md",
         "reports/tasks/02-04/acceptance-20261115/reviews/review-pr55-d80560b.md",
         "reports/tasks/02-04/acceptance-20261115/reviews/review-pr55-c0ad207.md",
-        "https://github.com/HeaInSeo/ieo_poc/pull/54"
+        "https://github.com/HeaInSeo/ieo_poc/pull/54",
+        "User_Decisions_2026-11-15_0204-acceptance.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/PROGRESS.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/PREVENTION.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/evidence/images-fake-a1cfe78.log",
+        "reports/tasks/02-04/provider-checkpoint-20261115/evidence/build-images-a1cfe78.txt"
       ],
-      "next_action": "사용자 수용 판단(수용 보고 PR #55 병합 fdbb16e, 검토 2회 approve)(수용 보고 §4의 결정 9건: 02-03 이월 이동, 코디네이터 start·reconnect 02-05, 안전 종료 미확인, §7 공급자 상태 값, D3, 실제 정지, 예비 회차, 호출자 이월, 코디네이터 쪽 체크포인트 보고·대조 미충족) → 결정에 따라 상태 변경 또는 남은 구현 → X-03",
-      "unresolved": "02-04 수용 보고 §4의 사용자 결정 9건(코디네이터 쪽 체크포인트 보고·대조 미충족과 호출자 이월 포함)과 §7의 이월(PR #54 검토 fa39d86 M-a·L-a·L-b·L-c, adf760e L-2 일부). 02-03 이월 이동은 제안이며 확인 전에는 02-04 미충족. 이월 항목은 진행 기록 8 §4 표로 정리(닫음 근거·남은 항목의 담당·시점·수용 영향). 02-04 수용 판단 대상: repo 범위 stop의 안전 종료 보고가 자식·외부 요청 미추적으로 미확인, 실행 중 실제 정지는 04-05 범위(진행 기록 7 §5), D3 답 기대값 불충족(진행 기록 7 §4). PR #53 검토 1729c9e L1은 수용 보고 §7에서 정정함. 실행 바이너리 재빌드 재현 미확인. 이미지는 병합 커밋 6aaf427에서 다시 빌드해 시험함(수용 보고 §6, 디버그 빌드). 02-03 이월(배정 수준 한도 집행, 실제 GitHub 수집기·F4·N5, F3)의 02-05·02-07 이동은 제안이며 확인 전에는 02-04 수용 조건 미충족으로 셈(진행 기록 8 §4). 코디네이터의 start·reconnect 호출은 02-05로 옮기는 제안."
+      "next_action": "항목 4·9 PR의 독립 검토·필수 CI·승인 head 병합·main CI → 나머지 결정 항목의 인계 확인(진행 기록 9 §4) → 02-04 수용 기록(원장·STATUS, 사용자 결정 2026-11-15 §6) → X-03 → X-04 → 02-05. 항목 8(호출자 이월) 완료 전에는 다음 실제 호출·X-02 착수 금지. 예비 회차(개발 2·Guardrail 3) 미사용 유지",
+      "unresolved": "사용자 결정 2026-11-15(User_Decisions_2026-11-15_0204-acceptance.md)로 수용 보고 §4 9건 처분: 4·9는 02-04 수용 전 완료(진행 기록 9, 검토 전), 1(02-03 이월: 배정 수준 한도 → 02-05, 실제 GitHub 수집·F4·N5 → GH1~GH5 뒤 연결 작업·EARLY-01, 판정 머리 F3 → 02-07), 2(코디네이터 start·reconnect → 02-05), 3(안전 종료: 자식 추적 04-05·외부 요청 02-05, 그때까지 미확인), 5(D3 실패 유지·재실행 없음), 6(실행 중 실제 정지 → 04-05, 실제 실행 전 결정안 보고), 7(예비 회차 미사용 유지), 8(호출자 이월: 다음 실제 호출·X-02 착수 전 필수 — 차단 조건). 이월은 완료가 아니며 수용 보고의 미충족 기록은 보존(진행 기록 9 §4 이월 대응표). 남은 한계(진행 기록 9 §5): 실제 Claude 회차는 항목 4·9 경로를 지나지 않음(모의), 공급자 거부·인증 오류 출력은 형 정의 기반 가정, 개발 컨테이너 같은 UID의 체크포인트 변경 가능(최종 근거 GitHub SHA·CI 대조는 02-05), worktree_head·자식·외부 요청 미추적, last_actual_action_at은 끝난 회차 기준. §7 이월: PR #54 검토 fa39d86 L-a 일부(미저장 체크포인트·30초 공동 대기 시험)·L-b·L-c, adf760e L-2 일부, 그 밖의 열린 이월(수용 보고 §7 표). 실행 바이너리 재빌드 재현 미확인."
     },
     {
       "task_id": "02-05",
@@ -2475,14 +2480,26 @@
         "reports/tasks/02-04/acceptance-20261115/evidence/images-fake-6aaf427.log",
         "reports/tasks/02-04/images-20261115/reviews/review-pr54-fa39d86.md"
       ]
+    },
+    {
+      "event_id": "02-04-PROVIDER-CHECKPOINT-20261115",
+      "event_revision": 1,
+      "task_id": "02-04",
+      "observed_at": "2026-11-15T13:24:53+09:00",
+      "state": "02-04 진행 기록 9: 사용자 결정 (나)에 따라 항목 4(공급자 상태 값·quota group)·9(중앙 체크포인트 보고·저장·대조) 구현·시험(실제 DB·가짜 런타임·컨테이너 a1cfe78), 런타임 계약 revision 9, 이월 대응표·재발 방지 대응표. 상태 “진행” 유지, 11/73 불변. 모델 호출 0",
+      "evidence": [
+        "reports/tasks/02-04/provider-checkpoint-20261115/PROGRESS.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/PREVENTION.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/evidence/images-fake-a1cfe78.log"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 병합, 02-04 진행(실제 세션 7회, 보완, 코디네이터·이미지 병합 6aaf427, 수용 보고 제출·판단 전), gRPC 계획 A4, P28 개정 A5",
+    "last_verified_stage": "02-03 검수 완료(11/73 · 0/12), X-01 검수 완료·후속 병합, 02-04 진행(실제 세션 7회, 보완, 코디네이터·이미지 병합 6aaf427, 수용 보고 병합 fdbb16e, 사용자 결정 (나): 항목 4·9 구현·검토 중), gRPC 계획 A4, P28 개정 A5",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main fdbb16e94991ad5becf4b0a51d0ab6cda04e32df (PR #55 병합, main CI success; 이 원장 PR 병합 전)",
-    "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 8",
-    "running": "원장 PR(report/0204-acceptance-ledger). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427(로컬). 실제 Claude 실행 없음",
+    "branch_sha": "main d33782890115161bbf3925185defb76af5205794 (이 PR 병합 전)",
+    "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 9",
+    "running": "작업 PR(task/0204-provider-checkpoint). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:a1cfe78(로컬). 실제 Claude 실행 없음",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2512,10 +2529,11 @@
       "reports/tasks/02-04/real-sessions-20261115/RESULTS.md",
       "reports/tasks/02-04/real-sessions-20261115/SUPPLEMENT.md",
       "reports/tasks/02-04/images-20261115/PROGRESS.md",
-      "reports/tasks/02-04/acceptance-20261115/REPORT.md"
+      "reports/tasks/02-04/acceptance-20261115/REPORT.md",
+      "reports/tasks/02-04/provider-checkpoint-20261115/PROGRESS.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "이 보고 PR → 사용자 02-04 수용 판단 → 결정에 따라 → X-03 → X-04 → 02-05 … PR은 하나씩. 예비 회차·실제 정지는 사용자 결정 전 사용하지 않음",
+    "next_action": "이 PR(항목 4·9) 검토·병합 → 02-04 수용 기록(사용자 결정 2026-11-15 §6 조건 충족 시) → X-03 → X-04 → 02-05 … PR은 하나씩. 예비 회차 미사용, 실제 정지 없음, 항목 8 완료 전 실제 호출·X-02 금지",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다."
   },
   "baseline_history": [
@@ -2603,7 +2621,7 @@
         "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr45-444970e.md"
       ],
       "next_action": "02-04 수용 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음)",
-      "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, executable 등록·의미 검토. 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), 가져온 page_id와 URL 안 페이지 ID 일치 검사는 완료(User_Decisions_2026-11-14_pr30.md §5 · PR #43 병합 42b435e·#44 병합 778ee47, 영속 코디네이터 재적용 x02-url-live: 불일치 400·행 불변). 남은 관찰: URL 호스트 허용 목록은 별도 결정, 연결·URL 경로 고정 시험(검토 65d56ce P3) · 착수 전 보고 항목(User_Decisions_2026-11-14_pr30.md §5 넷째): 예외 기록의 브랜치·기준 SHA·병합/배포 금지 범위 중 서버가 강제하는 부분(시험 ID·repo·페이지·내용 digest 결합)과 운영 규칙으로 지키는 부분(scope 필드는 기록만)을 구분해 보고"
+      "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: 02-04 수용, executable 등록·의미 검토. 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), 가져온 page_id와 URL 안 페이지 ID 일치 검사는 완료(User_Decisions_2026-11-14_pr30.md §5 · PR #43 병합 42b435e·#44 병합 778ee47, 영속 코디네이터 재적용 x02-url-live: 불일치 400·행 불변). 남은 관찰: URL 호스트 허용 목록은 별도 결정, 연결·URL 경로 고정 시험(검토 65d56ce P3) · 착수 전 보고 항목(User_Decisions_2026-11-14_pr30.md §5 넷째): 예외 기록의 브랜치·기준 SHA·병합/배포 금지 범위 중 서버가 강제하는 부분(시험 ID·repo·페이지·내용 digest 결합)과 운영 규칙으로 지키는 부분(scope 필드는 기록만)을 구분해 보고 · 차단 조건(사용자 결정 2026-11-15 항목 8): 02-04 호출자 이월(PR #51 P1~P4·N6·F8, PR #49 L-c3-2~4, 마감 정지 시험) 완료 전 착수 금지"
     },
     {
       "task_id": "X-03",

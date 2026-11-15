@@ -279,4 +279,57 @@ CREATE OR REPLACE TRIGGER notion_imports_append_only BEFORE UPDATE OR DELETE ON 
 CREATE OR REPLACE TRIGGER exec_exceptions_append_only BEFORE UPDATE OR DELETE ON exec_exceptions
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
+-- Central checkpoint record (runtime contract §2.1, §5-1, §5-2, §5-6; 02-04 decision item 9).
+-- One row per checkpoint a role supervisor wrote, in its sequence; the digest is computed here
+-- over the exact bytes reported. Linked to the assignment (and through it the sprint revision
+-- and target SHA). Append-only.
+CREATE TABLE IF NOT EXISTS role_checkpoints (
+    repo_id           text        NOT NULL,
+    role              text        NOT NULL CHECK (role IN ('development', 'guardrail')),
+    seq               bigint      NOT NULL CHECK (seq >= 1),
+    checkpoint_sha256 text        NOT NULL CHECK (checkpoint_sha256 ~ '^[a-f0-9]{64}$'),
+    phase             text        NOT NULL CHECK (phase IN ('takeover', 'after_run', 'error')),
+    session_id        text        NOT NULL,
+    assignment_id     text        NOT NULL,
+    generation        bigint      NOT NULL,
+    sprint_id         text        NOT NULL,
+    sprint_revision   bigint      NOT NULL,
+    spec_digest       text        NOT NULL,
+    target_sha        text        NOT NULL,
+    image_digest      text        NOT NULL,
+    profile_id        text        NOT NULL,
+    profile_revision  bigint      NOT NULL,
+    settings_digest   text        NOT NULL,
+    checkpoint        jsonb       NOT NULL,
+    reported_by       text        NOT NULL,
+    -- false: a later checkpoint of a run whose assignment moved on during the run
+    current_assignment boolean    NOT NULL,
+    received_at       timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (repo_id, role, seq),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
+);
+
+-- `config_tamper_detected` reports (§5-6): one per new session started after a detection.
+CREATE TABLE IF NOT EXISTS role_tamper_events (
+    repo_id           text        NOT NULL,
+    role              text        NOT NULL,
+    new_session_id    text        NOT NULL,
+    old_session_id    text        NOT NULL,
+    checkpoint_digest text        NOT NULL,
+    observed_digest   text        NOT NULL,
+    seq               bigint      NOT NULL,
+    reported_by       text        NOT NULL,
+    received_at       timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (repo_id, role, new_session_id),
+    FOREIGN KEY (repo_id, role, seq) REFERENCES role_checkpoints (repo_id, role, seq)
+);
+
+-- a database created before the column existed (review accd6c8 Info)
+ALTER TABLE role_checkpoints ADD COLUMN IF NOT EXISTS current_assignment boolean NOT NULL DEFAULT true;
+
+CREATE OR REPLACE TRIGGER role_checkpoints_append_only BEFORE UPDATE OR DELETE ON role_checkpoints
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+CREATE OR REPLACE TRIGGER role_tamper_events_append_only BEFORE UPDATE OR DELETE ON role_tamper_events
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;

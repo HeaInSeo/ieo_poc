@@ -86,6 +86,13 @@ fn repo_stop_sends_a_role_stop_to_each_and_reports_each_role() {
         u.iter().any(|x| x.contains("development: active_children")),
         "{u:?}"
     );
+    // a role that does not say its checkpoint was reported (missing field) is not reported
+    // (review 48b1d0e L-1: only an explicit true counts)
+    assert!(
+        u.iter()
+            .any(|x| x.contains("development: checkpoint not reported to the coordinator")),
+        "{u:?}"
+    );
     assert!(
         u.iter()
             .any(|x| x.contains("guardrail: pending_external_requests")),
@@ -233,4 +240,93 @@ fn an_unreachable_role_is_not_waited_for() {
     );
     assert_eq!(b["roles"]["guardrail"]["reachable"], false, "{b}");
     let _ = std::fs::remove_dir_all(&d);
+}
+
+// --- 02-04 decision item 4: one provider limit shared by both roles' credentials ---
+
+#[test]
+fn a_shared_quota_group_carries_a_usage_limit_to_every_member() {
+    let status = |q: Option<&str>, p: &str| json!({"reachable": true, "status": {"quota_group_id": q, "provider_status_or_unknown": p}});
+    let out = |d: Value, g: Value| {
+        let mut m = serde_json::Map::new();
+        m.insert("development".into(), d);
+        m.insert("guardrail".into(), g);
+        m
+    };
+    let t = json!({"development": {"quota_group_id": "q1"}, "guardrail": {"quota_group_id": "q1"}});
+    // development hit the limit; guardrail last saw "available": the group is limited for both
+    let v = ieo_coord::roles::quota_groups(
+        &t,
+        &out(
+            status(Some("q1"), "usage_limit"),
+            status(Some("q1"), "available"),
+        ),
+    );
+    let g = &v["groups"][0];
+    assert_eq!(g["provider_status_or_unknown"], "usage_limit", "{v}");
+    assert_eq!(
+        g["affected_roles"],
+        json!(["development", "guardrail"]),
+        "{v}"
+    );
+    assert_eq!(v["mismatches"], json!([]));
+    // one member observed availability, the other nothing: available (one limit)
+    let v = ieo_coord::roles::quota_groups(
+        &t,
+        &out(
+            status(Some("q1"), "unknown"),
+            status(Some("q1"), "available"),
+        ),
+    );
+    assert_eq!(
+        v["groups"][0]["provider_status_or_unknown"], "available",
+        "{v}"
+    );
+    // nobody observed anything: unknown, never available
+    let v = ieo_coord::roles::quota_groups(
+        &t,
+        &out(status(Some("q1"), "unknown"), status(Some("q1"), "unknown")),
+    );
+    assert_eq!(
+        v["groups"][0]["provider_status_or_unknown"], "unknown",
+        "{v}"
+    );
+    // an auth/billing error stays with its credential
+    let v = ieo_coord::roles::quota_groups(
+        &t,
+        &out(
+            status(Some("q1"), "auth_or_billing"),
+            status(Some("q1"), "available"),
+        ),
+    );
+    assert_eq!(
+        v["groups"][0]["auth_or_billing_roles"],
+        json!(["development"]),
+        "{v}"
+    );
+    assert_eq!(v["groups"][0]["affected_roles"], json!([]), "{v}");
+    // separate groups stay separate; a role reporting another group than configured is flagged
+    let v = ieo_coord::roles::quota_groups(
+        &t,
+        &out(
+            status(Some("q1"), "usage_limit"),
+            status(Some("q2"), "available"),
+        ),
+    );
+    assert_eq!(v["groups"].as_array().map(Vec::len), Some(2), "{v}");
+    assert_eq!(
+        v["groups"][1]["provider_status_or_unknown"], "available",
+        "{v}"
+    );
+    assert_eq!(v["mismatches"][0]["role"], "guardrail", "{v}");
+    // an unreachable role reports nothing: flagged, its configured group shows unknown for it
+    let v = ieo_coord::roles::quota_groups(
+        &t,
+        &out(status(Some("q1"), "available"), json!({"reachable": false})),
+    );
+    assert_eq!(v["mismatches"][0]["reported"], Value::Null, "{v}");
+    assert_eq!(
+        v["groups"][0]["member_status"][1]["provider_status_or_unknown"], "unknown",
+        "{v}"
+    );
 }

@@ -18,5 +18,9 @@ tiny_http = "0.12"
 signal-hook = "0.3"
 ureq = { version = "2", default-features = false, features = ["json"] }
 
+[dev-dependencies]
+# 02-04 decision item 9: the role service end to end against the coordinator (tests only)
+ieo-supervisor = { path = "../ieo-supervisor" }
+
 [lints]
 workspace = true

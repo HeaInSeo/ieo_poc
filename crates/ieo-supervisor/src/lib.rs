@@ -8,6 +8,8 @@
 //! * [`budget`]: model-call budget guard (user decision 2026-11-13 ①) checked between runs, with the no-overage precondition and an in-stream stop signal
 //!
 //! * [`serve`]: the role container's PID 1 service (adapter start/reconnect/stop/status)
+//! * [`provider`]: raw provider signals → §7 `provider_status_or_unknown`, with freshness (decision item 4)
+//! * [`central`]: checkpoint reports to the coordinator and the local/central comparison (§2.1, §5-2; decision item 9)
 //! * [`run`]: in-run enforcement (time, observed tokens, extra-usage signals) and process-group cleanup
 //!
 //! Pods, PID 1 and the adapter wiring around a real `claude` process are separate steps of 02-04.
@@ -15,9 +17,11 @@
 pub mod args;
 pub mod budget;
 pub mod caller;
+pub mod central;
 pub mod checkpoint;
 pub mod configdir;
 pub mod env;
 pub mod lock;
+pub mod provider;
 pub mod run;
 pub mod serve;
