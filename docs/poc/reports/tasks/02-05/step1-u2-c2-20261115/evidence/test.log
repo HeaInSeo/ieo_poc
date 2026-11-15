@@ -570,3 +570,8 @@ U2-CASE u2-g-0004 -> 422 DIGEST_MISMATCH
 U2-CASE u2-g-0005 -> 409 SPRINT_REPO_CONFLICT
 U2-CASE u2-g-0006 -> 409 SPRINT_REPO_CONFLICT
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 69 filtered out; finished in 7.59s
+
+# rebased on 1c21177 then 386a223 (docs only): head d9f81ba (rebased on 1c21177)
+fmt rc=0
+clippy rc=0
+full suite after rebase: passed 357 failed 0
