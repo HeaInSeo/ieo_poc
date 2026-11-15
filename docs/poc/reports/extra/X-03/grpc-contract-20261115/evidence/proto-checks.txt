@@ -1,0 +1,18 @@
+# X-03 contract checks (no model calls)
+date: 2026-11-15T17:29:02+09:00
+base: origin/main 3157c89
+buf: 1.47.2
+protoc: libprotoc 34.1
+
+$ buf lint   (contracts/proto, buf.yaml: STANDARD except PACKAGE_VERSION_SUFFIX)
+rc=0
+
+$ buf build -o /dev/null
+rc=0
+
+$ protoc -I . --descriptor_set_out=/dev/null ieo/internal/v0/supervisor.proto
+rc=0
+
+$ sha256sum
+bffa599dbceabda9fb718fb330e4d874d0bba1cac0a49c55976415a7e4a58906  ieo/internal/v0/supervisor.proto
+324fddb9b38b25e02956373f777dabd4c2619a772857de0e659c096de8c81eab  buf.yaml
