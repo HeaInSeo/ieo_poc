@@ -736,7 +736,8 @@ impl Admission {
         window_seconds: Option<u64>,
         billable: Option<u64>,
     ) -> Result<(), String> {
-        let l = &mut self.limits;
+        // checked first, changed after: a refusal leaves the limits as they were
+        let mut l = self.limits;
         if let Some(w) = window_seconds {
             let full = l.timeout + l.grace;
             let window = full.min(Duration::from_secs(w));
@@ -754,6 +755,7 @@ impl Admission {
             }
             l.billable_room = l.billable_room.min(b);
         }
+        self.limits = l;
         Ok(())
     }
 
@@ -817,10 +819,21 @@ impl Admission {
                 }),
             }),
             Ok((st, b)) => {
-                // refused: nothing started
+                // refused: nothing started by this call. A 200 `replayed` is the stored answer
+                // of the same attempt accepted earlier — by a caller on another ledger, since
+                // `admit` refuses an attempt this ledger knows (review c11e734 I-4); this call
+                // started nothing and records nothing
                 clear_inflight(plan)?;
+                let why = if st == 200 && b["replayed"] == true {
+                    format!(
+                        "{} 200 replayed: attempt {} was accepted earlier, not by this call",
+                        c.op, c.attempt_id
+                    )
+                } else {
+                    format!("{} {st} {}: {}", c.op, b["code"], b["reason"])
+                };
                 Ok(Sent::Refused {
-                    why: format!("{} {st} {}: {}", c.op, b["code"], b["reason"]),
+                    why,
                     status: st,
                     body: b,
                 })
@@ -1324,4 +1337,60 @@ pub fn records_path(plan: &Plan) -> PathBuf {
 pub fn share_json(s: &Share) -> Value {
     json!({"max_runs": s.max_runs, "total_seconds": s.total_seconds,
            "billable_tokens": s.billable_tokens, "cache_read_tokens": s.cache_read_tokens})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn admission(timeout: u64, billable: u64) -> Admission {
+        Admission {
+            lock: std::fs::File::open("/dev/null").expect("file"),
+            recs: vec![],
+            limits: Limits {
+                timeout: Duration::from_secs(timeout),
+                timeout_is_total: false,
+                billable_room: billable,
+                cache_read_room: 500,
+                grace: Duration::from_secs(6),
+            },
+            before: Value::Null,
+        }
+    }
+
+    /// `lower` only lowers (review c11e734 L-1): a bound above the room or window changes
+    /// nothing, one below it lowers, a window not above the grace and a zero room are refused.
+    #[test]
+    fn lower_never_raises_a_limit() {
+        let mut a = admission(114, 1_000);
+        a.lower(Some(3_600), Some(100_000)).expect("lower");
+        assert_eq!(a.limits(), admission(114, 1_000).limits(), "nothing raised");
+        a.lower(Some(60), Some(400)).expect("lower");
+        let l = a.limits();
+        assert_eq!(
+            (
+                l.timeout,
+                l.timeout_is_total,
+                l.billable_room,
+                l.cache_read_room,
+                l.grace
+            ),
+            (
+                Duration::from_secs(54),
+                true,
+                400,
+                500,
+                Duration::from_secs(6)
+            )
+        );
+        a.lower(None, None).expect("no bound");
+        assert_eq!(a.limits(), l);
+        assert!(
+            a.lower(Some(6), None).is_err(),
+            "window not above the grace"
+        );
+        assert!(a.lower(None, Some(0)).is_err(), "no billable room");
+        assert!(a.lower(Some(30), Some(0)).is_err(), "refused as a whole");
+        assert_eq!(a.limits(), l, "a refusal changes nothing");
+    }
 }

@@ -112,6 +112,8 @@ struct Role {
     drop_next: Arc<std::sync::atomic::AtomicBool>,
     /// Start and reconnect requests that reached the service.
     launches: Arc<std::sync::atomic::AtomicUsize>,
+    /// While set, the status answers 503 (the coordinator cannot observe the role).
+    fail_status: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Role {
@@ -122,7 +124,12 @@ impl Role {
         let h = Arc::clone(&svc);
         let drop_next = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let launches = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let (d, n) = (Arc::clone(&drop_next), Arc::clone(&launches));
+        let fail_status = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (d, n, f) = (
+            Arc::clone(&drop_next),
+            Arc::clone(&launches),
+            Arc::clone(&fail_status),
+        );
         std::thread::spawn(move || {
             for mut req in server.incoming_requests() {
                 let bearer = req
@@ -137,6 +144,11 @@ impl Role {
                     && (req.url().ends_with("/start") || req.url().ends_with("/reconnect"));
                 if launch {
                     n.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
+                if req.url().ends_with("/status") && f.load(std::sync::atomic::Ordering::SeqCst) {
+                    let _ =
+                        req.respond(tiny_http::Response::from_string("{}").with_status_code(503));
+                    continue;
                 }
                 let r = s.handle(req.method().as_str(), req.url(), bearer.as_deref(), &body);
                 if launch && d.swap(false, std::sync::atomic::Ordering::SeqCst) {
@@ -158,6 +170,7 @@ impl Role {
             port,
             drop_next,
             launches,
+            fail_status,
         }
     }
     fn call(&self, method: &str, path: &str, body: &Value) -> (u16, Value) {
@@ -314,29 +327,61 @@ fn e2e(transport: &str) {
                       "cache_read_tokens": 10_000_000}}))
         .expect("role config"),
     );
+    // the guardrail role's service (idle throughout; the budget check asks it too)
+    let groot = dir.join("guard");
+    std::fs::create_dir_all(groot.join("etc/template")).expect("etc");
+    std::fs::write(
+        groot.join("etc/template/settings.json"),
+        r#"{"autoMemoryEnabled": false}"#,
+    )
+    .expect("t");
+    std::fs::create_dir_all(groot.join("cred")).expect("cred");
+    std::fs::write(groot.join("cred/adapter.sha256"), digest(ADAPTER)).expect("a");
+    let guard = Role::new(
+        Config::from_json(&json!({"role": "guardrail", "repo": "repo-a",
+            "state": groot.join("state"), "etc": groot.join("etc"), "cred": groot.join("cred"),
+            "claude": "/nonexistent", "budget": "02-04", "quota_group_id": "anthropic-shared-0104",
+            "checkpoint_central": "local_only",
+            "share": {"max_runs": 2, "total_seconds": 4_800, "billable_tokens": 500_000,
+                      "cache_read_tokens": 5_000_000}}))
+        .expect("guardrail config"),
+    );
     // the no-extra-billing observation for the first run of the budget (a stored stream)
     let first = dir.join("first-observation.jsonl");
     std::fs::write(&first, "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n").expect("obs");
     let ledger = dir.join("ledger");
-    let roles_json = |max_runs: u64| {
+    let roles_json = |max_runs: u64, plan_roles: &[&str]| {
+        let mut plan = json!({"development": {"max_window_seconds": 120,
+                    "share": {"max_runs": max_runs, "total_seconds": 9_600,
+                              "billable_tokens": 1_000_000, "cache_read_tokens": 10_000_000}},
+                "guardrail": {"max_window_seconds": 120,
+                    "share": {"max_runs": 2, "total_seconds": 4_800,
+                              "billable_tokens": 500_000, "cache_read_tokens": 5_000_000}}});
+        for r in ["development", "guardrail"] {
+            if !plan_roles.contains(&r) {
+                plan.as_object_mut().expect("o").remove(r);
+            }
+        }
         json!({"repo-a": {
             "development": {"url": format!("http://127.0.0.1:{}", role.port),
                             "adapter_token_file": dir.join("adapter_token"),
                             "quota_group_id": "anthropic-shared-0104",
                             "image_digest": "sha256:img", "profile_id": "dev-profile",
                             "profile_revision": 1},
-            // nobody listens here: its judgment is not_observed
-            "guardrail": {"url": "http://127.0.0.1:9", "adapter_token_file": dir.join("adapter_token"),
+            "guardrail": {"url": format!("http://127.0.0.1:{}", guard.port),
+                          "adapter_token_file": dir.join("adapter_token"),
                           "image_digest": "sha256:img", "profile_id": "guard-profile",
                           "profile_revision": 1},
             "budget_plan": {"budget": "02-04", "ledger_dir": ledger,
                 "first_observation": {"stream": first, "observed_unix": unix_now()},
-                "roles": {"development": {"max_window_seconds": 120,
-                    "share": {"max_runs": max_runs, "total_seconds": 9_600,
-                              "billable_tokens": 1_000_000, "cache_read_tokens": 10_000_000}}}}}})
+                "roles": plan}}})
         .to_string()
     };
-    std::fs::write(dir.join("roles.json"), roles_json(4)).expect("roles");
+    std::fs::write(
+        dir.join("roles.json"),
+        roles_json(4, &["development", "guardrail"]),
+    )
+    .expect("roles");
     let rootdir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
     let mut coord = Coord {
         child: None,
@@ -698,6 +743,9 @@ fn e2e(transport: &str) {
     }
     std::fs::write(&cp_path, &good).expect("restore");
     assert_eq!(assign("guardrail", 0, Value::Null).0, 201);
+    guard
+        .fail_status
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     let (st, d) = deliver(
         "operator",
         "dlv-key-0020",
@@ -707,9 +755,83 @@ fn e2e(transport: &str) {
     );
     assert_eq!(st, 201, "{d}");
     assert_eq!(outcome(&d), o("not_observed", None, "not_called"), "{d}");
+    guard
+        .fail_status
+        .store(false, std::sync::atomic::Ordering::SeqCst);
     assert_eq!(launches(), n, "no refusal called the supervisor");
 
-    // 7. a newer generation: stale without an explicit new session; with one, a start
+    // 6b. review c11e734 L-3: the judgment is made again once the budget's lock is held, and a
+    //     same-key retry of a delivery still in flight records nothing (409)
+    {
+        let held = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(ledger.join("caller.lock"))
+            .expect("lock file");
+        held.lock().expect("hold the ledger lock");
+        let b50 = dbody("a50", 0, "s9", json!({}));
+        let (st, d50) = std::thread::scope(|sc| {
+            let h = sc.spawn(|| deliver("operator", "dlv-key-0050", "development", &b50));
+            std::thread::sleep(Duration::from_millis(600));
+            let (st, b) = deliver("operator", "dlv-key-0050", "development", &b50);
+            assert_eq!(
+                (st, b["rejections"][0]["code"].as_str()),
+                (409, Some("DELIVERY_IN_PROGRESS")),
+                "{b}"
+            );
+            // the state changes while the delivery waits for the budget's lock
+            let mut cp: Value = serde_json::from_slice(&good).expect("cp");
+            cp["last_event_offset"] = json!(999);
+            std::fs::write(&cp_path, serde_json::to_vec_pretty(&cp).expect("j")).expect("w");
+            held.unlock().expect("release");
+            h.join().expect("delivery thread")
+        });
+        assert_eq!(st, 201, "{d50}");
+        assert_eq!(
+            outcome(&d50),
+            o("external_reconciliation_required", None, "not_called"),
+            "{d50}"
+        );
+        assert!(
+            d50["result"]["reasons"][0]
+                .as_str()
+                .is_some_and(|r| r.contains("judgment changed")),
+            "{d50}"
+        );
+        assert_eq!(d50["result"]["n"], 1);
+        std::fs::write(&cp_path, &good).expect("restore");
+        let (st, again) = deliver("operator", "dlv-key-0050", "development", &b50);
+        assert_eq!((st, &again), (200, &d50));
+        assert_eq!(launches(), n);
+    }
+
+    // 7. a newer generation: an older generation's unfinished run (takeover) is reconciliation
+    //    even with an explicit new session (review c11e734 M-1); once it finished (after_run),
+    //    stale without an explicit new session, with one a start
+    let report = |seq: u64, phase: &str| {
+        let mut cp: Value = serde_json::from_slice(&good).expect("cp");
+        cp["seq"] = json!(seq);
+        cp["phase"] = json!(phase);
+        let raw = serde_json::to_string_pretty(&cp).expect("j");
+        let (st, b) = c(
+            "sup",
+            "POST",
+            "/v0/repos/repo-a/roles/development/checkpoints",
+            Some(&json!({"seq": seq, "checkpoint_json": raw})),
+        );
+        assert_eq!(st, 201, "{b}");
+        std::fs::write(&cp_path, &raw).expect("local");
+        std::fs::write(
+            state.join("checkpoints").join(format!("{seq:020}.json")),
+            &raw,
+        )
+        .expect("archive");
+    };
+    let good_seq = serde_json::from_slice::<Value>(&good).expect("cp")["seq"]
+        .as_u64()
+        .expect("seq");
+    report(good_seq + 1, "takeover");
     assert_eq!(
         assign(
             "development",
@@ -719,6 +841,24 @@ fn e2e(transport: &str) {
         .0,
         201
     );
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0040",
+        "development",
+        &dbody("a40", 1, "s2", json!({"new_session": true})),
+    );
+    assert_eq!(
+        outcome(&d),
+        o("external_reconciliation_required", None, "not_called"),
+        "{st} {d}"
+    );
+    assert!(
+        d["result"]["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("did not finish")),
+        "{d}"
+    );
+    report(good_seq + 2, "after_run");
     let (st, d) = deliver(
         "operator",
         "dlv-key-0005",
@@ -809,10 +949,37 @@ fn e2e(transport: &str) {
     // 9. the coordinator restarts with a larger share: the stored deliveries and the judgment
     //    are the same
     coord.stop();
-    std::fs::write(dir.join("roles.json"), roles_json(6)).expect("roles");
+    // review c11e734 L-2: a budget plan that leaves out a configured role is refused
+    std::fs::write(dir.join("roles.json"), roles_json(6, &["development"])).expect("roles");
     coord.start();
     let (st, again) = deliver("operator", "dlv-key-0001", "development", &b1);
     assert_eq!((st, &again), (200, &d1));
+    let n = launches();
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0042",
+        "development",
+        &dbody("a42", 1, "s2", json!({})),
+    );
+    assert_eq!(
+        outcome(&d),
+        o("resume_allowed", Some("reconnect"), "budget_refused"),
+        "{st} {d}"
+    );
+    assert!(
+        d["result"]["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("not the configured roles")),
+        "{d}"
+    );
+    assert_eq!(launches(), n);
+    coord.stop();
+    std::fs::write(
+        dir.join("roles.json"),
+        roles_json(6, &["development", "guardrail"]),
+    )
+    .expect("roles");
+    coord.start();
 
     // 10. the supervisor refuses (no credential): recorded as refused, nothing ran, no ledger
     //     record; the same refusal with its answer lost: unknown, and the re-query finds no
@@ -860,6 +1027,47 @@ fn e2e(transport: &str) {
     assert_eq!(r10["result"]["n"], 2);
     let (st, again) = deliver("operator", "dlv-key-0010", "development", &b10);
     assert_eq!((st, &again), (200, &r10));
+    std::fs::write(ledger.join("records.jsonl"), &kept).expect("reconciled");
+    // review c11e734 L-1: the supervisor holds another request under the delivery's attempt id
+    // (accepted before, other content): the delivery is refused and its answer lost, and the
+    // re-query does not take the other request's answer for this delivery's
+    std::fs::create_dir_all(state.join("attempts")).expect("dir");
+    std::fs::write(
+        state.join("attempts/a41.json"),
+        json!({"attempt_id": "a41", "op": "reconnect", "request_sha256": "0".repeat(64),
+               "answer": {"accepted": {"attempt_id": "a41", "session_id": "s2"}}})
+        .to_string(),
+    )
+    .expect("other request");
+    role.drop_next
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let b41 = dbody("a41", 1, "s2", json!({}));
+    let (st, d41) = deliver("operator", "dlv-key-0041", "development", &b41);
+    assert_eq!(
+        outcome(&d41),
+        o("resume_allowed", Some("reconnect"), "unknown"),
+        "{st} {d41}"
+    );
+    let (st, r41) = deliver("operator", "dlv-key-0041", "development", &b41);
+    assert_eq!(st, 200, "{r41}");
+    assert_eq!(
+        outcome(&r41),
+        o("resume_allowed", Some("reconnect"), "unknown"),
+        "{r41}"
+    );
+    assert_eq!(
+        (
+            r41["result"]["n"].as_i64(),
+            r41["result"]["requeried"].as_bool()
+        ),
+        (Some(2), Some(true))
+    );
+    assert!(
+        r41["result"]["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("another request")),
+        "{r41}"
+    );
     std::fs::write(ledger.join("records.jsonl"), &kept).expect("reconciled");
     std::fs::write(&cred, "fake-oauth-token\n").expect("cred");
     assert_eq!(runs(), 4);
@@ -926,10 +1134,10 @@ fn e2e(transport: &str) {
 
     // every run went through a delivery; the database holds every request and result
     assert_eq!(runs(), 5);
-    assert_eq!(count("role_deliveries"), 15);
+    assert_eq!(count("role_deliveries"), 19);
     // each run that started reported its takeover and after_run; refusals reported nothing
-    assert_eq!(count("role_checkpoints"), 10);
-    assert_eq!(count("role_delivery_results"), 17);
+    assert_eq!(count("role_checkpoints"), 12);
+    assert_eq!(count("role_delivery_results"), 22);
     let n: i64 = db
         .query_one(
             "SELECT count(*) FROM role_delivery_results WHERE outcome = 'accepted'",

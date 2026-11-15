@@ -663,6 +663,9 @@ paths:
         checkpoint (sequence, SHA-256) with the central record, and the central record with the
         current assignment. `decision`: `resume_allowed`, `no_checkpoint`, `already_running`,
         `stale_generation`, `external_reconciliation_required` or `not_observed`, with `reasons`.
+        `stale_generation` is an older generation of the same assignment whose last run finished
+        (`after_run`); one whose last run did not finish is `external_reconciliation_required`
+        (0.11.0, 02-05 step 3 review c11e734 M-1).
         Read-only. The supervisor is asked before the database reads, which run under the same
         lock as the reports. An unknown role → 404 `NOT_FOUND`.
       parameters:
@@ -781,8 +784,12 @@ paths:
         current head (else 409 `STALE_ASSIGNMENT`; no head → 404 `NO_CURRENT_ASSIGNMENT`; an `attempt_id` used
         by another delivery → 409 `ATTEMPT_ID_CONFLICT`); (2) the resume judgment of compareCheckpoint:
         `no_checkpoint` → `start`, `resume_allowed` → `reconnect` (`new_session: true` asks for `start` on
-        `resume_allowed` and `stale_generation` too); `already_running`, `external_reconciliation_required`,
-        `not_observed` and `stale_generation` without `new_session` call nothing (`outcome: not_called`);
+        `resume_allowed`, and on `stale_generation` only when that older generation's last run finished
+        (`after_run`); an older generation whose last run did not finish is judged
+        `external_reconciliation_required`); `already_running`, `external_reconciliation_required`,
+        `not_observed` and `stale_generation` without `new_session` call nothing (`outcome: not_called`).
+        The judgment is made again once the budget check holds the ledger lock; if it changed, nothing is
+        called (`not_called`, first reason says so);
         (3) the shared budget check outside the role containers — the same code as the 02-04 host caller: the
         ledger read fail-closed, a record that asks for a person, an unmeasured run, the no-extra-billing
         observation, the budget and role-share limits, every service idle with its runs known; a refusal calls
@@ -790,13 +797,19 @@ paths:
         with the coordinator record (assignment, generation, sprint revision, spec digest, image, profile), the
         target SHA and the limits the coordinator builds from its database and configuration — never from the
         request; the run's limits are also bounded by the revision's `elapsed_seconds` and `total_tokens`;
-        (5) the answer is recorded (transaction 2): `accepted` (202), `refused` (the supervisor's 4xx/5xx), or
+        (5) the answer is recorded (transaction 2): `accepted` (202), `refused` (any other answer of the
+        supervisor: a 4xx/5xx refusal, or a 200 `replayed` stored answer of the same attempt accepted earlier
+        by another caller — nothing was started by this delivery), or
         `unknown` when the answer was lost (the budget ledger then asks for a person, as for the host caller).
         An accepted run is finished, measured and charged in the background by the same library.
-        The same key with the same body answers the stored delivery (200); a stored `unknown` (or a missing
-        result) is re-queried first: the supervisor's stored answer for the attempt (`GET /v0/role/attempts/{id}`,
+        The same key with the same body answers the stored delivery (200). A delivery with no result yet that
+        was requested less than 120 s ago is still in flight: 409 `DELIVERY_IN_PROGRESS`, nothing recorded.
+        A stored `unknown` (or a result still missing after that) is re-queried first: the supervisor's stored answer for the attempt (`GET /v0/role/attempts/{id}`,
         which never starts a run) is recorded as the next result (`accepted`, `not_accepted`, or `unknown`
-        again). The same key with another body → 409 `IDEMPOTENCY_KEY_CONFLICT`. A delivery is not a takeover:
+        again; `accepted` only when the stored answer's request digest equals what this delivery sent, and a
+        re-query result is not recorded if another result was recorded meanwhile). The same key with another
+        body → 409 `IDEMPOTENCY_KEY_CONFLICT`. The budget plan must name exactly the roles configured for the
+        repo (else `budget_refused`). A delivery is not a takeover:
         the takeover is the supervisor's checkpoint report (02-05 step 4). `logical_name` (default
         `<repo>-<role>`) is kept in the mapping record only; a reconnect resumes by the checkpoint's session id
         (runtime contract §4.2, §10 item 5). Order: 401 → 404 role → 403 → 400 Idempotency-Key → 400 body →
@@ -848,7 +861,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Problem' }
         '409':
-          description: '`STALE_ASSIGNMENT`, `ATTEMPT_ID_CONFLICT` or `IDEMPOTENCY_KEY_CONFLICT`; nothing recorded'
+          description: '`STALE_ASSIGNMENT`, `ATTEMPT_ID_CONFLICT`, `IDEMPOTENCY_KEY_CONFLICT` or `DELIVERY_IN_PROGRESS`; nothing recorded'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RejectionList' }
@@ -946,7 +959,7 @@ paths:
               properties:
                 observed_at: { type: string, format: date-time, description: 'UTC, ending in Z' }
                 lifecycle: { type: string, enum: [idle, running, stopping] }
-                session_id: { type: [string, 'null'], maxLength: 256 }
+                session_id: { type: [string, 'null'], minLength: 1, maxLength: 256 }
                 assignment_id: { type: [string, 'null'], maxLength: 128 }
                 generation: { type: [integer, 'null'], minimum: 0 }
                 quota_group_id: { type: string, minLength: 1, maxLength: 128 }
@@ -1357,7 +1370,7 @@ components:
                  STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH, OWNERSHIP_CONFLICT, PREREQUISITE_UNMET, LIMIT_REACHED,
                  SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
                  NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE,
-                 CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH, ATTEMPT_ID_CONFLICT]
+                 CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH, ATTEMPT_ID_CONFLICT, DELIVERY_IN_PROGRESS]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

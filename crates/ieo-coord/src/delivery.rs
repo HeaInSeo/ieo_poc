@@ -129,6 +129,18 @@ fn budget_plan(ctx: &Ctx, repo: &str) -> Result<Plan, String> {
         .as_object()
         .map(|m| m.keys().cloned().collect())
         .unwrap_or_default();
+    // every role the coordinator controls in this repo is in the plan, and only those: the
+    // budget check asks each of them to be idle with its runs known (review c11e734 L-2)
+    let configured: Vec<String> = crate::roles::ROLES
+        .iter()
+        .filter(|r| ctx.roles[repo][**r].is_object())
+        .map(|r| r.to_string())
+        .collect();
+    if names != configured {
+        return Err(format!(
+            "the budget plan's roles {names:?} are not the configured roles {configured:?}"
+        ));
+    }
     for r in names {
         let t = &ctx.roles[repo][&r];
         v["roles"][&r]["url"] = t["url"].clone();
@@ -315,8 +327,22 @@ fn record_result(
     id: &str,
     o: &Outcome,
     status: u16,
+    expect_n: Option<i32>,
 ) -> R {
     lock(tx, &format!("delivery:{repo}:{role}"))?;
+    // a re-query adds its row only when no other result was recorded since it read the
+    // delivery: a newer answer is never buried (review c11e734 L-3)
+    if let Some(n) = expect_n {
+        let now: i32 = tx
+            .query_one(
+                "SELECT coalesce(max(n), 0) FROM role_delivery_results WHERE delivery_id = $1",
+                &[&id],
+            )?
+            .get(0);
+        if now != n {
+            return ok(status, load(tx, id)?);
+        }
+    }
     let st = o.supervisor.as_ref().map(|(s, _)| i32::from(*s));
     let sb = o.supervisor.as_ref().map(|(_, b)| b.clone());
     tx.execute(
@@ -382,20 +408,18 @@ pub fn deliver(
     let id = d["delivery_id"].as_str().unwrap_or_default().to_string();
     // the resume judgment: the supervisor's status outside any transaction, then the central
     // record and the head under the checkpoint lock
-    let local = role_status(ctx, repo, role);
-    let judged = run_tx(db, guard, &|tx| compare_checkpoint(tx, repo, role, &local))?;
+    let judge = |db: &mut Client| {
+        let local = role_status(ctx, repo, role);
+        run_tx(db, guard, &|tx| compare_checkpoint(tx, repo, role, &local))
+    };
+    let judged = judge(db)?;
     if judged.status != 200 {
         return Ok(judged);
     }
     let decision = judged.body["decision"].as_str().unwrap_or_default();
     let reasons = judged.body["reasons"].clone();
     let new_session = body["new_session"] == true;
-    let op = match (decision, new_session) {
-        ("no_checkpoint", _) => Some("start"),
-        ("resume_allowed", false) => Some("reconnect"),
-        ("resume_allowed" | "stale_generation", true) => Some("start"),
-        _ => None,
-    };
+    let op = choose_op(decision, new_session, &judged.body);
     let base = |outcome| Outcome {
         decision: Some(decision),
         reasons: reasons.clone(),
@@ -408,7 +432,9 @@ pub fn deliver(
     };
     let Some(op) = op else {
         let o = base("not_called");
-        return run_tx(db, guard, &|tx| record_result(tx, repo, role, &id, &o, 201));
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
     };
     let budget_refused = |why: String| {
         let mut o = base("budget_refused");
@@ -437,9 +463,45 @@ pub fn deliver(
         Ok(x) => x,
         Err(why) => {
             let o = budget_refused(why);
-            return run_tx(db, guard, &|tx| record_result(tx, repo, role, &id, &o, 201));
+            return run_tx(db, guard, &|tx| {
+                record_result(tx, repo, role, &id, &o, 201, None)
+            });
         }
     };
+    // the judgment again, now that the budget's lock is held: a run that ended (or anything
+    // else that changed) while the check waited must not be acted on by the earlier judgment
+    // (review c11e734 L-3)
+    let again = judge(db)?;
+    if again.status != 200 {
+        drop(adm);
+        return Ok(again);
+    }
+    let decision2 = again.body["decision"].as_str().unwrap_or_default();
+    if decision2 != decision || choose_op(decision2, new_session, &again.body) != Some(op) {
+        drop(adm);
+        let mut why = vec![json!(format!(
+            "the judgment changed while the budget check waited ({decision} → {decision2})"
+        ))];
+        why.extend(
+            again.body["reasons"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default(),
+        );
+        let o = Outcome {
+            decision: Some(decision2),
+            reasons: json!(why),
+            op: None,
+            outcome: "not_called",
+            limits: None,
+            sent_sha256: None,
+            supervisor: None,
+            requeried: false,
+        };
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
+    }
     // the revision's limits bound one run too (the remaining amounts are step 5)
     if let Err(why) = adm.lower(
         rec["limits"]["elapsed_seconds"].as_u64(),
@@ -447,7 +509,9 @@ pub fn deliver(
     ) {
         drop(adm);
         let o = budget_refused(format!("the sprint revision's limits: {why}"));
-        return run_tx(db, guard, &|tx| record_result(tx, repo, role, &id, &o, 201));
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
     }
     let extra = json!({"target_sha": d["target_sha"]});
     let mut sent = adm.body(&call);
@@ -490,8 +554,28 @@ pub fn deliver(
             o.reasons = json!([format!("the call could not be completed: {e}")]);
         }
     }
-    run_tx(db, guard, &|tx| record_result(tx, repo, role, &id, &o, 201))
+    run_tx(db, guard, &|tx| {
+        record_result(tx, repo, role, &id, &o, 201, None)
+    })
 }
+
+/// The operation the judgment allows. `new_session` asks for a start where a resume is allowed,
+/// or over an older generation whose last run finished (`after_run`); never where the judgment
+/// refuses (review c11e734 M-1: `judge_resume` already reports an unfinished older run as
+/// reconciliation; the phase is checked here again so a start never covers one).
+fn choose_op(decision: &str, new_session: bool, judged: &Value) -> Option<&'static str> {
+    match (decision, new_session) {
+        ("no_checkpoint", _) => Some("start"),
+        ("resume_allowed", false) => Some("reconnect"),
+        ("resume_allowed", true) => Some("start"),
+        ("stale_generation", true) if judged["central"]["phase"] == "after_run" => Some("start"),
+        _ => None,
+    }
+}
+
+/// A delivery without a result younger than this is still in flight: a replay answers 409
+/// `DELIVERY_IN_PROGRESS` instead of re-querying (the call itself is bounded well below it).
+const IN_FLIGHT: &str = "120 seconds";
 
 /// The same request again: the stored delivery, or — when its result is `unknown` or was never
 /// written — the supervisor's stored answer for the attempt, recorded as the next result.
@@ -503,12 +587,44 @@ fn replay(
     id: &str,
     t: &Value,
 ) -> Result<Resp, Abort> {
-    let stored = run_tx(db, guard, &|tx| ok(200, load(tx, id)?))?;
+    let stored = run_tx(db, guard, &|tx| {
+        let mut d = load(tx, id)?;
+        let young: bool = tx
+            .query_one(
+                &format!(
+                    "SELECT now() - requested_at < interval '{IN_FLIGHT}' FROM role_deliveries
+                     WHERE delivery_id = $1"
+                ),
+                &[&id],
+            )?
+            .get(0);
+        d["_young"] = json!(young);
+        ok(200, d)
+    })?;
     if stored.status != 200 {
         return Ok(stored);
     }
-    let d = stored.body;
+    let mut d = stored.body;
+    let young = d["_young"] == true;
+    if let Some(m) = d.as_object_mut() {
+        m.remove("_young");
+    }
     let res = &d["result"];
+    if res.is_null() && young {
+        return Ok(one(
+            409,
+            "DELIVERY_IN_PROGRESS",
+            "Idempotency-Key",
+            "this delivery is still in progress (no result recorded yet)",
+            "send the same request again later",
+        ));
+    }
+    let expect_n = Some(
+        res["n"]
+            .as_i64()
+            .and_then(|n| i32::try_from(n).ok())
+            .unwrap_or(0),
+    );
     if !res.is_null() && res["outcome"] != "unknown" {
         return Ok(Resp {
             status: 200,
@@ -528,7 +644,9 @@ fn replay(
         requeried: true,
     };
     match crate::roles::call(t, "GET", &format!("/v0/role/attempts/{attempt}")) {
-        Ok((200, v)) if sent.is_none_or(|s| v["request_sha256"] == s) => {
+        // the stored answer counts only for exactly what this delivery sent; without a recorded
+        // digest (the coordinator stopped before transaction 2) it stays unknown
+        Ok((200, v)) if sent.is_some_and(|s| v["request_sha256"] == s) => {
             o.outcome = "accepted";
             o.op = if v["op"] == "reconnect" {
                 Some("reconnect")
@@ -536,6 +654,11 @@ fn replay(
                 Some("start")
             };
             o.supervisor = Some((202, v["answer"].clone()));
+        }
+        Ok((200, _)) if sent.is_none() => {
+            o.reasons = json!([
+                "the supervisor holds an accepted attempt, but this delivery has no recorded request digest to compare"
+            ]);
         }
         Ok((200, _)) => {
             o.reasons = json!(["the supervisor holds another request under this attempt_id"]);
@@ -549,5 +672,7 @@ fn replay(
         }
         Err(e) => o.reasons = json!([format!("the supervisor was not reached: {e}")]),
     }
-    run_tx(db, guard, &|tx| record_result(tx, repo, role, id, &o, 200))
+    run_tx(db, guard, &|tx| {
+        record_result(tx, repo, role, id, &o, 200, expect_n)
+    })
 }

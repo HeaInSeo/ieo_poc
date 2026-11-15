@@ -4056,6 +4056,15 @@ pub fn judge_resume(
         return reconcile("no current assignment for this repo and role".into());
     };
     let cgen = c["generation"].as_i64().unwrap_or(-1);
+    // an older generation whose last run did not finish is a run to reconcile, not merely stale:
+    // its children, external requests and session record were never observed (§6), so no new
+    // session may start over it either (02-05 step 3, review c11e734 M-1)
+    if c["assignment_id"] == aid.as_str() && cgen < *generation && c["phase"] != "after_run" {
+        return reconcile(format!(
+            "the last run of the older generation {cgen} did not finish (phase {})",
+            c["phase"]
+        ));
+    }
     if c["assignment_id"] == aid.as_str() && cgen < *generation {
         return (
             "stale_generation",
@@ -4573,7 +4582,41 @@ pub fn migrate(db: &mut impl GenericClient) -> Result<(), postgres::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::legacy_split;
+    use super::{judge_resume, legacy_split};
+    use serde_json::json;
+
+    /// The resume judgment by the central checkpoint's assignment, generation and phase (the local
+    /// checkpoint matches it). Review c11e734 M-1: an older generation whose last run did not
+    /// finish is reconciliation, not `stale_generation`; every other outcome is as before.
+    #[test]
+    fn an_unfinished_run_of_an_older_generation_is_reconciliation() {
+        let head = ("A1".to_string(), 2i64);
+        let local = json!({"running": null, "checkpoint_seq": 5, "checkpoint_sha256": "x"});
+        let judge = |aid: &str, generation: i64, phase: &str| {
+            let c = json!({"seq": 5, "checkpoint_sha256": "x", "assignment_id": aid,
+                           "generation": generation, "phase": phase});
+            judge_resume(Some(&c), Some(&head), Ok(&local)).0
+        };
+        assert_eq!(judge("A1", 1, "after_run"), "stale_generation");
+        assert_eq!(
+            judge("A1", 1, "takeover"),
+            "external_reconciliation_required"
+        );
+        assert_eq!(judge("A1", 1, "error"), "external_reconciliation_required");
+        assert_eq!(judge("A1", 2, "after_run"), "resume_allowed");
+        assert_eq!(
+            judge("A1", 2, "takeover"),
+            "external_reconciliation_required"
+        );
+        assert_eq!(
+            judge("A1", 3, "after_run"),
+            "external_reconciliation_required"
+        );
+        assert_eq!(
+            judge("B1", 1, "after_run"),
+            "external_reconciliation_required"
+        );
+    }
 
     #[test]
     fn legacy_reasons_split_fail_closed() {

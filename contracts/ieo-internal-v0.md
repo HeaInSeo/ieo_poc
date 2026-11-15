@@ -31,7 +31,7 @@ supervisor(역할 Pod의 실행 관리 서비스)가 코디네이터에 하는 �
 - **스프린트 상태·사건 조회**(`GET /v0/sprints/{id}/state`, `…/events`). 계획 §1이 미결로 둔 질문이다: supervisor가 이 조회를 쓸 수 있는가. **v0에서는 넣지 않는다.** 에이전트 자격의 `/v0/sprints*` 금지(403 `AGENT_READ_DENIED`, 역할은 서로를 보지 않는다)를 그대로 둔다. supervisor가 필요한 자기 배정 정보는 02-05가 만든 자기 배정 조회(`GetOwnAssignment`)로 얻는다(§8.2).
 - **`compareCheckpoint`**(`GET …/checkpoints/compare`). `roles:control` 클라이언트(코디네이터 쪽 운영 주체)의 작업이다. supervisor는 `GetLatestCheckpoint`로 중앙 기록을 읽고 스스로 대조한다(02-04 `central::compare`).
 - 사람·등록자·배정자용 작업 전부: 명세 등록·변환, 의미 검토, Notion 가져오기, 예외 승인, 배정, 증거 입력, 판정, outbox, repo 역할 상태·정지. HTTP/JSON에만 둔다.
-- **`deliverAssignment`**(`POST /v0/repos/{repo_id}/roles/{role}/deliveries`, 02-05 단계 3). `roles:control` 클라이언트(운영 주체)의 작업이라 **HTTP 전용**이다. RPC를 두지 않는다(proto 변경 없음, 02-05 계획 §3.1 작업 표). 코디네이터는 이 작업 안에서 supervisor의 start·reconnect를 역할 서비스 HTTP(`/v0/role/*`)로 부른다(§1.3). supervisor는 그 요청을 받으면 `GetOwnAssignment`로 현재 배정과 대조한다.
+- **`deliverAssignment`**(`POST /v0/repos/{repo_id}/roles/{role}/deliveries`, 02-05 단계 3). `roles:control` 클라이언트(운영 주체)의 작업이라 **HTTP 전용**이다. RPC는 없다(이 작업을 위한 proto 변경 없음, 02-05 계획 §3.1 작업 표. 단계 3의 proto 변경은 `GetOwnAssignmentResponse.expected_runtime` 하나다, §14). 코디네이터는 이 작업 안에서 supervisor의 start·reconnect를 역할 서비스 HTTP(`/v0/role/*`)로 부른다(§1.3). supervisor는 그 요청을 받으면 `GetOwnAssignment`로 현재 배정과 대조한다.
 
 ### 1.3 호출 방향
 
@@ -305,5 +305,5 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 | 절 | 바뀐 내용 | 이유 |
 | --- | --- | --- |
 | 머리 | 제목에 단계 3 | 이 절 |
-| §1.2 | `deliverAssignment`는 HTTP 전용이라고 적었다 | 운영 주체 작업(계획 §3.1) |
+| §1.2 | `deliverAssignment`는 HTTP 전용이라고 적었다(검토 c11e734 I-3: “이 작업을 위한 proto 변경 없음”으로 정정) | 운영 주체 작업(계획 §3.1) |
 | (§9 참고) | 작업 표의 실행 모양에 `Delivery`(권한 → 요청 기록 트랜잭션 → 재개 판단 → 예산 검사·supervisor 호출은 트랜잭션 밖 → 결과 기록 트랜잭션)를 더했다. gRPC 표면 작업의 모양은 그대로 “트랜잭션 하나”다 | `crates/ieo-coord/src/api.rs` `Shape::Delivery` |
