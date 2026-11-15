@@ -49,7 +49,7 @@
 ## 3. 시험
 
 - `cargo fmt --all -- --check`, `cargo clippy --all-targets --locked -- -D warnings`: 통과.
-- `cargo test --locked --all-targets`(시험 DB 포함): 346 통과, 0 실패, 0 무시. 기록은 [evidence/test.log](evidence/test.log)(커밋 1feebb1).
+- `cargo test --locked --all-targets`(시험 DB 포함): 346 통과, 0 실패, 0 무시(커밋 1feebb1, PR #67). 그 기록은 후속(§6)의 9b63ce8 실행(349 통과)으로 [evidence/test.log](evidence/test.log)를 바꿨다. 이전 기록은 git 이력(PR #67의 이 파일)에 있다. 후속 검토는 [review-pr68-3724bc9.md](review-pr68-3724bc9.md)(제안 문구 안의 상대 링크가 풀리도록 보고와 같은 폴더에 보관).
 - 변이 24개: 24개 모두 잡혔다([evidence/mutants.txt](evidence/mutants.txt)). 교정을 하나씩 되돌리고 해당 시험만 돌린 뒤 원래 코드로 복구했다. 정리(cleanup) 변이는 처음에 이를 지나지 않는 시험으로 돌려 살아남았고, 1feebb1의 시험으로 다시 돌려 잡혔다.
 
 ## 4. 교정하지 않은 항목과 사용자 결정 요청
