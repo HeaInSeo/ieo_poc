@@ -191,6 +191,17 @@ fn spec() -> Value {
 
 #[test]
 fn checkpoints_are_reported_compared_and_judged_across_restarts() {
+    e2e("http");
+}
+
+/// X-04: the same run with the role service reporting over gRPC (`--grpc-listen` on the same
+/// coordinator binary, `checkpoint_central.transport = "grpc"`).
+#[test]
+fn checkpoints_are_reported_compared_and_judged_across_restarts_over_grpc() {
+    e2e("grpc");
+}
+
+fn e2e(transport: &str) {
     let Ok(base) = std::env::var("IEO_TEST_DB_URL") else {
         assert!(
             std::env::var("CI").is_err(),
@@ -200,13 +211,13 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         return;
     };
     let cfg: postgres::Config = base.parse().expect("IEO_TEST_DB_URL");
-    let dbname = format!("ieo_t_cpe2e_{}", std::process::id());
+    let dbname = format!("ieo_t_cpe2e_{transport}_{}", std::process::id());
     let mut admin = cfg.connect(NoTls).expect("connect");
     let _ = admin.batch_execute(&format!("DROP DATABASE IF EXISTS {dbname} WITH (FORCE)"));
     admin
         .batch_execute(&format!("CREATE DATABASE {dbname}"))
         .expect("create db");
-    let dir = std::env::temp_dir().join(format!("ieo-cp-e2e-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("ieo-cp-e2e-{transport}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("dir");
     let tok = |n: &str| format!("e2e-{n}-{}", std::process::id());
@@ -235,12 +246,18 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
         .and_then(|l| l.local_addr())
         .expect("port")
         .port();
+    let grpc_port = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|l| l.local_addr())
+        .expect("port")
+        .port();
+    let central_port = if transport == "grpc" { grpc_port } else { port };
     let role_cfg = || {
         Config::from_json(&json!({"role": "development", "repo": "repo-a",
             "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
             "claude": claude, "budget": "02-04", "quota_group_id": "anthropic-shared-0104",
-            "checkpoint_central": {"url": format!("http://127.0.0.1:{port}"),
-                                   "token_file": root.join("cred/coordinator_token")},
+            "checkpoint_central": {"url": format!("http://127.0.0.1:{central_port}"),
+                                   "token_file": root.join("cred/coordinator_token"),
+                                   "transport": transport},
             "share": {"max_runs": 12, "total_seconds": 9_600, "billable_tokens": 1_000_000,
                       "cache_read_tokens": 10_000_000}}))
         .expect("role config")
@@ -269,6 +286,10 @@ fn checkpoints_are_reported_compared_and_judged_across_restarts() {
             format!("{rootdir}/contracts/judgment-policy-v0.json"),
         ],
     };
+    if transport == "grpc" {
+        coord.args.push("--grpc-listen".into());
+        coord.args.push(format!("127.0.0.1:{grpc_port}"));
+    }
     coord.start();
     let c = |who: &str, method: &str, path: &str, body: Option<&Value>| {
         http(port, Some(&tok(who)), method, path, body).expect("coordinator answered")
