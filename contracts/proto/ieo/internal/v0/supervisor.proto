@@ -10,7 +10,7 @@
 //   servers would misread goes to a new package (ieo.internal.v1).
 // - Authentication: metadata `authorization: Bearer <token>`, resolved by the same credential table
 //   and scopes as HTTP. Names inside messages are never trusted for authorization.
-// - Errors: a gRPC status (mapping table in the description, section 3) plus the binary trailer
+// - Errors: a gRPC status (mapping table in the description, section 4) plus the binary trailer
 //   `ieo-error-bin` carrying a serialized `Error` with the HTTP status and the unchanged `code`
 //   and `rejections[]`.
 // - Health: the standard grpc.health.v1.Health service (no credential). It is not part of this
@@ -25,11 +25,12 @@ package ieo.internal.v0;
 service SupervisorService {
   // = submitAgentReport, POST /v0/agent/reports. Scope `agent:report` bound to (repo_id, role).
   // Idempotency key: (event_id, event_revision) in the report, scoped to the credential's repo
-  // and role. Retry: safe with the identical report (description, section 4).
+  // and role. No automatic resend; a resend by the caller carries the identical report
+  // (description, section 5).
   rpc SubmitAgentReport(SubmitAgentReportRequest) returns (SubmitAgentReportResponse);
 
   // = submitReproRequest, POST /v0/agent/repro-requests. Scope `agent:repro`, guardrail only.
-  // Idempotency key: request_id. Retry: safe with the identical request.
+  // Idempotency key: request_id. No automatic resend; confirm with GetReproRequest.
   rpc SubmitReproRequest(SubmitReproRequestRequest) returns (SubmitReproRequestResponse);
 
   // = getReproRequest, GET /v0/agent/repro-requests/{request_id}. Read only.
@@ -37,7 +38,7 @@ service SupervisorService {
 
   // = reportCheckpoint, POST /v0/repos/{repo_id}/roles/{role}/checkpoints. Scope
   // `checkpoint:report` bound to (repo_id, role). Idempotency key: (repo_id, role, seq) with the
-  // exact bytes. Retry: only after GetLatestCheckpoint (description, section 4).
+  // exact bytes. No automatic resend; confirm with GetLatestCheckpoint (description, section 5).
   rpc ReportCheckpoint(ReportCheckpointRequest) returns (ReportCheckpointResponse);
 
   // = latestCheckpoint, GET /v0/repos/{repo_id}/roles/{role}/checkpoints/latest. Read only.
@@ -69,7 +70,7 @@ message SubmitAgentReportResponse {
 // = components.schemas.ClaimReceipt.
 message ClaimReceipt {
   string event_id = 1;
-  uint32 event_revision = 2;
+  uint64 event_revision = 2;
   // RFC 3339, as stored.
   string stored_at = 3;
   // Always "claim": an agent submission is never verified.
@@ -190,8 +191,9 @@ message GetLatestCheckpointResponse {
   bool current_assignment = 17;
 }
 
-// Carried in the binary trailer `ieo-error-bin` of every non-OK status the coordinator produces.
-// Without the trailer (for example a deadline or transport failure seen only by the client), the
+// Carried in the binary trailer `ieo-error-bin` of a non-OK answer from the coordinator's handling
+// and of the adapter's size, path and UTF-8 refusals (description, section 4.3). Deadline,
+// cancellation and transport failures carry no trailer. Without a trailer, and for any 500, the
 // outcome on the server is unknown (description, section 5).
 message Error {
   // The HTTP status the same request gets on the HTTP path.

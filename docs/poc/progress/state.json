@@ -2708,11 +2708,12 @@
       "status": "진행",
       "last_observed_at": "2026-11-15T17:32:49+09:00",
       "latest_report": "reports/extra/X-03/grpc-contract-20261115/REPORT.md",
-      "result_state": "계약 초안 작성: contracts/proto/ieo/internal/v0/supervisor.proto(SupervisorService RPC 5개: SubmitAgentReport·SubmitReproRequest·GetReproRequest·ReportCheckpoint·GetLatestCheckpoint), contracts/proto/buf.yaml(STANDARD lint, PACKAGE_VERSION_SUFFIX만 예외, breaking WIRE_JSON), 설명 contracts/ieo-internal-v0.md(범위·버전 호환·인증·상태 대응·ieo-error-bin·재시도·멱등·deadline·취소·전송 쪽 동작·스트림 규칙·분리 영향). buf lint·build·protoc 통과. 구현 없음. 독립 검토 전. 모델 호출 0",
+      "result_state": "계약 초안 작성: contracts/proto/ieo/internal/v0/supervisor.proto(SupervisorService RPC 5개: SubmitAgentReport·SubmitReproRequest·GetReproRequest·ReportCheckpoint·GetLatestCheckpoint), contracts/proto/buf.yaml(STANDARD lint, PACKAGE_VERSION_SUFFIX만 예외, breaking WIRE_JSON), 설명 contracts/ieo-internal-v0.md(범위·버전 호환·인증·상태 대응·ieo-error-bin·재시도·멱등·deadline·취소·전송 쪽 동작·스트림 규칙·분리 영향). buf lint·build·protoc 통과. 구현 없음. 검토 b8506fd 변경 요청(M-1 500은 결과 불명, M-2 검사 순서, M-3 크기 규칙, M-4 자동 재전송 없음·읽기 확인만, L-1~L-4) → 교정 1(검토 1/4·교정 1/3). 모델 호출 0",
       "verification_level": "unverified",
       "evidence": [
         "reports/extra/X-03/grpc-contract-20261115/REPORT.md",
-        "reports/extra/X-03/grpc-contract-20261115/evidence/proto-checks.txt"
+        "reports/extra/X-03/grpc-contract-20261115/evidence/proto-checks.txt",
+        "reports/extra/X-03/grpc-contract-20261115/reviews/review-pr62-b8506fd.md"
       ],
       "next_action": "독립 검토·필수 CI·승인 head 병합·main CI → 검수 기록 → X-04",
       "unresolved": "업무 규칙은 기존 api::handle 재사용 전제(§3). 02-05 전에 끝내는 것이 목표(02-05의 선행 아님) · PR #41 검토 b3cb083: agent:repro는 guardrail 전용 — supervisor 주체·범위를 정할 때 재현 요청 재사용 여부 결정 · 처분(X-03 계약 설명 §3): agent:repro는 guardrail supervisor가 그대로 재사용, 새 범위 없음. 스프린트 조회는 gRPC 표면에 넣지 않음(§1.2)"

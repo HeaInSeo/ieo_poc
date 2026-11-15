@@ -7,7 +7,7 @@
 | 산출물 | proto [`contracts/proto/ieo/internal/v0/supervisor.proto`](../../../../../../contracts/proto/ieo/internal/v0/supervisor.proto) · lint·호환 규칙 [`contracts/proto/buf.yaml`](../../../../../../contracts/proto/buf.yaml) · 계약 설명 [`contracts/ieo-internal-v0.md`](../../../../../../contracts/ieo-internal-v0.md) |
 | 검사 | `buf lint`·`buf build`·`protoc` 통과([evidence/proto-checks.txt](evidence/proto-checks.txt)) |
 | 모델 호출 | 0회. 실제 호출·예비 회차·결제 없음 |
-| 상태 | 계약 초안. 구현 없음(X-04) |
+| 상태 | 계약 초안. 구현 없음(X-04). 독립 검토 [b8506fd 변경 요청](reviews/review-pr62-b8506fd.md)(M-1~M-4, L-1~L-4) → 교정 1(§5) |
 
 ## 1. 수용 기준 대응
 
@@ -38,6 +38,7 @@
 
 계약을 쓰며 main 3157c89의 처리 코드를 다시 읽었다.
 - 같은 `code`가 작업에 따라 HTTP 상태가 다르다(`DIGEST_MISMATCH`: 등록 422, 체크포인트 409). 그래서 gRPC 상태를 `code`만으로 정하지 않고 HTTP 상태와 함께 정했다.
+- 검사 순서가 작업마다 다르다: 보고·재현 요청은 재조회·식별 검사가 형식 검사보다 먼저이고, 체크포인트는 형식 → `REPO_MISMATCH` → 식별 순서다. 크기 규칙은 전송 쪽(본문 1 MiB, 인증 전)과 처리 쪽(`checkpoint_json` 1 MiB, `MISSING_FIELD`) 두 겹이다. 커밋 실패도 500이므로 500은 결과 불명이다(검토 b8506fd M-1~M-3 반영).
 - 재현 요청에서 대상 SHA가 다르면 `ASSIGNMENT_SHA_MISMATCH`가 아니라 `STALE_ASSIGNMENT`다. 형식 검사(`SCHEMA_VIOLATION`)는 권한·식별 검사를 통과한 새 요청에만 한다.
 - 보고와 재현 요청의 중복 판정은 파싱한 JSON 값을 비교한다. 체크포인트의 digest는 받은 바이트로 계산한다. 두 사실이 “두 전송에서 같은 요청은 같은 요청”의 근거다(설명 §2).
 - 계획 §3 이후 `handle`에 작업별 실행 모양 차이가 생겼다: DB 없는 역할 제어, 트랜잭션 밖의 supervisor 호출 뒤 트랜잭션(`compare`). 작업 표가 이를 표현해야 한다(설명 §9).
@@ -45,7 +46,21 @@
 ## 4. 넘기는 것과 한계
 
 - **X-04**: 작업 표 분리, tonic 어댑터, 커밋 전 확인, supervisor `CoordinatorClient` 경계, 공통 회귀(설명 §10), CI의 `buf lint`·`buf breaking`.
-- **02-05**: 새 작업(자기 배정 조회·인수, 세션 상태)을 작업 표와 이 서비스에 추가. 토큰을 쥐는 프로세스의 분리.
+- **02-05**: 새 작업(자기 배정 조회·인수, 세션 상태)을 작업 표에 추가(HTTP 형태). 이 서비스에 RPC를 추가하는 것은 X-04가 먼저 병합됐을 때만이고, 아니면 X-04의 몫이다. 토큰을 쥐는 프로세스의 분리.
 - **한계**(설명 §11): 라이브러리 지원은 아직 확인하지 않았다. 15초·재시도 값은 초안이다. 크기 초과 응답이 HTTP와 다르다. 오류 상세는 자체 trailer다. TLS는 정식 설계의 몫이다.
 - **검사의 범위**: lint·build는 정의의 형식만 확인한다. HTTP와 같은 동작인지는 구현(X-04)의 공통 회귀가 확인한다.
 - 02-05의 선행·수용 기준은 바꾸지 않는다. X-04가 늦으면 02-05는 HTTP로 진행한다.
+
+## 5. 교정 1(검토 b8506fd)
+
+| 지적 | 처리 |
+| --- | --- |
+| M-1 500을 롤백 확정으로 적음(커밋 실패도 500) | 설명 §4.1·§4.3·§5: 500은 결과 불명. 거부 확정은 trailer `http_status` 400~499뿐 |
+| M-2 검사 순서·`MISSING_FIELD` 누락 | 설명 §3 작업별 순서, §4.2에 `MISSING_FIELD` |
+| M-3 크기 규칙 차이 | 설명 §7.1: 어댑터가 HTTP와 같은 JSON 본문에 같은 1 MiB 상한을 인증 전에 적용. `report_json`의 유일한 상한. 처리 쪽 `MISSING_FIELD`는 그대로 |
+| M-4 자동 재시도 정책 추가 | 설명 §5: 상태를 바꾸는 RPC의 자동 재전송 없음. 자동은 읽기 전용 확인만. proto 주석도 고침 |
+| L-1 `event_revision` 범위 | `uint64` |
+| L-2 trailer·문장 시간 제한 | 설명 §4.3·§6.1: 서버가 만든 `DEADLINE_EXCEEDED`·`CANCELLED`는 trailer 없음, `57014`는 `DEADLINE_EXCEEDED`로 |
+| L-3 JSON 동일성 빈틈 | 설명 §2: 비 optional 필드는 늘 넣음, 명시적 `null`은 gRPC로 재전송 불가, UTF-8 아닌 문서 거부 |
+| L-4 02-05의 RPC 추가 조건 | 설명 §8.2·이 보고 §4: X-04가 먼저 병합됐을 때만 |
+| I-1~I-4 | 기준 SHA 병기, 헬스는 주기적 기록, 경로 매개변수·알 수 없는 역할 값, `buf breaking`은 첫 병합 뒤 |

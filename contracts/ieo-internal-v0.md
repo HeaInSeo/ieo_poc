@@ -4,7 +4,7 @@
 | --- | --- |
 | 작업 | X-03 gRPC 내부 API 계약과 분리 영향 확인(개정 A4, 장부 §7 수용 기준) |
 | 정의 파일 | [`proto/ieo/internal/v0/supervisor.proto`](proto/ieo/internal/v0/supervisor.proto) · lint·호환 규칙 [`proto/buf.yaml`](proto/buf.yaml). 이 문서도 계약의 일부다 |
-| 근거 | [gRPC 내부 API 계획 v0](../docs/poc/Plan_gRPC_Internal_API_v0.md) §1·§3·§4, [사용자 결정 2026-11-14 · gRPC](../docs/poc/User_Decisions_2026-11-14_grpc.md), HTTP 계약 [`ieo-api-v0.openapi.yaml`](ieo-api-v0.openapi.yaml) 0.8.0, 코드 main 3157c89 |
+| 근거 | [gRPC 내부 API 계획 v0](../docs/poc/Plan_gRPC_Internal_API_v0.md) §1·§3·§4, [사용자 결정 2026-11-14 · gRPC](../docs/poc/User_Decisions_2026-11-14_grpc.md), HTTP 계약 [`ieo-api-v0.openapi.yaml`](ieo-api-v0.openapi.yaml) 0.8.0, 코드 main 3157c89(작성)·0779850(검토 기준, crates·contracts 차이 없음) |
 | 상태 | 계약 초안. 구현은 X-04, 분산·복구 시험은 X-05·X-06. 이 문서는 업무 규칙을 새로 정하지 않는다. 업무 규칙은 같은 이름의 HTTP 작업과 `ieo_coord::api`의 처리다 |
 
 ## 1. 범위
@@ -47,7 +47,10 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 - **JSON 문서는 바이트로 싣는다.** `report_json`(ProgressReport v0)과 `checkpoint_json`(체크포인트 파일)은 각자의 JSON 스키마·규칙이 정본이다. proto로 다시 정의하지 않는다. 두 전송이 같은 문서를 같은 규칙으로 검사한다.
   - 보고의 중복 판정은 파싱한 JSON 값을 비교한다. HTTP로 보낸 보고와 gRPC로 보낸 같은 보고는 같은 보고다.
   - 체크포인트의 SHA-256은 받은 바이트로 계산한다. 같은 파일은 어느 전송으로 보내도 digest가 같다.
-- **작은 요청은 타입이 있는 필드로 싣는다**(`SubmitReproRequestRequest`). 어댑터는 HTTP 본문과 **같은 JSON 값**을 만든다. 설정하지 않은 `optional` 필드는 JSON에서도 빠진다. 재현 요청의 중복 판정도 파싱한 JSON 값을 비교하므로, 이 규칙이 깨지면 같은 요청이 `EVENT_CONTENT_CONFLICT`가 된다. X-04 공통 회귀가 확인한다.
+- **작은 요청은 타입이 있는 필드로 싣는다**(`SubmitReproRequestRequest`). 어댑터는 HTTP 본문과 **같은 JSON 값**을 만든다. 재현 요청의 중복 판정도 파싱한 JSON 값을 비교하므로, 이 규칙이 깨지면 같은 요청이 `EVENT_CONTENT_CONFLICT`가 된다. X-04 공통 회귀가 확인한다.
+  - `optional`이 아닌 필드는 기본값(빈 문자열·0·빈 목록)이어도 **늘 JSON에 넣는다**. 설정하지 않은 `optional` 필드는 JSON에서 빠진다.
+  - gRPC로는 명시적 `null`을 보낼 수 없다. HTTP로 `"timeout_seconds": null`을 넣어 저장한 요청을 gRPC로 다시 보내면 다른 JSON 값이 되어 `EVENT_CONTENT_CONFLICT`다. 그 요청의 결과 확인은 `GetReproRequest`로 한다(§5).
+  - `checkpoint_json`·`report_json`이 UTF-8이 아니면 어댑터가 처리 전에 `INVALID_ARGUMENT`(`SCHEMA_VIOLATION`, 그 필드)로 거부한다. HTTP의 JSON 문자열은 UTF-8이 아닐 수 없으므로 같은 입력이 HTTP에는 없다.
 - **알 수 없는 필드.** proto3는 모르는 필드를 무시한다. HTTP는 정의되지 않은 키를 거부한다(`additionalProperties: false`, `SCHEMA_VIOLATION`). 그래서 v0의 새 필드는 무시돼도 안전한 것만 더한다(위 “추가만”). JSON 문서 안의 키는 바이트째 전달되므로 HTTP와 똑같이 거부된다.
 - **응답의 결과 구분.** HTTP는 새 저장(201·202)과 재조회(200)를 상태 코드로 나눈다. gRPC는 `Outcome`(`OUTCOME_STORED`·`OUTCOME_REPLAYED`)으로 나눈다.
 
@@ -58,8 +61,13 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 - **supervisor 주체**: 종류 `agent`, 하나의 (repo, role)에 묶인 자격이다. 범위는 지금 있는 에이전트 범위 셋만 쓴다: `agent:report`, `agent:repro`(guardrail 전용), `checkpoint:report`. 새 범위는 만들지 않는다.
   - PR #41 검토 b3cb083의 질문(재현 요청을 supervisor가 재사용하는가)의 답: 재사용한다. guardrail 역할의 supervisor만 `agent:repro`로 부른다. development 자격은 HTTP와 같이 거부된다.
   - 어느 프로세스가 어느 토큰을 쥐는가(모델 프로세스와 supervisor의 분리)는 02-05의 배정·인수 연결에서 정한다. 이 계약은 “HTTP가 받는 자격만 gRPC도 받는다”만 정한다.
-- **검사 순서**: HTTP와 같다(같은 처리이므로). 401 → 403/409(범위·역할·현재 배정) → 400(형식) → 409(식별) → 422(참조). 체크포인트 작업은 역할 이름 검사(404)가 자격 검사보다 먼저다(HTTP와 같음).
-- **역할 값**: `ROLE_UNSPECIFIED`는 알 수 없는 역할이다. HTTP의 알 수 없는 역할과 같이 `NOT_FOUND`(`NOT_FOUND`)다.
+- **검사 순서**: 작업마다 처리 코드가 정하고, gRPC는 같은 처리를 부르므로 순서가 같다. OpenAPI 머리말의 일반 순서(401 → 403/409 → 400 → 409 → 422)와 다른 작업이 있다(main 0779850):
+  - `SubmitAgentReport`: 401 → 범위·역할(403) → 본문 파싱(400) → 저장된 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`)·배정 확인(409) → 형식(400)·의미(422). 재조회와 식별 검사가 형식 검사보다 먼저다.
+  - `SubmitReproRequest`: 401 → 범위·역할(403) → 본문 파싱(400) → 재조회(200)·내용 충돌·현재 배정(409) → 새 요청만 형식(400 `MISSING_FIELD`·`SCHEMA_VIOLATION`).
+  - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 형식(400) → repo·역할 불일치(409 `REPO_MISMATCH`) → 순번·내용 식별(200·409) → 배정 대조(409).
+  - `GetReproRequest`·`GetLatestCheckpoint`: 401 → (`GetLatestCheckpoint`만 역할 이름 404) → 권한(403) → 없음(404).
+  - **HTTP 전송 쪽**의 본문 크기 검사(400)는 인증보다 먼저다. gRPC 어댑터도 같은 크기 검사를 인증 전에 한다(§7.1).
+- **역할 값과 경로 매개변수**: `ROLE_UNSPECIFIED`와 정의되지 않은 숫자 값은 알 수 없는 역할이다. HTTP의 알 수 없는 역할과 같이 `NOT_FOUND`(`NOT_FOUND`)다. HTTP에서 경로 조각이 되는 값(`repo_id`, `request_id`)이 비었거나 `/`를 담으면 HTTP는 다른 경로로 읽혀 404가 된다. 어댑터는 이런 값을 처리에 넘기지 않고 `NOT_FOUND`(`code` `NOT_FOUND`, `http_status` 404)로 답한다.
 
 ## 4. 상태 코드 대응과 상세 사유
 
@@ -78,7 +86,7 @@ gRPC 상태는 **같은 요청이 HTTP에서 받을 상태 코드와 `code`**로
 | 409, 모든 `code`가 `OWNERSHIP_CONFLICT`·`OUTBOX_STATE_CONFLICT` | `ABORTED` | 동시성·CAS. 다시 읽고 판단한다(gRPC 표면에서는 나오지 않음) |
 | 그 밖의 409 | `FAILED_PRECONDITION` | 배정·세대·순번·SHA·digest·repo 불일치 등 |
 | 422 | `FAILED_PRECONDITION` | 참조·결합 |
-| 500 | `INTERNAL` | 트랜잭션은 롤백됐다 |
+| 500 | `INTERNAL` | **결과 불명.** 처리 중 실패는 롤백되지만, 커밋 실패도 500이고 그때 서버는 이미 커밋했을 수 있다. 그래서 500은 거부 확정이 아니다(§5) |
 | 500, 작업 전 DB 연결 실패 | `UNAVAILABLE` | 아무것도 실행하지 않았다(§7.2) |
 | 503 | `UNAVAILABLE` | 지금은 나오지 않는다 |
 
@@ -89,36 +97,38 @@ gRPC 상태는 **같은 요청이 HTTP에서 받을 상태 코드와 `code`**로
 | RPC | `code`(HTTP 상태) |
 | --- | --- |
 | `SubmitAgentReport` | `UNAUTHENTICATED`(401) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`·`VERIFIED_FROM_AGENT_DENIED`(403) · `MISSING_FIELD`·`SCHEMA_VIOLATION`(400) · `EVENT_CONTENT_CONFLICT`(409 → `ALREADY_EXISTS`) · `STALE_ASSIGNMENT`·`ASSIGNMENT_SHA_MISMATCH`(409) · `REPORT_SEMANTIC_VIOLATION`(422) · `INTERNAL`(500) |
-| `SubmitReproRequest` | `UNAUTHENTICATED` · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `EVENT_CONTENT_CONFLICT`(409 → `ALREADY_EXISTS`) · `STALE_ASSIGNMENT`(409, 현재가 아닌 배정·세대 또는 그 배정의 SHA와 다른 `target_sha`) · `SCHEMA_VIOLATION`(400, 권한·식별 검사를 통과한 새 요청만 형식 검사) · `INTERNAL` |
+| `SubmitReproRequest` | `UNAUTHENTICATED` · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `EVENT_CONTENT_CONFLICT`(409 → `ALREADY_EXISTS`) · `STALE_ASSIGNMENT`(409, 현재가 아닌 배정·세대 또는 그 배정의 SHA와 다른 `target_sha`) · `MISSING_FIELD`·`SCHEMA_VIOLATION`(400, 본문 파싱 실패는 처음에, 필드 형식은 권한·식별 검사를 통과한 새 요청에만) · `INTERNAL` |
 | `GetReproRequest` | `UNAUTHENTICATED` · `REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `NOT_FOUND`(404, 권한 검사 뒤) · `INTERNAL` |
-| `ReportCheckpoint` | `UNAUTHENTICATED` · `NOT_FOUND`(404, 알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `SCHEMA_VIOLATION`(400) · `EVENT_CONTENT_CONFLICT`(409 → `ALREADY_EXISTS`) · `CHECKPOINT_SEQUENCE_GAP`·`STALE_ASSIGNMENT`·`CHECKPOINT_MISMATCH`·`NO_CURRENT_ASSIGNMENT`·`DIGEST_MISMATCH`·`ASSIGNMENT_SHA_MISMATCH`·`REPO_MISMATCH`(409) · `INTERNAL` |
+| `ReportCheckpoint` | `UNAUTHENTICATED` · `NOT_FOUND`(404, 알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `MISSING_FIELD`·`SCHEMA_VIOLATION`(400, `checkpoint_json` 1 MiB 초과는 `MISSING_FIELD`) · `EVENT_CONTENT_CONFLICT`(409 → `ALREADY_EXISTS`) · `CHECKPOINT_SEQUENCE_GAP`·`STALE_ASSIGNMENT`·`CHECKPOINT_MISMATCH`·`NO_CURRENT_ASSIGNMENT`·`DIGEST_MISMATCH`·`ASSIGNMENT_SHA_MISMATCH`·`REPO_MISMATCH`(409) · `INTERNAL` |
 | `GetLatestCheckpoint` | `UNAUTHENTICATED` · `NOT_FOUND`(알 수 없는 역할) · `SCOPE_DENIED`·`REPO_SCOPE_DENIED`·`ROLE_MISMATCH`(403) · `NO_CHECKPOINT`(404) · `INTERNAL` |
 
-이 표는 main 3157c89의 처리 코드를 읽어 만들었다. 정본은 처리 코드이고, X-04 공통 회귀가 두 전송의 상태·`code`가 같은지 확인한다.
+이 표는 main 3157c89의 처리 코드를 읽어 만들었고 0779850에서 검토했다. 모든 작업에 어댑터의 본문 크기 거부(400 `SCHEMA_VIOLATION`, §7.1)가 더해진다. 정본은 처리 코드이고, X-04 공통 회귀가 두 전송의 상태·`code`가 같은지 확인한다.
 
 ### 4.3 상세 사유: `ieo-error-bin`
 
-- 코디네이터가 만든 모든 비정상 응답은 바이너리 trailer `ieo-error-bin`에 `ieo.internal.v0.Error`를 싣는다: HTTP 상태(`http_status`), `Problem.code`·`message`, 또는 `rejections[]`(code·field·message·correction·retryable_after_edit)를 바꾸지 않고.
+- **처리(`handle`)가 만든 비정상 응답**과 어댑터가 처리 대신 답한 크기·경로·UTF-8 거부(§2·§3·§7)는 바이너리 trailer `ieo-error-bin`에 `ieo.internal.v0.Error`를 싣는다: HTTP 상태(`http_status`), `Problem.code`·`message`, 또는 `rejections[]`(code·field·message·correction·retryable_after_edit)를 바꾸지 않고.
 - gRPC 상태 메시지(`grpc-message`)에는 사람이 읽을 요약만 둔다. 클라이언트의 판단은 trailer로 한다.
 - `google.rpc.Status`(`grpc-status-details-bin`)는 쓰지 않는다. 그 형식의 의존을 들이지 않고 기존 오류 모양을 그대로 옮기기 위해서다.
-- **trailer가 없는 비정상 상태**(`DEADLINE_EXCEEDED`, `CANCELLED`, 연결 끊김, 라이브러리가 만든 `UNAVAILABLE`·`RESOURCE_EXHAUSTED` 등)는 코디네이터 처리의 답이 아니다. 클라이언트는 서버의 결과를 **알 수 없음**으로 다룬다(§5).
+- **trailer가 없는 비정상 상태**: `DEADLINE_EXCEEDED`·`CANCELLED`(서버가 만든 것도 trailer를 싣지 않는다, §6), 연결 끊김, 라이브러리가 만든 `UNAVAILABLE`·`RESOURCE_EXHAUSTED` 등. DB 연결 실패의 `UNAVAILABLE`(§7.2)만 trailer를 싣는다.
+- 클라이언트는 trailer 없는 상태와 `INTERNAL`을 결과 **알 수 없음**으로 다룬다(§5). 거부 확정은 trailer의 `http_status`가 400~499일 때뿐이다.
 
 ## 5. 재시도와 멱등
 
 원칙(사용자 결정 2026-11-14 §5): **연결 실패만으로 재실행하지 않는다.** 결과를 알 수 없으면 같은 키로 서버의 실제 반영 여부를 먼저 확인한다. 상태를 바꾸는 작업은 키 없이 재시도하지 않는다.
 
-**결과를 알 수 없는 경우**: `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `CANCELLED`, 연결 끊김, trailer 없는 `INTERNAL`·`UNKNOWN`. trailer가 있는 `INTERNAL`(HTTP 500)은 롤백이 확정된 실패다.
+**결과를 알 수 없는 경우**: `INTERNAL`(trailer가 있어도, HTTP 500), `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `CANCELLED`, `UNKNOWN`, 연결 끊김. 02-04의 “5xx는 결과 불명” 규칙과 같다. 이때는 같은 키로 확인한다.
 
 | RPC | 멱등 키 | 결과를 알 수 없을 때 | 하지 않는 것 |
 | --- | --- | --- | --- |
-| `SubmitAgentReport` | (event_id, event_revision), 자격의 (repo, role) 안 | **같은 바이트**를 다시 보낸다. 서버 규칙상 이것이 재조회다: 저장돼 있으면 `OUTCOME_REPLAYED`와 저장된 영수증, 상태 변화 없음 | 내용을 바꿔 같은 키로 보내기(→ `ALREADY_EXISTS`). 새 내용은 새 revision |
-| `SubmitReproRequest` | request_id | 같은 요청을 다시 보내거나 `GetReproRequest`로 확인한다. 저장된 요청은 다시 큐에 넣지 않는다 | 새 request_id로 다시 보내기(새 실행이 된다) |
+| `SubmitAgentReport` | (event_id, event_revision), 자격의 (repo, role) 안 | 결과 불명을 호출자에게 돌려준다. 다시 보낼지는 호출자의 규칙이 정한다(지금은 없음, 02-05가 정한다). 다시 보낼 때는 **같은 바이트**만: 저장돼 있으면 `OUTCOME_REPLAYED`와 저장된 영수증이고 상태 변화가 없다 | 내용을 바꿔 같은 키로 보내기(→ `ALREADY_EXISTS`). 새 내용은 새 revision |
+| `SubmitReproRequest` | request_id | `GetReproRequest`로 확인한다(자동 확인 가능). 없으면 결과 불명을 호출자에게 돌려준다. 다시 보낼 때는 같은 요청만: 저장된 요청은 다시 큐에 넣지 않는다 | 새 request_id로 다시 보내기(새 실행이 된다) |
 | `GetReproRequest` | — | 다시 부른다 | — |
-| `ReportCheckpoint` | (repo, role, seq) + 바이트 | **먼저 `GetLatestCheckpoint`**. 최신 seq·SHA가 보낸 것과 같으면 반영됨. 최신 seq가 보낸 seq − 1이면 같은 바이트로 다시 보낼 수 있다. 그 밖이면 외부 대조(02-04 `EXTERNAL_RECONCILIATION_REQUIRED`) | 같은 seq에 다른 바이트(→ `ALREADY_EXISTS`). 확인 없이 다음 seq로 넘어가기 |
+| `ReportCheckpoint` | (repo, role, seq) + 바이트 | **`GetLatestCheckpoint`로 확인**(자동 확인 가능). 최신 seq·SHA가 보낸 것과 같으면 반영됨. 아니면 결과 불명을 호출자에게 돌려준다. 다시 보낼지는 02-04 규칙(대기 사본 유지, 다음 기동의 채택 판단)이 정한다. 그 밖의 불일치는 외부 대조(`EXTERNAL_RECONCILIATION_REQUIRED`) | 같은 seq에 다른 바이트(→ `ALREADY_EXISTS`). 확인 없이 다음 seq로 넘어가기 |
 | `GetLatestCheckpoint` | — | 다시 부른다 | — |
 
 - **자동 재시도하지 않는 상태**: `INVALID_ARGUMENT`, `UNAUTHENTICATED`, `PERMISSION_DENIED`, `NOT_FOUND`, `ALREADY_EXISTS`, `FAILED_PRECONDITION`, `RESOURCE_EXHAUSTED`. 고치거나 다시 읽은 뒤의 새 판단으로만 다시 보낸다. `ABORTED`는 다시 읽고 판단한다.
-- **횟수**: 확인·재전송은 지수 대기(0.5초에서 시작, 최대 4초)로 최대 3회다. 그래도 모르면 그 상태를 기록하고 멈춘다. 이 값은 클라이언트 정책이며 X-04에서 확정한다.
+- **자동 재전송을 더하지 않는다**(사용자 결정 2026-11-14 §7 “자동 재시도를 추가하지 않는다”). gRPC 클라이언트는 상태를 바꾸는 RPC를 스스로 다시 보내지 않는다. 지금 02-04 HTTP 클라이언트도 자동 재전송을 하지 않는다.
+- **자동으로 하는 것은 읽기 전용 확인뿐이다**(`GetLatestCheckpoint`, `GetReproRequest`): 상태를 바꾸지 않으므로 지수 대기(0.5초에서 시작, 최대 4초)로 최대 3회까지 부를 수 있다. 그래도 모르면 결과 불명을 기록하고 멈춘다. 이 횟수·간격은 X-04에서 확정한다.
 - **02-04 supervisor 규칙과의 대응**(`central::report`): 지금 HTTP 4xx는 “거부 확정”(대기 사본 삭제, 시작하지 않음), 5xx·전송 오류는 “결과 불명”(대기 사본 유지, 다음 기동에 채택 판단)이다. gRPC 클라이언트는 **trailer의 `http_status`**로 같은 구분을 한다: 400~499면 거부 확정, 그 밖(500, trailer 없음)이면 결과 불명. gRPC 상태 이름만으로 나누지 않는다.
 - 이 RPC들은 모델을 부르지 않는다. 재조회·재전송은 모델 호출의 재시도가 아니다. 모델 호출의 자동 재시도 금지는 그대로다.
 
@@ -128,8 +138,8 @@ gRPC 상태는 **같은 요청이 HTTP에서 받을 상태 코드와 `code`**로
 
 - **클라이언트**는 모든 호출에 deadline을 둔다. supervisor 기본값은 10초다(02-04 HTTP 클라이언트의 시간 제한과 같다).
 - **서버 최대 처리 시간**은 15초다. 실제 처리 시간은 min(클라이언트 deadline, 15초)이다. 지금 표면 작업은 트랜잭션 하나로 끝나며 재현 요청도 대기열에 넣기만 한다. X-04에서 측정해 기록하고, 바꾸면 이 문서를 고친다.
-- **시작 전**: 남은 시간이 50ms보다 짧으면 트랜잭션을 열지 않고 `DEADLINE_EXCEEDED`로 답한다. 아무것도 실행하지 않았다.
-- **커밋 전 만료·취소는 롤백한다.** 처리는 트랜잭션 안에서 문장마다 남은 시간을 넘지 않게 하고(`SET LOCAL statement_timeout`), 커밋 직전에 deadline과 취소를 다시 본다. 지났으면 롤백하고 `DEADLINE_EXCEEDED`·`CANCELLED`다.
+- **시작 전**: 남은 시간이 50ms보다 짧으면 트랜잭션을 열지 않고 `DEADLINE_EXCEEDED`로 답한다(trailer 없음). 아무것도 실행하지 않았다.
+- **커밋 전 만료·취소는 롤백한다.** 처리는 트랜잭션 안에서 문장마다 남은 시간을 넘지 않게 하고(`SET LOCAL statement_timeout`), 커밋 직전에 deadline과 취소를 다시 본다. 지났으면 롤백하고 `DEADLINE_EXCEEDED`·`CANCELLED`다. 문장 시간 제한에 걸린 실패(PostgreSQL `57014 query_canceled`)도 트랜잭션 실행기가 500 `INTERNAL`이 아니라 `DEADLINE_EXCEEDED`로 바꾼다. 서버가 만든 `DEADLINE_EXCEEDED`·`CANCELLED`는 trailer를 싣지 않는다. 롤백했더라도 클라이언트는 결과 불명으로 다룬다(§4.3·§5).
 - **커밋 뒤 끊김은 반영된 상태다.** 커밋과 응답 사이에 클라이언트가 떠났으면 상태는 바뀌었고 답만 잃었다. 클라이언트는 §5대로 같은 키로 재조회해 결과를 얻는다.
 - 커밋 직전 확인과 커밋 사이의 짧은 틈에 취소가 오면 커밋될 수 있다. 이 경우도 위 “커밋 뒤 끊김”과 같이 재조회로 해결한다. 클라이언트는 `CANCELLED`·`DEADLINE_EXCEEDED`를 “실행되지 않음”으로 해석하지 않는다.
 
@@ -144,9 +154,14 @@ HTTP 어댑터(`http.rs`)와 `handle`이 전송 쪽에서 하는 일을 gRPC에�
 
 ### 7.1 크기 상한
 
-- HTTP는 본문 1 MiB를 넘으면 400 `SCHEMA_VIOLATION`이다.
-- gRPC는 메시지 상한을 1 MiB + 64 KiB로 둔다(문서 1 MiB와 봉투). 이 상한을 넘는 메시지는 라이브러리가 `RESOURCE_EXHAUSTED`로 거부한다. **HTTP와 다르다**(400이 아님). trailer가 없으므로 클라이언트는 원인을 크기로 알 수 없다. 클라이언트는 보내기 전에 크기를 확인한다.
-- 상한 안의 메시지에서 `report_json`·`checkpoint_json`이 1 MiB를 넘으면 처리 쪽이 HTTP와 같이 `INVALID_ARGUMENT`(`SCHEMA_VIOLATION`)로 답한다.
+HTTP의 크기 규칙은 두 겹이다(main 0779850).
+- **전송 쪽**(`http.rs`): 본문 전체가 1 MiB를 넘으면 인증 전에 400 `SCHEMA_VIOLATION`(field `""`)이다. 체크포인트는 JSON 문자열로 이스케이프된 채 이 본문 안에 들어가므로, 받을 수 있는 체크포인트 파일은 1 MiB보다 작다.
+- **처리 쪽**: `checkpoint_json` 문자열이 1 MiB를 넘으면 400 `MISSING_FIELD`(field `checkpoint_json`)다. `submit_report`에는 처리 쪽 크기 검사가 없다. 전송 쪽 검사만 있다.
+
+gRPC는 같은 입력에 같은 답을 내도록 이렇게 한다.
+- 어댑터는 처리에 넘길 JSON 본문(HTTP 본문과 같은 값, §2)을 만든 뒤 **같은 1 MiB 상한을 인증 전에** 적용한다. 넘으면 `INVALID_ARGUMENT`(trailer: `http_status` 400, `SCHEMA_VIOLATION`, field `""`)다. 그래서 같은 체크포인트 파일이 HTTP에서 400이면 gRPC에서도 400이다. `report_json`은 처리 쪽 검사가 없으므로 이 어댑터 검사가 유일한 상한이다.
+- 그 밖의 크기 검사(`checkpoint_json`의 `MISSING_FIELD`)는 처리가 그대로 한다.
+- 전송 메시지 상한은 1 MiB + 64 KiB다. 이 상한을 넘는 메시지는 HTTP 본문으로도 반드시 1 MiB를 넘는다(이스케이프는 크기를 줄이지 않는다). 라이브러리가 `RESOURCE_EXHAUSTED`로 거부하며 trailer가 없다. 거부라는 점은 HTTP와 같고 상태 표현만 다르다. 클라이언트는 보내기 전에 크기를 확인한다.
 
 ### 7.2 DB 연결
 
@@ -156,7 +171,7 @@ HTTP 어댑터(`http.rs`)와 `handle`이 전송 쪽에서 하는 일을 gRPC에�
 ### 7.3 헬스
 
 - HTTP `/v0/health`는 인증 없이 트랜잭션 밖에서 `schema_meta`를 읽어 답한다(생존 확인, P04 결과 아님).
-- gRPC는 표준 `grpc.health.v1.Health/Check`를 쓴다. 서비스 이름 `""`과 `ieo.internal.v0.SupervisorService`. 같은 읽기가 성공하면 `SERVING`, 실패하면 `NOT_SERVING`. 자격 없이 답한다. 스키마 버전과 정책 digest는 HTTP `/v0/health`에서 읽는다.
+- gRPC는 표준 `grpc.health.v1.Health/Check`를 쓴다. 서비스 이름 `""`과 `ieo.internal.v0.SupervisorService`. 자격 없이 답한다. 후보 구현(`tonic-health`)은 호출마다 읽지 않고 서버가 기록한 상태를 돌려준다. 그래서 서버가 같은 읽기(`schema_meta`)를 주기적으로(초안 5초) 하고, 성공하면 `SERVING`, 실패하면 `NOT_SERVING`으로 기록한다. 상태는 최대 그 주기만큼 늦다. 스키마 버전과 정책 digest는 HTTP `/v0/health`에서 읽는다.
 - 표준 헬스 서비스 구현(후보 `tonic-health`)을 X-04에서 확인한다. 쓸 수 없으면 같은 의미의 RPC를 이 패키지에 더하고 이 문서를 고친다.
 
 ### 7.4 전송 보안
@@ -179,7 +194,7 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 계획 §1이 02-05 범위로 둔 작업은 자기 배정 조회·인수, 세션 상태 보고다. 지금은 HTTP에도 없다. 02-05가 이 작업을 만들 때:
 
 - 업무 규칙과 HTTP 형태를 먼저 정하고, 작업 표에 한 번 넣는다.
-- `SupervisorService`에 RPC를 **추가**한다(새 필드 번호, v0 안). 상태를 바꾸는 작업은 요청에 `idempotency_key`(HTTP `Idempotency-Key`와 같은 규칙, 8~128자)를 두거나 (assignment_id, generation)을 키로 쓴다. 재시도 표(§5)와 `code` 표(§4.2)에 행을 더한다.
+- **X-04가 먼저 병합됐으면** `SupervisorService`에 RPC를 **추가**한다(새 필드 번호, v0 안). 아니면 02-05는 HTTP 형태만 만들고, RPC 추가는 X-04가 맡는다. 상태를 바꾸는 작업은 요청에 `idempotency_key`(HTTP `Idempotency-Key`와 같은 규칙, 8~128자)를 두거나 (assignment_id, generation)을 키로 쓴다. 재시도 표(§5)와 `code` 표(§4.2)에 행을 더한다.
 - X-04가 준비되지 않았으면 02-05는 HTTP로 진행한다. gRPC 전환은 X-04의 몫이다(02-05의 선행·수용 기준은 바뀌지 않음).
 
 ## 9. 분리 영향(계획 §3을 main 3157c89에서 다시 확인)
@@ -207,14 +222,15 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 4. 에이전트 자격의 금지 범위가 같다(development의 재현 요청, 다른 repo·역할, 범위 밖 작업).
 5. 크기 상한(§7.1)과 DB 연결 실패(§7.2)의 대응.
 6. supervisor 클라이언트의 두 구현이 02-04 대기 사본 시험을 같이 통과한다.
-7. `buf lint`와 `buf breaking`(main 대비)을 CI에서 돌린다.
+7. `buf lint`와 `buf breaking`(main 대비)을 CI에서 돌린다. `buf breaking`은 이 proto가 main에 병합된 뒤부터 비교 대상이 생긴다(첫 병합 전에는 main에 proto가 없다).
+8. 크기 상한이 두 전송에서 같은 답을 내는지(§7.1), 경로 매개변수 거부(§3), 문장 시간 제한의 `DEADLINE_EXCEEDED` 변환(§6.1).
 
 ## 11. 남은 결정과 한계
 
 - **토큰을 쥐는 프로세스**(모델 프로세스와 supervisor의 분리)는 02-05에서 정한다(§3).
 - **코디네이터 → supervisor 방향의 gRPC**는 이 계약 범위가 아니다. 필요하면 별도 결정으로 다룬다(§1.3).
 - **TLS·상호 인증**은 정식 설계의 몫이다. kind 시험의 평문은 시험 환경에서만 쓴다(§7.4).
-- **크기 초과 응답**이 HTTP(400 `SCHEMA_VIOLATION`)와 gRPC(`RESOURCE_EXHAUSTED`, trailer 없음)에서 다르다(§7.1).
+- **전송 상한을 넘는 메시지**는 gRPC에서 `RESOURCE_EXHAUSTED`(trailer 없음)다. HTTP는 400이다. 어댑터의 1 MiB 본문 검사 범위 안에서는 같은 답이다(§7.1).
 - **오류 상세**는 `ieo-error-bin`이라는 자체 trailer다. 다른 생태계의 표준 클라이언트는 상태와 메시지만 본다(§4.3).
-- **서버 최대 처리 시간 15초와 클라이언트 재시도 횟수·간격**은 초안 값이다. X-04 측정으로 확정한다(§5·§6).
+- **서버 최대 처리 시간 15초, 읽기 확인의 횟수·간격, 헬스 갱신 주기**는 초안 값이다. X-04 측정으로 확정한다(§5·§6).
 - **라이브러리 지원**(tonic의 deadline 전달, 취소 감지, 헬스, 메시지 상한 설정)은 X-04에서 정확한 버전의 문서·소스와 시험으로 확인한다. 이 문서는 아직 확인하지 않았다.
