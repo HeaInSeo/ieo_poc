@@ -1,6 +1,6 @@
 # PoC 진행과 최근 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0035` · 원장 SHA-256 `bf1ea718d30116840b2c3de8b130f5aa30aa9dca673c6693a034bdd847142501`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0035` · 원장 SHA-256 `3f6aa10dd02fd99d0d0b99e2c26d848eacaeda6093839e57b2ab40247c5a3e59`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 

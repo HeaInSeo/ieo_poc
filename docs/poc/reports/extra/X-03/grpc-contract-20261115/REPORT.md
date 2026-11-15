@@ -7,7 +7,7 @@
 | 산출물 | proto [`contracts/proto/ieo/internal/v0/supervisor.proto`](../../../../../../contracts/proto/ieo/internal/v0/supervisor.proto) · lint·호환 규칙 [`contracts/proto/buf.yaml`](../../../../../../contracts/proto/buf.yaml) · 계약 설명 [`contracts/ieo-internal-v0.md`](../../../../../../contracts/ieo-internal-v0.md) |
 | 검사 | `buf lint`·`buf build`·`protoc` 통과([evidence/proto-checks.txt](evidence/proto-checks.txt)) |
 | 모델 호출 | 0회. 실제 호출·예비 회차·결제 없음 |
-| 상태 | 계약 초안. 구현 없음(X-04). 독립 검토 [b8506fd 변경 요청](reviews/review-pr62-b8506fd.md)(M-1~M-4, L-1~L-4) → 교정 1(§5) |
+| 상태 | 계약 초안. 구현 없음(X-04). 독립 검토 [b8506fd 변경 요청](reviews/review-pr62-b8506fd.md)(M-1~M-4, L-1~L-4) → 교정 1(§5) → 재검토 [0de371c 승인](reviews/review-pr62-0de371c.md)(Low N-1~N-5) → 교정 2(§6) |
 
 ## 1. 수용 기준 대응
 
@@ -38,7 +38,7 @@
 
 계약을 쓰며 main 3157c89의 처리 코드를 다시 읽었다.
 - 같은 `code`가 작업에 따라 HTTP 상태가 다르다(`DIGEST_MISMATCH`: 등록 422, 체크포인트 409). 그래서 gRPC 상태를 `code`만으로 정하지 않고 HTTP 상태와 함께 정했다.
-- 검사 순서가 작업마다 다르다: 보고·재현 요청은 재조회·식별 검사가 형식 검사보다 먼저이고, 체크포인트는 형식 → `REPO_MISMATCH` → 식별 순서다. 크기 규칙은 전송 쪽(본문 1 MiB, 인증 전)과 처리 쪽(`checkpoint_json` 1 MiB, `MISSING_FIELD`) 두 겹이다. 커밋 실패도 500이므로 500은 결과 불명이다(검토 b8506fd M-1~M-3 반영).
+- 검사 순서가 작업마다 다르다: 보고·재현 요청은 재조회·식별 검사가 형식 검사보다 먼저이고, 체크포인트는 본문 형식 → `REPO_MISMATCH` → 나머지 필드 형식 → 식별 → 배정 → 저장 뒤 변조 기록 형식 순서다. 크기 규칙은 전송 쪽(본문 1 MiB, 인증 전)과 처리 쪽(`checkpoint_json` 1 MiB, `MISSING_FIELD`) 두 겹이다. 커밋 실패도 500이므로 500은 결과 불명이다(검토 b8506fd M-1~M-3 반영).
 - 재현 요청에서 대상 SHA가 다르면 `ASSIGNMENT_SHA_MISMATCH`가 아니라 `STALE_ASSIGNMENT`다. 형식 검사(`SCHEMA_VIOLATION`)는 권한·식별 검사를 통과한 새 요청에만 한다.
 - 보고와 재현 요청의 중복 판정은 파싱한 JSON 값을 비교한다. 체크포인트의 digest는 받은 바이트로 계산한다. 두 사실이 “두 전송에서 같은 요청은 같은 요청”의 근거다(설명 §2).
 - 계획 §3 이후 `handle`에 작업별 실행 모양 차이가 생겼다: DB 없는 역할 제어, 트랜잭션 밖의 supervisor 호출 뒤 트랜잭션(`compare`). 작업 표가 이를 표현해야 한다(설명 §9).
@@ -64,3 +64,14 @@
 | L-3 JSON 동일성 빈틈 | 설명 §2: 비 optional 필드는 늘 넣음, 명시적 `null`은 gRPC로 재전송 불가, UTF-8 아닌 문서 거부 |
 | L-4 02-05의 RPC 추가 조건 | 설명 §8.2·이 보고 §4: X-04가 먼저 병합됐을 때만 |
 | I-1~I-4 | 기준 SHA 병기, 헬스는 주기적 기록, 경로 매개변수·알 수 없는 역할 값, `buf breaking`은 첫 병합 뒤 |
+
+## 6. 교정 2(검토 0de371c, 승인·Low)
+
+| 지적 | 처리 |
+| --- | --- |
+| N-1 `ReportCheckpoint` 검사 순서 | 설명 §3에 나머지 필드 형식·저장 뒤 변조 기록 형식까지 |
+| N-2 `report_json` UTF-8 규칙 | 바이트를 바꾸지 않고 처리에 넘김. UTF-8 거부는 `checkpoint_json`만(인증 뒤) |
+| N-3 크기 안전 상한의 주장·거부 구분 | 설명 §7.1: 클라이언트 사전 계산이 규칙(넘으면 HTTP 400과 같이 거부 확정), 전송 상한은 안전 상한. proto 주석 |
+| N-4 경로 매개변수 | 빈 값은 처리에 그대로(HTTP와 같은 답), `/`는 인증 뒤 `NOT_FOUND` |
+| N-5 02-05에 결정을 맡긴 문구 | 설명 §1.4·§5: 02-05의 수용 기준을 바꾸지 않음, 보고 재전송 규칙은 이 계약 범위 밖이며 정해지기 전에는 다시 보내지 않음 |
+| I-6 어댑터 검사 순서 | 설명 §7.0, §7.2는 §5를 따름 |

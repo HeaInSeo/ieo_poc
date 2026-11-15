@@ -37,7 +37,7 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 
 - 기존 HTTP/JSON 계약과 시험은 그대로다. gRPC는 경로를 **추가**한다.
 - 표면의 다섯 작업은 HTTP 형태가 이미 있다. 둘은 같은 작업 표(§6.2)로 같은 처리에 보낸다.
-- 02-05가 새로 만들 작업도 작업 표에 한 번만 정의하고, **HTTP와 gRPC 형태를 함께 둔다**(계획 §1의 기본값을 X-03에서 확정). HTTP 시험 체계로 규칙을 검증할 수 있게 하기 위해서다.
+- 02-05가 새로 만들 작업도 작업 표에 한 번만 정의하고, **HTTP와 gRPC 형태를 함께 둔다**(계획 §1의 기본값을 X-03에서 확정). HTTP 시험 체계로 규칙을 검증할 수 있게 하기 위해서다. HTTP 형태는 02-05가 만든다. gRPC 형태는 X-04가 먼저 병합됐으면 02-05가, 아니면 X-04가 더한다(§8.2). 02-05의 선행·수용 기준은 바뀌지 않는다.
 
 ## 2. 메시지와 버전 호환
 
@@ -50,7 +50,8 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 - **작은 요청은 타입이 있는 필드로 싣는다**(`SubmitReproRequestRequest`). 어댑터는 HTTP 본문과 **같은 JSON 값**을 만든다. 재현 요청의 중복 판정도 파싱한 JSON 값을 비교하므로, 이 규칙이 깨지면 같은 요청이 `EVENT_CONTENT_CONFLICT`가 된다. X-04 공통 회귀가 확인한다.
   - `optional`이 아닌 필드는 기본값(빈 문자열·0·빈 목록)이어도 **늘 JSON에 넣는다**. 설정하지 않은 `optional` 필드는 JSON에서 빠진다.
   - gRPC로는 명시적 `null`을 보낼 수 없다. HTTP로 `"timeout_seconds": null`을 넣어 저장한 요청을 gRPC로 다시 보내면 다른 JSON 값이 되어 `EVENT_CONTENT_CONFLICT`다. 그 요청의 결과 확인은 `GetReproRequest`로 한다(§5).
-  - `checkpoint_json`·`report_json`이 UTF-8이 아니면 어댑터가 처리 전에 `INVALID_ARGUMENT`(`SCHEMA_VIOLATION`, 그 필드)로 거부한다. HTTP의 JSON 문자열은 UTF-8이 아닐 수 없으므로 같은 입력이 HTTP에는 없다.
+  - `report_json`은 HTTP 본문 그 자체이므로 바이트를 **바꾸지 않고** 처리에 넘긴다. UTF-8이 아니어도 HTTP와 같이 처리가 판단한다(401 → 403 → 400 `SCHEMA_VIOLATION`, field `""`).
+  - `checkpoint_json`은 HTTP에서 JSON 문자열 안에 들어가므로 UTF-8이 아닌 바이트를 HTTP로는 보낼 수 없다. 어댑터는 인증 뒤(§7.0의 순서) `INVALID_ARGUMENT`(trailer: `http_status` 400, `SCHEMA_VIOLATION`, field `checkpoint_json`)로 거부한다. HTTP에 대응하는 입력이 없는 gRPC만의 거부다.
 - **알 수 없는 필드.** proto3는 모르는 필드를 무시한다. HTTP는 정의되지 않은 키를 거부한다(`additionalProperties: false`, `SCHEMA_VIOLATION`). 그래서 v0의 새 필드는 무시돼도 안전한 것만 더한다(위 “추가만”). JSON 문서 안의 키는 바이트째 전달되므로 HTTP와 똑같이 거부된다.
 - **응답의 결과 구분.** HTTP는 새 저장(201·202)과 재조회(200)를 상태 코드로 나눈다. gRPC는 `Outcome`(`OUTCOME_STORED`·`OUTCOME_REPLAYED`)으로 나눈다.
 
@@ -64,10 +65,10 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 - **검사 순서**: 작업마다 처리 코드가 정하고, gRPC는 같은 처리를 부르므로 순서가 같다. OpenAPI 머리말의 일반 순서(401 → 403/409 → 400 → 409 → 422)와 다른 작업이 있다(main 0779850):
   - `SubmitAgentReport`: 401 → 범위·역할(403) → 본문 파싱(400) → 저장된 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`)·배정 확인(409) → 형식(400)·의미(422). 재조회와 식별 검사가 형식 검사보다 먼저다.
   - `SubmitReproRequest`: 401 → 범위·역할(403) → 본문 파싱(400) → 재조회(200)·내용 충돌·현재 배정(409) → 새 요청만 형식(400 `MISSING_FIELD`·`SCHEMA_VIOLATION`).
-  - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 형식(400) → repo·역할 불일치(409 `REPO_MISMATCH`) → 순번·내용 식별(200·409) → 배정 대조(409).
+  - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(`seq`·`checkpoint_json`, JSON 파싱, 400) → 체크포인트의 repo·역할 불일치(409 `REPO_MISMATCH`) → 나머지 체크포인트 필드 형식(400) → 잠금 → 순번·내용 식별(200·409 `EVENT_CONTENT_CONFLICT`·`CHECKPOINT_SEQUENCE_GAP`) → 배정 대조(409) → 저장 → `config_tamper_detected` 형식(400, 롤백). 그래서 repo가 다르고 `phase`가 빠진 체크포인트는 400이 아니라 409다.
   - `GetReproRequest`·`GetLatestCheckpoint`: 401 → (`GetLatestCheckpoint`만 역할 이름 404) → 권한(403) → 없음(404).
   - **HTTP 전송 쪽**의 본문 크기 검사(400)는 인증보다 먼저다. gRPC 어댑터도 같은 크기 검사를 인증 전에 한다(§7.1).
-- **역할 값과 경로 매개변수**: `ROLE_UNSPECIFIED`와 정의되지 않은 숫자 값은 알 수 없는 역할이다. HTTP의 알 수 없는 역할과 같이 `NOT_FOUND`(`NOT_FOUND`)다. HTTP에서 경로 조각이 되는 값(`repo_id`, `request_id`)이 비었거나 `/`를 담으면 HTTP는 다른 경로로 읽혀 404가 된다. 어댑터는 이런 값을 처리에 넘기지 않고 `NOT_FOUND`(`code` `NOT_FOUND`, `http_status` 404)로 답한다.
+- **역할 값과 경로 매개변수**: `ROLE_UNSPECIFIED`와 정의되지 않은 숫자 값은 알 수 없는 역할이다. HTTP의 알 수 없는 역할과 같이 처리가 `NOT_FOUND`(`NOT_FOUND`)로 답한다(인증 뒤). 경로 조각이 되는 값(`repo_id`, `request_id`)이 빈 문자열이면 어댑터는 그대로 처리에 넘긴다. HTTP도 빈 조각을 같은 작업으로 읽으므로 같은 답(예: 403 `SCOPE_DENIED`·`REPO_SCOPE_DENIED`)이 나온다. 값이 `/`를 담으면 HTTP는 다른 경로로 읽는다(대개 인증 뒤 404 “no such endpoint”). 어댑터는 인증 뒤 처리에 넘기지 않고 `NOT_FOUND`(trailer: `http_status` 404, `code` `NOT_FOUND`)로 답한다. `/`를 담은 값이 HTTP에서 우연히 다른 작업에 맞는 경우는 따라 하지 않는다. 정상 식별자는 `/`를 담지 않는다.
 
 ## 4. 상태 코드 대응과 상세 사유
 
@@ -120,7 +121,7 @@ gRPC 상태는 **같은 요청이 HTTP에서 받을 상태 코드와 `code`**로
 
 | RPC | 멱등 키 | 결과를 알 수 없을 때 | 하지 않는 것 |
 | --- | --- | --- | --- |
-| `SubmitAgentReport` | (event_id, event_revision), 자격의 (repo, role) 안 | 결과 불명을 호출자에게 돌려준다. 다시 보낼지는 호출자의 규칙이 정한다(지금은 없음, 02-05가 정한다). 다시 보낼 때는 **같은 바이트**만: 저장돼 있으면 `OUTCOME_REPLAYED`와 저장된 영수증이고 상태 변화가 없다 | 내용을 바꿔 같은 키로 보내기(→ `ALREADY_EXISTS`). 새 내용은 새 revision |
+| `SubmitAgentReport` | (event_id, event_revision), 자격의 (repo, role) 안 | 결과 불명을 호출자에게 돌려준다. 다시 보내는 호출자 규칙은 지금 없다. 정해지기 전에는 다시 보내지 않는다(그 규칙을 정하는 것은 이 계약의 범위가 아니며, 어느 작업의 수용 기준도 바꾸지 않는다). 다시 보낼 때는 **같은 바이트**만: 저장돼 있으면 `OUTCOME_REPLAYED`와 저장된 영수증이고 상태 변화가 없다 | 내용을 바꿔 같은 키로 보내기(→ `ALREADY_EXISTS`). 새 내용은 새 revision |
 | `SubmitReproRequest` | request_id | `GetReproRequest`로 확인한다(자동 확인 가능). 없으면 결과 불명을 호출자에게 돌려준다. 다시 보낼 때는 같은 요청만: 저장된 요청은 다시 큐에 넣지 않는다 | 새 request_id로 다시 보내기(새 실행이 된다) |
 | `GetReproRequest` | — | 다시 부른다 | — |
 | `ReportCheckpoint` | (repo, role, seq) + 바이트 | **`GetLatestCheckpoint`로 확인**(자동 확인 가능). 최신 seq·SHA가 보낸 것과 같으면 반영됨. 아니면 결과 불명을 호출자에게 돌려준다. 다시 보낼지는 02-04 규칙(대기 사본 유지, 다음 기동의 채택 판단)이 정한다. 그 밖의 불일치는 외부 대조(`EXTERNAL_RECONCILIATION_REQUIRED`) | 같은 seq에 다른 바이트(→ `ALREADY_EXISTS`). 확인 없이 다음 seq로 넘어가기 |
@@ -152,6 +153,10 @@ gRPC 상태는 **같은 요청이 HTTP에서 받을 상태 코드와 `code`**로
 
 HTTP 어댑터(`http.rs`)와 `handle`이 전송 쪽에서 하는 일을 gRPC에서 이렇게 한다.
 
+### 7.0 어댑터 자체 검사의 순서
+
+HTTP 전송 쪽과 같은 순서로 한다: DB 연결 확인(실패면 `UNAVAILABLE`, §7.2) → 본문 크기(400, §7.1) → 인증(401) → 어댑터의 경로 값 거부(404, §3)·`checkpoint_json` UTF-8 거부(400, §2) → 처리.
+
 ### 7.1 크기 상한
 
 HTTP의 크기 규칙은 두 겹이다(main 0779850).
@@ -161,12 +166,13 @@ HTTP의 크기 규칙은 두 겹이다(main 0779850).
 gRPC는 같은 입력에 같은 답을 내도록 이렇게 한다.
 - 어댑터는 처리에 넘길 JSON 본문(HTTP 본문과 같은 값, §2)을 만든 뒤 **같은 1 MiB 상한을 인증 전에** 적용한다. 넘으면 `INVALID_ARGUMENT`(trailer: `http_status` 400, `SCHEMA_VIOLATION`, field `""`)다. 그래서 같은 체크포인트 파일이 HTTP에서 400이면 gRPC에서도 400이다. `report_json`은 처리 쪽 검사가 없으므로 이 어댑터 검사가 유일한 상한이다.
 - 그 밖의 크기 검사(`checkpoint_json`의 `MISSING_FIELD`)는 처리가 그대로 한다.
-- 전송 메시지 상한은 1 MiB + 64 KiB다. 이 상한을 넘는 메시지는 HTTP 본문으로도 반드시 1 MiB를 넘는다(이스케이프는 크기를 줄이지 않는다). 라이브러리가 `RESOURCE_EXHAUSTED`로 거부하며 trailer가 없다. 거부라는 점은 HTTP와 같고 상태 표현만 다르다. 클라이언트는 보내기 전에 크기를 확인한다.
+- **클라이언트는 보내기 전에 같은 크기를 계산한다**: 같은 요청을 HTTP로 보낼 때의 JSON 본문이 1 MiB를 넘으면 보내지 않고, HTTP 400과 같이 **거부 확정**으로 기록한다(02-04 규칙에서 4xx와 같은 처리). 그래서 두 클라이언트가 같은 체크포인트를 같은 상태로 다룬다.
+- 전송 메시지 상한(1 MiB + 64 KiB)은 안전 상한이다. 위 사전 계산을 지킨 클라이언트는 이 상한에 닿지 않는다. 경로 조각이 되는 값(`repo_id`, `request_id`)은 HTTP 본문 크기에 들지 않으므로, 이 상한을 넘는 메시지가 HTTP로는 400이 아닐 수도 있다. 상한을 넘으면 라이브러리가 `RESOURCE_EXHAUSTED`로 거부하며 trailer가 없다. 클라이언트는 이를 결과 불명이 아니라 사전 계산을 어긴 클라이언트 결함으로 기록한다(서버는 처리를 시작하지 않았다).
 
 ### 7.2 DB 연결
 
 - HTTP 작업자는 스레드마다 DB 연결 하나를 쥐고, 끊기면 다시 연다. 다시 열지 못하면 500(`INTERNAL`, “database unavailable”)이다.
-- gRPC는 같은 방식의 연결을 쥔 작업자를 쓴다. 다시 열지 못하면 **`UNAVAILABLE`**(trailer: `http_status` 500, `code` `INTERNAL`)이다. 처리를 시작하지 않았으므로 클라이언트가 다시 보내도 된다. 이 경우만 HTTP 500과 gRPC 상태 대응이 다르다(§4.1).
+- gRPC는 같은 방식의 연결을 쥔 작업자를 쓴다. 다시 열지 못하면 **`UNAVAILABLE`**(trailer: `http_status` 500, `code` `INTERNAL`)이다. 처리를 시작하지 않았다. 다시 보낼지는 §5를 따른다(상태를 바꾸는 RPC의 자동 재전송 없음). 이 경우만 HTTP 500과 gRPC 상태 대응이 다르다(§4.1).
 
 ### 7.3 헬스
 
@@ -223,7 +229,7 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 5. 크기 상한(§7.1)과 DB 연결 실패(§7.2)의 대응.
 6. supervisor 클라이언트의 두 구현이 02-04 대기 사본 시험을 같이 통과한다.
 7. `buf lint`와 `buf breaking`(main 대비)을 CI에서 돌린다. `buf breaking`은 이 proto가 main에 병합된 뒤부터 비교 대상이 생긴다(첫 병합 전에는 main에 proto가 없다).
-8. 크기 상한이 두 전송에서 같은 답을 내는지(§7.1), 경로 매개변수 거부(§3), 문장 시간 제한의 `DEADLINE_EXCEEDED` 변환(§6.1).
+8. 크기 상한이 두 전송에서 같은 답을 내는지(§7.1, 클라이언트 사전 계산 포함), 어댑터 자체 검사의 순서(§7.0), 경로 값·빈 값의 답(§3), `ReportCheckpoint`의 검사 순서(§3), 문장 시간 제한의 `DEADLINE_EXCEEDED` 변환(§6.1).
 
 ## 11. 남은 결정과 한계
 

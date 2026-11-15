@@ -149,7 +149,8 @@ message ReportCheckpointRequest {
   Role role = 2;
   // At least 1.
   uint64 seq = 3;
-  // The exact checkpoint file bytes (UTF-8 JSON, at most 1 MiB). The coordinator computes the
+  // The exact checkpoint file bytes (UTF-8 JSON). The HTTP-equivalent JSON body must stay within
+  // 1 MiB (description, section 7.1). The coordinator computes the
   // SHA-256 over these bytes, so the same file sent over HTTP or gRPC has the same digest.
   bytes checkpoint_json = 4;
 }
@@ -192,7 +193,7 @@ message GetLatestCheckpointResponse {
 }
 
 // Carried in the binary trailer `ieo-error-bin` of a non-OK answer from the coordinator's handling
-// and of the adapter's size, path and UTF-8 refusals (description, section 4.3). Deadline,
+// and of the adapter's size, path and checkpoint UTF-8 refusals (description, section 4.3). Deadline,
 // cancellation and transport failures carry no trailer. Without a trailer, and for any 500, the
 // outcome on the server is unknown (description, section 5).
 message Error {
