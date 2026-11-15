@@ -11,6 +11,12 @@
 //!  [--child-transcript <agentId>=<path>]...`: re-evaluate a recorded run from its kept stream
 //! and child transcripts (no model call) and append a correction if it is now measured and
 //! consistent (exit 0); otherwise nothing is written (exit 1).
+//!
+//! `ieo-role-call check --plan <plan.json>`: the guards of a call without a call, read only
+//! (`caller::check`): no call in flight, the ledger reads with every correction measured
+//! again, no record asks for a person, and every role's service is idle with its last attempt
+//! and checkpoint attempt known. Exit 0: clear; 2: refused (the reason is printed); 1: an
+//! error. `call.sh` runs it under `caller.lock` before a container restart.
 
 use ieo_supervisor::caller::{self, Call, Called, Plan};
 use serde_json::{Value, json};
@@ -41,6 +47,18 @@ fn run() -> Result<i32, String> {
     };
     let plan_v: Value = serde_json::from_str(&read("--plan")?).map_err(|e| e.to_string())?;
     let plan = Plan::from_json(&plan_v)?;
+    if args.first().map(String::as_str) == Some("check") {
+        return Ok(match caller::check(&plan, &caller::Http)? {
+            None => {
+                println!("{}", json!({"clear": true}));
+                0
+            }
+            Some(why) => {
+                println!("{}", json!({"clear": false, "reason": why}));
+                2
+            }
+        });
+    }
     if args.first().map(String::as_str) == Some("reevaluate") {
         let mut transcripts = std::collections::BTreeMap::new();
         for (i, a) in args.iter().enumerate() {

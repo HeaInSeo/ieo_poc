@@ -1275,22 +1275,28 @@ fn a_missing_archive_copy_is_written_and_a_rollback_is_not_hidden() {
 
 /// A fake central record: stores reported checkpoints in order and answers `latest`. With
 /// `lose` set, the next report is stored but answered with a server error (an answer the
-/// supervisor cannot trust). X-04: the same record is served over HTTP or gRPC
+/// supervisor cannot trust). Like the coordinator, it records a tamper event once per new
+/// session id and says so in `tamper_recorded`. X-04: the same record is served over HTTP or gRPC
 /// (`ieo.internal.v0`, the status and `ieo-error-bin` trailer of the coordinator's adapter); every
 /// test that uses it runs once per transport.
 struct FakeCentral {
     url: String,
     transport: &'static str,
     store: Store,
+    events: Events,
     lose: Arc<std::sync::atomic::AtomicBool>,
     reject: Arc<std::sync::atomic::AtomicBool>,
 }
+
+/// New session ids of the tamper events the fake recorded.
+type Events = Arc<std::sync::Mutex<std::collections::BTreeSet<String>>>;
 
 type Store = Arc<std::sync::Mutex<Vec<(u64, String, Value)>>>;
 
 #[derive(Clone)]
 struct Fake {
     store: Store,
+    events: Events,
     lose: Arc<std::sync::atomic::AtomicBool>,
     reject: Arc<std::sync::atomic::AtomicBool>,
 }
@@ -1321,13 +1327,22 @@ impl Fake {
             )
         } else if seq == last + 1 {
             let cp: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+            // ON CONFLICT (repo, role, new_session_id) DO NOTHING
+            let t = &cp["config_tamper_detected"];
+            let tamper_recorded = !t.is_null()
+                && self
+                    .events
+                    .lock()
+                    .expect("events")
+                    .insert(t["new_session_id"].as_str().unwrap_or_default().to_string());
             s.push((seq, sha.clone(), cp));
             if self.lose.swap(false, Ordering::SeqCst) {
                 (502, json!({"code": "BAD_GATEWAY"}))
             } else {
                 (
                     201,
-                    json!({"stored": true, "seq": seq, "checkpoint_sha256": sha}),
+                    json!({"stored": true, "seq": seq, "checkpoint_sha256": sha,
+                           "tamper_recorded": tamper_recorded, "current_assignment": true}),
                 )
             }
         } else {
@@ -1395,6 +1410,7 @@ fn fake_central(transport: &'static str) -> FakeCentral {
     use std::sync::atomic::AtomicBool;
     let fake = Fake {
         store: Arc::new(std::sync::Mutex::new(Vec::new())),
+        events: Arc::new(std::sync::Mutex::new(Default::default())),
         lose: Arc::new(AtomicBool::new(false)),
         reject: Arc::new(AtomicBool::new(false)),
     };
@@ -1441,6 +1457,7 @@ fn fake_central(transport: &'static str) -> FakeCentral {
     FakeCentral {
         url,
         transport,
+        events: fake.events,
         store: fake.store,
         lose: fake.lose,
         reject: fake.reject,
@@ -1469,6 +1486,7 @@ over_both_transports!(
     a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once,
     a_takeover_accepted_but_not_written_locally_is_adopted_next_time,
     a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending,
+    a_tamper_the_coordinator_did_not_record_stays_pending,
 );
 
 fn svc_central(t: &Tmp, c: &FakeCentral) -> Arc<Service> {
@@ -1733,9 +1751,33 @@ fn a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending(transpo
         "a 4xx drops the staged copy"
     );
     assert!(state.join("pending-tamper.json").exists());
-    // a staged copy not newer than the local checkpoint is dropped, never adopted
+    // a staged copy not newer than the local checkpoint is dropped, never adopted (review
+    // 802e4a1 I-2). Its bytes differ from the coordinator's latest record at the same seq, so
+    // only that rule removes it (review ae65f0c Q-1): without it the copy would be kept
     let local = std::fs::read(state.join("checkpoint.json")).expect("cp");
-    std::fs::write(state.join("checkpoint-staged.json"), &local).expect("staged");
+    let mut other: Value = serde_json::from_slice(&local).expect("j");
+    other["phase"] = json!("takeover");
+    other["session_id"] = json!("s-other");
+    let other = serde_json::to_vec_pretty(&other).expect("j");
+    assert_ne!(other, local);
+    std::fs::write(state.join("checkpoint-staged.json"), &other).expect("staged");
+    // a request refused after the comparison: the copy is gone, checkpoint.json unchanged
+    let (st, _) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("k3", "hi", json!({})),
+    );
+    assert_eq!(st, 400);
+    assert!(
+        !state.join("checkpoint-staged.json").exists(),
+        "a staged copy not newer than local is dropped"
+    );
+    assert_eq!(
+        std::fs::read(state.join("checkpoint.json")).expect("cp"),
+        local,
+        "and never adopted"
+    );
     let (st, b) = call(
         &svc,
         "POST",
@@ -1758,4 +1800,160 @@ fn a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending(transpo
         .map(|x| x.2["config_tamper_detected"]["new_session_id"].to_string())
         .collect();
     assert_eq!(sessions.len(), 1, "one detection, one report: {sessions:?}");
+}
+
+/// Review 704330f P-2: a takeover whose tamper event the coordinator dropped
+/// (`tamper_recorded: false`, a new session id used by an earlier event) keeps the detection
+/// pending; the next new session reports it.
+fn a_tamper_the_coordinator_did_not_record_stays_pending(transport: &'static str) {
+    let (t, _) = setup("tamper-unrecorded");
+    let c = fake_central(transport);
+    let svc = svc_central(&t, &c);
+    let state = t.0.join("state");
+    let run = |attempt: &str, op: &str, extra: Value| {
+        let (st, b) = call(
+            &svc,
+            "POST",
+            &format!("/v0/role/{op}"),
+            &req(attempt, "hi", extra),
+        );
+        assert_eq!(st, 202, "{attempt}: {b}");
+        wait(&svc, attempt);
+        b
+    };
+    run("u1", "start", json!({"session_id": "s1"}));
+    // a tamper reported with s2: recorded, the pending file goes
+    std::fs::write(state.join("claude/CLAUDE.md"), "injected").expect("tamper");
+    let b = run("u2", "reconnect", json!({"new_session_id": "s2"}));
+    assert_eq!(b["accepted"]["tamper"]["new_session_id"], "s2", "{b}");
+    assert!(!state.join("pending-tamper.json").exists());
+    run("u3", "start", json!({"session_id": "s3"}));
+    // a second tamper, reported with s2 again: the coordinator drops the event
+    std::fs::write(state.join("claude/CLAUDE.md"), "injected again").expect("tamper");
+    let b = run("u4", "reconnect", json!({"new_session_id": "s2"}));
+    assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s3", "{b}");
+    assert_eq!(
+        c.events.lock().expect("e").len(),
+        1,
+        "the event was dropped"
+    );
+    let pending: Value = serde_json::from_slice(
+        &std::fs::read(state.join("pending-tamper.json")).expect("still pending"),
+    )
+    .expect("j");
+    assert_eq!(pending["old_session_id"], "s3", "{pending}");
+    // never resumed over: the next reconnect is a new session that reports it
+    let b = run("u5", "reconnect", json!({"new_session_id": "s5"}));
+    assert_eq!(b["accepted"]["mode"], "new", "{b}");
+    assert_eq!(b["accepted"]["tamper"]["old_session_id"], "s3", "{b}");
+    assert!(!state.join("pending-tamper.json").exists());
+    assert!(c.events.lock().expect("e").contains("s5"));
+}
+
+/// Review ae65f0c Q-2 and acceptance §4: an earlier pending detection is kept over a fresh one
+/// (the `(Some(p), false, _)` arm and the "not yet pending" condition), and a pending file that
+/// does not read is replaced by the fresh detection instead of blocking it.
+#[test]
+fn an_older_pending_detection_is_kept_and_an_unreadable_one_is_replaced() {
+    let _serial = serial();
+    let (t, svc) = setup("tamper-older");
+    let state = t.0.join("state");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("o1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "o1");
+    std::fs::write(state.join("claude/CLAUDE.md"), "first").expect("tamper");
+    let (st, _) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("o2", "hi", json!({})),
+    );
+    assert_eq!(st, 400);
+    let first = std::fs::read(state.join("pending-tamper.json")).expect("saved");
+    let first_v: Value = serde_json::from_slice(&first).expect("j");
+    // a different tamper, refused again: the earlier detection stays as it was
+    std::fs::write(state.join("claude/CLAUDE.md"), "second, different").expect("tamper");
+    let (st, _) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("o2", "hi", json!({})),
+    );
+    assert_eq!(st, 400);
+    assert_eq!(
+        std::fs::read(state.join("pending-tamper.json")).expect("kept"),
+        first
+    );
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("o2", "hi", json!({"new_session_id": "s3"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    let tamper = &b["accepted"]["tamper"];
+    assert_eq!(
+        (
+            tamper["old_session_id"].as_str(),
+            tamper["new_session_id"].as_str(),
+            &tamper["observed_digest"]
+        ),
+        (Some("s1"), Some("s3"), &first_v["observed_digest"]),
+        "the earlier detection is the one reported: {b}"
+    );
+    wait(&svc, "o2");
+    assert!(!state.join("pending-tamper.json").exists());
+
+    // an unreadable pending file does not block a fresh detection
+    let (t, svc) = setup("tamper-unreadable");
+    let state = t.0.join("state");
+    call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("r1", "hi", json!({"session_id": "s1"})),
+    );
+    wait(&svc, "r1");
+    std::fs::write(state.join("pending-tamper.json"), "{not json").expect("corrupt");
+    std::fs::write(state.join("claude/CLAUDE.md"), "injected").expect("tamper");
+    let (st, _) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("r2", "hi", json!({})),
+    );
+    assert_eq!(st, 400);
+    let saved: Value =
+        serde_json::from_slice(&std::fs::read(state.join("pending-tamper.json")).expect("p"))
+            .expect("the fresh detection replaced the unreadable file");
+    assert_eq!(
+        (
+            saved["config_tamper_detected"].as_bool(),
+            saved["old_session_id"].as_str()
+        ),
+        (Some(true), Some("s1")),
+        "{saved}"
+    );
+    // the config clean again: still reported, not resumed over
+    std::fs::remove_file(state.join("claude/CLAUDE.md")).expect("rm");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("r2", "hi", json!({"new_session_id": "s3"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(
+        (
+            b["accepted"]["mode"].as_str(),
+            b["accepted"]["tamper"]["old_session_id"].as_str()
+        ),
+        (Some("new"), Some("s1")),
+        "{b}"
+    );
+    wait(&svc, "r2");
 }

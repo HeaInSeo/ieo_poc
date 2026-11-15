@@ -393,9 +393,13 @@ pub fn execute(spec: &RunSpec) -> Result<EvidenceRecord, RunError> {
         let transcripts = spec
             .child_transcripts
             .iter()
-            .filter_map(|(a, p)| std::fs::read(p).ok().map(|b| (a.clone(), b)))
+            .map(|(a, p)| {
+                let read = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()));
+                (a.clone(), read)
+            })
             .collect();
-        let parsed = stream::parse_with_children(&out.bytes, spec.session_mode, base, &transcripts);
+        let parsed =
+            stream::parse_with_child_reads(&out.bytes, spec.session_mode, base, &transcripts);
         (Some(parsed.result), parsed.usage)
     } else {
         (None, Usage::not_applicable())

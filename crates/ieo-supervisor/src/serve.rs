@@ -741,9 +741,14 @@ impl Service {
                     };
                     // a fresh detection is kept on the volume before any refusal below, so a
                     // refused request never loses it (review 704330f P-1); an earlier unreported
-                    // detection is kept as it is
+                    // detection is kept as it is, but a pending file that does not read as one
+                    // is replaced by the fresh detection (review ae65f0c Q-2)
+                    let pending_readable = std::fs::read(self.cfg.pending_tamper_path())
+                        .ok()
+                        .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+                        .is_some_and(|v| v.is_object());
                     if let Some(d) = &detected
-                        && !self.cfg.pending_tamper_path().exists()
+                        && !pending_readable
                         && let Err(e) = crate::central::durable_write(
                             &self.cfg.pending_tamper_path(),
                             &serde_json::to_vec_pretty(d).unwrap_or_default(),
@@ -1144,19 +1149,25 @@ impl Service {
                 .map_err(|e| format!("staged checkpoint: {e}"))?;
             let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
             self.record_report(seq, phase, &answer, &bytes);
-            if let Err(r) = answer {
-                // only a refusal the coordinator answered (4xx) drops the staged copy; a server
-                // error or no answer keeps it for the next start to check (review 802e4a1 I-1)
-                let answered = r.body["coordinator_status"]
-                    .as_u64()
-                    .is_some_and(|c| (400..500).contains(&c));
-                if answered {
-                    let _ = std::fs::remove_file(cfg.staged_path());
+            let a = match answer {
+                Ok(a) => a,
+                Err(r) => {
+                    // only a refusal the coordinator answered (4xx) drops the staged copy; a server
+                    // error or no answer keeps it for the next start to check (review 802e4a1 I-1)
+                    let answered = r.body["coordinator_status"]
+                        .as_u64()
+                        .is_some_and(|c| (400..500).contains(&c));
+                    if answered {
+                        let _ = std::fs::remove_file(cfg.staged_path());
+                    }
+                    return Ok(Some(r.body));
                 }
-                return Ok(Some(r.body));
-            }
-            // the tamper is recorded with this takeover (review 802e4a1 N-1)
-            if job.tamper.is_some() {
+            };
+            // the tamper is recorded with this takeover (review 802e4a1 N-1) — only when the
+            // coordinator says it recorded it (or holds this exact takeover already): an event
+            // it dropped (`tamper_recorded: false`) stays pending for the next new session
+            // (review 704330f P-2)
+            if job.tamper.is_some() && (a["tamper_recorded"] == true || a["duplicate"] == true) {
                 let _ = std::fs::remove_file(cfg.pending_tamper_path());
             }
             if let Err(e) = write_local() {
@@ -1174,8 +1185,9 @@ impl Service {
                 self.record_report(seq, phase, &answer, &bytes);
             }
         }
-        // a tamper detection is reported once its takeover is recorded (review accd6c8 M-2)
-        if phase == "takeover" && job.tamper.is_some() {
+        // a tamper detection is reported once its takeover is recorded (review accd6c8 M-2);
+        // with a coordinator, only as its answer says (above)
+        if phase == "takeover" && job.tamper.is_some() && !central {
             let _ = std::fs::remove_file(cfg.pending_tamper_path());
         }
         Ok(None)
