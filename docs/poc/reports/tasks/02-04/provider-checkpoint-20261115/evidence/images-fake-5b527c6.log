@@ -1,7 +1,7 @@
-# 02-04 items 4 and 9 in containers, no model call · 2026-11-15T04:20:33Z · tag 5f38ab9
-coordinator: id=162bda6ad3c58980b16ce9c9b9eae32ea8c0e338a7c4c5d833fe0b5d4bfac1e0 user=20000:20000 revision=5f38ab9ed6b834a3c5c94ba3c57331fac3cb7f28 binary=ec2093187af2913db7f50a80de5316ae22d9d88fd9ec1e4e704329b02a26cc8d
-role-development: id=839b1ec410cb6804e080085db1fcaa6d08c53e63f56ab60f30c24cbdd2dfe53c user=20001:20001 revision=5f38ab9ed6b834a3c5c94ba3c57331fac3cb7f28 binary=7a9bde429b2af2d057bc7e197865b77c22a1f41a8e0cb9b70cd89e7cf58e30e5
-role-guardrail: id=9bac0957273da0e354b31266553f8bcf3a0827ff6a9484b377580e82d361fe0b user=20002:20002 revision=5f38ab9ed6b834a3c5c94ba3c57331fac3cb7f28 binary=7a9bde429b2af2d057bc7e197865b77c22a1f41a8e0cb9b70cd89e7cf58e30e5
+# 02-04 items 4 and 9 in containers, no model call · 2026-11-15T04:37:59Z · tag 5b527c6
+coordinator: id=cbc2f50e3b28f0ff520f2d7abf535029e08599e6e6ea94865b01decac79b1030 user=20000:20000 revision=5b527c66fd8adeebe4c211ddccf4211f00972f43 binary=c47d6fe58eaf2292ef3d05b7f3528bba125b5c70dda29666873b4a2f22057b46
+role-development: id=b9e98473568825b94e778162294d737996f926d5819b285c299b9e09af546ecc user=20001:20001 revision=5b527c66fd8adeebe4c211ddccf4211f00972f43 binary=14b7739e3c350835cf3e1ba16bbf9b01e0f4a45456d33322f4bab825aa075106
+role-guardrail: id=1b946768c550e70114944ff78acc2c9c32ea7e1d61199f4853c8590dbaba45d6 user=20002:20002 revision=5b527c66fd8adeebe4c211ddccf4211f00972f43 binary=14b7739e3c350835cf3e1ba16bbf9b01e0f4a45456d33322f4bab825aa075106
 ## coordinator container (UID 20000, PID 1, its own test DB)
 pid1: /usr/local/bin/ieo-coord serve --listen  uid: 20000
 register 201 · semantic review 201 · assign development 201 guardrail 201
@@ -29,7 +29,7 @@ judgment: external_reconciliation_required ['checkpoint 4: local digest differs 
 development reconnect: 409 EXTERNAL_RECONCILIATION_REQUIRED
 ## SIGTERM to PID 1
 coordinator: podman stop 0.3 s, exit 0
-development: podman stop 0.4 s, exit 0
+development: podman stop 0.2 s, exit 0
 guardrail: podman stop 0.5 s, exit 0
 rows in the coordinator DB: checkpoints 6 · tamper events 0
 # done
