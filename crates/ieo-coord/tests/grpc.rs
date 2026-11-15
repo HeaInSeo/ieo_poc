@@ -14,7 +14,8 @@ use ieo_coord::api::{self, Abort, Operation, Req, TxGuard};
 use ieo_coord::grpc::{Connect, GrpcConfig, GrpcServer};
 use ieo_proto::v0::supervisor_service_client::SupervisorServiceClient;
 use ieo_proto::v0::{
-    GetLatestCheckpointRequest, GetReproRequestRequest, Outcome, ReportCheckpointRequest,
+    GetLatestCheckpointRequest, GetOwnAssignmentRequest, GetReproRequestRequest, Outcome,
+    RecordFirstActionRequest, ReportCheckpointRequest, ReportSessionStatusRequest,
     SubmitAgentReportRequest, SubmitReproRequestRequest,
 };
 use postgres::NoTls;
@@ -102,6 +103,18 @@ enum Call {
     Latest {
         repo: String,
         role: &'static str,
+    },
+    /// 02-05 step 2
+    Own {
+        repo: String,
+        role: &'static str,
+    },
+    FirstAction(RecordFirstActionRequest),
+    Status {
+        repo: String,
+        role: &'static str,
+        key: String,
+        raw: Vec<u8>,
     },
 }
 
@@ -210,6 +223,48 @@ impl G {
                     .into_inner();
                 (200, ieo_proto::latest_to_json(&a))
             }
+            Call::Own { repo, role } => {
+                let m = GetOwnAssignmentRequest {
+                    repo_id: repo.clone(),
+                    role: ieo_proto::role_of(role) as i32,
+                };
+                let a = cl
+                    .get_own_assignment(request(e, who, m, timeout))
+                    .await?
+                    .into_inner();
+                (200, ieo_proto::own_assignment_to_json(&a))
+            }
+            Call::FirstAction(m) => {
+                let a = cl
+                    .record_first_action(request(e, who, m.clone(), timeout))
+                    .await?
+                    .into_inner();
+                (
+                    if replayed(a.outcome) { 200 } else { 201 },
+                    ieo_proto::first_action_receipt_to_json(&a.receipt.unwrap_or_default()),
+                )
+            }
+            Call::Status {
+                repo,
+                role,
+                key,
+                raw,
+            } => {
+                let m = ReportSessionStatusRequest {
+                    repo_id: repo.clone(),
+                    role: ieo_proto::role_of(role) as i32,
+                    idempotency_key: key.clone(),
+                    status_json: raw.clone(),
+                };
+                let a = cl
+                    .report_session_status(request(e, who, m, timeout))
+                    .await?
+                    .into_inner();
+                (
+                    if replayed(a.outcome) { 200 } else { 201 },
+                    ieo_proto::session_status_receipt_to_json(&a.receipt.unwrap_or_default()),
+                )
+            }
         })
     }
 
@@ -255,6 +310,7 @@ fn answer(r: Result<(u16, Value), Status>) -> (u16, Value) {
 /// The same call over HTTP, with the bytes the adapter would build.
 fn over_http(e: &Env, who: Option<&str>, c: &Call) -> (u16, Value) {
     let role_path = |r: &str| ieo_proto::role_name(ieo_proto::role_of(r) as i32);
+    let mut key = None;
     let (m, p, b) = match c {
         Call::Report(raw) => ("POST", "/v0/agent/reports".to_string(), raw.clone()),
         Call::Repro(r) => (
@@ -281,8 +337,36 @@ fn over_http(e: &Env, who: Option<&str>, c: &Call) -> (u16, Value) {
             ),
             vec![],
         ),
+        Call::Own { repo, role } => (
+            "GET",
+            format!("/v0/repos/{repo}/roles/{}/assignment", role_path(role)),
+            vec![],
+        ),
+        Call::FirstAction(r) => (
+            "POST",
+            format!(
+                "/v0/repos/{}/roles/{}/first-actions",
+                r.repo_id,
+                ieo_proto::role_name(r.role)
+            ),
+            serde_json::to_vec(&ieo_proto::first_action_request_json(r)).expect("json"),
+        ),
+        Call::Status {
+            repo,
+            role,
+            key: k,
+            raw,
+        } => {
+            // an empty gRPC field is no header (contract §8.2)
+            key = Some(k.as_str()).filter(|k| !k.is_empty());
+            (
+                "POST",
+                format!("/v0/repos/{repo}/roles/{}/session-status", role_path(role)),
+                raw.clone(),
+            )
+        }
     };
-    normalize(e.call_raw(who, m, &p, &b))
+    normalize(e.call_raw_k(who, m, &p, key, &b))
 }
 
 /// Timestamps differ between runs; everything else must be equal.
@@ -290,6 +374,7 @@ fn normalize((st, mut b): (u16, Value)) -> (u16, Value) {
     if let Some(m) = b.as_object_mut() {
         m.remove("stored_at");
         m.remove("received_at");
+        m.remove("issued_at");
     }
     (st, b)
 }
@@ -320,6 +405,8 @@ fn snapshot(db: &mut postgres::Client) -> Value {
         ("repro_requests", "created_at"),
         ("role_checkpoints", "received_at"),
         ("role_tamper_events", "received_at"),
+        ("role_first_actions", "received_at"),
+        ("role_session_status", "received_at"),
         ("history", "at,seq"),
     ] {
         let v: Value = db
@@ -381,6 +468,61 @@ fn latest(repo: &str, role: &'static str) -> Call {
     }
 }
 
+// --- 02-05 step 2 calls
+
+fn own(repo: &str, role: &'static str) -> Call {
+    Call::Own {
+        repo: repo.into(),
+        role,
+    }
+}
+
+fn fa_msg(aid: &str, generation: u64, attempt: &str, session: &str) -> RecordFirstActionRequest {
+    RecordFirstActionRequest {
+        repo_id: "repo-a".into(),
+        role: ieo_proto::role_of("development") as i32,
+        assignment_id: aid.into(),
+        generation,
+        attempt_id: attempt.into(),
+        session_id: session.into(),
+        event_offset: 3,
+        observed_at: "2026-11-15T01:00:00.250Z".into(),
+        kind: ieo_proto::first_action_kind_of("tool_use") as i32,
+    }
+}
+
+fn fa(aid: &str, generation: u64, attempt: &str, session: &str) -> Call {
+    Call::FirstAction(fa_msg(aid, generation, attempt, session))
+}
+
+/// A session status of repo-a's development supervisor (runtime contract §7 items).
+fn status_doc(observed: &str, assignment: Option<(&str, u64)>) -> Value {
+    json!({"observed_at": observed, "lifecycle": "idle", "session_id": "s1",
+        "assignment_id": assignment.map(|a| a.0), "generation": assignment.map(|a| a.1),
+        "quota_group_id": "test-shared", "provider_status_or_unknown": "unknown",
+        "last_actual_action_at": null, "checkpoint_seq": 1, "checkpoint_sha256": "a".repeat(64),
+        "pending_external_requests": "not_tracked", "active_children": "not_tracked"})
+}
+
+fn status_raw(key: &str, raw: Vec<u8>) -> Call {
+    Call::Status {
+        repo: "repo-a".into(),
+        role: "development",
+        key: key.into(),
+        raw,
+    }
+}
+
+fn status(key: &str, doc: &Value) -> Call {
+    status_raw(key, serde_json::to_vec(doc).expect("json"))
+}
+
+fn status_with(key: &str, edit: impl Fn(&mut Value)) -> Call {
+    let mut d = status_doc("2026-11-15T02:00:00Z", Some(("A1", 0)));
+    edit(&mut d);
+    status(key, &d)
+}
+
 enum Step {
     /// Run over HTTP in both environments (assignments).
     Setup(&'static str, Box<dyn Fn(&Env)>),
@@ -415,6 +557,30 @@ fn scenario(digest: &str) -> Vec<Step> {
             "checkpoint: no assignment",
             Some("sup-dev-a"),
             cpx(1, 0, json!({"phase": "takeover"})),
+        ),
+        // 02-05 step 2 before any assignment
+        Do(
+            "own assignment: none",
+            Some("sup-dev-a"),
+            own("repo-a", "development"),
+        ),
+        Do(
+            "first action: never issued",
+            Some("sup-dev-a"),
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "session status: no assignment named",
+            Some("sup-dev-a"),
+            status("st-000000", &status_doc("2026-11-15T00:00:00Z", None)),
+        ),
+        Do(
+            "session status: never issued",
+            Some("sup-dev-a"),
+            status(
+                "st-000001",
+                &status_doc("2026-11-15T00:10:00Z", Some(("A1", 0))),
+            ),
         ),
         setup("assign A1/G1 gen 0", |e| {
             assign_ok(e, "development", "A1", 0, SHA1, Value::Null);
@@ -826,6 +992,302 @@ fn scenario(digest: &str) -> Vec<Step> {
             "checkpoint_digest": "a".repeat(64), "observed_digest": "b".repeat(64)}, "session_id": "s2"}),
             ),
         ),
+        // --- GetOwnAssignment (02-05 step 2)
+        Do(
+            "own assignment: supervisor",
+            Some("sup-dev-a"),
+            own("repo-a", "development"),
+        ),
+        Do(
+            "own assignment: guardrail supervisor",
+            Some("sup-gr-a"),
+            own("repo-a", "guardrail"),
+        ),
+        Do(
+            "own assignment: other role's supervisor",
+            Some("sup-gr-a"),
+            own("repo-a", "development"),
+        ),
+        Do(
+            "own assignment: model credential",
+            Some("dev-a"),
+            own("repo-a", "development"),
+        ),
+        Do(
+            "own assignment: client with roles:control",
+            Some("operator"),
+            own("repo-a", "development"),
+        ),
+        Do(
+            "own assignment: assigner",
+            Some("assigner"),
+            own("repo-a", "development"),
+        ),
+        Do(
+            "own assignment: no credential",
+            None,
+            own("repo-a", "development"),
+        ),
+        Do(
+            "own assignment: other repo",
+            Some("sup-dev-a"),
+            own("repo-b", "development"),
+        ),
+        Do(
+            "own assignment: unknown role",
+            Some("sup-dev-a"),
+            own("repo-a", "manager"),
+        ),
+        Do(
+            "own assignment: slash",
+            Some("sup-dev-a"),
+            own("repo-a/x", "development"),
+        ),
+        // --- RecordFirstAction (02-05 step 2): s1 and s2 have stored takeovers under A1/0
+        Do(
+            "first action: no credential",
+            None,
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: model credential",
+            Some("dev-a"),
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: other role's supervisor",
+            Some("sup-gr-a"),
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: client",
+            Some("operator"),
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: other repo",
+            Some("sup-dev-a"),
+            Call::FirstAction(RecordFirstActionRequest {
+                repo_id: "repo-b".into(),
+                ..fa_msg("A1", 0, "att-1", "s1")
+            }),
+        ),
+        Do(
+            "first action: unknown role",
+            Some("sup-dev-a"),
+            Call::FirstAction(RecordFirstActionRequest {
+                role: 0,
+                ..fa_msg("A1", 0, "att-1", "s1")
+            }),
+        ),
+        Do(
+            "first action: unspecified kind",
+            Some("sup-dev-a"),
+            Call::FirstAction(RecordFirstActionRequest {
+                kind: 0,
+                ..fa_msg("A1", 0, "att-1", "s1")
+            }),
+        ),
+        Do(
+            "first action: bad time",
+            Some("sup-dev-a"),
+            Call::FirstAction(RecordFirstActionRequest {
+                observed_at: "2026-02-30T00:00:00Z".into(),
+                ..fa_msg("A1", 0, "att-1", "s1")
+            }),
+        ),
+        Do(
+            "first action: local time",
+            Some("sup-dev-a"),
+            Call::FirstAction(RecordFirstActionRequest {
+                observed_at: "2026-11-15T10:00:00+09:00".into(),
+                ..fa_msg("A1", 0, "att-1", "s1")
+            }),
+        ),
+        Do(
+            "first action: empty attempt",
+            Some("sup-dev-a"),
+            fa("A1", 0, "", "s1"),
+        ),
+        Do(
+            "first action: never issued assignment",
+            Some("sup-dev-a"),
+            fa("ZZ", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: guardrail's assignment",
+            Some("sup-dev-a"),
+            fa("G1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: session without takeover",
+            Some("sup-dev-a"),
+            fa("A1", 0, "att-1", "s9"),
+        ),
+        Do(
+            "first action: stored",
+            Some("sup-dev-a"),
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: replay",
+            Some("sup-dev-a"),
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: content conflict",
+            Some("sup-dev-a"),
+            Call::FirstAction(RecordFirstActionRequest {
+                event_offset: 9,
+                ..fa_msg("A1", 0, "att-1", "s1")
+            }),
+        ),
+        Do(
+            "first action: content conflict, other session",
+            Some("sup-dev-a"),
+            fa("A1", 0, "att-1", "s2"),
+        ),
+        // --- ReportSessionStatus (02-05 step 2)
+        Do(
+            "session status: no credential",
+            None,
+            status_with("st-000002", |_| {}),
+        ),
+        Do(
+            "session status: model credential",
+            Some("dev-a"),
+            status_with("st-000002", |_| {}),
+        ),
+        Do(
+            "session status: other role's supervisor",
+            Some("sup-gr-a"),
+            status_with("st-000002", |_| {}),
+        ),
+        Do(
+            "session status: client",
+            Some("operator"),
+            status_with("st-000002", |_| {}),
+        ),
+        Do(
+            "session status: other repo",
+            Some("sup-dev-a"),
+            Call::Status {
+                repo: "repo-b".into(),
+                role: "development",
+                key: "st-000002".into(),
+                raw: serde_json::to_vec(&status_doc("2026-11-15T02:00:00Z", Some(("A1", 0))))
+                    .expect("json"),
+            },
+        ),
+        Do(
+            "session status: no key",
+            Some("sup-dev-a"),
+            status_with("", |_| {}),
+        ),
+        Do(
+            "session status: short key",
+            Some("sup-dev-a"),
+            status_with("short", |_| {}),
+        ),
+        Do(
+            "session status: stored",
+            Some("sup-dev-a"),
+            status_with("st-000002", |_| {}),
+        ),
+        Do(
+            "session status: replay",
+            Some("sup-dev-a"),
+            status_with("st-000002", |_| {}),
+        ),
+        Do(
+            "session status: replay as other bytes",
+            Some("sup-dev-a"),
+            status_raw(
+                "st-000002",
+                serde_json::to_vec_pretty(&status_doc("2026-11-15T02:00:00Z", Some(("A1", 0))))
+                    .expect("json"),
+            ),
+        ),
+        Do(
+            "session status: key conflict",
+            Some("sup-dev-a"),
+            status_with("st-000002", |d| d["lifecycle"] = json!("running")),
+        ),
+        Do(
+            "session status: older than the stored one",
+            Some("sup-dev-a"),
+            status_with("st-000003", |d| {
+                d["observed_at"] = json!("2026-11-15T01:59:59.999Z")
+            }),
+        ),
+        Do(
+            "session status: same time as the stored one",
+            Some("sup-dev-a"),
+            status_with("st-000004", |d| d["lifecycle"] = json!("stopping")),
+        ),
+        Do(
+            "session status: never issued",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| d["assignment_id"] = json!("ZZ")),
+        ),
+        Do(
+            "session status: bad lifecycle",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| d["lifecycle"] = json!("sleeping")),
+        ),
+        Do(
+            "session status: zero for not tracked",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| d["active_children"] = json!(0)),
+        ),
+        Do(
+            "session status: missing item",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| {
+                d.as_object_mut().map(|m| m.remove("last_actual_action_at"));
+            }),
+        ),
+        Do(
+            "session status: unknown item",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| d["mood"] = json!("fine")),
+        ),
+        Do(
+            "session status: digest without sequence",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| d["checkpoint_seq"] = Value::Null),
+        ),
+        Do(
+            "session status: generation without assignment",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| d["assignment_id"] = Value::Null),
+        ),
+        Do(
+            "session status: not JSON",
+            Some("sup-dev-a"),
+            status_raw("st-000005", b"not json".to_vec()),
+        ),
+        Do(
+            "session status: not UTF-8",
+            Some("sup-dev-a"),
+            status_raw("st-000005", vec![0xff, 0xfe, b'{', b'}']),
+        ),
+        Do(
+            "session status: over 1 MiB",
+            Some("sup-dev-a"),
+            status_with("st-000005", |d| d["session_id"] = json!(big.clone())),
+        ),
+        Do(
+            "session status: running with a first action",
+            Some("sup-dev-a"),
+            status_with("st-000006", |d| {
+                d["observed_at"] = json!("2026-11-15T02:05:00Z");
+                d["lifecycle"] = json!("running");
+                d["last_actual_action_at"] = json!("2026-11-15T02:04:00.5Z");
+                d["active_children"] = json!([]);
+                d["pending_external_requests"] = json!([{"request_id": "r1"}]);
+            }),
+        ),
         // --- GetLatestCheckpoint
         Do(
             "latest: reporter",
@@ -962,6 +1424,53 @@ fn scenario(digest: &str) -> Vec<Step> {
             Some("sup-dev-a"),
             latest("repo-a", "development"),
         ),
+        // --- 02-05 step 2 after the move: the old run's facts are kept, not current
+        Do(
+            "own assignment: after the move",
+            Some("sup-dev-a"),
+            own("repo-a", "development"),
+        ),
+        Do(
+            "first action: replay after the move",
+            Some("sup-dev-a"),
+            fa("A1", 0, "att-1", "s1"),
+        ),
+        Do(
+            "first action: the old run's, not current",
+            Some("sup-dev-a"),
+            fa("A1", 0, "att-2", "s2"),
+        ),
+        Do(
+            "first action: new generation",
+            Some("sup-dev-a"),
+            fa("A1", 1, "att-3", "s3"),
+        ),
+        Do(
+            "first action: new generation, old session",
+            Some("sup-dev-a"),
+            fa("A1", 1, "att-4", "s2"),
+        ),
+        Do(
+            "session status: replay after the move",
+            Some("sup-dev-a"),
+            status_with("st-000002", |_| {}),
+        ),
+        Do(
+            "session status: old generation, not current",
+            Some("sup-dev-a"),
+            status_with("st-000007", |d| {
+                d["observed_at"] = json!("2026-11-15T03:00:00Z")
+            }),
+        ),
+        Do(
+            "session status: new generation",
+            Some("sup-dev-a"),
+            status_with("st-000008", |d| {
+                d["observed_at"] = json!("2026-11-15T03:01:00Z");
+                d["generation"] = json!(1);
+                d["session_id"] = json!("s3");
+            }),
+        ),
     ]
 }
 
@@ -1030,6 +1539,8 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
         (409, "DIGEST_MISMATCH"),
         (409, "REPO_MISMATCH"),
         (422, "REPORT_SEMANTIC_VIOLATION"),
+        (404, "NO_CURRENT_ASSIGNMENT"),
+        (409, "IDEMPOTENCY_KEY_CONFLICT"),
     ] {
         assert!(
             seen.contains(&(want.0, want.1.to_string())),
@@ -1154,6 +1665,220 @@ fn a_record_stored_over_one_transport_replays_over_the_other() {
         (Some(2), &b.1["checkpoint_sha256"])
     );
     assert_ne!(a.1["checkpoint_sha256"], b.1["checkpoint_sha256"]);
+    // 02-05 step 2: first actions (typed fields, the same JSON value) and session statuses
+    // (the status bytes, the Idempotency-Key)
+    stored_then_replayed(false, "sup-dev-a", fa("A1", 0, "att-1", "s1"), 201);
+    stored_then_replayed(
+        true,
+        "sup-dev-a",
+        status(
+            "st-000001",
+            &status_doc("2026-11-15T00:00:00Z", Some(("A1", 0))),
+        ),
+        201,
+    );
+    stored_then_replayed(
+        false,
+        "sup-dev-a",
+        status("st-000002", &status_doc("2026-11-15T00:01:00Z", None)),
+        201,
+    );
+}
+
+/// 02-05 step 2 (PLAN §3.1): what the three supervisor operations answer and store. The
+/// supervisor's facts are claims: they create no event, change no sprint state and are never a
+/// completion signal.
+#[test]
+fn supervisor_operations_answer_the_assignment_and_store_claims() {
+    let Some(e) = start() else { return };
+    let g = grpc(&e);
+    let s = ready_sprint(&e, 3);
+    let digest = s["digest"].as_str().expect("digest").to_string();
+    assign_ok(&e, "development", "A1", 0, SHA1, Value::Null);
+    // reads: both transports give the same answer
+    let both = |who: &str, c: &Call| {
+        let a = over_http(&e, Some(who), c);
+        let b = g.call(&e, Some(who), c);
+        assert_eq!(a, b, "{c:?}");
+        a
+    };
+    // writes: alternately over gRPC and HTTP (the replays are in the test above)
+    let n = std::cell::Cell::new(0);
+    let write = |c: &Call| {
+        n.set(n.get() + 1);
+        if n.get() % 2 == 1 {
+            g.call(&e, Some("sup-dev-a"), c)
+        } else {
+            over_http(&e, Some("sup-dev-a"), c)
+        }
+    };
+    let (st, a) = both("sup-dev-a", &own("repo-a", "development"));
+    assert_eq!(st, 200, "{a}");
+    assert_eq!(
+        a,
+        json!({"repo_id": "repo-a", "role": "development", "assignment_id": "A1",
+            "generation": 0, "task_id": "01-01", "target_sha": SHA1, "sprint_id": "POC-01",
+            "sprint_revision": 5, "spec_digest": digest, "sources": s["sources"],
+            "limits": {"elapsed_seconds": 3600, "total_tokens": 100000, "correction_attempts": 3},
+            "attempts_issued": 1, "policy_digest": e.app.ctx.policy.digest,
+            "last_delivery_id": null})
+    );
+    let (_, gr) = both("sup-gr-a", &own("repo-a", "guardrail"));
+    assert_eq!(gr["code"], "NO_CURRENT_ASSIGNMENT", "{gr}");
+    // only the (repo, role) supervisor credential
+    for (who, c, want) in [
+        ("dev-a", own("repo-a", "development"), (403, "SCOPE_DENIED")),
+        (
+            "operator",
+            own("repo-a", "development"),
+            (403, "SCOPE_DENIED"),
+        ),
+        (
+            "sup-gr-a",
+            own("repo-a", "development"),
+            (403, "ROLE_MISMATCH"),
+        ),
+        (
+            "sup-dev-a",
+            own("repo-b", "development"),
+            (403, "REPO_SCOPE_DENIED"),
+        ),
+        ("dev-a", fa("A1", 0, "att-1", "s1"), (403, "SCOPE_DENIED")),
+        (
+            "sup-gr-a",
+            fa("A1", 0, "att-1", "s1"),
+            (403, "ROLE_MISMATCH"),
+        ),
+        (
+            "dev-a",
+            status("st-000009", &status_doc("2026-11-15T00:00:00Z", None)),
+            (403, "SCOPE_DENIED"),
+        ),
+        (
+            "sup-gr-a",
+            status("st-000009", &status_doc("2026-11-15T00:00:00Z", None)),
+            (403, "ROLE_MISMATCH"),
+        ),
+    ] {
+        let (st, b) = both(who, &c);
+        assert_eq!((st, code(&b).as_str()), want, "{who} {c:?}");
+    }
+    let state = |e: &Env| e.get("alice", "/v0/sprints/POC-01/state").1;
+    let before = (state(&e), e.counts());
+    // no takeover of s1 stored yet: refused
+    let (st, r) = write(&fa("A1", 0, "att-1", "s1"));
+    assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
+    // the takeover of s1, then its first action and a status
+    let c1 = cp(1, cp_raw(1, 0, &digest, json!({"phase": "takeover"})));
+    assert_eq!(over_http(&e, Some("sup-dev-a"), &c1).0, 201);
+    let (st, r) = write(&fa("A1", 0, "att-1", "s1"));
+    assert_eq!(
+        (st, r["evidence_level"].as_str()),
+        (201, Some("claim")),
+        "{r}"
+    );
+    assert_eq!(r["current_assignment"], true);
+    let other = Call::FirstAction(RecordFirstActionRequest {
+        event_offset: 9,
+        ..fa_msg("A1", 0, "att-1", "s1")
+    });
+    let (st, r) = write(&other);
+    assert_eq!(
+        (st, code(&r).as_str()),
+        (409, "EVENT_CONTENT_CONFLICT"),
+        "{r}"
+    );
+    let st1 = status(
+        "st-000001",
+        &status_doc("2026-11-15T02:00:00Z", Some(("A1", 0))),
+    );
+    let (st, r) = write(&st1);
+    assert_eq!(
+        (st, &r["stale_on_arrival"], &r["current_assignment"]),
+        (201, &json!(false), &json!(true)),
+        "{r}"
+    );
+    let (st, r) = write(&status_with("st-000001", |d| {
+        d["lifecycle"] = json!("running")
+    }));
+    assert_eq!(
+        (st, code(&r).as_str()),
+        (409, "IDEMPOTENCY_KEY_CONFLICT"),
+        "{r}"
+    );
+    let older = status("st-000002", &status_doc("2026-11-15T01:00:00Z", None));
+    let (st, r) = write(&older);
+    assert_eq!(
+        (st, &r["stale_on_arrival"], &r["current_assignment"]),
+        (201, &json!(true), &Value::Null),
+        "{r}"
+    );
+    // claims only: no event, no sprint state change, no judgment input
+    let mut db = e.db();
+    let levels: Vec<String> = db
+        .query(
+            "SELECT evidence_level FROM role_first_actions UNION ALL
+             SELECT evidence_level FROM role_session_status",
+            &[],
+        )
+        .expect("levels")
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    assert_eq!(levels, ["claim", "claim", "claim"]);
+    let after = (state(&e), e.counts());
+    assert_eq!(after.0, before.0, "sprint state unchanged");
+    let changed: Vec<&str> = before
+        .1
+        .iter()
+        .zip(&after.1)
+        .filter(|(x, y)| x != y)
+        .map(|(x, _)| x.0.as_str())
+        .collect();
+    assert_eq!(
+        changed,
+        [
+            "history",
+            "role_checkpoints",
+            "role_first_actions",
+            "role_session_status"
+        ]
+    );
+    // a new generation: the own assignment follows the head; the old run's facts stay, not current
+    assign_ok(
+        &e,
+        "development",
+        "A1",
+        1,
+        SHA2,
+        json!({"assignment_id": "A1", "generation": 0}),
+    );
+    let (_, a) = both("sup-dev-a", &own("repo-a", "development"));
+    assert_eq!(
+        (&a["generation"], &a["target_sha"], &a["attempts_issued"]),
+        (&json!(1), &json!(SHA2), &json!(2)),
+        "{a}"
+    );
+    let (st, r) = write(&fa("A1", 0, "att-1", "s1"));
+    assert_eq!(
+        (st, &r["current_assignment"]),
+        (200, &json!(true)),
+        "stored value"
+    );
+    let c2 = cp(2, cp_raw(2, 0, &digest, json!({"phase": "after_run"})));
+    assert_eq!(over_http(&e, Some("sup-dev-a"), &c2).0, 201);
+    let (st, r) = write(&fa("A1", 0, "att-1b", "s1"));
+    assert_eq!((st, &r["current_assignment"]), (201, &json!(false)), "{r}");
+    let late = status(
+        "st-000003",
+        &status_doc("2026-11-15T03:00:00Z", Some(("A1", 0))),
+    );
+    let (st, r) = write(&late);
+    assert_eq!(
+        (st, &r["stale_on_arrival"], &r["current_assignment"]),
+        (201, &json!(false), &json!(false)),
+        "{r}"
+    );
 }
 
 // ---------------------------------------------------------------------------

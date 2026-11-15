@@ -4079,6 +4079,17 @@ fn c2_a_binding_sprint_id_is_reserved_for_its_repo() {
         ),
         (409, "SPRINT_REPO_CONFLICT".into())
     );
+    // a draft-state spec (registration_state draft, unbound limits) is reserved the same way
+    // (PR #72 review 23877c1 I-2)
+    let mut draft = theirs.clone();
+    draft["registration_state"] = json!("draft");
+    draft["limits"] = json!({"elapsed_seconds": null, "total_tokens": null,
+        "correction_attempts": null, "unresolved_reason": "limits are not bound yet"});
+    let draft = redigest(draft);
+    assert_eq!(
+        refused(&e, "carol", "/v0/sprints", "c2n2-0007", &draft),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
     // checked before the format, like RG2: a malformed body naming it is also 409
     let mut malformed = theirs.clone();
     malformed.as_object_mut().map(|m| m.remove("title"));

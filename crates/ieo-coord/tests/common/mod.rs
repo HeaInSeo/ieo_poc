@@ -345,10 +345,24 @@ impl Env {
         path: &str,
         body: &[u8],
     ) -> (u16, Value) {
+        self.call_raw_k(who, method, path, None, body)
+    }
+    /// [`Env::call_raw`] with an `Idempotency-Key` header.
+    pub fn call_raw_k(
+        &self,
+        who: Option<&str>,
+        method: &str,
+        path: &str,
+        key: Option<&str>,
+        body: &[u8],
+    ) -> (u16, Value) {
         let mut req = format!("{method} {path} HTTP/1.1\r\nHost: t\r\nConnection: close\r\n");
         if let Some(w) = who {
             let t = self.tokens.get(w).cloned().unwrap_or_else(|| w.to_string());
             req += &format!("Authorization: Bearer {t}\r\n");
+        }
+        if let Some(k) = key {
+            req += &format!("Idempotency-Key: {k}\r\n");
         }
         req += &format!(
             "Content-Type: application/json\r\nContent-Length: {}\r\n\r\n",
@@ -399,6 +413,8 @@ impl Env {
             "history",
             "role_checkpoints",
             "role_tamper_events",
+            "role_first_actions",
+            "role_session_status",
         ]
         .iter()
         .map(|t| {

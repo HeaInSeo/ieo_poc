@@ -259,27 +259,67 @@ fn insert_event(tx: &mut Transaction, e: &NewEvent) -> Result<i64, Resp> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operation<'a> {
     Health,
-    RoleStatus { repo: &'a str },
-    RoleStop { repo: &'a str },
+    RoleStatus {
+        repo: &'a str,
+    },
+    RoleStop {
+        repo: &'a str,
+    },
     Register,
     Convert,
     ImportNotion,
     RecordException,
-    GetRevision { id: &'a str, rev: &'a str },
-    SemanticReview { id: &'a str, rev: &'a str },
-    SprintState { id: &'a str },
-    ListEvents { id: &'a str },
+    GetRevision {
+        id: &'a str,
+        rev: &'a str,
+    },
+    SemanticReview {
+        id: &'a str,
+        rev: &'a str,
+    },
+    SprintState {
+        id: &'a str,
+    },
+    ListEvents {
+        id: &'a str,
+    },
     SubmitReport,
     SubmitRepro,
-    GetRepro { id: &'a str },
+    GetRepro {
+        id: &'a str,
+    },
     Assign,
-    ReportCheckpoint { repo: &'a str, role: &'a str },
-    LatestCheckpoint { repo: &'a str, role: &'a str },
-    CompareCheckpoint { repo: &'a str, role: &'a str },
+    ReportCheckpoint {
+        repo: &'a str,
+        role: &'a str,
+    },
+    LatestCheckpoint {
+        repo: &'a str,
+        role: &'a str,
+    },
+    CompareCheckpoint {
+        repo: &'a str,
+        role: &'a str,
+    },
+    /// 02-05 step 2: the supervisor's own assignment, first action and session status.
+    OwnAssignment {
+        repo: &'a str,
+        role: &'a str,
+    },
+    RecordFirstAction {
+        repo: &'a str,
+        role: &'a str,
+    },
+    ReportSessionStatus {
+        repo: &'a str,
+        role: &'a str,
+    },
     Ingest,
     Judge,
     ListOutbox,
-    Deliver { id: &'a str },
+    Deliver {
+        id: &'a str,
+    },
 }
 
 /// How an operation runs (contracts/ieo-internal-v0.md §9, "작업마다 다른 실행 모양").
@@ -336,6 +376,16 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         }
         ("GET", ["v0", "repos", repo, "roles", role, "checkpoints", "compare"]) => {
             Operation::CompareCheckpoint { repo, role }
+        }
+        // the supervisor's own assignment and session facts (02-05 step 2, PLAN §3.1)
+        ("GET", ["v0", "repos", repo, "roles", role, "assignment"]) => {
+            Operation::OwnAssignment { repo, role }
+        }
+        ("POST", ["v0", "repos", repo, "roles", role, "first-actions"]) => {
+            Operation::RecordFirstAction { repo, role }
+        }
+        ("POST", ["v0", "repos", repo, "roles", role, "session-status"]) => {
+            Operation::ReportSessionStatus { repo, role }
         }
         ("POST", ["v0", "coordinator", "evidence"]) => Operation::Ingest,
         ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
@@ -547,6 +597,15 @@ pub fn dispatch(
             }
             let local = role_status(ctx, repo, role);
             run(db, &|tx| compare_checkpoint(tx, repo, role, &local))
+        }
+        Operation::OwnAssignment { repo, role } => {
+            run(db, &|tx| own_assignment(tx, who, repo, role))
+        }
+        Operation::RecordFirstAction { repo, role } => {
+            run(db, &|tx| record_first_action(tx, who, repo, role, req))
+        }
+        Operation::ReportSessionStatus { repo, role } => {
+            run(db, &|tx| report_session_status(tx, who, repo, role, req))
         }
         Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
@@ -3996,6 +4055,474 @@ pub fn judge_resume(
         ));
     }
     ("resume_allowed", vec![])
+}
+
+// ---------------------------------------------------------------------------
+// The supervisor's own assignment and session facts (02-05 step 2, PLAN §3.1, T1)
+// ---------------------------------------------------------------------------
+//
+// Only the role supervisor's `checkpoint:report` credential of exactly this (repo, role) may call
+// these (`need_reporter`); the model process never holds it (runtime contract §4.3). What the
+// supervisor records here is a claim: it is stored with `evidence_level = claim` and never read
+// as a completion signal (02-03 `judge` reads GitHub and run evidence only).
+
+/// An RFC 3339 UTC timestamp as the supervisor writes it: `YYYY-MM-DDTHH:MM:SS[.fraction]Z`,
+/// year 1970–9999, a real calendar day. Anything PostgreSQL would refuse is refused here first.
+fn is_utc_timestamp(s: &str) -> bool {
+    let b = s.as_bytes();
+    let digits =
+        |r: std::ops::Range<usize>| b.get(r).is_some_and(|x| x.iter().all(u8::is_ascii_digit));
+    let num = |r: std::ops::Range<usize>| s[r].parse::<u32>().unwrap_or(u32::MAX);
+    if b.len() < 20
+        || !digits(0..4)
+        || b[4] != b'-'
+        || !digits(5..7)
+        || b[7] != b'-'
+        || !digits(8..10)
+        || b[10] != b'T'
+        || !digits(11..13)
+        || b[13] != b':'
+        || !digits(14..16)
+        || b[16] != b':'
+        || !digits(17..19)
+        || b[b.len() - 1] != b'Z'
+    {
+        return false;
+    }
+    let frac = &b[19..b.len() - 1];
+    if !(frac.is_empty()
+        || (frac.len() >= 2
+            && frac.len() <= 10
+            && frac[0] == b'.'
+            && frac[1..].iter().all(u8::is_ascii_digit)))
+    {
+        return false;
+    }
+    let (y, m, d) = (num(0..4), num(5..7), num(8..10));
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let days = match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => 0,
+    };
+    (1970..=9999).contains(&y)
+        && (1..=days).contains(&d)
+        && num(11..13) < 24
+        && num(14..16) < 60
+        && num(17..19) < 60
+}
+
+fn bad_field(field: &str, message: &str) -> Resp {
+    one(
+        400,
+        "SCHEMA_VIOLATION",
+        field,
+        message,
+        "report the value as the supervisor observed it",
+    )
+}
+
+/// `GET /v0/repos/{repo}/roles/{role}/assignment` (getOwnAssignment): the current assignment of
+/// this (repo, role) as the coordinator recorded it — head, sprint revision, digest and sources,
+/// the revision's limits and the attempts issued. Read only. No head → 404
+/// `NO_CURRENT_ASSIGNMENT`. Elapsed time and token consumption are not metered by the coordinator
+/// yet (02-05 step 5) and no delivery is recorded yet (step 3): `last_delivery_id` is null.
+fn own_assignment(tx: &mut Transaction, who: &Caller, repo: &str, role: &str) -> R {
+    need_role(role)?;
+    need_reporter(who, repo, role)?;
+    let row = tx.query_opt(
+        "SELECT a.assignment_id, a.generation, a.task_id, a.target_sha, a.sprint_id,
+                a.sprint_revision, s.digest, s.spec, a.policy_digest, iso(a.issued_at),
+                coalesce((SELECT issued FROM task_attempts t WHERE t.sprint_id = a.sprint_id
+                            AND t.task_id = a.task_id AND t.role = a.role), 0)
+         FROM assignment_heads h
+         JOIN assignments a ON (a.assignment_id, a.generation) = (h.assignment_id, h.generation)
+         JOIN sprint_revisions s ON (s.sprint_id, s.revision) = (a.sprint_id, a.sprint_revision)
+         WHERE h.repo_id = $1 AND h.role = $2",
+        &[&repo, &role],
+    )?;
+    let Some(r) = row else {
+        return Err(problem(
+            404,
+            "NO_CURRENT_ASSIGNMENT",
+            "no current assignment for this repo and role",
+        ));
+    };
+    let spec: Value = r.get(7);
+    // exactly the SprintSpec v0 source keys, so both transports carry the same value
+    let sources: Vec<Value> = spec["sources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|x| {
+            json!({"kind": x["kind"], "ref": x["ref"], "revision": x["revision"],
+                   "digest": x["digest"], "observed_at": x["observed_at"]})
+        })
+        .collect();
+    let limit = |k: &str| spec["limits"][k].as_u64().map_or(Value::Null, |n| json!(n));
+    ok(
+        200,
+        json!({"repo_id": repo, "role": role, "assignment_id": r.get::<_, String>(0),
+               "generation": r.get::<_, i64>(1), "task_id": r.get::<_, String>(2),
+               "target_sha": r.get::<_, String>(3), "sprint_id": r.get::<_, String>(4),
+               "sprint_revision": r.get::<_, i64>(5), "spec_digest": r.get::<_, String>(6),
+               "sources": sources,
+               "limits": {"elapsed_seconds": limit("elapsed_seconds"),
+                          "total_tokens": limit("total_tokens"),
+                          "correction_attempts": limit("correction_attempts")},
+               "attempts_issued": r.get::<_, i64>(10),
+               "policy_digest": r.get::<_, String>(8), "issued_at": r.get::<_, String>(9),
+               "last_delivery_id": null}),
+    )
+}
+
+/// The assignment named by a supervisor fact was issued to this (repo, role); `true` when it is
+/// the current head. Never issued → 409 `STALE_ASSIGNMENT` (as for agent claims).
+fn issued_here(
+    tx: &mut Transaction,
+    repo: &str,
+    role: &str,
+    aid: &str,
+    generation: u64,
+    field: &str,
+) -> Result<bool, Resp> {
+    let issued = tx
+        .query_opt(
+            "SELECT 1 FROM assignments WHERE assignment_id = $1 AND generation = $2
+               AND repo_id = $3 AND role = $4",
+            &[&aid, &i64_of(generation), &repo, &role],
+        )?
+        .is_some();
+    if !issued {
+        return Err(one(
+            409,
+            "STALE_ASSIGNMENT",
+            field,
+            &format!("{aid}/{generation} was never issued to this repo and role"),
+            "report under an assignment issued to this role",
+        ));
+    }
+    Ok(tx
+        .query_opt(
+            "SELECT 1 FROM assignment_heads WHERE repo_id = $1 AND role = $2
+               AND assignment_id = $3 AND generation = $4",
+            &[&repo, &role, &aid, &i64_of(generation)],
+        )?
+        .is_some())
+}
+
+/// `POST /v0/repos/{repo}/roles/{role}/first-actions` (recordFirstAction): the first actual action
+/// of one attempt as the supervisor observed it in the stream (event offset, supervisor clock,
+/// `tool_use` or `text`). Key (assignment_id, generation, attempt_id) within the credential's
+/// (repo, role): the same content again → 200 with the stored receipt, other content → 409
+/// `EVENT_CONTENT_CONFLICT`. The session's takeover checkpoint must be stored under that
+/// assignment and generation (else 409 `CHECKPOINT_MISMATCH`); like the later checkpoints of a
+/// run, a first action after the assignment moved on is stored with `current_assignment: false`.
+/// A claim.
+fn record_first_action(tx: &mut Transaction, who: &Caller, repo: &str, role: &str, req: &Req) -> R {
+    need_role(role)?;
+    need_reporter(who, repo, role)?;
+    let body = parse_body(req.body)?;
+    only_keys(
+        &body,
+        &[
+            "assignment_id",
+            "generation",
+            "attempt_id",
+            "session_id",
+            "event_offset",
+            "observed_at",
+            "kind",
+        ],
+    )?;
+    let aid = str_field(&body, "assignment_id", 128)?;
+    let generation = u64_field(&body, "generation")?;
+    let attempt = str_field(&body, "attempt_id", 128)?;
+    let session = str_field(&body, "session_id", 256)?;
+    let offset = u64_field(&body, "event_offset")?;
+    let observed = str_field(&body, "observed_at", 64)?;
+    if !is_utc_timestamp(observed) {
+        return Err(bad_field(
+            "observed_at",
+            "observed_at is an RFC 3339 UTC timestamp (…Z)",
+        ));
+    }
+    let kind = body["kind"].as_str().unwrap_or_default();
+    if kind != "tool_use" && kind != "text" {
+        return Err(bad_field("kind", "kind is tool_use or text"));
+    }
+    lock(tx, &format!("checkpoint:{repo}:{role}"))?;
+    let receipt = |r: &postgres::Row| {
+        json!({"assignment_id": r.get::<_, String>(0), "generation": r.get::<_, i64>(1),
+               "attempt_id": r.get::<_, String>(2), "session_id": r.get::<_, String>(3),
+               "evidence_level": "claim", "current_assignment": r.get::<_, bool>(4),
+               "received_at": r.get::<_, String>(5)})
+    };
+    let select = "SELECT assignment_id, generation, attempt_id, session_id, current_assignment,
+                         iso(received_at), body
+                  FROM role_first_actions WHERE repo_id = $1 AND role = $2
+                    AND assignment_id = $3 AND generation = $4 AND attempt_id = $5";
+    let key: [&(dyn postgres::types::ToSql + Sync); 5] =
+        [&repo, &role, &aid, &i64_of(generation), &attempt];
+    if let Some(r) = tx.query_opt(select, &key)? {
+        return if r.get::<_, Value>(6) == body {
+            ok(200, receipt(&r))
+        } else {
+            Err(one(
+                409,
+                "EVENT_CONTENT_CONFLICT",
+                "attempt_id",
+                "the first action of this attempt is already recorded with other content",
+                "keep the first observation; a later action is not a first action",
+            ))
+        };
+    }
+    let current = issued_here(tx, repo, role, aid, generation, "assignment_id")?;
+    let taken_over = tx
+        .query_opt(
+            "SELECT 1 FROM role_checkpoints WHERE repo_id = $1 AND role = $2 AND phase = 'takeover'
+               AND session_id = $3 AND assignment_id = $4 AND generation = $5",
+            &[&repo, &role, &session, &aid, &i64_of(generation)],
+        )?
+        .is_some();
+    if !taken_over {
+        return Err(one(
+            409,
+            "CHECKPOINT_MISMATCH",
+            "session_id",
+            "no takeover checkpoint of this session is stored under this assignment and generation",
+            "report the takeover checkpoint first",
+        ));
+    }
+    tx.execute(
+        "INSERT INTO role_first_actions (repo_id, role, assignment_id, generation, attempt_id,
+            session_id, event_offset, observed_at, kind, body, current_assignment, reported_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,CAST($8::text AS timestamptz),$9,$10,$11,$12)",
+        &[
+            &repo,
+            &role,
+            &aid,
+            &i64_of(generation),
+            &attempt,
+            &session,
+            &i64_of(offset),
+            &observed,
+            &kind,
+            &body,
+            &current,
+            &who.name,
+        ],
+    )?;
+    history(
+        tx,
+        &who.name,
+        "first_action.record",
+        &json!({"repo_id": repo, "role": role, "assignment_id": aid, "generation": generation,
+                "attempt_id": attempt, "current_assignment": current}),
+    )?;
+    let r = tx.query_one(select, &key)?;
+    ok(201, receipt(&r))
+}
+
+/// The status items a session status carries (runtime contract §7 status), every one required
+/// (`null` where nothing is known).
+const SESSION_STATUS_KEYS: [&str; 12] = [
+    "observed_at",
+    "lifecycle",
+    "session_id",
+    "assignment_id",
+    "generation",
+    "quota_group_id",
+    "provider_status_or_unknown",
+    "last_actual_action_at",
+    "checkpoint_seq",
+    "checkpoint_sha256",
+    "pending_external_requests",
+    "active_children",
+];
+
+/// Format of a session status. Returns the named assignment, if any.
+fn check_session_status(v: &Value) -> Result<Option<(String, u64)>, Resp> {
+    only_keys(v, &SESSION_STATUS_KEYS)?;
+    if let Some(k) = SESSION_STATUS_KEYS.iter().find(|k| v.get(**k).is_none()) {
+        return Err(one(
+            400,
+            "MISSING_FIELD",
+            k,
+            &format!("`{k}` is required (null when not known)"),
+            &format!("supply `{k}`"),
+        ));
+    }
+    let observed = str_field(v, "observed_at", 64)?;
+    if !is_utc_timestamp(observed) {
+        return Err(bad_field(
+            "observed_at",
+            "observed_at is an RFC 3339 UTC timestamp (…Z)",
+        ));
+    }
+    if !matches!(
+        v["lifecycle"].as_str(),
+        Some("idle" | "running" | "stopping")
+    ) {
+        return Err(bad_field(
+            "lifecycle",
+            "lifecycle is idle, running or stopping",
+        ));
+    }
+    let nullable_str = |k: &str, max: usize| -> Result<(), Resp> {
+        if v[k].is_null() {
+            Ok(())
+        } else {
+            str_field(v, k, max).map(|_| ())
+        }
+    };
+    nullable_str("session_id", 256)?;
+    str_field(v, "quota_group_id", 128)?;
+    str_field(v, "provider_status_or_unknown", 64)?;
+    if !v["last_actual_action_at"].is_null()
+        && !v["last_actual_action_at"]
+            .as_str()
+            .is_some_and(is_utc_timestamp)
+    {
+        return Err(bad_field(
+            "last_actual_action_at",
+            "null or an RFC 3339 UTC timestamp (…Z)",
+        ));
+    }
+    let assignment = match (&v["assignment_id"], &v["generation"]) {
+        (Value::Null, Value::Null) => None,
+        _ => Some((
+            str_field(v, "assignment_id", 128)?.to_string(),
+            u64_field(v, "generation")?,
+        )),
+    };
+    match (&v["checkpoint_seq"], &v["checkpoint_sha256"]) {
+        (Value::Null, Value::Null) => {}
+        (s, d) => {
+            if s.as_u64().is_none_or(|n| n == 0) {
+                return Err(bad_field(
+                    "checkpoint_seq",
+                    "null or an integer ≥ 1, with its digest",
+                ));
+            }
+            if !d.as_str().is_some_and(|d| d.len() == 64 && is_sha(d)) {
+                return Err(bad_field(
+                    "checkpoint_sha256",
+                    "null or 64 lowercase hex, with its sequence",
+                ));
+            }
+        }
+    }
+    for k in ["pending_external_requests", "active_children"] {
+        let ok = v[k] == "not_tracked"
+            || v[k]
+                .as_array()
+                .is_some_and(|a| a.iter().all(Value::is_object));
+        if !ok {
+            return Err(bad_field(
+                k,
+                "\"not_tracked\" or a list of objects (never 0 for not tracked)",
+            ));
+        }
+    }
+    Ok(assignment)
+}
+
+/// `POST /v0/repos/{repo}/roles/{role}/session-status` (reportSessionStatus): append one session
+/// status to the coordinator's history of this (repo, role), so the last report and its time
+/// stay visible when the supervisor cannot be reached. Key: `Idempotency-Key` (gRPC
+/// `idempotency_key`) within the credential's (repo, role): the same status again → 200 with the
+/// stored receipt, another status → 409 `IDEMPOTENCY_KEY_CONFLICT`. A status observed at or before
+/// an already stored one is kept as history with `stale_on_arrival: true` and is never the current
+/// value (02-04 item 4 freshness). A named assignment must have been issued to this (repo, role)
+/// (else 409 `STALE_ASSIGNMENT`); an earlier one is kept with `current_assignment: false`. A claim.
+fn report_session_status(
+    tx: &mut Transaction,
+    who: &Caller,
+    repo: &str,
+    role: &str,
+    req: &Req,
+) -> R {
+    need_role(role)?;
+    need_reporter(who, repo, role)?;
+    let key = idem_key(req)?;
+    let body = parse_body(req.body)?;
+    let assignment = check_session_status(&body)?;
+    lock(tx, &format!("checkpoint:{repo}:{role}"))?;
+    let receipt = |r: &postgres::Row| {
+        json!({"idempotency_key": r.get::<_, String>(0),
+               "observed_at": r.get::<_, Value>(1)["observed_at"],
+               "evidence_level": "claim", "stale_on_arrival": r.get::<_, bool>(2),
+               "current_assignment": r.get::<_, Option<bool>>(3),
+               "received_at": r.get::<_, String>(4)})
+    };
+    let select = "SELECT idempotency_key, status, stale_on_arrival, current_assignment,
+                         iso(received_at)
+                  FROM role_session_status WHERE repo_id = $1 AND role = $2 AND idempotency_key = $3";
+    if let Some(r) = tx.query_opt(select, &[&repo, &role, &key])? {
+        return if r.get::<_, Value>(1) == body {
+            ok(200, receipt(&r))
+        } else {
+            Err(one(
+                409,
+                "IDEMPOTENCY_KEY_CONFLICT",
+                "Idempotency-Key",
+                "this key was used with another status",
+                "use a new key for a new status",
+            ))
+        };
+    }
+    let current = match &assignment {
+        Some((aid, generation)) => Some(issued_here(
+            tx,
+            repo,
+            role,
+            aid,
+            *generation,
+            "assignment_id",
+        )?),
+        None => None,
+    };
+    let observed = body["observed_at"].as_str().unwrap_or_default();
+    let stale: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM role_session_status WHERE repo_id = $1 AND role = $2
+                              AND observed_at >= CAST($3::text AS timestamptz))",
+            &[&repo, &role, &observed],
+        )?
+        .get(0);
+    let (aid, generation) = match &assignment {
+        Some((a, g)) => (Some(a.as_str()), Some(i64_of(*g))),
+        None => (None, None),
+    };
+    tx.execute(
+        "INSERT INTO role_session_status (repo_id, role, idempotency_key, status, observed_at,
+            assignment_id, generation, current_assignment, stale_on_arrival, reported_by)
+         VALUES ($1,$2,$3,$4,CAST($5::text AS timestamptz),$6,$7,$8,$9,$10)",
+        &[
+            &repo,
+            &role,
+            &key,
+            &body,
+            &observed,
+            &aid,
+            &generation,
+            &current,
+            &stale,
+            &who.name,
+        ],
+    )?;
+    history(
+        tx,
+        &who.name,
+        "session_status.report",
+        &json!({"repo_id": repo, "role": role, "idempotency_key": key,
+                "stale_on_arrival": stale, "current_assignment": current}),
+    )?;
+    let r = tx.query_one(select, &[&repo, &role, &key])?;
+    ok(201, receipt(&r))
 }
 
 /// Apply the schema (idempotent `CREATE ... IF NOT EXISTS`).
