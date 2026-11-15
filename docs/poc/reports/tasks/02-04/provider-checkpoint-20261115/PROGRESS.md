@@ -82,8 +82,9 @@
 **경로**(런타임 계약 §13 항목 10). 바꾼 곳은 supervisor `central.rs`·`serve.rs`, coordinator `api.rs`·`schema.sql`·`roles.rs`다.
 1. supervisor가 체크포인트를 쓸 때마다 다음 순서로 처리한다.
    - 체크포인트에 `seq`(1부터 연속), `repo_id`, `role`, `config_tamper_detected`를 넣는다.
+   - 순번은 보관 사본과 로컬 체크포인트 중 큰 값의 다음이다.
    - 사본을 `/state/checkpoints/<seq>.json`에 둔 뒤 `checkpoint.json`을 바꾼다.
-   - 파일 바이트를 그대로 코디네이터에 보고한다.
+   - 파일 바이트를 그대로 코디네이터에 보고한다. takeover는 **먼저** 보고하고 받아들여진 뒤에만 로컬에 쓴다. after_run·error는 로컬에 먼저 쓰고 보고한다(교정 1, 검토 48b1d0e M-1).
    - 보고 자격은 supervisor 전용 `checkpoint:report`(agent 종류, repo·역할 하나)다. 모델의 `agent:report` 자격과는 다르다.
 2. 코디네이터는 받은 바이트의 SHA-256을 직접 계산한다. 다음 순번만 `role_checkpoints`(추가 전용)에 저장한다.
    - 배정·세대가 (repo, 역할)의 현재 배정 머리와 같아야 한다. 그 배정의 sprint revision, 명세 digest, 대상 SHA와도 같아야 한다. 세대는 저장된 마지막 값보다 낮으면 안 된다.
@@ -92,14 +93,16 @@
    - 다음 순번을 건너뛰면 409 `CHECKPOINT_SEQUENCE_GAP`이다.
    - 낮은 세대는 409 `STALE_ASSIGNMENT`다.
    - 다른 배정이나 sprint revision은 `CHECKPOINT_MISMATCH`, 명세 digest는 `DIGEST_MISMATCH`, 대상 SHA는 `ASSIGNMENT_SHA_MISMATCH`, 배정 없음은 `NO_CURRENT_ASSIGNMENT`다.
+   - 예외 하나: 회차 도중 배정이 바뀌면, 같은 세션·배정·세대로 저장된 takeover를 잇는 after_run·error는 `current_assignment=false`로 저장한다. takeover는 언제나 현재 배정이어야 한다(교정 1).
    - 변조 탐지는 새 session_id 하나에 한 번 `role_tamper_events`에 기록한다.
    - 거부된 보고는 행을 남기지 않는다.
 3. supervisor는 start·reconnect **전에** 코디네이터의 최신 기록을 받아 로컬 체크포인트의 순번·digest와 맞춘다.
    - 로컬이 앞서면 보관 사본을 순서대로 보내고 다시 맞춘다.
    - 다음 경우는 `EXTERNAL_RECONCILIATION_REQUIRED`다. 중앙이 앞섬, digest가 다름, 로컬이 없는데 중앙에 기록이 있음, 보관 사본이 없거나 다름.
    - 코디네이터에 닿지 않으면 `NOT_OBSERVED`이고 아무것도 시작하지 않는다.
-   - 회차 시작(takeover) 보고가 실패하면 실행하지 않는다.
-   - 회차 뒤 보고가 실패하면 상태의 `checkpoint_reported: false`로 드러난다. 이것은 repo 범위 stop의 안전 종료 확인을 막는다.
+   - takeover 보고가 거부되거나 닿지 않으면 로컬에 아무것도 쓰지 않고 실행하지 않는다. 시도는 실행되지 않은 것으로 닫힌다(예산 원장 끝 행 0/0). 그래서 다음 기동이 막히지 않는다(교정 1).
+   - 회차 뒤 보고가 실패하면 상태의 `checkpoint_reported: false`로 드러난다. 마지막 보고 결과는 볼륨(`checkpoint-report.json`)에 남아 재시작 뒤에도 같다. repo 범위 stop은 명시적인 `true`만 보고됨으로 본다.
+   - 로컬 체크포인트가 보관 사본보다 정확히 하나 뒤면(두 파일 쓰기 사이의 중단) 보관 사본을 되살린 뒤 대조한다. 그 밖의 차이는 되살리지 않는다.
 4. 코디네이터의 재개 판단 `GET /v0/repos/{repo}/roles/{role}/checkpoints/compare`는 역할 상태의 로컬 순번·digest를 중앙 기록·현재 배정과 비교한다.
    - 결과는 `resume_allowed` / `no_checkpoint` / `already_running` / `stale_generation` / `external_reconciliation_required` / `not_observed` 중 하나다.
    - 마지막 기록이 `after_run`이 아니면 재개하지 않는다.
@@ -127,6 +130,10 @@ session_id만 저장하지 않는다. 저장하는 식별자는 다음과 같다
 | 코디네이터 재시작 | e2e 3, 컨테이너 | `resume_allowed` 유지 |
 | 역할 프로세스 재시작 | e2e 4, 컨테이너 | 같은 볼륨의 새 서비스가 대조한 뒤 재개(순번 3·4) |
 | 로컬 불일치·누락·되돌림 | e2e 5, 컨테이너 | 세 경우 모두 409 `EXTERNAL_RECONCILIATION_REQUIRED`, 실행 없음. 코디네이터 판단도 같다 |
+| 거부된 takeover(잘못된 대상 SHA) | e2e 10 | 202 뒤 시도는 `CentralRefused`·실행 안 됨으로 닫힌다. 로컬 체크포인트·중앙 순번 그대로. 다음 올바른 기동 202(교정 1) |
+| 회차 도중 배정 세대 변경 | e2e 11 | 회차 뒤 체크포인트가 `current_assignment=false`로 기록된다(보고됨 true). 판단 `stale_generation`. 새 세대의 새 세션 기동 202, 순번 18(교정 1) |
+| 쓰기 중단(사본이 하나 앞섬) | `tests/serve.rs::a_checkpoint_one_behind_its_archive_is_restored_from_the_archive` | 하나 뒤면 되살려 재개, 둘 뒤면 거부(교정 1) |
+| 재시작 뒤 보고 상태 | e2e 4 | 재시작한 서비스도 `checkpoint_reported: true`(교정 1) |
 | 회차 중 코디네이터 중단 | e2e 6 | 회차 뒤 보고 실패 → `checkpoint_reported: false`. 중단 중 재개 → 503 `NOT_OBSERVED`, 실행 없음. 복구 뒤 판단 → “아직 기록 안 됨”. 다음 재개가 보관 사본 1건을 먼저 보낸 뒤 실행(순번 8) |
 
 컨테이너([기록](evidence/images-fake-5f38ab9.log), 이미지 5f38ab9, UID 20000/20001/20002, PID 1) 순서:
@@ -140,7 +147,7 @@ session_id만 저장하지 않는다. 저장하는 식별자는 다음과 같다
 
 모든 시험 결과는 다음과 같다(시험 DB 연결, `cargo test --workspace`). 실패는 0이다.
 - `ieo-coord`: 68 + e2e 1 + roles 7 + shutdown 2
-- `ieo-supervisor`: 단위 3, caller 23, run_guard 27, serve 20, supervisor 20
+- `ieo-supervisor`: 단위 3, caller 23, run_guard 27, serve 21, supervisor 20
 
 `cargo clippy --workspace --all-targets -D warnings`도 통과했다.
 
@@ -175,3 +182,19 @@ session_id만 저장하지 않는다. 저장하는 식별자는 다음과 같다
 ## 6. 재발 방지
 
 원인별 대응표는 [PREVENTION.md](PREVENTION.md)에 있다. 이번 작업에서 구현한 것과 정식 설계·개발로 넘길 것을 구분했다.
+
+## 7. 교정 1(검토 48b1d0e)
+
+| 지적 | 처분 |
+| --- | --- |
+| M-1 거부된 보고가 역할과 예산을 영구히 막음 | takeover는 보고가 받아들여진 뒤에만 로컬에 쓴다. 거부되거나 닿지 않으면 시도를 실행 안 됨(0/0)으로 닫는다. 회차 도중 배정이 바뀌면 회차 뒤 체크포인트를 `current_assignment=false`로 기록하고, 판단은 `stale_generation`, 복구는 새 세대의 새 세션이다. 시험: e2e 10·11 |
+| L-1 repo 정지가 명시적 false만 막음 | 명시적인 `true`만 보고됨으로 본다 |
+| L-2 재시작 뒤 `checkpoint_reported: false` | 마지막 보고 결과를 볼륨에 남기고 기동 때 읽는다. 시험: e2e 4 |
+| L-3 순번을 보관 사본만으로 정함 | 보관 사본과 로컬 중 큰 값의 다음. 사본이 정확히 하나 앞서면 되살린다. 시험: serve 새 시험 |
+| L-4 거부 이유가 “409 null” | `rejections[0].code`도 읽는다 |
+| L-5 OpenAPI 누락 | `quota_groups`, 정지 사유, 모르는 역할 404, `current_assignment`, 예외 규칙을 적었다 |
+| I-1 `unix_of` 뺄셈 | 0년을 거부한다(시험) |
+| I-2 거래 안 원격 호출, 두 읽기 | supervisor 상태를 거래 전에 받는다. 두 읽기는 보고와 같은 잠금 아래에서 한다 |
+| I-3 상태 잠금 안 파일 읽기 | 상태를 복사한 뒤 잠금을 풀고 읽는다 |
+| I-4 신선도 경계 | 미래의 시작 시각은 신선하지 않다(시험). 최대 나이보다 긴 회차는 실행 중 `unknown`(보수적, 모듈 문서에 적음) |
+
