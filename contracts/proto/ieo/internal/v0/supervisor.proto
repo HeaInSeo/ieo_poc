@@ -1,4 +1,4 @@
-// ieo internal API v0: role supervisor -> coordinator (task X-03, contract draft).
+// ieo internal API v0: role supervisor -> coordinator (task X-03 contract, implemented in X-04).
 //
 // Description and rules: contracts/ieo-internal-v0.md. That document is part of this contract.
 //
@@ -193,9 +193,11 @@ message GetLatestCheckpointResponse {
 }
 
 // Carried in the binary trailer `ieo-error-bin` of a non-OK answer from the coordinator's handling
-// and of the adapter's size, path and checkpoint UTF-8 refusals (description, section 4.3). Deadline,
-// cancellation and transport failures carry no trailer. Without a trailer, and for any 500, the
-// outcome on the server is unknown (description, section 5).
+// and of the adapter's own answers: database unavailable (UNAVAILABLE, http_status 500), size,
+// path and checkpoint UTF-8 refusals (description, section 4.3). Deadline, cancellation,
+// transport failures and the library's message-size refusal (OUT_OF_RANGE in tonic 0.14,
+// RESOURCE_EXHAUSTED elsewhere) carry no trailer. Without a trailer, and for any 500, the outcome
+// on the server is unknown (description, section 5).
 message Error {
   // The HTTP status the same request gets on the HTTP path.
   uint32 http_status = 1;

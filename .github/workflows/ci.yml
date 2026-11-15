@@ -30,6 +30,28 @@ jobs:
       - name: OpenAPI contract (external $ref resolved)
         working-directory: contracts
         run: openapi-spec-validator ieo-api-v0.openapi.yaml
+  proto-check:
+    # X-04 (contracts/ieo-internal-v0.md §2, §10 item 7). Not a required check.
+    name: proto buf lint and breaking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: install buf 1.47.2 (release binary, sha256 pinned)
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/buf" https://github.com/bufbuild/buf/releases/download/v1.47.2/buf-Linux-x86_64
+          echo "3a0c4da8d46eea8136affa63db202c76a44f8112384160b73c3fffb1cf14b5d8  $RUNNER_TEMP/buf" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/buf"
+      - name: buf lint
+        working-directory: contracts/proto
+        run: $RUNNER_TEMP/buf lint
+      - name: buf build
+        working-directory: contracts/proto
+        run: $RUNNER_TEMP/buf build -o /dev/null
+      - name: buf breaking against main (WIRE_JSON)
+        working-directory: contracts/proto
+        run: $RUNNER_TEMP/buf breaking --against "$GITHUB_WORKSPACE/.git#ref=refs/remotes/origin/main,subdir=contracts/proto"
   rust-toolchain:
     name: rust toolchain pin resolves
     runs-on: ubuntu-latest

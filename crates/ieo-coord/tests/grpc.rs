@@ -989,7 +989,9 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
             Step::Do(label, who, call) => {
                 let before = snapshot(&mut dh);
                 let a = over_http(&h, who, &call);
+                let t0 = Instant::now();
                 let b = g.call(&r, who, &call);
+                let took = t0.elapsed();
                 assert_eq!(a, b, "{label}: HTTP vs gRPC");
                 let after = (snapshot(&mut dh), snapshot(&mut dr));
                 assert_eq!(after.0, after.1, "{label}: database state");
@@ -1002,7 +1004,8 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
                     .unwrap_or("OK")
                     .to_string();
                 seen.insert((a.0, code));
-                eprintln!("{label}: {} {}", a.0, a.1);
+                // the handling time over gRPC (contract §6.1 records it)
+                eprintln!("{label}: {} {} [grpc {} ms]", a.0, a.1, took.as_millis());
             }
         }
     }
