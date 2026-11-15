@@ -831,11 +831,14 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "ieo-evidence",
+ "ieo-proto",
  "nix",
  "serde_json",
  "sha2",
  "signal-hook",
  "tiny_http",
+ "tokio",
+ "tonic",
  "ureq",
 ]
 

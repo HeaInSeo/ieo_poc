@@ -16,6 +16,14 @@ signal-hook = "0.3"
 nix = { version = "0.29", features = ["process"] }
 ieo-evidence = { path = "../ieo-evidence" }
 ureq = { version = "2", default-features = false, features = ["json"] }
+# X-04: the coordinator over gRPC (checkpoint_central.transport = "grpc")
+ieo-proto = { path = "../ieo-proto" }
+tonic = "0.14"
+tokio = { version = "1", features = ["rt", "time"] }
+
+[dev-dependencies]
+# X-04: the fake central record over gRPC
+tokio = { version = "1", features = ["rt-multi-thread", "net"] }
 
 [lints]
 workspace = true

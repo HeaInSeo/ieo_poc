@@ -15,19 +15,68 @@
 //!
 //! `local_only` (explicit in the role configuration) turns this off for tests; the status then
 //! says the comparison is not made.
+//!
+//! Transport (X-04): `checkpoint_central.transport` is `"http"` (default; the 02-04 client) or
+//! `"grpc"` (`ieo.internal.v0.SupervisorService`, contracts/ieo-internal-v0.md). Both clients sit
+//! behind [`CoordinatorClient`] and return the answer as HTTP status and body, so the meaning
+//! of an answer (stored, refused with 4xx, unknown) is decided here once for both.
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Every coordinator call has this deadline (contracts/ieo-internal-v0.md §6.1).
+pub const CALL_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How the supervisor reaches the coordinator (`checkpoint_central.transport`, default HTTP).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Transport {
+    Http,
+    Grpc,
+}
+
+/// One coordinator call's result as the HTTP path would see it: the HTTP status and body
+/// (over gRPC: from the outcome, or from the `ieo-error-bin` trailer), or no answer at all.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Reply {
+    Answered(u16, Value),
+    /// Transport failure, deadline, or a gRPC status without a trailer: the outcome is unknown.
+    NoAnswer(String),
+}
+
+/// The coordinator calls of the supervisor (X-04 boundary; contracts/ieo-internal-v0.md §1.1,
+/// §5). Implementations move bytes only: what an answer means is decided once, in
+/// [`Central::latest`] and [`Central::report`]. Neither implementation resends anything.
+pub trait CoordinatorClient: std::fmt::Debug + Send + Sync {
+    /// `GET …/checkpoints/latest` / `GetLatestCheckpoint`.
+    fn latest_checkpoint(&self, repo: &str, role: &str) -> Reply;
+    /// `POST …/checkpoints` / `ReportCheckpoint` with the exact checkpoint bytes.
+    fn report_checkpoint(&self, repo: &str, role: &str, seq: u64, raw: &[u8]) -> Reply;
+    /// Transport, URL and credential file (configuration identity).
+    fn describe(&self) -> String;
+}
+
+#[derive(Debug, Clone)]
 pub enum Central {
     /// No central record (tests only; reported as a capability gap).
     LocalOnly,
-    /// The coordinator: base URL and the file holding this supervisor's report credential.
-    Coordinator { url: String, token_file: PathBuf },
+    /// The coordinator, over the configured transport.
+    Coordinator(Arc<dyn CoordinatorClient>),
 }
+
+impl PartialEq for Central {
+    fn eq(&self, other: &Central) -> bool {
+        match (self, other) {
+            (Central::LocalOnly, Central::LocalOnly) => true,
+            (Central::Coordinator(a), Central::Coordinator(b)) => a.describe() == b.describe(),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Central {}
 
 /// Why the comparison stops a start: the HTTP status and body the adapter answers with.
 #[derive(Debug, Clone, PartialEq)]
@@ -51,23 +100,252 @@ fn not_observed(reason: impl Into<String>) -> Refusal {
     }
 }
 
+fn read_token(token_file: &Path) -> Result<String, String> {
+    std::fs::read_to_string(token_file)
+        .map(|t| t.trim().to_string())
+        .map_err(|e| format!("report credential: {}", e.kind()))
+}
+
+/// The 02-04 HTTP client (`ureq`, 10 s).
+#[derive(Debug)]
+pub struct HttpClient {
+    pub url: String,
+    pub token_file: PathBuf,
+}
+
+impl HttpClient {
+    fn call(&self, method: &str, path: &str, body: Option<&Value>) -> Reply {
+        let token = match read_token(&self.token_file) {
+            Ok(t) => t,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        let req = ureq::request(method, &format!("{}{path}", self.url))
+            .timeout(CALL_TIMEOUT)
+            .set("Authorization", &format!("Bearer {token}"));
+        let r = match body {
+            Some(b) => req.send_json(b.clone()),
+            None => req.call(),
+        };
+        let r = match r {
+            Ok(r) => r,
+            Err(ureq::Error::Status(_, r)) => r,
+            Err(e) => return Reply::NoAnswer(format!("transport: {}", e.kind())),
+        };
+        let st = r.status();
+        let v = r.into_json().unwrap_or(Value::Null);
+        Reply::Answered(st, v)
+    }
+
+    fn path(repo: &str, role: &str) -> String {
+        format!("/v0/repos/{repo}/roles/{role}/checkpoints")
+    }
+}
+
+impl CoordinatorClient for HttpClient {
+    fn latest_checkpoint(&self, repo: &str, role: &str) -> Reply {
+        self.call("GET", &format!("{}/latest", Self::path(repo, role)), None)
+    }
+
+    fn report_checkpoint(&self, repo: &str, role: &str, seq: u64, raw: &[u8]) -> Reply {
+        // a JSON string carries UTF-8 only: bytes that are not are sent as their lossy
+        // conversion (the supervisor writes checkpoints with serde_json, so they are UTF-8)
+        let body = json!({"seq": seq, "checkpoint_json": String::from_utf8_lossy(raw)});
+        self.call("POST", &Self::path(repo, role), Some(&body))
+    }
+
+    fn describe(&self) -> String {
+        format!("http {} {}", self.url, self.token_file.display())
+    }
+}
+
+/// The gRPC client (X-04): `ieo.internal.v0.SupervisorService` with a 10 s deadline, no
+/// automatic resend. An answer is read the way HTTP reads it (§5): a trailer's `http_status`
+/// and body, the outcome of an OK answer; a status without a trailer is no answer (unknown).
+#[derive(Debug)]
+pub struct GrpcClient {
+    pub url: String,
+    pub token_file: PathBuf,
+    rt: Mutex<Option<tokio::runtime::Runtime>>,
+}
+
+impl GrpcClient {
+    pub fn new(url: String, token_file: PathBuf) -> GrpcClient {
+        GrpcClient {
+            url,
+            token_file,
+            rt: Mutex::new(None),
+        }
+    }
+
+    fn request<T>(m: T, token: &str) -> Result<tonic::Request<T>, String> {
+        let mut r = tonic::Request::new(m);
+        r.set_timeout(CALL_TIMEOUT);
+        r.metadata_mut().insert(
+            "authorization",
+            format!("Bearer {token}")
+                .parse()
+                .map_err(|_| "report credential: not a header value".to_string())?,
+        );
+        Ok(r)
+    }
+
+    /// Connect and make one call within [`CALL_TIMEOUT`].
+    fn run<F, Fut>(&self, call: F) -> Reply
+    where
+        F: FnOnce(
+            ieo_proto::v0::supervisor_service_client::SupervisorServiceClient<
+                tonic::transport::Channel,
+            >,
+        ) -> Fut,
+        Fut: std::future::Future<Output = Reply>,
+    {
+        let mut rt = self
+            .rt
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if rt.is_none() {
+            match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(r) => *rt = Some(r),
+                Err(e) => return Reply::NoAnswer(format!("grpc runtime: {e}")),
+            }
+        }
+        let Some(rt) = rt.as_ref() else {
+            return Reply::NoAnswer("grpc runtime".into());
+        };
+        let url = self.url.clone();
+        rt.block_on(async move {
+            let attempt = async move {
+                let ch = tonic::transport::Endpoint::from_shared(url)
+                    .map_err(|e| format!("grpc url: {e}"))?
+                    .connect_timeout(CALL_TIMEOUT)
+                    .connect()
+                    .await
+                    .map_err(|e| format!("transport: {e}"))?;
+                let cl = ieo_proto::v0::supervisor_service_client::SupervisorServiceClient::new(ch)
+                    .max_decoding_message_size(ieo_proto::MAX_MESSAGE);
+                Ok::<Reply, String>(call(cl).await)
+            };
+            match tokio::time::timeout(CALL_TIMEOUT, attempt).await {
+                Ok(Ok(r)) => r,
+                Ok(Err(e)) => Reply::NoAnswer(e),
+                Err(_) => Reply::NoAnswer("transport: deadline (10 s)".into()),
+            }
+        })
+    }
+}
+
+/// A non-OK status as the HTTP path would see it (§4.3, §5).
+fn reply_of(st: &tonic::Status) -> Reply {
+    match ieo_proto::error_from_status(st) {
+        Some(e) => Reply::Answered(
+            u16::try_from(e.http_status).unwrap_or(500),
+            ieo_proto::body_of(&e),
+        ),
+        None => Reply::NoAnswer(format!("grpc {:?}: {}", st.code(), st.message())),
+    }
+}
+
+impl CoordinatorClient for GrpcClient {
+    fn latest_checkpoint(&self, repo: &str, role: &str) -> Reply {
+        let token = match read_token(&self.token_file) {
+            Ok(t) => t,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        let m = ieo_proto::v0::GetLatestCheckpointRequest {
+            repo_id: repo.to_string(),
+            role: ieo_proto::role_of(role) as i32,
+        };
+        let req = match Self::request(m, &token) {
+            Ok(r) => r,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        self.run(|mut cl| async move {
+            match cl.get_latest_checkpoint(req).await {
+                Ok(r) => Reply::Answered(200, ieo_proto::latest_to_json(r.get_ref())),
+                Err(st) => reply_of(&st),
+            }
+        })
+    }
+
+    fn report_checkpoint(&self, repo: &str, role: &str, seq: u64, raw: &[u8]) -> Reply {
+        // §7.1 pre-check: the request HTTP would send (compact JSON) must fit the 1 MiB body
+        // limit, and the path value the handler's 256 bytes; otherwise it is refused here, as
+        // HTTP refuses it (400), and nothing is sent
+        if repo.len() > ieo_proto::MAX_REPO_ID {
+            return Reply::Answered(
+                400,
+                json!({"rejections": [{"code": "SCHEMA_VIOLATION", "field": "repo_id",
+                    "message": "repo_id over 256 bytes (client pre-check)",
+                    "correction": "use the configured repo id", "retryable_after_edit": true}]}),
+            );
+        }
+        if ieo_proto::checkpoint_request_body(seq, raw).len() > ieo_proto::MAX_BODY {
+            return Reply::Answered(400, ieo_proto::body_too_large_json());
+        }
+        let token = match read_token(&self.token_file) {
+            Ok(t) => t,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        let m = ieo_proto::v0::ReportCheckpointRequest {
+            repo_id: repo.to_string(),
+            role: ieo_proto::role_of(role) as i32,
+            seq,
+            checkpoint_json: raw.to_vec(),
+        };
+        let req = match Self::request(m, &token) {
+            Ok(r) => r,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        self.run(|mut cl| async move {
+            match cl.report_checkpoint(req).await {
+                Ok(r) => Reply::Answered(
+                    ieo_proto::status_of_outcome(r.get_ref().outcome),
+                    ieo_proto::checkpoint_answer_to_json(r.get_ref()),
+                ),
+                Err(st) => reply_of(&st),
+            }
+        })
+    }
+
+    fn describe(&self) -> String {
+        format!("grpc {} {}", self.url, self.token_file.display())
+    }
+}
+
 impl Central {
     pub fn from_json(v: &Value) -> Result<Central, String> {
         match v {
             Value::String(s) if s == "local_only" => Ok(Central::LocalOnly),
-            Value::Object(_) => Ok(Central::Coordinator {
-                url: v["url"]
+            Value::Object(_) => {
+                let url = v["url"]
                     .as_str()
                     .ok_or("config.checkpoint_central.url missing")?
                     .trim_end_matches('/')
-                    .to_string(),
-                token_file: v["token_file"]
+                    .to_string();
+                let token_file: PathBuf = v["token_file"]
                     .as_str()
                     .ok_or("config.checkpoint_central.token_file missing")?
-                    .into(),
-            }),
+                    .into();
+                let transport = match v["transport"].as_str() {
+                    None | Some("http") => Transport::Http,
+                    Some("grpc") => Transport::Grpc,
+                    Some(_) => {
+                        return Err(
+                            "config.checkpoint_central.transport must be \"http\" or \"grpc\""
+                                .into(),
+                        );
+                    }
+                };
+                Ok(Central::Coordinator(match transport {
+                    Transport::Http => Arc::new(HttpClient { url, token_file }),
+                    Transport::Grpc => Arc::new(GrpcClient::new(url, token_file)),
+                }))
+            }
             _ => Err(
-                "config.checkpoint_central must be {url, token_file} or \"local_only\" \
+                "config.checkpoint_central must be {url, token_file[, transport]} or \"local_only\" \
                  (runtime contract §2.1: the coordinator's record is canonical)"
                     .into(),
             ),
@@ -77,53 +355,36 @@ impl Central {
     pub fn mode(&self) -> &'static str {
         match self {
             Central::LocalOnly => "local_only",
-            Central::Coordinator { .. } => "coordinator",
+            Central::Coordinator(_) => "coordinator",
         }
-    }
-
-    fn call(&self, method: &str, path: &str, body: Option<&Value>) -> Result<(u16, Value), String> {
-        let Central::Coordinator { url, token_file } = self else {
-            return Err("no coordinator configured".into());
-        };
-        let token = std::fs::read_to_string(token_file)
-            .map_err(|e| format!("report credential: {}", e.kind()))?;
-        let req = ureq::request(method, &format!("{url}{path}"))
-            .timeout(Duration::from_secs(10))
-            .set("Authorization", &format!("Bearer {}", token.trim()));
-        let r = match body {
-            Some(b) => req.send_json(b.clone()),
-            None => req.call(),
-        };
-        let r = match r {
-            Ok(r) => r,
-            Err(ureq::Error::Status(_, r)) => r,
-            Err(e) => return Err(format!("transport: {}", e.kind())),
-        };
-        let st = r.status();
-        let v = r.into_json().unwrap_or(Value::Null);
-        Ok((st, v))
-    }
-
-    fn path(repo: &str, role: &str) -> String {
-        format!("/v0/repos/{repo}/roles/{role}/checkpoints")
     }
 
     /// The coordinator's latest record (`None` when it has none).
     pub fn latest(&self, repo: &str, role: &str) -> Result<Option<Value>, String> {
-        match self.call("GET", &format!("{}/latest", Self::path(repo, role)), None)? {
-            (200, v) => Ok(Some(v)),
-            (404, v) if v["code"] == "NO_CHECKPOINT" => Ok(None),
-            (st, v) => Err(format!("latest answered {st}: {}", code_of(&v))),
+        let Central::Coordinator(c) = self else {
+            return Err("no coordinator configured".into());
+        };
+        match c.latest_checkpoint(repo, role) {
+            Reply::NoAnswer(e) => Err(e),
+            Reply::Answered(200, v) => Ok(Some(v)),
+            Reply::Answered(404, v) if v["code"] == "NO_CHECKPOINT" => Ok(None),
+            Reply::Answered(st, v) => Err(format!("latest answered {st}: {}", code_of(&v))),
         }
     }
 
-    /// Report one checkpoint (its exact bytes). `Ok` for a stored or duplicate report.
+    /// Report one checkpoint (its exact bytes). `Ok` for a stored or duplicate report. A
+    /// refusal carries the coordinator's status (`coordinator_status`): only a 4xx is a refusal
+    /// the coordinator decided; a 5xx or no answer leaves the outcome unknown (02-04 rule;
+    /// contracts/ieo-internal-v0.md §5).
     pub fn report(&self, repo: &str, role: &str, seq: u64, raw: &[u8]) -> Result<Value, Refusal> {
-        let body = json!({"seq": seq, "checkpoint_json": String::from_utf8_lossy(raw)});
-        match self.call("POST", &Self::path(repo, role), Some(&body)) {
-            Err(e) => Err(not_observed(format!("checkpoint report {seq}: {e}"))),
-            Ok((200 | 201, v)) => Ok(v),
-            Ok((st, v)) => Err(reconcile(format!(
+        let reply = match self {
+            Central::Coordinator(c) => c.report_checkpoint(repo, role, seq, raw),
+            Central::LocalOnly => Reply::NoAnswer("no coordinator configured".into()),
+        };
+        match reply {
+            Reply::NoAnswer(e) => Err(not_observed(format!("checkpoint report {seq}: {e}"))),
+            Reply::Answered(200 | 201, v) => Ok(v),
+            Reply::Answered(st, v) => Err(reconcile(format!(
                 "the coordinator refused checkpoint {seq} ({st} {})",
                 code_of(&v)
             ))
