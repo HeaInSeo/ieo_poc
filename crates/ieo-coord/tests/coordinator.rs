@@ -1731,15 +1731,18 @@ fn an_imported_draft_with_unresolved_reasons_cannot_execute() {
                 "sprint_id": "POCX-T01", "sprint_revision": 1, "task_id": "11-01", "target_sha": SHA1,
                 "expected_current": null}));
     assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
-    // promoting the stored draft as executable is refused by the import gate recorded by the
-    // import service (C2), before the binding check
+    // promoting the stored draft as executable is refused. Since 02-05 U2 the 01-07 binding
+    // check runs before the import gate (C2), so the first code is the binding's 422; before
+    // 02-05 it was the gate's 409 `IMPORT_GATED`. Either way it is refused and nothing changes.
+    let before = e.counts();
     let (st, b) = e.post_k(
         "alice",
         "/v0/sprints?mode=executable",
         "promote-key-01",
         &spec,
     );
-    assert_eq!((st, code(&b)), (409, "IMPORT_GATED".into()), "{b}");
+    assert_eq!((st, code(&b)), (422, "UNBOUND_DRAFT".into()), "{b}");
+    assert_eq!(e.counts(), before);
     // flipping a copy to ready while reasons remain fails the format check (other sprint id)
     let mut ready = spec.clone();
     ready["registration_state"] = json!("ready");
@@ -3632,5 +3635,532 @@ fn resume_judgment_compares_local_central_and_assignment() {
     assert_eq!(
         judge_resume(Some(&central), Some(&head), Err(&"down".to_string())).0,
         "not_observed"
+    );
+}
+
+// --- 02-05 step 1: U2 check order (X-01 review 74bd796 U2; PR #66 review 3c017a4 N-1, N-2) ---
+//
+// registerSprint: sprint repo (RG2, C2 reservation) → 01-07 checks → import ownership → import
+// gate → store. Every case below was refused before 02-05 and is refused now; only the first code
+// of a request that fails several checks may differ. Each refusal leaves every row count as it was.
+
+/// A refused request: (status, first code); asserts that no row of any table changed.
+fn refused(e: &Env, who: &str, path: &str, key: &str, body: &Value) -> (u16, String) {
+    let before = e.counts();
+    let (st, b) = e.post_k(who, path, key, body);
+    // one line per case for the step-1 evidence log (`--nocapture`)
+    eprintln!("U2-CASE {key} -> {st} {}", code(&b));
+    assert!(st >= 400, "{b}");
+    assert_eq!(e.counts(), before, "{b}");
+    (st, code(&b))
+}
+
+fn redigest(mut s: Value) -> Value {
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    s
+}
+
+/// POCX-T01 imported once (no gates) and its derived spec registered executable as revision 3;
+/// returns that derived spec.
+fn imported_with_derived_rev3(e: &Env) -> Value {
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    let mut good = derived_executable(e, "POCX-T01");
+    good["revision"] = json!(3);
+    let good = redigest(good);
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "u2-good-03", &good);
+    assert_eq!(
+        (st, b["state"].clone()),
+        (201, json!("ACCEPTED_FOR_SEMANTIC_REVIEW")),
+        "{b}"
+    );
+    good
+}
+
+/// `good` with other tasks (not derived from the import) at `revision`.
+fn not_derived(good: &Value, revision: u64) -> Value {
+    let mut s = good.clone();
+    s["tasks"][0]["exit_condition"] = json!("다른 종료 조건");
+    s["revision"] = json!(revision);
+    redigest(s)
+}
+
+#[test]
+fn u2_an_older_revision_of_an_imported_sprint_gets_the_revision_code_first() {
+    let Some(e) = start() else { return };
+    let good = imported_with_derived_rev3(&e);
+    // (a) not derived, below the latest revision: was 409 EVENT_CONTENT_CONFLICT
+    let stale = not_derived(&good, 2);
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-a-0001",
+            &stale
+        ),
+        (409, "REVISION_SUPERSEDED".into())
+    );
+    assert_eq!(
+        refused(&e, "alice", "/v0/sprints", "u2-a-0002", &stale),
+        (409, "REVISION_SUPERSEDED".into())
+    );
+    // (b) not derived, same number as a stored revision, other digest: was EVENT_CONTENT_CONFLICT
+    let same_number = not_derived(&good, 3);
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-b-0001",
+            &same_number
+        ),
+        (409, "REVISION_CONFLICT".into())
+    );
+    // unchanged: not derived, a new revision that passes 01-07 → ownership 409
+    let fresh = not_derived(&good, 4);
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-o-0001",
+            &fresh
+        ),
+        (409, "EVENT_CONTENT_CONFLICT".into())
+    );
+}
+
+#[test]
+fn u2_an_imported_sprint_with_a_01_07_error_gets_the_01_07_code_first() {
+    let Some(e) = start() else { return };
+    let good = imported_with_derived_rev3(&e);
+    // (c) not derived and a wrong digest: was 409 EVENT_CONTENT_CONFLICT
+    let mut wrong_digest = not_derived(&good, 4);
+    wrong_digest["digest"] = json!("0".repeat(64));
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-c-0001",
+            &wrong_digest
+        ),
+        (422, "DIGEST_MISMATCH".into())
+    );
+    // (c) not derived and an undefined prerequisite: was 409 EVENT_CONTENT_CONFLICT
+    let mut bad_ref = not_derived(&good, 4);
+    bad_ref["tasks"][0]["prerequisites"] =
+        json!([{"task_id": "99-99", "plan_version": "v1.3.3", "required_state": "accepted"}]);
+    let bad_ref = redigest(bad_ref);
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-c-0002",
+            &bad_ref
+        ),
+        (422, "UNDEFINED_PREREQUISITE".into())
+    );
+    // (d) not derived and draft state asked for executable intake: was 409 EVENT_CONTENT_CONFLICT
+    let mut unbound = not_derived(&good, 4);
+    unbound["registration_state"] = json!("draft");
+    let unbound = redigest(unbound);
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-d-0001",
+            &unbound
+        ),
+        (422, "UNBOUND_DRAFT".into())
+    );
+    // unchanged: a format error stays 400; another repo stays SPRINT_REPO_CONFLICT
+    let mut malformed = not_derived(&good, 4);
+    malformed.as_object_mut().map(|m| m.remove("title"));
+    assert_eq!(
+        refused(&e, "alice", "/v0/sprints", "u2-f-0001", &malformed).0,
+        400
+    );
+    let mut theirs = not_derived(&good, 4);
+    theirs["target"]["repo_id"] = json!("repo-b");
+    let theirs = redigest(theirs);
+    assert_eq!(
+        refused(&e, "carol", "/v0/sprints", "u2-r-0001", &theirs),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
+}
+
+#[test]
+fn u2_ownership_covers_every_outcome_the_01_07_checks_accept() {
+    let Some(e) = start() else { return };
+    // two imports: revision 1 (content a), revision 2 (content b)
+    for c in ['a', 'b'] {
+        assert_eq!(
+            e.post(
+                "importer",
+                "/v0/imports/notion",
+                &notion_import("POCX-T01", c, json!([]))
+            )
+            .0,
+            201
+        );
+    }
+    let rev1 = e.get("alice", "/v0/sprints/POCX-T01/revisions/1").1["spec"].clone();
+    let rev2 = e.get("alice", "/v0/sprints/POCX-T01/revisions/2").1["spec"].clone();
+    // the earlier import's stored revision re-sent unchanged: 01-07 says Superseded (200), the
+    // ownership guard still refuses it (PLAN §2.4 "위치"; was and stays 409, never 200)
+    assert_eq!(
+        refused(&e, "alice", "/v0/sprints", "u2-m1-0001", &rev1),
+        (409, "EVENT_CONTENT_CONFLICT".into())
+    );
+    // the latest import's stored revision re-sent unchanged: AlreadyRegistered, 200
+    let (st, b) = e.post_k("alice", "/v0/sprints", "u2-m1-0002", &rev2);
+    assert_eq!(
+        (st, b["state"].clone()),
+        (200, json!("ALREADY_REGISTERED")),
+        "{b}"
+    );
+    // a derived new revision: 201; the same again under a new key: 200
+    let d = ready_from(&e, "POCX-T01", 2, 3);
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "u2-m1-0003", &d);
+    assert_eq!(st, 201, "{b}");
+    let before = e.counts();
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "u2-m1-0004", &d);
+    assert_eq!(
+        (st, b["state"].clone()),
+        (200, json!("ALREADY_REGISTERED")),
+        "{b}"
+    );
+    // a 200 without a write stores only the idempotency record
+    let after = e.counts();
+    let changed: Vec<_> = before
+        .iter()
+        .zip(&after)
+        .filter(|(x, y)| x != y)
+        .map(|(x, _)| x.0.clone())
+        .collect();
+    assert_eq!(changed, vec!["idempotency".to_string()]);
+    // a newer import: the derived revision 3 re-sent is Superseded for 01-07 and no longer
+    // derived from the latest import → 409, not 200
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'c', json!([]))
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        refused(&e, "alice", "/v0/sprints?mode=executable", "u2-m1-0005", &d),
+        (409, "EVENT_CONTENT_CONFLICT".into())
+    );
+}
+
+#[test]
+fn u2_the_import_gate_follows_the_01_07_checks_and_the_repo_rule() {
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &on_page(
+                notion_import_gated("POCX-T02", 'e', json!([]), json!(["기한 미정"])),
+                "fedcba9876543210fedcba9876543210"
+            )
+        )
+        .0,
+        201
+    );
+    let gated = derived_executable(&e, "POCX-T01");
+    // unchanged: a derived spec without other errors → the gate's 409
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-g-0001",
+            &gated
+        ),
+        (409, "IMPORT_GATED".into())
+    );
+    // gate + wrong digest: was 409 IMPORT_GATED
+    let mut wrong = gated.clone();
+    wrong["digest"] = json!("0".repeat(64));
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-g-0002",
+            &wrong
+        ),
+        (422, "DIGEST_MISMATCH".into())
+    );
+    // missing facts + wrong digest: was 409 IMPORT_INCOMPLETE
+    let mut incomplete = derived_executable(&e, "POCX-T02");
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-g-0003",
+            &incomplete
+        ),
+        (409, "IMPORT_INCOMPLETE".into())
+    );
+    incomplete["digest"] = json!("0".repeat(64));
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "u2-g-0004",
+            &incomplete
+        ),
+        (422, "DIGEST_MISMATCH".into())
+    );
+    // gate + the sprint belongs to another repo (RG2): was 409 IMPORT_GATED
+    let mut theirs = gated.clone();
+    theirs["target"]["repo_id"] = json!("repo-b");
+    theirs["target"]["repository_url"] = json!("https://example.invalid/repo-b");
+    let theirs = redigest(theirs);
+    assert_eq!(
+        refused(
+            &e,
+            "carol",
+            "/v0/sprints?mode=executable",
+            "u2-g-0005",
+            &theirs
+        ),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
+    // gate + a sprint_id reserved for repo-a's binding (C2): was 409 IMPORT_GATED
+    let mut reserved = theirs.clone();
+    reserved["sprint_id"] = json!("HUM-01");
+    reserved["revision"] = json!(1);
+    reserved["tasks"][0]["task_id"] = json!("13-01");
+    let reserved = redigest(reserved);
+    assert_eq!(
+        refused(
+            &e,
+            "carol",
+            "/v0/sprints?mode=executable",
+            "u2-g-0006",
+            &reserved
+        ),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
+}
+
+#[test]
+fn n2_a_re_gated_page_keeps_an_unchanged_executable_copy_refused() {
+    // review 3c017a4 N-2: the gate covers AlreadyRegistered and Superseded too (409, never 200)
+    let Some(e) = start() else { return };
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'a', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'b', json!([]), json!([]))
+        )
+        .0,
+        201
+    );
+    // a copy under another sprint id, registered executable while the page is released
+    let mut copy = ready_from(&e, "POCX-T01", 2, 1);
+    copy["sprint_id"] = json!("POCX-Z02");
+    copy["tasks"][0]["task_id"] = json!("13-01");
+    let copy = redigest(copy);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "n2-copy-01", &copy)
+            .0,
+        201
+    );
+    let mut copy2 = copy.clone();
+    copy2["revision"] = json!(2);
+    copy2["title"] = json!("사본 2");
+    let copy2 = redigest(copy2);
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "n2-copy-02", &copy2)
+            .0,
+        201
+    );
+    // while released, re-sending is a 200 lookup
+    assert_eq!(
+        e.post_k("alice", "/v0/sprints?mode=executable", "n2-copy-03", &copy2)
+            .0,
+        200
+    );
+    // the page is gated again
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import_gated("POCX-T01", 'd', queue_gates(), json!([]))
+        )
+        .0,
+        201
+    );
+    // the latest copy unchanged (AlreadyRegistered for 01-07) → IMPORT_GATED
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "n2-copy-04",
+            &copy2
+        ),
+        (409, "IMPORT_GATED".into())
+    );
+    // the older copy unchanged (Superseded for 01-07) → IMPORT_GATED
+    assert_eq!(
+        refused(
+            &e,
+            "alice",
+            "/v0/sprints?mode=executable",
+            "n2-copy-05",
+            &copy
+        ),
+        (409, "IMPORT_GATED".into())
+    );
+    // an idempotent replay of the earlier request is answered first, as before (no new check)
+    let (st, b) = e.post_k("alice", "/v0/sprints?mode=executable", "n2-copy-03", &copy2);
+    assert_eq!(st, 200, "{b}");
+}
+
+// --- 02-05 step 1: C2 (02-03 review 0fa839d N2) — a binding reserves its sprint_id ---
+
+#[test]
+fn c2_a_binding_sprint_id_is_reserved_for_its_repo() {
+    let Some(e) = start() else { return };
+    // HUM-01 is repo-a's binding sprint and is not registered yet
+    let mut theirs = spec("repo-b", 1, 3);
+    theirs["sprint_id"] = json!("HUM-01");
+    let theirs = redigest(theirs);
+    assert_eq!(
+        refused(&e, "carol", "/v0/sprints", "c2n2-0001", &theirs),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
+    assert_eq!(
+        refused(
+            &e,
+            "carol",
+            "/v0/sprints?mode=executable",
+            "c2n2-0002",
+            &theirs
+        ),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
+    // checked before the format, like RG2: a malformed body naming it is also 409
+    let mut malformed = theirs.clone();
+    malformed.as_object_mut().map(|m| m.remove("title"));
+    assert_eq!(
+        refused(&e, "carol", "/v0/sprints", "c2n2-0003", &malformed),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
+    // nothing visible to repo-b afterwards
+    assert_eq!(e.get("carol", "/v0/sprints/HUM-01/state").0, 404);
+    // the binding's own repo registers it (registerSprint and the conversion path)
+    let mut ours = spec("repo-a", 1, 3);
+    ours["sprint_id"] = json!("HUM-01");
+    let ours = redigest(ours);
+    let (st, b) = e.post_k("alice", "/v0/sprints", "c2n2-0004", &ours);
+    assert_eq!(st, 201, "{b}");
+    let input = json!({"title": "설명용 예시", "repo": "repo-a", "goal": "설명용 목표",
+        "out_of_scope": [], "decisions": [],
+        "deadline": {"state": "none", "at": null, "reason": "기한 없음"},
+        "tasks": [{"name": "검사 준비", "output": "시험 입력", "done_when": "입력 확정", "how_to_check": "목록 대조"}]});
+    let (st, b) = e.post_k("alice", "/v0/sprint-inputs", "c2n2-0005", &input);
+    assert_eq!(
+        (
+            st,
+            b["registration"]["sprint_id"].clone(),
+            b["registration"]["revision"].clone()
+        ),
+        (201, json!("HUM-01"), json!(2)),
+        "{b}"
+    );
+    // once registered, RG2 answers the same for repo-b
+    let mut later = spec("repo-b", 3, 3);
+    later["sprint_id"] = json!("HUM-01");
+    let later = redigest(later);
+    assert_eq!(
+        refused(&e, "carol", "/v0/sprints", "c2n2-0006", &later),
+        (409, "SPRINT_REPO_CONFLICT".into())
+    );
+}
+
+#[test]
+fn c2_the_startup_check_refuses_a_binding_on_another_repos_sprint() {
+    let Some(e) = start() else { return };
+    let mut db = e.db();
+    assert_eq!(
+        ieo_coord::api::check_bindings(&mut db, &json!({"repo-a": {"sprint_id": "HUM-01"}})),
+        Ok(())
+    );
+    ready_sprint(&e, 3); // POC-01 for repo-a
+    // a binding of repo-b naming repo-a's sprint: RG2 and the reservation would contradict
+    let err = ieo_coord::api::check_bindings(&mut db, &json!({"repo-b": {"sprint_id": "POC-01"}}))
+        .expect_err("another repo's sprint");
+    assert!(
+        err.contains("registered for another repo (repo-b: POC-01, owned by repo-a)"),
+        "{err}"
+    );
+    // the owner's own binding is fine
+    assert_eq!(
+        ieo_coord::api::check_bindings(&mut db, &json!({"repo-a": {"sprint_id": "POC-01"}})),
+        Ok(())
+    );
+    // two bindings naming one sprint_id
+    let err = ieo_coord::api::check_bindings(
+        &mut db,
+        &json!({"repo-a": {"sprint_id": "X-01"}, "repo-b": {"sprint_id": "X-01"}}),
+    )
+    .expect_err("two bindings");
+    assert!(err.contains("named by two repos"), "{err}");
+    // an imported test id (X-01 U3, unchanged)
+    assert_eq!(
+        e.post(
+            "importer",
+            "/v0/imports/notion",
+            &notion_import("POCX-T01", 'a', json!([]))
+        )
+        .0,
+        201
+    );
+    let err =
+        ieo_coord::api::check_bindings(&mut db, &json!({"repo-a": {"sprint_id": "POCX-T01"}}))
+            .expect_err("imported");
+    assert!(
+        err.contains("owned by a Notion import (repo-a: POCX-T01)"),
+        "{err}"
     );
 }

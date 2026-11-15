@@ -80,31 +80,9 @@ fn run() -> Result<(), String> {
             {
                 let mut db = cfg.connect(NoTls).map_err(|e| format!("db connect: {e}"))?;
                 migrate(&mut db).map_err(|e| format!("migrate: {e}"))?;
-                // startup check (X-01 U3): a repo binding's sprint_id may not be a test id that a
-                // Notion import already owns; the conversion path would otherwise write into it
-                let imported: std::collections::BTreeSet<String> = db
-                    .query("SELECT DISTINCT test_id FROM notion_imports", &[])
-                    .map_err(|e| format!("startup check: {e}"))?
-                    .iter()
-                    .map(|r| r.get::<_, String>(0))
-                    .collect();
-                let clashes: Vec<String> = bindings
-                    .as_object()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|(repo, b)| {
-                        b["sprint_id"]
-                            .as_str()
-                            .filter(|sid| imported.contains(*sid))
-                            .map(|sid| format!("{repo}: {sid}"))
-                    })
-                    .collect();
-                if !clashes.is_empty() {
-                    return Err(format!(
-                        "startup check: binding sprint_id owned by a Notion import ({})",
-                        clashes.join(", ")
-                    ));
-                }
+                // startup check (X-01 U3, 02-05 C2): a binding's sprint_id is neither an imported
+                // test id, nor another repo's sprint, nor named by two bindings
+                ieo_coord::api::check_bindings(&mut db, &bindings)?;
             }
             let server = tiny_http::Server::http(&listen).map_err(|e| format!("listen {listen}: {e}"))?;
             eprintln!("ieo-coord listening on {listen}; policy {}", policy.digest);

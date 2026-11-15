@@ -120,7 +120,8 @@ fn sigterm_stops_the_coordinator_with_exit_zero() {
 
 #[test]
 fn a_binding_on_an_imported_test_id_stops_the_start() {
-    // X-01 U3: the startup check refuses a repo binding whose sprint_id a Notion import owns
+    // X-01 U3: the startup check refuses a repo binding whose sprint_id a Notion import owns;
+    // 02-05 C2: also one whose sprint_id another repo registered
     let Some(url) = base() else { return };
     let cfg: postgres::Config = url.parse().expect("IEO_TEST_DB_URL");
     let dbname = format!("ieo_t_bindcheck_{}", std::process::id());
@@ -146,6 +147,13 @@ fn a_binding_on_an_imported_test_id_stops_the_start() {
         "a".repeat(64)
     ))
     .expect("import row");
+    // 02-05 C2: a sprint of another repo that no import created
+    db.batch_execute(&format!(
+        "INSERT INTO sprint_revisions (sprint_id, revision, repo_id, digest, spec, mode, registration_state, \
+         registered_by) VALUES ('OWNED-X', 1, 'repo-x', '{}', '{{}}', 'draft', 'draft', 'svc')",
+        "c".repeat(64)
+    ))
+    .expect("revision row");
     let dir = std::env::temp_dir().join(format!("ieo-coord-bindcheck-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("dir");
     std::fs::write(dir.join("tokens.json"), r#"{"principals": []}"#).expect("tokens");
@@ -197,6 +205,13 @@ fn a_binding_on_an_imported_test_id_stops_the_start() {
     assert_eq!(exit, Some(Some(2)), "{err}");
     assert!(
         err.contains("owned by a Notion import") && err.contains("repo-a: POCX-T-01"),
+        "{err}"
+    );
+    // 02-05 C2: a binding naming another repo's sprint stops the start too
+    let (exit, err) = run("OWNED-X");
+    assert_eq!(exit, Some(Some(2)), "{err}");
+    assert!(
+        err.contains("registered for another repo (repo-a: OWNED-X, owned by repo-x)"),
         "{err}"
     );
     // another sprint id starts normally (it listened, then was stopped)

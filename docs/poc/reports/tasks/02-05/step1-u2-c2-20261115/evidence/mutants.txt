@@ -1,0 +1,17 @@
+# mutants at c61708f: each change applied alone to crates/ieo-coord/src/api.rs, then
+# cargo test -p ieo-coord --test coordinator -- u2_ n2_ c2_a_binding_sprint_id_is_reserved_for c2_the_startup ; code restored after each
+M1 ownership+gate only before a write (skip AlreadyRegistered/Superseded)
+test u2_ownership_covers_every_outcome_the_01_07_checks_accept ... FAILED
+test n2_a_re_gated_page_keeps_an_unchanged_executable_copy_refused ... FAILED
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 68 filtered out; finished in 1.77s
+M2 ownership guard before the 01-07 checks (old position)
+test u2_an_older_revision_of_an_imported_sprint_gets_the_revision_code_first ... FAILED
+test u2_an_imported_sprint_with_a_01_07_error_gets_the_01_07_code_first ... FAILED
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 68 filtered out; finished in 1.76s
+M3 binding reservation removed
+test c2_a_binding_sprint_id_is_reserved_for_its_repo ... FAILED
+test u2_the_import_gate_follows_the_01_07_checks_and_the_repo_rule ... FAILED
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 68 filtered out; finished in 1.79s
+M4 startup check: another repo's sprint not refused
+test c2_the_startup_check_refuses_a_binding_on_another_repos_sprint ... FAILED
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 68 filtered out; finished in 1.82s
