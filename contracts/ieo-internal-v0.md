@@ -32,6 +32,7 @@ supervisor(역할 Pod의 실행 관리 서비스)가 코디네이터에 하는 �
 - **`compareCheckpoint`**(`GET …/checkpoints/compare`). `roles:control` 클라이언트(코디네이터 쪽 운영 주체)의 작업이다. supervisor는 `GetLatestCheckpoint`로 중앙 기록을 읽고 스스로 대조한다(02-04 `central::compare`).
 - 사람·등록자·배정자용 작업 전부: 명세 등록·변환, 의미 검토, Notion 가져오기, 예외 승인, 배정, 증거 입력, 판정, outbox, repo 역할 상태·정지. HTTP/JSON에만 둔다.
 - **`deliverAssignment`**(`POST /v0/repos/{repo_id}/roles/{role}/deliveries`, 02-05 단계 3). `roles:control` 클라이언트(운영 주체)의 작업이라 **HTTP 전용**이다. RPC는 없다(이 작업을 위한 proto 변경 없음, 02-05 계획 §3.1 작업 표. 단계 3의 proto 변경은 `GetOwnAssignmentResponse.expected_runtime` 하나다, §14). 코디네이터는 이 작업 안에서 supervisor의 start·reconnect를 역할 서비스 HTTP(`/v0/role/*`)로 부른다(§1.3). supervisor는 그 요청을 받으면 `GetOwnAssignment`로 현재 배정과 대조한다.
+- **`getAssignmentChain`**(`GET /v0/coordinator/assignments/{assignment_id}/generations/{generation}/chain`, 02-05 단계 4). `coordinator:assign` 또는 `roles:control` 클라이언트의 읽기 작업이라 **HTTP 전용**이다. RPC는 없다(§15).
 
 ### 1.3 호출 방향
 
@@ -69,7 +70,7 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 - **검사 순서**: 작업마다 처리 코드가 정하고, gRPC는 같은 처리를 부르므로 순서가 같다. OpenAPI 머리말의 일반 순서(401 → 403/409 → 400 → 409 → 422)와 다른 작업이 있다(main 0779850):
   - `SubmitAgentReport`: 401 → 범위·역할(403) → 본문 파싱(400) → 저장된 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`)·배정 확인(409) → 형식(400)·의미(422). 재조회와 식별 검사가 형식 검사보다 먼저다.
   - `SubmitReproRequest`: 401 → 범위·역할(403) → 본문 파싱(400) → 재조회(200)·내용 충돌·현재 배정(409) → 새 요청만 형식(400 `MISSING_FIELD`·`SCHEMA_VIOLATION`).
-  - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(`seq`·`checkpoint_json`, JSON 파싱, `format`이 `ieo-checkpoint/v0`인지, `seq`가 1 이상이고 체크포인트 자신의 `seq`와 같은지, 모두 400) → 체크포인트의 repo·역할 불일치(409 `REPO_MISMATCH`) → 나머지 체크포인트 필드 형식(400) → 잠금 → 순번·내용 식별(200·409 `EVENT_CONTENT_CONFLICT`·`CHECKPOINT_SEQUENCE_GAP`) → 배정 대조(409) → 저장 → `config_tamper_detected` 형식(400, 롤백). 그래서 repo가 다르고 `phase`가 빠진 체크포인트는 400이 아니라 409이고, repo가 다르고 `format`이나 `seq`가 틀린 체크포인트는 400이다.
+  - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(`seq`·`checkpoint_json`, JSON 파싱, `format`이 `ieo-checkpoint/v0`인지, `seq`가 1 이상이고 체크포인트 자신의 `seq`와 같은지, 모두 400) → 체크포인트의 repo·역할 불일치(409 `REPO_MISMATCH`) → 나머지 체크포인트 필드 형식(400) → 잠금 → 순번·내용 식별(200·409 `EVENT_CONTENT_CONFLICT`·`CHECKPOINT_SEQUENCE_GAP`) → 배정 대조(409) → takeover이면 전달 확인(409 `DELIVERY_REQUIRED`·`DELIVERY_MISMATCH`, 02-05 단계 4) → 저장 → takeover이면 인수 행(같은 트랜잭션, 이미 인수된 전달은 409 `DELIVERY_MISMATCH`로 롤백) → after_run·error의 `first_action`으로 첫 행동 채움 → `config_tamper_detected` 형식(400, 롤백). `delivery_id`·`first_action` 형식(400)은 “나머지 체크포인트 필드 형식”에 든다. 그래서 repo가 다르고 `phase`가 빠진 체크포인트는 400이 아니라 409이고, repo가 다르고 `format`이나 `seq`가 틀린 체크포인트는 400이다.
   - `GetReproRequest`·`GetLatestCheckpoint`: 401 → (`GetLatestCheckpoint`만 역할 이름 404) → 권한(403) → 없음(404).
   - `GetOwnAssignment`(02-05): 401 → 역할 이름(404) → 범위·repo·역할(403) → 현재 배정 없음(404 `NO_CURRENT_ASSIGNMENT`).
   - `RecordFirstAction`(02-05): 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(400) → 잠금 → 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`) → 그 (repo, role)에 발급된 배정인지(409 `STALE_ASSIGNMENT`) → 그 세션의 takeover 체크포인트가 그 배정·세대로 저장됐는지(409 `CHECKPOINT_MISMATCH`) → 저장.
@@ -307,3 +308,12 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 | 머리 | 제목에 단계 3 | 이 절 |
 | §1.2 | `deliverAssignment`는 HTTP 전용이라고 적었다(검토 c11e734 I-3: “이 작업을 위한 proto 변경 없음”으로 정정) | 운영 주체 작업(계획 §3.1) |
 | (§9 참고) | 작업 표의 실행 모양에 `Delivery`(권한 → 요청 기록 트랜잭션 → 재개 판단 → 예산 검사·supervisor 호출은 트랜잭션 밖 → 결과 기록 트랜잭션)를 더했다. gRPC 표면 작업의 모양은 그대로 “트랜잭션 하나”다 | `crates/ieo-coord/src/api.rs` `Shape::Delivery` |
+
+## 15. 02-05 단계 4에서 바꾼 문장
+
+02-05 단계 4(인수·첫 행동 연결)는 **proto를 바꾸지 않는다.** takeover의 `delivery_id`와 회차의 `first_action`은 체크포인트 JSON의 필드(런타임 계약 revision 12 §15)라서 `ReportCheckpoint`의 `checkpoint_json` 바이트 안에 실린다. 판단은 HTTP와 같은 `reportCheckpoint` 처리 하나가 한다. 새 거부 코드 `DELIVERY_REQUIRED`·`DELIVERY_MISMATCH`는 409이고, §4.1 대응표의 409 규칙(내용 충돌 코드도, 소유·outbox 충돌 코드도 아니므로)대로 `FAILED_PRECONDITION`이다. 대응표는 바꾸지 않는다. 이제 supervisor가 `RecordFirstAction`을 부른다(단계 2에 이미 있던 RPC, 두 전송 모두).
+
+| 절 | 바뀐 내용 | 이유 |
+| --- | --- | --- |
+| §1.2 | `getAssignmentChain`은 HTTP 전용이라고 적었다 | 클라이언트 읽기 작업(계획 §3.1) |
+| §1.2 `ReportCheckpoint` 순서 | takeover의 전달 확인·인수 행·첫 행동 채움의 자리를 적었다 | `crates/ieo-coord/src/api.rs` `report_checkpoint` |

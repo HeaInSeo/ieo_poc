@@ -1,12 +1,23 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.11.0
+  version: 0.12.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.12.0 (02-05 step 4, additive): getAssignmentChain (`GET /v0/coordinator/assignments/{assignment_id}/generations/{generation}/chain`,
+    `coordinator:assign` or `roles:control`, HTTP only): sprint revision → assignment → deliveries (verified) → takeovers
+    → first actions → checkpoints and tamper events → agent reports and the latest session status (claims). Every
+    section is labelled `verified` or `claim`. reportCheckpoint: a checkpoint carries `delivery_id` and
+    `first_action` (runtime contract revision 12); a `takeover` must name a delivery of the same repo, role,
+    assignment and generation that sent something (no result yet, `accepted` or `unknown`) and not taken over yet —
+    else 409 `DELIVERY_REQUIRED`/`DELIVERY_MISMATCH` and no row; the takeover row is written in the same transaction.
+    A later checkpoint's `first_action` fills a first action whose report was lost (recordFirstAction `source`).
+    deliverAssignment sends `delivery_id` with the start. **Behaviour change of an accepted operation:** a
+    `takeover` checkpoint without a delivery (every 02-04 direct start) is now refused (409 `DELIVERY_REQUIRED`).
+    reportSessionStatus `assignment_id` states `minLength: 1` (the code already refused an empty one).
     0.11.0 (02-05 step 3, additive): deliverAssignment (`POST /v0/repos/{repo_id}/roles/{role}/deliveries`,
     `roles:control`, `Idempotency-Key`; HTTP only): the coordinator records the request, judges resumption
     (`compare`), runs the shared budget check, calls the role supervisor's start or reconnect with the coordinator
@@ -587,6 +598,18 @@ paths:
         `current_assignment: false` when the assignment moved on during the run (a takeover must
         always be current). A `config_tamper_detected` object in the checkpoint is recorded once
         per new session. Refused reports leave no row. An unknown role → 404 `NOT_FOUND`.
+        02-05 step 4 (runtime contract revision 12): the checkpoint carries `delivery_id` (null or the
+        delivery its run answers; any other type → 400) and `first_action` (null: not known; `"none"`: the
+        run ended without one; or `{attempt_id, event_offset, observed_at, kind}`; anything else → 400).
+        A `takeover` must name a delivery (none → 409 `DELIVERY_REQUIRED`) recorded for the same repo, role,
+        assignment and generation whose newest result is missing (the supervisor reports the takeover while
+        the coordinator is still recording the answer), `accepted` or `unknown`, and not taken over before;
+        anything else → 409 `DELIVERY_MISMATCH`. These checks follow every check above; the takeover row
+        (delivery, sequence, digest, session, applied revision and digest, received_at; a claim) is
+        written in the same transaction as the checkpoint row, and a refusal leaves neither. A request
+        alone is never a takeover. An `after_run`/`error` checkpoint whose `first_action` is an object
+        records that first action (recordFirstAction, `source: checkpoint`) when none is recorded for the
+        attempt and the session's takeover is stored; a recorded one is never replaced.
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
         - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
@@ -810,7 +833,9 @@ paths:
         re-query result is not recorded if another result was recorded meanwhile). The same key with another
         body → 409 `IDEMPOTENCY_KEY_CONFLICT`. The budget plan must name exactly the roles configured for the
         repo (else `budget_refused`). A delivery is not a takeover:
-        the takeover is the supervisor's checkpoint report (02-05 step 4). `logical_name` (default
+        the takeover is the supervisor's checkpoint report (02-05 step 4). The start or reconnect carries
+        `delivery_id` (top level); the supervisor writes it on the run's checkpoints and the coordinator links
+        the takeover to this delivery (reportCheckpoint). `logical_name` (default
         `<repo>-<role>`) is kept in the mapping record only; a reconnect resumes by the checkpoint's session id
         (runtime contract §4.2, §10 item 5). Order: 401 → 404 role → 403 → 400 Idempotency-Key → 400 body →
         404 no role configuration → transaction 1 → judgment → budget → supervisor → transaction 2.
@@ -884,6 +909,11 @@ paths:
         generation (else 409 `CHECKPOINT_MISMATCH`). Like the later checkpoints of a run, a first action
         recorded after the assignment moved on is kept with `current_assignment: false`.
         Order: 401 → 404 role → 403 → 400 format → 409 key → 409 assignment, takeover. Refusals leave no row.
+        A report lost on the way is filled from the run's `after_run`/`error` checkpoint (reportCheckpoint,
+        same body, recorded with `source: checkpoint`); this report afterwards is the same body → 200.
+        The supervisor detects the first action as the first `assistant` event after `init` with a
+        `tool_use` or non-empty `text` block (runtime contract revision 12 §14 item 15); a run without one has
+        no record (never offset 0 or the start time).
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
         - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
@@ -960,7 +990,7 @@ paths:
                 observed_at: { type: string, format: date-time, description: 'UTC, ending in Z' }
                 lifecycle: { type: string, enum: [idle, running, stopping] }
                 session_id: { type: [string, 'null'], minLength: 1, maxLength: 256 }
-                assignment_id: { type: [string, 'null'], maxLength: 128 }
+                assignment_id: { type: [string, 'null'], minLength: 1, maxLength: 128 }
                 generation: { type: [integer, 'null'], minimum: 0 }
                 quota_group_id: { type: string, minLength: 1, maxLength: 128 }
                 provider_status_or_unknown: { type: string, minLength: 1, maxLength: 64 }
@@ -1121,6 +1151,49 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Rejected' }
         '422': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/assignments/{assignment_id}/generations/{generation}/chain:
+    get:
+      tags: [coordinator]
+      operationId: getAssignmentChain
+      summary: The connection of one assignment generation (02-05 step 4; HTTP only, read only)
+      description: |
+        Scope `coordinator:assign` or `roles:control` (service or user; agent credentials → 403 `SCOPE_DENIED`).
+        An unknown generation, or one of a repo outside the credential's repos → 404 `NOT_FOUND` (no existence
+        leak). A generation that is not a non-negative integer → 400. One read-only transaction; the answer is
+        built from the database only, so it is the same after a coordinator restart.
+        Sections, in the order of the chain:
+        `sprint` (sprint_id, revision, digest, `sources[]`) and `assignment` (generation, task, target SHA, the
+        revision's limits, issuer, issued_at, policy digest, whether it is the current head) — `verified`;
+        `deliveries` (request, cause, every result: judgment, operation, budget outcome, what was sent and the
+        supervisor's answer; `requested_at`, `responded_at`) — `verified`: what the coordinator itself did;
+        `takeovers` (delivery, checkpoint sequence and digest, session, applied revision and digest,
+        received_at), `first_actions` (attempt, offset, supervisor-clock time, kind, `source`), `checkpoints` of
+        the generation (with their `delivery_id` and `first_action`), `tamper_events`, `agent_reports` of the
+        assignment generation (report v0 claims, a separate field) and `session_status` (the latest one of the
+        (repo, role) that was not stale on arrival) — `claim`: reported by the supervisor or an agent.
+        `links`: one per delivery — whether it was taken over (`taken_over`, `takeover_seq`) and its first
+        action (`first_action`: the record, `"none"` when the run's `after_run` says it had none, or null: not
+        known; `first_action_conflict` when the run's checkpoint carries another one). A delivery is never a
+        takeover by itself. Claims are not inputs of the completion judgment (judgments read GitHub and
+        execution evidence only).
+      parameters:
+        - { name: assignment_id, in: path, required: true, schema: { type: string } }
+        - { name: generation, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        '200':
+          description: The chain
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssignmentChain' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Unknown or not visible (`NOT_FOUND`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '500': { $ref: '#/components/responses/Internal' }
   /v0/coordinator/evidence:
     post:
       tags: [coordinator]
@@ -1303,6 +1376,48 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Problem' }
   schemas:
+    AssignmentChain:
+      description: getAssignmentChain (02-05 step 4). `evidence_levels` names the verified and the claim sections
+      type: object
+      required: [assignment_id, generation, repo_id, role, evidence_levels, sprint, assignment, deliveries, takeovers,
+                 first_actions, checkpoints, tamper_events, agent_reports, session_status, links]
+      properties:
+        assignment_id: { type: string }
+        generation: { type: integer, minimum: 0 }
+        repo_id: { type: string }
+        role: { type: string, enum: [development, guardrail] }
+        evidence_levels:
+          type: object
+          required: [verified, claim]
+          properties:
+            verified: { type: array, items: { type: string } }
+            claim: { type: array, items: { type: string } }
+        sprint: { type: object }
+        assignment: { type: object }
+        deliveries: { type: array, items: { type: object } }
+        takeovers: { type: array, items: { type: object } }
+        first_actions: { type: array, items: { type: object } }
+        checkpoints: { type: array, items: { type: object } }
+        tamper_events: { type: array, items: { type: object } }
+        agent_reports: { type: array, items: { type: object } }
+        session_status: { type: [object, 'null'] }
+        links:
+          type: array
+          items:
+            type: object
+            required: [delivery_id, attempt_id, outcome, taken_over, takeover_seq, first_action, first_action_conflict]
+            properties:
+              delivery_id: { type: string }
+              attempt_id: { type: string }
+              outcome: { type: [string, 'null'] }
+              taken_over: { type: boolean }
+              takeover_seq: { type: [integer, 'null'] }
+              first_action:
+                oneOf:
+                  - { type: 'null' }
+                  - { type: string, const: none }
+                  - { type: object }
+              first_action_conflict: { type: boolean }
     Delivery:
       description: A delivery (02-05 step 3, `verified`) and its newest result
       type: object
@@ -1370,7 +1485,8 @@ components:
                  STALE_ASSIGNMENT, ASSIGNMENT_SHA_MISMATCH, OWNERSHIP_CONFLICT, PREREQUISITE_UNMET, LIMIT_REACHED,
                  SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
                  NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE,
-                 CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH, ATTEMPT_ID_CONFLICT, DELIVERY_IN_PROGRESS]
+                 CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH, ATTEMPT_ID_CONFLICT, DELIVERY_IN_PROGRESS,
+                 DELIVERY_REQUIRED, DELIVERY_MISMATCH]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

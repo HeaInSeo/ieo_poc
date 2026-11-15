@@ -208,6 +208,12 @@ struct State {
     /// The newest checkpoint known to be in the central record (`seq`, `sha256`): from an
     /// accepted report or a successful comparison (review accd6c8 L-2).
     central_accepted: Option<Value>,
+    /// The newest first action this service observed (its supervisor-clock time), or the newest
+    /// one recorded in a run outcome on the volume (02-05 step 4, C14): §7
+    /// `last_actual_action_at`.
+    last_action_at: Option<String>,
+    /// The last first-action report to the coordinator (attempt, answer or error).
+    first_action_report: Option<Value>,
 }
 
 pub struct Service {
@@ -304,6 +310,15 @@ impl Service {
                             "observation": o["provider"]})
             })
             .unwrap_or(Value::Null);
+        // the newest first action recorded in a run outcome on the volume (02-05 step 4)
+        let last_action_at = std::fs::read_dir(cfg.runs())
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .filter_map(|e| std::fs::read(e.path().join("outcome.json")).ok())
+            .filter_map(|b| serde_json::from_slice::<Value>(&b).ok())
+            .filter_map(|o| o["first_action"]["observed_at"].as_str().map(str::to_owned))
+            .max();
         let rec = std::fs::read(cfg.report_record_path())
             .ok()
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
@@ -315,6 +330,7 @@ impl Service {
             state: Mutex::new(State {
                 central_last,
                 central_accepted,
+                last_action_at,
                 ..State::default()
             }),
             restored,
@@ -406,6 +422,8 @@ impl Service {
                 last: g.last.clone(),
                 central_last: g.central_last.clone(),
                 central_accepted: g.central_accepted.clone(),
+                last_action_at: g.last_action_at.clone(),
+                first_action_report: g.first_action_report.clone(),
             }
         };
         let raw = std::fs::read(self.cfg.checkpoint_path()).ok();
@@ -485,7 +503,10 @@ impl Service {
                "provider_status_or_unknown": provider,
                "provider_status_detail": provider_detail,
                "provider_status_before_start": self.previous_provider,
-               "last_actual_action_at": last.and_then(|l| l.get("ended_at")).cloned().unwrap_or(Value::Null),
+               // the newest first action observed (02-05 step 4, C14): a time the stream showed an
+               // action, never the end or start of a run; null when none was observed
+               "last_actual_action_at": st.last_action_at,
+               "first_action_report": st.first_action_report,
                "restored_checkpoint_ref": self.restored,
                "capability_gaps": gaps})
     }
@@ -642,6 +663,19 @@ impl Service {
         ) = coord
         else {
             return err(400, "SCHEMA_VIOLATION", "coordinator record incomplete");
+        };
+        // the delivery this start belongs to (02-05 step 4): carried on the run's checkpoints;
+        // the coordinator links the takeover to it (and refuses a takeover without one)
+        let delivery_id = match &req["delivery_id"] {
+            Value::Null => None,
+            Value::String(d) if safe_id(d) => Some(d.clone()),
+            _ => {
+                return err(
+                    400,
+                    "SCHEMA_VIOLATION",
+                    "delivery_id (1-64 of [A-Za-z0-9_-]) when present",
+                );
+            }
         };
         if self.cfg.runs().join(&attempt).exists() {
             return err(409, "ID_CONTENT_CONFLICT", "attempt_id already used");
@@ -930,6 +964,9 @@ impl Service {
         st.stop = Some(stop.clone());
         drop(st);
         let me = Arc::clone(self);
+        let probe = Arc::new(self.first_action_probe(json!({
+            "assignment_id": assignment_id, "generation": generation,
+            "attempt_id": attempt, "session_id": session_id})));
         let job = Job {
             attempt,
             session_id,
@@ -941,9 +978,11 @@ impl Service {
                 "sprint_id": sprint_id, "sprint_revision": sprint_revision,
                 "spec_digest": spec_digest, "image_digest": image_digest,
                 "profile_id": profile_id, "profile_revision": profile_revision,
-                "target_sha": req["target_sha"].as_str().unwrap_or("unknown")}),
+                "target_sha": req["target_sha"].as_str().unwrap_or("unknown"),
+                "delivery_id": delivery_id}),
             tamper,
             stop,
+            probe,
             started_at: info["started_at"].as_str().unwrap_or_default().to_string(),
         };
         std::thread::spawn(move || me.execute(job));
@@ -1037,6 +1076,7 @@ impl Service {
             kill: cfg.kill.clone(),
             stdin: Some(prompt_message(&job.prompt)),
             stop: Some(job.stop.clone()),
+            probe: Some(Arc::clone(&job.probe)),
         };
         let stdout = dir.join("stdout.jsonl");
         let outcome: Outcome =
@@ -1074,6 +1114,7 @@ impl Service {
             "config_cleanup": {"digest": report.digest, "removed": report.removed.len(),
                                "credentials_removed": report.credentials_removed},
             "tamper": job.tamper,
+            "first_action": first_action_json(job, true),
             "argv": argv, "env_names": crate::env::names(&env)});
         let _ = std::fs::write(
             dir.join("outcome.json"),
@@ -1162,6 +1203,14 @@ impl Service {
         });
         let mut cp = cp;
         cp["phase"] = json!(phase);
+        // 02-05 step 4 (runtime contract revision 12): the delivery this run belongs to, and
+        // the run's first action — `none` after a run that showed none; not known at takeover
+        // or after an error without one
+        cp["delivery_id"] = c["delivery_id"].clone();
+        cp["first_action"] = match phase {
+            "takeover" => Value::Null,
+            p => first_action_json(job, p == "after_run"),
+        };
         // the empty lists above are not observations: these are not tracked yet (§7 report)
         cp["tracked"] = json!({"active_children": false, "pending_external_requests": false,
                                "worktree_head": false});
@@ -1490,9 +1539,50 @@ struct Job {
     stop: Arc<AtomicBool>,
     /// When the attempt was accepted (the lower bound of its provider observation's time).
     started_at: String,
+    /// Sees every stream line of the run: its first action (02-05 step 4).
+    probe: Arc<crate::first_action::Probe>,
+}
+
+/// The run's first action as its checkpoint and outcome carry it: the observation, `"none"` when
+/// the run ended without one (`ended`), else null (not known).
+fn first_action_json(job: &Job, ended: bool) -> Value {
+    match job.probe.found() {
+        Some(f) => json!({"attempt_id": job.attempt, "event_offset": f.event_offset,
+                          "observed_at": f.observed_at, "kind": f.kind}),
+        None if ended => json!("none"),
+        None => Value::Null,
+    }
 }
 
 impl Service {
+    /// The probe of one run: on its first action, `last_actual_action_at` moves to the
+    /// observation and the action is reported to the coordinator from another thread. A failed
+    /// report never stops the run; the `after_run` checkpoint carries the same values.
+    fn first_action_probe(self: &Arc<Self>, ident: Value) -> crate::first_action::Probe {
+        let me = Arc::clone(self);
+        crate::first_action::Probe::new(Some(Box::new(move |f: &crate::first_action::Found| {
+            let mut body = ident;
+            body["event_offset"] = json!(f.event_offset);
+            body["observed_at"] = json!(f.observed_at);
+            body["kind"] = json!(f.kind);
+            {
+                let mut st = me.state.lock().unwrap_or_else(|e| e.into_inner());
+                st.last_action_at = Some(f.observed_at.clone());
+                st.first_action_report =
+                    Some(json!({"attempt_id": body["attempt_id"], "pending": true}));
+            }
+            std::thread::spawn(move || {
+                let r = me
+                    .cfg
+                    .central
+                    .record_first_action(&me.cfg.repo, me.cfg.role_name(), &body);
+                let mut st = me.state.lock().unwrap_or_else(|e| e.into_inner());
+                st.first_action_report = Some(json!({"attempt_id": body["attempt_id"],
+                    "pending": false, "result": r}));
+            });
+        })))
+    }
+
     /// PID 1 duty: reap orphans (processes reparented to PID 1, e.g. a run's descendants after
     /// the group kill). Only while no run is active and under the state lock that also gates new
     /// runs, so it never takes the exit status of a run's own child. Returns how many were reaped.
@@ -1654,6 +1744,7 @@ mod tests {
             tamper: None,
             stop: Arc::new(AtomicBool::new(true)),
             started_at: ieo_evidence::time::now(),
+            probe: Arc::new(crate::first_action::Probe::new(None)),
         };
         svc.execute(job);
         let v = svc.status()["last"].clone();

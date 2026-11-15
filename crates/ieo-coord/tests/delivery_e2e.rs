@@ -813,6 +813,30 @@ fn e2e(transport: &str) {
         let mut cp: Value = serde_json::from_slice(&good).expect("cp");
         cp["seq"] = json!(seq);
         cp["phase"] = json!(phase);
+        if phase == "takeover" {
+            // 02-05 step 4: a takeover names a delivery not taken over yet (a test fixture
+            // recorded as deliverAssignment records one, without a result)
+            let id = format!("D-e2e-step7-{seq}");
+            let mut c2 = cfg.clone();
+            c2.dbname(&dbname);
+            c2.connect(NoTls)
+                .expect("db")
+                .execute(
+                    "INSERT INTO role_deliveries (delivery_id, repo_id, role, request_id, body,
+                         assignment_id, generation, attempt_id, session_id, logical_name,
+                         coordinator_record, target_sha, requested_by)
+                     VALUES ($1, 'repo-a', 'development', $1, '{}'::jsonb, 'A1', 0, $1, 'f',
+                             'f', $3, $2, 'test-fixture')",
+                    &[
+                        &id,
+                        &SHA1,
+                        &json!({"image_digest": "sha256:img", "profile_id": "dev-profile",
+                                "profile_revision": 1}),
+                    ],
+                )
+                .expect("fixture delivery");
+            cp["delivery_id"] = json!(id);
+        }
         let raw = serde_json::to_string_pretty(&cp).expect("j");
         let (st, b) = c(
             "sup",
@@ -1134,9 +1158,12 @@ fn e2e(transport: &str) {
 
     // every run went through a delivery; the database holds every request and result
     assert_eq!(runs(), 5);
-    assert_eq!(count("role_deliveries"), 19);
+    // 19 deliveries and the fixture of step 7's crafted takeover (02-05 step 4)
+    assert_eq!(count("role_deliveries"), 20);
     // each run that started reported its takeover and after_run; refusals reported nothing
     assert_eq!(count("role_checkpoints"), 12);
+    // every takeover is linked to its delivery: the five runs and step 7's (02-05 step 4)
+    assert_eq!(count("role_takeovers"), 6);
     assert_eq!(count("role_delivery_results"), 22);
     let n: i64 = db
         .query_one(

@@ -258,14 +258,14 @@ fn signal_group(kill: &str, pgid: u32, sig: &str) -> bool {
 /// Copies stdout lines that arrived after a stop decision (no more checks): everything the reader
 /// queued during the stop grace, plus a bounded time afterwards, so a `result` written on the way
 /// out is kept.
-struct Copier<'a> {
+struct Copier<'a, 'b> {
     rx: &'a mpsc::Receiver<Event>,
-    out: &'a mut std::fs::File,
+    out: &'a mut Sink<'b>,
     ended: bool,
     error: Option<std::io::Error>,
 }
 
-impl Copier<'_> {
+impl Copier<'_, '_> {
     /// Copy what arrives within `for_`.
     fn pump(&mut self, for_: Duration) {
         let until = Instant::now() + for_;
@@ -275,7 +275,7 @@ impl Copier<'_> {
             };
             match self.rx.recv_timeout(left) {
                 Ok(Event::Line(line)) => {
-                    if let Err(e) = writeln!(self.out, "{line}")
+                    if let Err(e) = self.out.line(&line)
                         && self.error.is_none()
                     {
                         self.error = Some(e);
@@ -370,6 +370,8 @@ pub struct Options {
     pub stdin: Option<Vec<u8>>,
     /// Set from outside to stop the run (adapter `stop`); checked on every loop iteration.
     pub stop: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// Fed every line written to the stdout file, in order (02-05 step 4: the first action).
+    pub probe: Option<std::sync::Arc<crate::first_action::Probe>>,
 }
 
 impl Default for Options {
@@ -378,6 +380,7 @@ impl Default for Options {
             kill: "kill".into(),
             stdin: None,
             stop: None,
+            probe: None,
         }
     }
 }
@@ -444,10 +447,14 @@ pub fn run_with(
     });
     let mut cleanup_failed = false;
     let mut usage = Usage::default();
+    let probe = opts.probe.as_deref();
     let watched = watch(
         &mut child,
         &rx,
-        &mut out,
+        &mut Sink {
+            out: &mut out,
+            probe,
+        },
         &mut usage,
         &limits,
         started,
@@ -455,7 +462,10 @@ pub fn run_with(
     );
     let mut copier = Copier {
         rx: &rx,
-        out: &mut out,
+        out: &mut Sink {
+            out: &mut out,
+            probe,
+        },
         ended: false,
         error: None,
     };
@@ -510,14 +520,30 @@ enum Watch {
     Stopped(Stop),
 }
 
+/// The stdout file and the probe that sees every line written to it.
+struct Sink<'a> {
+    out: &'a mut std::fs::File,
+    probe: Option<&'a crate::first_action::Probe>,
+}
+
+impl Sink<'_> {
+    fn line(&mut self, line: &str) -> std::io::Result<()> {
+        writeln!(self.out, "{line}")?;
+        if let Some(p) = self.probe {
+            p.feed(line);
+        }
+        Ok(())
+    }
+}
+
 /// Handle one line; `Some(stop)` when it requires stopping.
 fn on_line(
     line: &str,
-    out: &mut std::fs::File,
+    out: &mut Sink,
     usage: &mut Usage,
     limits: &Limits,
 ) -> std::io::Result<Option<Stop>> {
-    writeln!(out, "{line}")?;
+    out.line(line)?;
     if let Some(why) = crate::budget::stream_stop(line) {
         return Ok(Some(Stop::Overage(why)));
     }
@@ -536,7 +562,7 @@ fn on_line(
 fn watch(
     child: &mut Child,
     rx: &mpsc::Receiver<Event>,
-    out: &mut std::fs::File,
+    out: &mut Sink,
     usage: &mut Usage,
     limits: &Limits,
     started: Instant,
@@ -593,7 +619,7 @@ fn watch(
 fn drained(
     status: ExitStatus,
     rx: &mpsc::Receiver<Event>,
-    out: &mut std::fs::File,
+    out: &mut Sink,
     usage: &mut Usage,
     limits: &Limits,
     deadline: Instant,
