@@ -47,6 +47,9 @@ pub struct Resp {
 
 impl From<postgres::Error> for Resp {
     fn from(e: postgres::Error) -> Self {
+        if e.code() == Some(&postgres::error::SqlState::QUERY_CANCELED) {
+            QUERY_CANCELED.with(|c| c.set(true));
+        }
         // The database message never contains credentials (the URL is not part of it).
         Resp {
             status: 500,
@@ -247,43 +250,263 @@ fn insert_event(tx: &mut Transaction, e: &NewEvent) -> Result<i64, Resp> {
 }
 
 // ---------------------------------------------------------------------------
-// Router
+// Operation table (X-04): one route per operation, shared by the HTTP and gRPC adapters
 // ---------------------------------------------------------------------------
 
+/// Every operation the coordinator serves, with its path parameters. The HTTP adapter finds it
+/// with [`route`]; the gRPC adapter names it directly (contracts/ieo-internal-v0.md §9). Both
+/// run it through [`dispatch`], so the business rules live in one place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Operation<'a> {
+    Health,
+    RoleStatus { repo: &'a str },
+    RoleStop { repo: &'a str },
+    Register,
+    Convert,
+    ImportNotion,
+    RecordException,
+    GetRevision { id: &'a str, rev: &'a str },
+    SemanticReview { id: &'a str, rev: &'a str },
+    SprintState { id: &'a str },
+    ListEvents { id: &'a str },
+    SubmitReport,
+    SubmitRepro,
+    GetRepro { id: &'a str },
+    Assign,
+    ReportCheckpoint { repo: &'a str, role: &'a str },
+    LatestCheckpoint { repo: &'a str, role: &'a str },
+    CompareCheckpoint { repo: &'a str, role: &'a str },
+    Ingest,
+    Judge,
+    ListOutbox,
+    Deliver { id: &'a str },
+}
+
+/// How an operation runs (contracts/ieo-internal-v0.md §9, "작업마다 다른 실행 모양").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    /// No credential, outside a transaction (liveness).
+    Unauthenticated,
+    /// Authenticated, no database (repo-scope role control).
+    NoDatabase,
+    /// Authorization, then a call outside the transaction, then one transaction (`compare`).
+    CallThenTransaction,
+    /// One transaction: a 2xx answer commits, anything else rolls back.
+    Transaction,
+}
+
+impl Operation<'_> {
+    pub fn shape(&self) -> Shape {
+        match self {
+            Operation::Health => Shape::Unauthenticated,
+            Operation::RoleStatus { .. } | Operation::RoleStop { .. } => Shape::NoDatabase,
+            Operation::CompareCheckpoint { .. } => Shape::CallThenTransaction,
+            _ => Shape::Transaction,
+        }
+    }
+}
+
+/// The operation an HTTP method and path name (`None`: no such endpoint).
+pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
+    let segs: Vec<&'a str> = path.trim_matches('/').split('/').collect();
+    let op = match (method, segs.as_slice()) {
+        ("GET", ["v0", "health"]) => Operation::Health,
+        ("GET", ["v0", "repos", repo, "roles"]) => Operation::RoleStatus { repo },
+        ("POST", ["v0", "repos", repo, "stop"]) => Operation::RoleStop { repo },
+        ("POST", ["v0", "sprints"]) => Operation::Register,
+        ("POST", ["v0", "sprint-inputs"]) => Operation::Convert,
+        ("POST", ["v0", "imports", "notion"]) => Operation::ImportNotion,
+        ("POST", ["v0", "coordinator", "exceptions"]) => Operation::RecordException,
+        ("GET", ["v0", "sprints", id, "revisions", rev]) => Operation::GetRevision { id, rev },
+        ("POST", ["v0", "sprints", id, "revisions", rev, "semantic-review"]) => {
+            Operation::SemanticReview { id, rev }
+        }
+        ("GET", ["v0", "sprints", id, "state"]) => Operation::SprintState { id },
+        ("GET", ["v0", "sprints", id, "events"]) => Operation::ListEvents { id },
+        ("POST", ["v0", "agent", "reports"]) => Operation::SubmitReport,
+        ("POST", ["v0", "agent", "repro-requests"]) => Operation::SubmitRepro,
+        ("GET", ["v0", "agent", "repro-requests", id]) => Operation::GetRepro { id },
+        ("POST", ["v0", "coordinator", "assignments"]) => Operation::Assign,
+        // central checkpoint record (runtime contract §2.1, §5-2; 02-04 decision item 9)
+        ("POST", ["v0", "repos", repo, "roles", role, "checkpoints"]) => {
+            Operation::ReportCheckpoint { repo, role }
+        }
+        ("GET", ["v0", "repos", repo, "roles", role, "checkpoints", "latest"]) => {
+            Operation::LatestCheckpoint { repo, role }
+        }
+        ("GET", ["v0", "repos", repo, "roles", role, "checkpoints", "compare"]) => {
+            Operation::CompareCheckpoint { repo, role }
+        }
+        ("POST", ["v0", "coordinator", "evidence"]) => Operation::Ingest,
+        ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
+        ("GET", ["v0", "coordinator", "outbox"]) => Operation::ListOutbox,
+        ("POST", ["v0", "coordinator", "outbox", id, "delivery"]) => Operation::Deliver { id },
+        _ => return None,
+    };
+    Some(op)
+}
+
+/// Why a transport abandoned an operation's transaction before it committed (gRPC deadline or
+/// cancellation, contracts/ieo-internal-v0.md §6). Never produced on the HTTP path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Abort {
+    DeadlineExceeded,
+    Cancelled,
+}
+
+/// Transport hooks around the one transaction of an operation (contracts/ieo-internal-v0.md
+/// §6.2). The HTTP path uses [`NoGuard`]: every check passes, so its behaviour is unchanged.
+pub trait TxGuard {
+    /// Before the transaction opens (e.g. too little time left: nothing runs).
+    fn before_begin(&self) -> Result<(), Abort> {
+        Ok(())
+    }
+    /// `SET LOCAL statement_timeout` for the transaction, if any.
+    fn statement_timeout(&self) -> Option<std::time::Duration> {
+        None
+    }
+    /// Right before commit: a passed deadline or a cancelled call rolls back.
+    fn before_commit(&self) -> Result<(), Abort> {
+        Ok(())
+    }
+    /// A statement failed with SQLSTATE 57014 (`query_canceled`): `Some` replaces the 500
+    /// answer (the guard's own statement timeout fired). `None` keeps the 500.
+    fn query_canceled(&self) -> Option<Abort> {
+        None
+    }
+}
+
+/// The HTTP path's guard: no deadline, no cancellation.
+pub struct NoGuard;
+
+impl TxGuard for NoGuard {}
+
+thread_local! {
+    /// Set when a statement of the current transaction failed with SQLSTATE 57014.
+    static QUERY_CANCELED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The 401 answer for a missing or unknown bearer credential.
+pub fn unauthenticated() -> Resp {
+    problem(
+        401,
+        "UNAUTHENTICATED",
+        "missing or unknown bearer credential",
+    )
+}
+
+/// A one-rejection answer (`{"rejections": [...]}`), for a transport's own refusals.
+pub fn rejection(status: u16, code: &str, field: &str, message: &str, correction: &str) -> Resp {
+    one(status, code, field, message, correction)
+}
+
+/// The 404 answer for a path that names no operation.
+pub fn no_such_endpoint() -> Resp {
+    problem(404, "NOT_FOUND", "no such endpoint")
+}
+
+/// One transaction: a 2xx answer (`Ok`) commits after the guard's pre-commit check, any other
+/// answer rolls back.
+fn run_tx(
+    db: &mut Client,
+    guard: &dyn TxGuard,
+    f: &dyn Fn(&mut Transaction) -> R,
+) -> Result<Resp, Abort> {
+    guard.before_begin()?;
+    let mut tx = match db.transaction() {
+        Ok(t) => t,
+        Err(e) => return Ok(e.into()),
+    };
+    if let Some(limit) = guard.statement_timeout() {
+        let ms = limit.as_millis().max(1);
+        if let Err(e) = tx.batch_execute(&format!("SET LOCAL statement_timeout = {ms}")) {
+            let _ = tx.rollback();
+            return Ok(e.into());
+        }
+    }
+    QUERY_CANCELED.with(|c| c.set(false));
+    match f(&mut tx) {
+        Ok(r) => {
+            if let Err(a) = guard.before_commit() {
+                let _ = tx.rollback();
+                return Err(a);
+            }
+            match tx.commit() {
+                Ok(()) => Ok(r),
+                Err(e) => Ok(e.into()),
+            }
+        }
+        Err(r) => {
+            let _ = tx.rollback();
+            if QUERY_CANCELED.with(|c| c.replace(false))
+                && let Some(a) = guard.query_canceled()
+            {
+                return Err(a);
+            }
+            Ok(r)
+        }
+    }
+}
+
+/// HTTP entry: route the path, then [`dispatch`] with no deadline.
 pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Resp {
-    let segs: Vec<&str> = req.path.trim_matches('/').split('/').collect();
-    if req.method == "GET" && segs == ["v0", "health"] {
-        // Liveness only: the process answers and the DB is reachable. This is not P04.
-        return match db.query_one("SELECT v FROM schema_meta WHERE k = 'schema_version'", &[]) {
-            Ok(row) => Resp {
-                status: 200,
-                body: json!({"status": "up", "schema_version": row.get::<_, String>(0),
-                             "policy_digest": ctx.policy.digest,
-                             "scope": "liveness only; not a P04 result"}),
-            },
-            Err(e) => e.into(),
-        };
+    match dispatch(db, ctx, who, route(req.method, req.path), req, &NoGuard) {
+        Ok(r) => r,
+        // NoGuard never aborts
+        Err(_) => problem(500, "INTERNAL", "transaction abandoned"),
+    }
+}
+
+/// Liveness only: the process answers and the DB is reachable. This is not P04.
+fn health(db: &mut Client, ctx: &Ctx) -> Resp {
+    match db.query_one("SELECT v FROM schema_meta WHERE k = 'schema_version'", &[]) {
+        Ok(row) => Resp {
+            status: 200,
+            body: json!({"status": "up", "schema_version": row.get::<_, String>(0),
+                         "policy_digest": ctx.policy.digest,
+                         "scope": "liveness only; not a P04 result"}),
+        },
+        Err(e) => e.into(),
+    }
+}
+
+/// Run one operation: liveness without a credential, then 401, then 404 for no operation,
+/// then the operation in its own execution shape. `req` carries the body, query and
+/// Idempotency-Key; its path is not read again.
+pub fn dispatch(
+    db: &mut Client,
+    ctx: &Ctx,
+    who: Option<&Caller>,
+    op: Option<Operation>,
+    req: &Req,
+    guard: &dyn TxGuard,
+) -> Result<Resp, Abort> {
+    if op == Some(Operation::Health) {
+        return Ok(health(db, ctx));
     }
     let Some(who) = who else {
-        return problem(
-            401,
-            "UNAUTHENTICATED",
-            "missing or unknown bearer credential",
-        );
+        return Ok(unauthenticated());
     };
-    let route = (req.method, segs.as_slice());
-    // repo-scope role control (§7): no database; service and user credentials with
-    // `roles:control`
-    match route {
-        ("GET", ["v0", "repos", repo, "roles"]) | ("POST", ["v0", "repos", repo, "stop"]) => {
+    let Some(op) = op else {
+        return Ok(no_such_endpoint());
+    };
+    let run = |db: &mut Client, f: &dyn Fn(&mut Transaction) -> R| run_tx(db, guard, f);
+    match op {
+        // repo-scope role control (§7): no database; service and user credentials with
+        // `roles:control`
+        Operation::RoleStatus { repo } | Operation::RoleStop { repo } => {
             if let Err(r) = need_client_scope(who, "roles:control", false) {
-                return r;
+                return Ok(r);
             }
             // an empty repo list is no repo, as everywhere else (review adf760e B1)
             if !who.in_repo(repo) {
-                return problem(403, "SCOPE_DENIED", "repo outside the credential's repos");
+                return Ok(problem(
+                    403,
+                    "SCOPE_DENIED",
+                    "repo outside the credential's repos",
+                ));
             }
-            let (status, body) = if req.method == "GET" {
+            let (status, body) = if matches!(op, Operation::RoleStatus { .. }) {
                 crate::roles::status(&ctx.roles, repo)
             } else {
                 crate::roles::stop(
@@ -293,68 +516,42 @@ pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Re
                     std::time::Duration::from_millis(250),
                 )
             };
-            return Resp { status, body };
+            Ok(Resp { status, body })
         }
-        _ => {}
-    }
-    let run = |db: &mut Client, f: &dyn Fn(&mut Transaction) -> R| -> Resp {
-        let mut tx = match db.transaction() {
-            Ok(t) => t,
-            Err(e) => return e.into(),
-        };
-        match f(&mut tx) {
-            Ok(r) => match tx.commit() {
-                Ok(()) => r,
-                Err(e) => e.into(),
-            },
-            Err(r) => {
-                let _ = tx.rollback();
-                r
-            }
-        }
-    };
-    match route {
-        ("POST", ["v0", "sprints"]) => run(db, &|tx| register(tx, ctx, who, req)),
-        ("POST", ["v0", "sprint-inputs"]) => run(db, &|tx| convert(tx, ctx, who, req)),
-        ("POST", ["v0", "imports", "notion"]) => run(db, &|tx| import_notion(tx, ctx, who, req)),
-        ("POST", ["v0", "coordinator", "exceptions"]) => {
-            run(db, &|tx| record_exception(tx, who, req))
-        }
-        ("GET", ["v0", "sprints", id, "revisions", rev]) => {
-            run(db, &|tx| get_revision(tx, who, id, rev))
-        }
-        ("POST", ["v0", "sprints", id, "revisions", rev, "semantic-review"]) => {
+        Operation::Health => Ok(health(db, ctx)),
+        Operation::Register => run(db, &|tx| register(tx, ctx, who, req)),
+        Operation::Convert => run(db, &|tx| convert(tx, ctx, who, req)),
+        Operation::ImportNotion => run(db, &|tx| import_notion(tx, ctx, who, req)),
+        Operation::RecordException => run(db, &|tx| record_exception(tx, who, req)),
+        Operation::GetRevision { id, rev } => run(db, &|tx| get_revision(tx, who, id, rev)),
+        Operation::SemanticReview { id, rev } => {
             run(db, &|tx| semantic_review(tx, who, id, rev, req))
         }
-        ("GET", ["v0", "sprints", id, "state"]) => run(db, &|tx| sprint_state(tx, who, id)),
-        ("GET", ["v0", "sprints", id, "events"]) => run(db, &|tx| list_events(tx, who, id, req)),
-        ("POST", ["v0", "agent", "reports"]) => run(db, &|tx| submit_report(tx, who, req)),
-        ("POST", ["v0", "agent", "repro-requests"]) => run(db, &|tx| submit_repro(tx, who, req)),
-        ("GET", ["v0", "agent", "repro-requests", id]) => run(db, &|tx| get_repro(tx, who, id)),
-        ("POST", ["v0", "coordinator", "assignments"]) => run(db, &|tx| assign(tx, ctx, who, req)),
-        // central checkpoint record (runtime contract §2.1, §5-2; 02-04 decision item 9)
-        ("POST", ["v0", "repos", repo, "roles", role, "checkpoints"]) => {
+        Operation::SprintState { id } => run(db, &|tx| sprint_state(tx, who, id)),
+        Operation::ListEvents { id } => run(db, &|tx| list_events(tx, who, id, req)),
+        Operation::SubmitReport => run(db, &|tx| submit_report(tx, who, req)),
+        Operation::SubmitRepro => run(db, &|tx| submit_repro(tx, who, req)),
+        Operation::GetRepro { id } => run(db, &|tx| get_repro(tx, who, id)),
+        Operation::Assign => run(db, &|tx| assign(tx, ctx, who, req)),
+        Operation::ReportCheckpoint { repo, role } => {
             run(db, &|tx| report_checkpoint(tx, who, repo, role, req))
         }
-        ("GET", ["v0", "repos", repo, "roles", role, "checkpoints", "latest"]) => {
+        Operation::LatestCheckpoint { repo, role } => {
             run(db, &|tx| latest_checkpoint(tx, who, repo, role))
         }
-        ("GET", ["v0", "repos", repo, "roles", role, "checkpoints", "compare"]) => {
+        Operation::CompareCheckpoint { repo, role } => {
             // authorization first; the supervisor is asked outside the database transaction
             // (review 48b1d0e I-2)
             if let Err(r) = need_compare(who, repo, role) {
-                return r;
+                return Ok(r);
             }
             let local = role_status(ctx, repo, role);
             run(db, &|tx| compare_checkpoint(tx, repo, role, &local))
         }
-        ("POST", ["v0", "coordinator", "evidence"]) => run(db, &|tx| ingest(tx, who, req)),
-        ("POST", ["v0", "coordinator", "judgments"]) => run(db, &|tx| judge(tx, ctx, who, req)),
-        ("GET", ["v0", "coordinator", "outbox"]) => run(db, &|tx| list_outbox(tx, who, req)),
-        ("POST", ["v0", "coordinator", "outbox", id, "delivery"]) => {
-            run(db, &|tx| deliver(tx, who, id, req))
-        }
-        _ => problem(404, "NOT_FOUND", "no such endpoint"),
+        Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
+        Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
+        Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
+        Operation::Deliver { id } => run(db, &|tx| deliver(tx, who, id, req)),
     }
 }
 

@@ -9,6 +9,15 @@ use std::time::{Duration, Instant};
 
 const TOKEN: &str = "adapter-test-token";
 
+/// The session lock is a flock on an O_CLOEXEC file. A process spawned on another test thread
+/// shares the descriptor until it execs, so a just-released lock can look held (PR #64 review
+/// c6c0656 M-1; the same guard as tests/caller.rs). Every test in this file runs alone.
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 struct Tmp(PathBuf);
 impl Tmp {
     fn new(name: &str) -> Tmp {
@@ -136,6 +145,7 @@ fn init_line(svc: &Arc<Service>, attempt: &str) -> Value {
 
 #[test]
 fn the_adapter_credential_is_required() {
+    let _serial = serial();
     let (t, svc) = setup("auth");
     assert_eq!(svc.handle("GET", "/v0/role/status", None, b"").status, 401);
     assert_eq!(
@@ -158,6 +168,7 @@ fn the_adapter_credential_is_required() {
 
 #[test]
 fn start_runs_a_new_session_with_the_contract_arguments_and_environment() {
+    let _serial = serial();
     let (_t, svc) = setup("start");
     let (st, b) = call(
         &svc,
@@ -210,6 +221,7 @@ fn start_runs_a_new_session_with_the_contract_arguments_and_environment() {
 
 #[test]
 fn a_cleanup_removes_directive_markers_before_the_first_start() {
+    let _serial = serial();
     let (t, svc) = setup("clean");
     let cfg = t.0.join("state/claude");
     for f in [
@@ -244,6 +256,7 @@ fn a_cleanup_removes_directive_markers_before_the_first_start() {
 
 #[test]
 fn reconnect_resumes_an_untouched_session_and_starts_anew_after_tamper() {
+    let _serial = serial();
     let (t, svc) = setup("reconnect");
     call(
         &svc,
@@ -296,6 +309,7 @@ fn reconnect_resumes_an_untouched_session_and_starts_anew_after_tamper() {
 
 #[test]
 fn one_running_process_per_session_and_stop() {
+    let _serial = serial();
     let (_t, svc) = setup("single");
     call(
         &svc,
@@ -365,6 +379,7 @@ fn one_running_process_per_session_and_stop() {
 
 #[test]
 fn reconnect_refuses_stale_or_mismatched_records_and_missing_credentials() {
+    let _serial = serial();
     let (t, svc) = setup("refuse");
     call(
         &svc,
@@ -424,6 +439,7 @@ fn code(r: (u16, Value)) -> (u16, Option<String>) {
 
 #[test]
 fn a_reconnect_needs_a_readable_checkpoint() {
+    let _serial = serial();
     let (t, svc) = setup("nocp");
     let body = req("a1", "x", json!({"new_session_id": "s1"}));
     // F1: nothing to reconnect to → never a silent new session
@@ -466,6 +482,7 @@ fn a_reconnect_needs_a_readable_checkpoint() {
 
 #[test]
 fn ids_must_be_safe() {
+    let _serial = serial();
     let (t, svc) = setup("ids");
     for (attempt, sid) in [
         ("-a", "s1"),
@@ -505,6 +522,7 @@ fn ids_must_be_safe() {
 
 #[test]
 fn a_session_held_by_another_process_is_reported_not_restarted() {
+    let _serial = serial();
     let (t, svc) = setup("lockprobe");
     call(
         &svc,
@@ -534,6 +552,7 @@ fn a_session_held_by_another_process_is_reported_not_restarted() {
 
 #[test]
 fn an_empty_credential_is_unavailable() {
+    let _serial = serial();
     let (t, svc) = setup("emptycred");
     std::fs::write(t.0.join("cred/oauth_token"), " \n").expect("empty");
     assert_eq!(
@@ -582,6 +601,7 @@ fn refused(svc: &Arc<Service>, a: &str, limits: Value) -> String {
 
 #[test]
 fn the_service_enforces_its_own_budget_ceiling() {
+    let _serial = serial();
     let (t, svc) = setup("budget");
     // grace beyond the shared constant: schema
     assert_eq!(
@@ -661,6 +681,7 @@ fn the_service_enforces_its_own_budget_ceiling() {
 
 #[test]
 fn limits_from_the_budget_path_are_accepted() {
+    let _serial = serial();
     use ieo_supervisor::budget::{BUDGET_0204, Observation};
     use ieo_supervisor::run::Limits;
     let (_t, svc) = setup("fornext");
@@ -695,6 +716,7 @@ fn limits_from_the_budget_path_are_accepted() {
 
 #[test]
 fn an_unfinished_run_is_not_resumed_and_the_resume_base_is_kept() {
+    let _serial = serial();
     let (t, svc) = setup("unfinished");
     call(
         &svc,
@@ -768,6 +790,7 @@ fn an_unfinished_run_is_not_resumed_and_the_resume_base_is_kept() {
 
 #[test]
 fn a_run_error_leaves_an_error_checkpoint_and_stops_further_starts() {
+    let _serial = serial();
     let (t, svc) = setup("runerror");
     // the configured program is missing: the spawn fails
     std::fs::remove_file(t.0.join("fake-claude")).expect("rm");
@@ -819,6 +842,7 @@ fn wait_init(t: &Tmp, attempt: &str) {
 
 #[test]
 fn a_live_session_is_reported_running_before_its_checkpoint_phase_is_judged() {
+    let _serial = serial();
     // R1: a holder of the session lock answers ALREADY_RUNNING even with a takeover checkpoint
     let (t, svc) = setup("r1");
     call(
@@ -861,6 +885,7 @@ fn a_live_session_is_reported_running_before_its_checkpoint_phase_is_judged() {
 
 #[test]
 fn a_result_written_after_a_guard_stop_is_not_a_resume_base() {
+    let _serial = serial();
     // R2: the stopped run's late result (zero usage) does not replace the carried base
     let (t, svc) = setup("r2");
     call(
@@ -894,6 +919,7 @@ fn a_result_written_after_a_guard_stop_is_not_a_resume_base() {
 
 #[test]
 fn runs_are_counted_by_attempt_directories_too_and_shares_are_bounded() {
+    let _serial = serial();
     // R6: more attempt directories than ledger lines count
     let (t, svc) = setup("r6");
     call(
@@ -949,6 +975,7 @@ fn runs_are_counted_by_attempt_directories_too_and_shares_are_bounded() {
 
 #[test]
 fn the_largest_end_line_of_an_attempt_counts() {
+    let _serial = serial();
     // R4: a forged smaller end line (before or after the real one) does not lower the count
     let (t, svc) = setup("r4");
     call(&svc, "POST", "/v0/role/start", &with("a1", json!({})));
@@ -970,6 +997,7 @@ fn the_largest_end_line_of_an_attempt_counts() {
 
 #[test]
 fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
+    let _serial = serial();
     let (t, svc) = setup("status7");
     let s = svc.status();
     assert_eq!(s["quota_group_id"], "test-shared");
@@ -1075,6 +1103,7 @@ const AUTH_ERR: &str =
 
 #[test]
 fn provider_status_maps_raw_signals_and_never_reuses_an_old_value() {
+    let _serial = serial();
     let (t, _) = setup("provider");
     // 1. an allowed window → available
     let ok = scripted_claude(&t, "ok", &[RL_ALLOWED], 0);
@@ -1198,6 +1227,7 @@ fn provider_status_maps_raw_signals_and_never_reuses_an_old_value() {
 /// rollback stays visible (here: the older `takeover` checkpoint refuses the resume).
 #[test]
 fn a_missing_archive_copy_is_written_and_a_rollback_is_not_hidden() {
+    let _serial = serial();
     let (t, svc) = setup("cp-repair");
     call(
         &svc,
@@ -1245,76 +1275,201 @@ fn a_missing_archive_copy_is_written_and_a_rollback_is_not_hidden() {
 
 /// A fake central record: stores reported checkpoints in order and answers `latest`. With
 /// `lose` set, the next report is stored but answered with a server error (an answer the
-/// supervisor cannot trust).
+/// supervisor cannot trust). X-04: the same record is served over HTTP or gRPC
+/// (`ieo.internal.v0`, the status and `ieo-error-bin` trailer of the coordinator's adapter); every
+/// test that uses it runs once per transport.
 struct FakeCentral {
     url: String,
-    store: Arc<std::sync::Mutex<Vec<(u64, String, Value)>>>,
+    transport: &'static str,
+    store: Store,
     lose: Arc<std::sync::atomic::AtomicBool>,
     reject: Arc<std::sync::atomic::AtomicBool>,
 }
 
-fn fake_central() -> FakeCentral {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    let server = tiny_http::Server::http("127.0.0.1:0").expect("bind");
-    let url = format!("http://{}", server.server_addr().to_ip().expect("ip"));
-    let store = Arc::new(std::sync::Mutex::new(Vec::<(u64, String, Value)>::new()));
-    let lose = Arc::new(AtomicBool::new(false));
-    let reject = Arc::new(AtomicBool::new(false));
-    let (st, lo, rj) = (Arc::clone(&store), Arc::clone(&lose), Arc::clone(&reject));
-    std::thread::spawn(move || {
-        for mut req in server.incoming_requests() {
-            let mut body = Vec::new();
-            let _ = std::io::Read::read_to_end(req.as_reader(), &mut body);
-            let mut s = st.lock().expect("store");
-            let (code, out) = if req.method().as_str() == "GET" {
-                match s.last() {
-                    Some((n, sha, _)) => (200, json!({"seq": n, "checkpoint_sha256": sha})),
-                    None => (404, json!({"code": "NO_CHECKPOINT"})),
-                }
-            } else {
-                let v: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
-                let seq = v["seq"].as_u64().unwrap_or(0);
-                let raw = v["checkpoint_json"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_string();
-                let sha = hex::encode(Sha256::digest(raw.as_bytes()));
-                let last = s.last().map(|x| x.0).unwrap_or(0);
-                if rj.swap(false, Ordering::SeqCst) {
-                    (
-                        409,
-                        json!({"rejections": [{"code": "ASSIGNMENT_SHA_MISMATCH"}]}),
-                    )
-                } else if seq == last + 1 {
-                    let cp: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
-                    s.push((seq, sha.clone(), cp));
-                    if lo.swap(false, Ordering::SeqCst) {
-                        (502, json!({"code": "BAD_GATEWAY"}))
-                    } else {
-                        (
-                            201,
-                            json!({"stored": true, "seq": seq, "checkpoint_sha256": sha}),
-                        )
-                    }
-                } else {
-                    (
-                        409,
-                        json!({"rejections": [{"code": "CHECKPOINT_SEQUENCE_GAP"}]}),
-                    )
-                }
+type Store = Arc<std::sync::Mutex<Vec<(u64, String, Value)>>>;
+
+#[derive(Clone)]
+struct Fake {
+    store: Store,
+    lose: Arc<std::sync::atomic::AtomicBool>,
+    reject: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Fake {
+    /// The fake's answer, as HTTP status and body, to `GET latest` or a report body.
+    fn answer(&self, method: &str, body: &[u8]) -> (u16, Value) {
+        use std::sync::atomic::Ordering;
+        let mut s = self.store.lock().expect("store");
+        if method == "GET" {
+            return match s.last() {
+                Some((n, sha, _)) => (200, json!({"seq": n, "checkpoint_sha256": sha})),
+                None => (404, json!({"code": "NO_CHECKPOINT"})),
             };
-            drop(s);
-            let _ = req
-                .respond(tiny_http::Response::from_string(out.to_string()).with_status_code(code));
         }
-    });
-    FakeCentral {
-        url,
-        store,
-        lose,
-        reject,
+        let v: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
+        let seq = v["seq"].as_u64().unwrap_or(0);
+        let raw = v["checkpoint_json"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        let sha = hex::encode(Sha256::digest(raw.as_bytes()));
+        let last = s.last().map(|x| x.0).unwrap_or(0);
+        if self.reject.swap(false, Ordering::SeqCst) {
+            (
+                409,
+                json!({"rejections": [{"code": "ASSIGNMENT_SHA_MISMATCH"}]}),
+            )
+        } else if seq == last + 1 {
+            let cp: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+            s.push((seq, sha.clone(), cp));
+            if self.lose.swap(false, Ordering::SeqCst) {
+                (502, json!({"code": "BAD_GATEWAY"}))
+            } else {
+                (
+                    201,
+                    json!({"stored": true, "seq": seq, "checkpoint_sha256": sha}),
+                )
+            }
+        } else {
+            (
+                409,
+                json!({"rejections": [{"code": "CHECKPOINT_SEQUENCE_GAP"}]}),
+            )
+        }
     }
 }
+
+#[tonic::async_trait]
+impl ieo_proto::v0::supervisor_service_server::SupervisorService for Fake {
+    async fn submit_agent_report(
+        &self,
+        _: tonic::Request<ieo_proto::v0::SubmitAgentReportRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::SubmitAgentReportResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("fake"))
+    }
+    async fn submit_repro_request(
+        &self,
+        _: tonic::Request<ieo_proto::v0::SubmitReproRequestRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::SubmitReproRequestResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("fake"))
+    }
+    async fn get_repro_request(
+        &self,
+        _: tonic::Request<ieo_proto::v0::GetReproRequestRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::GetReproRequestResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("fake"))
+    }
+    async fn report_checkpoint(
+        &self,
+        r: tonic::Request<ieo_proto::v0::ReportCheckpointRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::ReportCheckpointResponse>, tonic::Status> {
+        let m = r.into_inner();
+        let body = ieo_proto::checkpoint_request_body(m.seq, &m.checkpoint_json);
+        match self.answer("POST", &body) {
+            (st @ 200..=299, v) => Ok(tonic::Response::new(
+                ieo_proto::checkpoint_answer_from_json(st, &v),
+            )),
+            (st, v) => Err(ieo_proto::status_with_error(
+                ieo_proto::grpc_code(st, &v),
+                st,
+                &v,
+            )),
+        }
+    }
+    async fn get_latest_checkpoint(
+        &self,
+        _: tonic::Request<ieo_proto::v0::GetLatestCheckpointRequest>,
+    ) -> Result<tonic::Response<ieo_proto::v0::GetLatestCheckpointResponse>, tonic::Status> {
+        match self.answer("GET", &[]) {
+            (200, v) => Ok(tonic::Response::new(ieo_proto::latest_from_json(&v))),
+            (st, v) => Err(ieo_proto::status_with_error(
+                ieo_proto::grpc_code(st, &v),
+                st,
+                &v,
+            )),
+        }
+    }
+}
+
+fn fake_central(transport: &'static str) -> FakeCentral {
+    use std::sync::atomic::AtomicBool;
+    let fake = Fake {
+        store: Arc::new(std::sync::Mutex::new(Vec::new())),
+        lose: Arc::new(AtomicBool::new(false)),
+        reject: Arc::new(AtomicBool::new(false)),
+    };
+    let url = if transport == "grpc" {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let f = fake.clone();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()
+                .expect("runtime");
+            rt.block_on(async move {
+                let incoming = tonic::transport::server::TcpIncoming::bind(
+                    "127.0.0.1:0".parse().expect("addr"),
+                )
+                .expect("bind");
+                let _ = tx.send(incoming.local_addr().expect("addr"));
+                let _ = tonic::transport::Server::builder()
+                    .add_service(
+                        ieo_proto::v0::supervisor_service_server::SupervisorServiceServer::new(f),
+                    )
+                    .serve_with_incoming(incoming)
+                    .await;
+            });
+        });
+        format!("http://{}", rx.recv().expect("grpc fake"))
+    } else {
+        let server = tiny_http::Server::http("127.0.0.1:0").expect("bind");
+        let url = format!("http://{}", server.server_addr().to_ip().expect("ip"));
+        let f = fake.clone();
+        std::thread::spawn(move || {
+            for mut req in server.incoming_requests() {
+                let mut body = Vec::new();
+                let _ = std::io::Read::read_to_end(req.as_reader(), &mut body);
+                let (code, out) = f.answer(req.method().as_str(), &body);
+                let _ = req.respond(
+                    tiny_http::Response::from_string(out.to_string()).with_status_code(code),
+                );
+            }
+        });
+        url
+    };
+    FakeCentral {
+        url,
+        transport,
+        store: fake.store,
+        lose: fake.lose,
+        reject: fake.reject,
+    }
+}
+
+/// Each test of the central record, once per coordinator transport (X-04).
+macro_rules! over_both_transports {
+    ($($name:ident),* $(,)?) => {$(
+        mod $name {
+            #[test]
+            fn http() {
+                let _serial = super::serial();
+                super::$name("http")
+            }
+            #[test]
+            fn grpc() {
+                let _serial = super::serial();
+                super::$name("grpc")
+            }
+        }
+    )*};
+}
+
+over_both_transports!(
+    a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once,
+    a_takeover_accepted_but_not_written_locally_is_adopted_next_time,
+    a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending,
+);
 
 fn svc_central(t: &Tmp, c: &FakeCentral) -> Arc<Service> {
     let root = &t.0;
@@ -1323,17 +1478,17 @@ fn svc_central(t: &Tmp, c: &FakeCentral) -> Arc<Service> {
         Config::from_json(&json!({"role": "development", "repo": "sori",
             "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
             "claude": root.join("fake-claude"), "budget": "02-04", "quota_group_id": "test-shared",
-            "checkpoint_central": {"url": c.url, "token_file": root.join("cred/coordinator_token")},
+            "checkpoint_central": {"url": c.url, "token_file": root.join("cred/coordinator_token"),
+                                   "transport": c.transport},
             "share": {"max_runs": 8, "total_seconds": 9_600, "billable_tokens": 1_000_000,
                       "cache_read_tokens": 10_000_000}}))
         .expect("config"),
     ))
 }
 
-#[test]
-fn a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once() {
+fn a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once(transport: &'static str) {
     let (t, _) = setup("lost-answer");
-    let c = fake_central();
+    let c = fake_central(transport);
     let svc = svc_central(&t, &c);
     let state = t.0.join("state");
     call(
@@ -1410,10 +1565,9 @@ fn a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once() {
     assert_eq!(tampers, 1, "one detection, one report");
 }
 
-#[test]
-fn a_takeover_accepted_but_not_written_locally_is_adopted_next_time() {
+fn a_takeover_accepted_but_not_written_locally_is_adopted_next_time(transport: &'static str) {
     let (t, _) = setup("local-write");
-    let c = fake_central();
+    let c = fake_central(transport);
     let svc = svc_central(&t, &c);
     let state = t.0.join("state");
     // checkpoint.json cannot be written (a directory in its place)
@@ -1467,6 +1621,7 @@ fn a_takeover_accepted_but_not_written_locally_is_adopted_next_time() {
 /// (review 802e4a1 N-2).
 #[test]
 fn a_pending_tamper_needs_a_session_other_than_the_tampered_one() {
+    let _serial = serial();
     let (t, svc) = setup("tamper-new");
     call(
         &svc,
@@ -1528,10 +1683,9 @@ fn a_pending_tamper_needs_a_session_other_than_the_tampered_one() {
 /// A fresh tamper detection survives a refused request (review 704330f P-1); a takeover the
 /// coordinator refuses (4xx) drops the staged copy but keeps the tamper pending, and a staged
 /// copy not newer than the local checkpoint is dropped (P-3, review 802e4a1 I-1/I-2).
-#[test]
-fn a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending() {
+fn a_detection_survives_refusals_and_a_refused_takeover_keeps_it_pending(transport: &'static str) {
     let (t, _) = setup("tamper-keep");
-    let c = fake_central();
+    let c = fake_central(transport);
     let svc = svc_central(&t, &c);
     let state = t.0.join("state");
     call(

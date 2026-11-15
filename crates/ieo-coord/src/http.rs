@@ -1,6 +1,6 @@
 //! Minimal HTTP/1.1 front end. Each worker thread owns one PostgreSQL connection.
 
-use crate::api::{Ctx, Req, handle};
+use crate::api::{Ctx, Req, Resp, handle};
 use crate::auth::Credentials;
 use postgres::{Client, Config, NoTls};
 use std::io::Read;
@@ -9,6 +9,26 @@ use tiny_http::{Header, Response, Server};
 
 /// Largest accepted request body.
 pub const MAX_BODY: u64 = 1 << 20;
+
+/// The answer to a body over [`MAX_BODY`] (or unreadable), before authentication. The gRPC
+/// adapter gives the same answer for an HTTP-equivalent body over the limit.
+pub fn body_too_large() -> Resp {
+    Resp {
+        status: 400,
+        body: serde_json::json!({"rejections": [{"code": "SCHEMA_VIOLATION", "field": "",
+            "message": "body too large or unreadable", "correction": "send at most 1 MiB",
+            "retryable_after_edit": true}]}),
+    }
+}
+
+/// The answer when a worker's database connection cannot be re-opened (HTTP 500; gRPC
+/// `UNAVAILABLE` with this answer in its trailer).
+pub fn db_unavailable() -> Resp {
+    Resp {
+        status: 500,
+        body: serde_json::json!({"code": "INTERNAL", "message": "database unavailable"}),
+    }
+}
 
 pub struct App {
     pub ctx: Ctx,
@@ -36,10 +56,8 @@ fn serve_one(db: &mut Client, app: &App, mut req: tiny_http::Request) {
     let too_big = req.body_length().is_some_and(|n| n as u64 > MAX_BODY);
     let read = req.as_reader().take(MAX_BODY + 1).read_to_end(&mut body);
     if too_big || read.is_err() || body.len() as u64 > MAX_BODY {
-        let b = serde_json::json!({"rejections": [{"code": "SCHEMA_VIOLATION", "field": "",
-            "message": "body too large or unreadable", "correction": "send at most 1 MiB",
-            "retryable_after_edit": true}]});
-        respond(req, 400, &b);
+        let r = body_too_large();
+        respond(req, r.status, &r.body);
         return;
     }
     let url = req.url().to_string();
@@ -83,8 +101,8 @@ pub fn serve(
                         Ok(c) => db = c,
                         Err(e) => {
                             eprintln!("ieo-coord: database reconnect failed: {e}");
-                            let b = serde_json::json!({"code": "INTERNAL", "message": "database unavailable"});
-                            respond(req, 500, &b);
+                            let r = db_unavailable();
+                            respond(req, r.status, &r.body);
                             continue;
                         }
                     }

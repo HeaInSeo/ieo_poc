@@ -1,0 +1,22 @@
+[package]
+name = "ieo-proto"
+version = "0.1.0"
+description = "Internal gRPC API v0 (X-03 contract, X-04): generated ieo.internal.v0 code, the HTTP <-> gRPC status mapping and the ieo-error-bin trailer, shared by the coordinator and the supervisor"
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+prost = "0.14"
+serde_json = "1.0.154"
+tonic = "0.14"
+tonic-prost = "0.14"
+
+[build-dependencies]
+# protox compiles the .proto in Rust: no protoc in CI or on the build host
+protox = "0.10"
+tonic-prost-build = "0.14"
+
+[lints]
+workspace = true
