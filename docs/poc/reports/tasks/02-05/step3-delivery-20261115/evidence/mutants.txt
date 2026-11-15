@@ -1,0 +1,19 @@
+# 02-05 step 3 mutants: each applied alone to the code that became 2c8fe8d (before the final role_checkpoints count assertion was added to delivery_e2e; no source line the mutants touch changed), then the named test target; the file was restored after each. Columns: id | mutation | result | failing tests
+# targets: S3-D*/S3-B1 cargo test -p ieo-coord --test delivery_e2e; S3-S* -p ieo-supervisor --test serve; S3-C* -p ieo-supervisor --test supervisor; L1-* -p ieo-coord --test grpc supervisor_operations
+S3-D1 | delivery: stale_generation/resume_allowed start without new_session | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S3-D2 | delivery: no head check (request names any generation) | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S3-D3 | delivery: a stored unknown is answered as final (no re-query) | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S3-D4 | delivery: re-query 404 read as accepted | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S3-D5 | delivery: the revision limits are not applied | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S3-D6 | delivery: coordinator record image from the request side (config ignored) | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S3-B1 | budget library: a record that asks for a person is not checked | KILLED | deliveries_go_through_compare_budget_and_the_supervisor, deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S3-S1 | supervisor: a replay ignores the content | KILLED | start_runs_a_new_session_with_the_contract_arguments_and_environment, the_same_attempt_with_the_same_content_replays_the_stored_answer
+S3-S2 | supervisor: no check against the current assignment | KILLED | a_start_is_checked_against_the_coordinators_current_assignment::grpc, a_start_is_checked_against_the_coordinators_current_assignment::http
+S3-S3 | supervisor: the delivery expectation (image, profile) is ignored | KILLED | a_start_is_checked_against_the_coordinators_current_assignment::grpc, a_start_is_checked_against_the_coordinators_current_assignment::http
+S3-S4 | supervisor: an older generation is reconciliation, not STALE_GENERATION | KILLED | a_start_is_checked_against_the_coordinators_current_assignment::grpc, a_start_is_checked_against_the_coordinators_current_assignment::http
+S3-C1 | configdir: every regular file is read before the scope check (bc55edf R5) | KILLED | an_unreadable_file_outside_the_directive_scope_is_never_opened
+S3-C2 | configdir: directories are digested too (f73ac13 P3) | KILLED | an_empty_memory_directory_is_not_a_tamper, an_unreadable_file_outside_the_directive_scope_is_never_opened, c_normal_cli_writes_are_not_tamper
+L1-R2 | stale_on_arrival with > (equal time not stale) | KILLED | supervisor_operations_answer_the_assignment_and_store_claims
+L1-R4 | first action: any takeover of the assignment and generation | KILLED | supervisor_operations_answer_the_assignment_and_store_claims
+L1-R5 | calendar check weakened to 1..=31 | KILLED | supervisor_operations_answer_the_assignment_and_store_claims
+# 16 of 16 killed. The first run of S3-S1..L1-R5 stopped at a pattern that rustfmt had re-wrapped (S3-S1); the pattern was corrected and those nine were run again (above).
