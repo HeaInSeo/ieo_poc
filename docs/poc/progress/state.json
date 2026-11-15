@@ -1,9 +1,9 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0046",
-  "snapshot_created_at": "2026-11-15T23:12:53+09:00",
-  "last_actual_work_observed_at": "2026-11-15T23:12:53+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0047",
+  "snapshot_created_at": "2026-11-16T00:13:31+09:00",
+  "last_actual_work_observed_at": "2026-11-16T00:13:31+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
   "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건)",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
@@ -378,9 +378,9 @@
       "group": "핵심",
       "kind": "구현",
       "status": "진행",
-      "last_observed_at": "2026-11-15T23:12:53+09:00",
-      "latest_report": "reports/tasks/02-05/step2-supervisor-ops-20261115/REPORT.md",
-      "result_state": "계획 작성·병합(PLAN.md): 이월 C1~C14, 착수 전 규칙 결정(F4 사용자 결정, N5 개발자 권한·보고, S1 사용자 확인, U2·T1 개발자 권한), 단계 0~9(모델 호출 없는 1~7·9, 실제 호출 8은 사용자 결정·X-08 검수 완료 뒤(PR #69 검토 d0f72ec L-1)), 02-05 예산 결정 요청 초안(가 실제 호출 없음 / 나 3회+예비 1). 검토 3f9909f 변경 요청(M-1 U2 위치, M-2 착수 전 조건 유지, M-3 X-08은 단계 8만의 관문) → 교정 1 → 3c017a4 approve(검토 2/4·교정 1/3), 병합 fda0f2b. 규칙 결정에 C2(sprint_id 예약, 개발자 결정) 포함. 모델 호출 0 · 단계 1 PR(feat/0205-s1): U2 등록 검사 순서(멱등 재조회 → sprint repo(RG2·C2) → 01-07 → 가져오기 소유 → notion_gate → 저장/저장된 결과, 소유·관문은 모든 비거부 결과에 적용), C2 바인딩 sprint_id 예약과 시작 검사, OpenAPI 0.9.0. 첫 거부 코드가 바뀐 경우 10건(거부 집합 같음, 409→200 없음), C2는 계획대로 거부 추가. 시험 357 통과. 검토 23877c1 approve, 병합 089fb95 · 단계 2 PR(feat/0205-s2): supervisor 작업 getOwnAssignment·recordFirstAction·reportSessionStatus(HTTP·gRPC, checkpoint:report 범위, claim 저장), OpenAPI 0.10.0, proto RPC 셋, C13 닫음. 시험 358 통과. 독립 검토 전",
+      "last_observed_at": "2026-11-16T00:13:31+09:00",
+      "latest_report": "reports/tasks/02-05/step3-delivery-20261115/REPORT.md",
+      "result_state": "계획 작성·병합(PLAN.md): 이월 C1~C14, 착수 전 규칙 결정(F4 사용자 결정, N5 개발자 권한·보고, S1 사용자 확인, U2·T1 개발자 권한), 단계 0~9(모델 호출 없는 1~7·9, 실제 호출 8은 사용자 결정·X-08 검수 완료 뒤(PR #69 검토 d0f72ec L-1)), 02-05 예산 결정 요청 초안(가 실제 호출 없음 / 나 3회+예비 1). 검토 3f9909f 변경 요청(M-1 U2 위치, M-2 착수 전 조건 유지, M-3 X-08은 단계 8만의 관문) → 교정 1 → 3c017a4 approve(검토 2/4·교정 1/3), 병합 fda0f2b. 규칙 결정에 C2(sprint_id 예약, 개발자 결정) 포함. 모델 호출 0 · 단계 1 PR(feat/0205-s1): U2 등록 검사 순서(멱등 재조회 → sprint repo(RG2·C2) → 01-07 → 가져오기 소유 → notion_gate → 저장/저장된 결과, 소유·관문은 모든 비거부 결과에 적용), C2 바인딩 sprint_id 예약과 시작 검사, OpenAPI 0.9.0. 첫 거부 코드가 바뀐 경우 10건(거부 집합 같음, 409→200 없음), C2는 계획대로 거부 추가. 시험 357 통과. 검토 23877c1 approve, 병합 089fb95 · 단계 2 PR(feat/0205-s2): supervisor 작업 getOwnAssignment·recordFirstAction·reportSessionStatus(HTTP·gRPC, checkpoint:report 범위, claim 저장), OpenAPI 0.10.0, proto RPC 셋, C13 닫음. 시험 358 통과. 검토 a349dc6 approve, 병합 3701f6b · 단계 3 PR(feat/0205-s3): deliverAssignment(roles:control, HTTP 전용, 요청 기록 → compare → 공유 예산 검사 → start/reconnect → 결과 또는 unknown, 읽기 전용 재조회), 공유 예산 검사 라이브러리(caller::admit/start/finish, 02-04 호출자 동작 유지), supervisor 같은 attempt 재전송·현재 배정 대조, 런타임 계약 revision 11, OpenAPI 0.11.0. C8·C12 닫음, C1 단계 3 몫. 시험 365 통과·변이 16/16. 검토 c11e734 변경 요청(M-1 new_session이 끝나지 않은 옛 세대 위에서 start) → 교정 1: compare가 끝나지 않은(takeover·error) 옛 세대를 external_reconciliation_required로 판단(02-04 판단의 닫힌 쪽 변경), 전달은 after_run 옛 세대에서만 new_session start, Admission::lower 시험, 예산 계획 역할 = 설정 역할, 잠금 뒤 재판단, 진행 중 같은 키 409 DELIVERY_IN_PROGRESS. 시험 367 통과·변이 23/24(남은 1은 결정적 재현 불가 창, 보고 §7.3)",
       "verification_level": "unverified",
       "evidence": [
         "reports/tasks/02-05/plan-20261115/PLAN.md",
@@ -390,10 +390,14 @@
         "reports/tasks/02-05/step1-u2-c2-20261115/evidence/test.log",
         "reports/tasks/02-05/step1-u2-c2-20261115/reviews/review-pr72-23877c1.md",
         "reports/tasks/02-05/step2-supervisor-ops-20261115/REPORT.md",
-        "reports/tasks/02-05/step2-supervisor-ops-20261115/evidence/test.log"
+        "reports/tasks/02-05/step2-supervisor-ops-20261115/evidence/test.log",
+        "reports/tasks/02-05/step2-supervisor-ops-20261115/reviews/review-pr73-a349dc6.md",
+        "reports/tasks/02-05/step3-delivery-20261115/REPORT.md",
+        "reports/tasks/02-05/step3-delivery-20261115/evidence/test.log",
+        "reports/tasks/02-05/step3-delivery-20261115/reviews/review-pr74-c11e734.md"
       ],
-      "next_action": "단계 2 PR 검토·병합 → 단계 3(코디네이터 전달·start/reconnect·공유 예산 검사) → 4~7 → 예산 코드 PR → 단계 8(재배치 전 바인딩 읽기 전용 대조 포함) → 9",
-      "unresolved": "런타임 계약 rev 6 §10 항목 5: 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) — PR #18 검토 P3-1 · 02-03 이월: sprint_id를 repo별 승인 바인딩으로 미리 묶음(ieo-coord는 첫 등록 repo가 소유, 재검토 0fa839d N2) · 02-03 이월(02-05 착수 전): GitHub 검토 author 신원 확인 규칙(F4), 이전 SHA changes_requested와 GitHub PR 상태 차이 처리(N5), G1 판정 관련 필드 중 outputs를 필수 산출물 artifact_id만으로 좁힐지 정책 다음 버전 결정(S1) · X-01 이월(02-05 착수 전): 가져온 스프린트 소유 검사와 01-07 revision 검사의 순서를 계약에 명시(X-01 최종 검토 U2) · 02-04 수용 이월(사용자 결정 2026-11-15, 02-04 수용 기록 §3): 배정 수준 시간·토큰 한도 집행, 코디네이터의 start·reconnect 호출(중앙 체크포인트 compare 경유), 외부 요청 추적(repo 범위 안전 종료), GitHub SHA·CI 대조로 재개 최종 근거 — 02-05 수용 전 필수 · 구분: 위 02-03 이월의 F4·N5는 규칙 결정(02-05 착수 전)이고, 실제 수집·신원·검토 상태 연결(02-04 이월 1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01 · 차단 조건(02-04 결정 항목 8): 호출자 이월(PR #51 P1~P4·N6·F8, PR #49 L-c3-2~4, 마감 정지 시험)을 처리·검토하기 전에는 실제 모델 호출을 하지 않는다(02-05의 실제 인수 시험 포함). 항목 8의 담당은 X-08(개정 A6). X-08 검수 완료 전에는 02-05의 실제 모델 호출을 하지 않는다. 02-05의 모델 호출 없는 부분(코디네이터 start·reconnect 호출, 배정 한도 집행 등의 가짜 런타임 시험)은 X-08을 기다리지 않는다 · 비차단 참고(PR #61 검토 79b40da N-2): 02-04 수용 보고 §7의 f73ac13 P3(빈 memory 디렉터리 digest)·bc55edf R5(정리 코드 시험)를 02-05의 첫 supervisor 변경 PR에서 함께 처리한다. 02-05의 선행·수용 조건이 아니다 · 계획(PLAN.md §2·§4): 사용자 결정 2026-11-15로 해소 — F4(GitHub 검토 author 신원, 정책 G3 의미, 1b에서 반영), S1(정책 0.6.0 유지 확인), 02-05 실제 회차 예산((가)/(나)). 개발자 결정 — N5(G3 유지, PR 수준 상태는 별도 입력, 02-06·02-07), U2(소유 검사를 01-07 검사 뒤로), T1(supervisor만 코디네이터 자격). “02-05 착수 전” 조건(PR #66 검토 3f9909f M-2)은 사용자 답(F4 승인·S1 유지·바로 착수)으로 충족됐다. C2(sprint_id 예약, 개발자 결정) · PR #66 검토 3c017a4(비차단): N-1 U2 재배치로 X-01 시험 an_imported_draft_with_unresolved_reasons_cannot_execute의 기대가 409 IMPORT_GATED → 422 UNBOUND_DRAFT로 바뀐다(거부 집합은 같음, X-01 C2가 정한 순서를 뒤집음 → 사용자 보고에 포함, 단계 1 PR에 명시). N-2 notion_gate도 AlreadyRegistered·Superseded에 적용해야 거부 집합이 같고, 순서 문장에 RG2·예약 SPRINT_REPO_CONFLICT 검사 위치를 적는다(단계 1). N-3 예산 답은 착수 조건이 아니다(착수 조건은 F4·S1뿐). N-5 02-06·02-07 인계는 원장에 이미 적음 · 사용자 결정 2026-11-15(User_Decisions_2026-11-15_0205-x08.md): F4 (다) 승인(정책 G3 새 버전은 1b 작업에서, 02-05 코드 무변경), S1 정책 0.6.0 유지 확인, 02-05 바로 착수, 실제 회차 예산 (나) 승인 — 계획 3회(개발 2·Guardrail 1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, 추가 청구 USD 0, 자동 재시도 없음, X-08 검수 완료 전 실행 금지, 02-04·X-02·01-04 예산 사용·전용 금지, 02-04 예비 회차 계속 미사용. 단계 8 전에 예산 이름·상한 코드 PR 필요 · 런타임 계약 번호(PR #70 검토 8e1ecf7 L-2): X-08이 revision 10을 썼으므로 02-05의 계약 변경(PLAN.md의 “revision 10”)은 revision 11부터 쓴다 · PR #72 검토 23877c1: L-2 재배치 전 비공개 바인딩과 영속 DB sprints 소유의 읽기 전용 대조(단계 8 준비), I-1 checkpoint_e2e gRPC 변형의 500ms 대기 한 번 실패(재실행 통과)"
+      "next_action": "단계 3 PR 검토·병합 → 단계 4(인수·첫 행동·연결 조회, 세션 상태 조회 경로) → 5~7 → 예산 코드 PR → 단계 8(재배치 전 바인딩 읽기 전용 대조) → 9",
+      "unresolved": "런타임 계약 rev 6 §10 항목 5: 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) — PR #18 검토 P3-1 · 02-03 이월: sprint_id를 repo별 승인 바인딩으로 미리 묶음(ieo-coord는 첫 등록 repo가 소유, 재검토 0fa839d N2) · 02-03 이월(02-05 착수 전): GitHub 검토 author 신원 확인 규칙(F4), 이전 SHA changes_requested와 GitHub PR 상태 차이 처리(N5), G1 판정 관련 필드 중 outputs를 필수 산출물 artifact_id만으로 좁힐지 정책 다음 버전 결정(S1) · X-01 이월(02-05 착수 전): 가져온 스프린트 소유 검사와 01-07 revision 검사의 순서를 계약에 명시(X-01 최종 검토 U2) · 02-04 수용 이월(사용자 결정 2026-11-15, 02-04 수용 기록 §3): 배정 수준 시간·토큰 한도 집행, 코디네이터의 start·reconnect 호출(중앙 체크포인트 compare 경유), 외부 요청 추적(repo 범위 안전 종료), GitHub SHA·CI 대조로 재개 최종 근거 — 02-05 수용 전 필수 · 구분: 위 02-03 이월의 F4·N5는 규칙 결정(02-05 착수 전)이고, 실제 수집·신원·검토 상태 연결(02-04 이월 1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01 · 차단 조건(02-04 결정 항목 8): 호출자 이월(PR #51 P1~P4·N6·F8, PR #49 L-c3-2~4, 마감 정지 시험)을 처리·검토하기 전에는 실제 모델 호출을 하지 않는다(02-05의 실제 인수 시험 포함). 항목 8의 담당은 X-08(개정 A6). X-08 검수 완료 전에는 02-05의 실제 모델 호출을 하지 않는다. 02-05의 모델 호출 없는 부분(코디네이터 start·reconnect 호출, 배정 한도 집행 등의 가짜 런타임 시험)은 X-08을 기다리지 않는다 · 비차단 참고(PR #61 검토 79b40da N-2): 02-04 수용 보고 §7의 f73ac13 P3(빈 memory 디렉터리 digest)·bc55edf R5(정리 코드 시험)를 02-05의 첫 supervisor 변경 PR에서 함께 처리한다. 02-05의 선행·수용 조건이 아니다 · 계획(PLAN.md §2·§4): 사용자 결정 2026-11-15로 해소 — F4(GitHub 검토 author 신원, 정책 G3 의미, 1b에서 반영), S1(정책 0.6.0 유지 확인), 02-05 실제 회차 예산((가)/(나)). 개발자 결정 — N5(G3 유지, PR 수준 상태는 별도 입력, 02-06·02-07), U2(소유 검사를 01-07 검사 뒤로), T1(supervisor만 코디네이터 자격). “02-05 착수 전” 조건(PR #66 검토 3f9909f M-2)은 사용자 답(F4 승인·S1 유지·바로 착수)으로 충족됐다. C2(sprint_id 예약, 개발자 결정) · PR #66 검토 3c017a4(비차단): N-1 U2 재배치로 X-01 시험 an_imported_draft_with_unresolved_reasons_cannot_execute의 기대가 409 IMPORT_GATED → 422 UNBOUND_DRAFT로 바뀐다(거부 집합은 같음, X-01 C2가 정한 순서를 뒤집음 → 사용자 보고에 포함, 단계 1 PR에 명시). N-2 notion_gate도 AlreadyRegistered·Superseded에 적용해야 거부 집합이 같고, 순서 문장에 RG2·예약 SPRINT_REPO_CONFLICT 검사 위치를 적는다(단계 1). N-3 예산 답은 착수 조건이 아니다(착수 조건은 F4·S1뿐). N-5 02-06·02-07 인계는 원장에 이미 적음 · 사용자 결정 2026-11-15(User_Decisions_2026-11-15_0205-x08.md): F4 (다) 승인(정책 G3 새 버전은 1b 작업에서, 02-05 코드 무변경), S1 정책 0.6.0 유지 확인, 02-05 바로 착수, 실제 회차 예산 (나) 승인 — 계획 3회(개발 2·Guardrail 1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, 추가 청구 USD 0, 자동 재시도 없음, X-08 검수 완료 전 실행 금지, 02-04·X-02·01-04 예산 사용·전용 금지, 02-04 예비 회차 계속 미사용. 단계 8 전에 예산 이름·상한 코드 PR 필요 · 런타임 계약 번호(PR #70 검토 8e1ecf7 L-2): X-08이 revision 10을 썼으므로 02-05의 계약 변경(PLAN.md의 “revision 10”)은 revision 11부터 쓴다 · PR #72 검토 23877c1: L-2 재배치 전 비공개 바인딩과 영속 DB sprint 소유(sprint_revisions·notion_imports)의 읽기 전용 대조(단계 8 준비), I-1 checkpoint_e2e gRPC 변형의 500ms 대기 한 번 실패(재실행 통과) · PR #73 검토 a349dc6 L-2(단계 2에서 미룬 것): 세션 상태 조회 경로는 단계 4의 연결 조회로, 자기 배정 조회의 last_delivery_id·이미지·프로파일 기대값은 단계 3에서 닫음 · 단계 3에서 정한 것(검토로 확인): 명시적 new_session, 답 유실 뒤 읽기 전용 재조회(재전송 아님), 답 유실이면 그 예산은 사람 대조까지 정지, 회차 중 코디네이터 재시작이면 진행 중 표식이 다음 전달을 막음"
     },
     {
       "task_id": "02-06",
@@ -2039,7 +2043,10 @@
     "2026-11-15 사용자 결정(User_Decisions_2026-11-15_0205-x08.md): 02-05 F4 (다) 승인·S1 유지·바로 착수·실제 회차 예산 (나) 승인, X-08 Q-3 한계로 기록·손상 대기 파일 재개 거절·유지한 동작 확정",
     "main CI 기록: 43718393840(1c21177, PR #70 병합 = X-08 사용자 결정 반영) success",
     "main CI 기록: 43719278914(386a223, PR #71 병합 = X-08 수용 기록) success",
-    "main CI 기록: 43720550428(089fb95, PR #72 병합 = 02-05 단계 1) success"
+    "main CI 기록: 43720550428(089fb95, PR #72 병합 = 02-05 단계 1) success",
+    "main CI 기록: 43724114126(3701f6b, PR #73 병합 = 02-05 단계 2) success",
+    "2026-11-16 시험 환경: /home 99% 사용으로 시험 DB 생성이 실패해 단계 3 구현 중 일회성 시험 DB(55432)의 끝난 프로세스의 ieo_t_* 데이터베이스 114개를 지움(다른 세션이 남긴 것 포함). 영속 DB 55433·코디네이터 58090은 손대지 않음",
+    "2026-11-16 단계 3 교정 중 시험 DB(55432)에서 자기 변이 실행이 남긴 ieo_t_dlv_* 데이터베이스 26개를 지움(만든 프로세스 종료, 그 이름은 이 시험만 씀)"
   ],
   "events": [
     {
@@ -2687,14 +2694,24 @@
       "evidence": [
         "reports/tasks/02-05/step1-u2-c2-20261115/reviews/review-pr72-23877c1.md"
       ]
+    },
+    {
+      "event_id": "02-05-S2-MERGED-20261116",
+      "event_revision": 1,
+      "task_id": "02-05",
+      "observed_at": "2026-11-16T00:13:31+09:00",
+      "state": "02-05 단계 2 병합 3701f6b(검토 a349dc6 approve), main CI 43724114126 success. 단계 3 PR. 12/73·0/12 불변. 모델 호출 0",
+      "evidence": [
+        "reports/tasks/02-05/step2-supervisor-ops-20261115/reviews/review-pr73-a349dc6.md"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-03 검수 완료, 02-04 검수 완료(12/73 · 0/12), X-01 검수 완료·후속 병합, gRPC 계획 A4, P28 개정 A5, 항목 8 담당 X-08 개정 A6(PR #61 병합 0779850), X-03 검수 완료(0c243ee), X-04 검수 완료(84c9668), 02-05 계획 병합(fda0f2b), X-08 교정 병합(6e5e502), X-08 후속 병합(e0a7f8a), X-08 검수 완료(1c21177), X-08 수용 기록 병합(386a223), 02-05 단계 1 병합(089fb95)",
+    "last_verified_stage": "02-03 검수 완료, 02-04 검수 완료(12/73 · 0/12), X-01 검수 완료·후속 병합, gRPC 계획 A4, P28 개정 A5, 항목 8 담당 X-08 개정 A6(PR #61 병합 0779850), X-03 검수 완료(0c243ee), X-04 검수 완료(84c9668), 02-05 계획 병합(fda0f2b), X-08 교정 병합(6e5e502), X-08 후속 병합(e0a7f8a), X-08 검수 완료(1c21177), X-08 수용 기록 병합(386a223), 02-05 단계 1 병합(089fb95), 02-05 단계 2 병합(3701f6b)",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc (docs/poc) · origin https://github.com/HeaInSeo/ieo_poc (public)",
-    "branch_sha": "main 089fb9527291faac8abf772a7b4ba4d4254a3f66 (PR #72 병합 = 02-05 단계 1, main CI 43720550428 success; 이 단계 2 PR 병합 전)",
-    "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 10",
-    "running": "02-05 단계 2 PR(feat/0205-s2). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:a1cfe78(로컬). 실제 Claude 실행 없음",
+    "branch_sha": "main 3701f6b255618643b84817b4d443a1a9303ec47a (PR #73 병합 = 02-05 단계 2, main CI 43724114126 success; 이 단계 3 PR 병합 전)",
+    "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 11(이 PR)",
+    "running": "02-05 단계 3 PR(feat/0205-s3). 영속 PoC DB ieo-poc-db(127.0.0.1:55433)와 코디네이터 서비스(127.0.0.1:58090, main 778ee47 빌드) 실행 중. 시험 DB ieo-poc-0203-pg(tmpfs). 02-04 실제 역할 컨테이너는 정지. 시험 이미지 localhost/ieo-poc/*:6aaf427·*:a1cfe78(로컬). 실제 Claude 실행 없음",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -2732,12 +2749,13 @@
       "reports/tasks/02-05/plan-20261115/PLAN.md",
       "reports/tasks/02-04/caller-carryovers-20261115/REPORT.md",
       "reports/tasks/02-05/step1-u2-c2-20261115/REPORT.md",
-      "reports/tasks/02-05/step2-supervisor-ops-20261115/REPORT.md"
+      "reports/tasks/02-05/step2-supervisor-ops-20261115/REPORT.md",
+      "reports/tasks/02-05/step3-delivery-20261115/REPORT.md"
     ],
     "pending_index_updates": "없음",
-    "next_action": "02-05 단계 2 PR 검토·병합 → 단계 3 … (PLAN.md §3). PR은 하나씩",
+    "next_action": "02-05 단계 3 PR 검토·병합 → 단계 4 … (PLAN.md §3). PR은 하나씩",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다.",
-    "current_work": "current_task·next_task = 02-05(진행). X-08 검수 완료(386a223). 단계 1 병합(089fb95). 지금: 02-05 단계 2 PR → 단계 3~7 → 예산 코드 PR → 단계 8 → 9. 02-05 완료 조건: 장부 02-05 수용 기준과 02-05 unresolved의 이월(PLAN.md §1.2 C1~C14). 계약 변경은 revision 11부터. 독립 검토 승인·필수 CI 3개·승인 head 조건 병합·병합 SHA main CI",
+    "current_work": "current_task·next_task = 02-05(진행). X-08 검수 완료(386a223). 단계 1·2 병합(089fb95·3701f6b). 지금: 02-05 단계 3 PR → 단계 4~7 → 예산 코드 PR → 단계 8 → 9. 02-05 완료 조건: 장부 02-05 수용 기준과 02-05 unresolved의 이월(PLAN.md §1.2 C1~C14). 계약 변경은 revision 11(단계 3)부터. 독립 검토 승인·필수 CI 3개·승인 head 조건 병합·병합 SHA main CI",
     "blocking": "X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지",
     "budget": "02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 검수 완료와 X-02 남은 조건 뒤에만 · 02-05 실제 회차 예산(사용자 결정 2026-11-15 (나)): 계획 3회(개발 R1·R2, Guardrail G1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, USD 0, 예산 검사는 컨테이너 밖. 단계 8에만, X-08 검수 완료와 예산 코드 PR 뒤",
     "user_decisions": [

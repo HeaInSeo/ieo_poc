@@ -58,13 +58,13 @@ impl From<postgres::Error> for Resp {
     }
 }
 
-type R = Result<Resp, Resp>;
+pub(crate) type R = Result<Resp, Resp>;
 
-fn ok(status: u16, body: Value) -> R {
+pub(crate) fn ok(status: u16, body: Value) -> R {
     Ok(Resp { status, body })
 }
 
-fn problem(status: u16, code: &str, message: &str) -> Resp {
+pub(crate) fn problem(status: u16, code: &str, message: &str) -> Resp {
     Resp {
         status,
         body: json!({"code": code, "message": message}),
@@ -83,7 +83,7 @@ fn rejected(status: u16, rejections: Vec<Value>) -> Resp {
     }
 }
 
-fn one(status: u16, code: &str, field: &str, message: &str, correction: &str) -> Resp {
+pub(crate) fn one(status: u16, code: &str, field: &str, message: &str, correction: &str) -> Resp {
     rejected(status, vec![rej(code, field, message, correction)])
 }
 
@@ -116,7 +116,7 @@ fn is_sha(s: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-fn parse_body(body: &[u8]) -> Result<Value, Resp> {
+pub(crate) fn parse_body(body: &[u8]) -> Result<Value, Resp> {
     match serde_json::from_slice::<Value>(body) {
         Ok(v @ Value::Object(_)) => Ok(v),
         _ => Err(one(
@@ -129,7 +129,7 @@ fn parse_body(body: &[u8]) -> Result<Value, Resp> {
     }
 }
 
-fn str_field<'a>(v: &'a Value, k: &str, max: usize) -> Result<&'a str, Resp> {
+pub(crate) fn str_field<'a>(v: &'a Value, k: &str, max: usize) -> Result<&'a str, Resp> {
     match v[k].as_str() {
         Some(s) if !s.is_empty() && s.len() <= max => Ok(s),
         _ => Err(one(
@@ -154,7 +154,7 @@ fn u64_field(v: &Value, k: &str) -> Result<u64, Resp> {
     })
 }
 
-fn only_keys(v: &Value, allowed: &[&str]) -> Result<(), Resp> {
+pub(crate) fn only_keys(v: &Value, allowed: &[&str]) -> Result<(), Resp> {
     let extra: Vec<&String> = v
         .as_object()
         .into_iter()
@@ -173,12 +173,12 @@ fn only_keys(v: &Value, allowed: &[&str]) -> Result<(), Resp> {
     }
 }
 
-fn i64_of(n: u64) -> i64 {
+pub(crate) fn i64_of(n: u64) -> i64 {
     i64::try_from(n).unwrap_or(i64::MAX)
 }
 
 /// Transaction-scoped advisory lock (released at commit/rollback).
-fn lock(tx: &mut Transaction, key: &str) -> Result<(), Resp> {
+pub(crate) fn lock(tx: &mut Transaction, key: &str) -> Result<(), Resp> {
     tx.execute(
         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
         &[&key],
@@ -186,7 +186,12 @@ fn lock(tx: &mut Transaction, key: &str) -> Result<(), Resp> {
     Ok(())
 }
 
-fn history(tx: &mut Transaction, actor: &str, action: &str, subject: &Value) -> Result<(), Resp> {
+pub(crate) fn history(
+    tx: &mut Transaction,
+    actor: &str,
+    action: &str,
+    subject: &Value,
+) -> Result<(), Resp> {
     tx.execute(
         "INSERT INTO history (actor, action, subject) VALUES ($1, $2, $3)",
         &[&actor, &action, subject],
@@ -314,6 +319,11 @@ pub enum Operation<'a> {
         repo: &'a str,
         role: &'a str,
     },
+    /// 02-05 step 3: deliver the current assignment to the role supervisor (HTTP only).
+    DeliverAssignment {
+        repo: &'a str,
+        role: &'a str,
+    },
     Ingest,
     Judge,
     ListOutbox,
@@ -333,6 +343,10 @@ pub enum Shape {
     CallThenTransaction,
     /// One transaction: a 2xx answer commits, anything else rolls back.
     Transaction,
+    /// Authorization, the request recorded (transaction 1), the judgment, the budget check and
+    /// the supervisor call outside any transaction, the result recorded (transaction 2)
+    /// (deliverAssignment, 02-05 step 3).
+    Delivery,
 }
 
 impl Operation<'_> {
@@ -341,6 +355,7 @@ impl Operation<'_> {
             Operation::Health => Shape::Unauthenticated,
             Operation::RoleStatus { .. } | Operation::RoleStop { .. } => Shape::NoDatabase,
             Operation::CompareCheckpoint { .. } => Shape::CallThenTransaction,
+            Operation::DeliverAssignment { .. } => Shape::Delivery,
             _ => Shape::Transaction,
         }
     }
@@ -386,6 +401,10 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         }
         ("POST", ["v0", "repos", repo, "roles", role, "session-status"]) => {
             Operation::ReportSessionStatus { repo, role }
+        }
+        // the coordinator's delivery of the current assignment (02-05 step 3)
+        ("POST", ["v0", "repos", repo, "roles", role, "deliveries"]) => {
+            Operation::DeliverAssignment { repo, role }
         }
         ("POST", ["v0", "coordinator", "evidence"]) => Operation::Ingest,
         ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
@@ -457,7 +476,7 @@ pub fn no_such_endpoint() -> Resp {
 
 /// One transaction: a 2xx answer (`Ok`) commits after the guard's pre-commit check, any other
 /// answer rolls back.
-fn run_tx(
+pub(crate) fn run_tx(
     db: &mut Client,
     guard: &dyn TxGuard,
     f: &dyn Fn(&mut Transaction) -> R,
@@ -607,6 +626,9 @@ pub fn dispatch(
         Operation::ReportSessionStatus { repo, role } => {
             run(db, &|tx| report_session_status(tx, who, repo, role, req))
         }
+        Operation::DeliverAssignment { repo, role } => {
+            crate::delivery::deliver(db, ctx, who, repo, role, req, guard)
+        }
         Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
         Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
@@ -672,7 +694,7 @@ fn latest_revision(tx: &mut Transaction, sprint_id: &str) -> Result<Option<i64>,
         .get(0))
 }
 
-fn idem_key<'a>(req: &Req<'a>) -> Result<&'a str, Resp> {
+pub(crate) fn idem_key<'a>(req: &Req<'a>) -> Result<&'a str, Resp> {
     match req.idempotency_key {
         Some(k) if (8..=128).contains(&k.len()) => Ok(k),
         _ => Err(one(
@@ -3931,7 +3953,7 @@ fn latest_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str)
 /// digest) with the central record, and the central record with the current assignment.
 /// `decision`: `resume_allowed`, `no_checkpoint` (a new session may start), `already_running`,
 /// `stale_generation`, `external_reconciliation_required` or `not_observed`. Read-only.
-fn need_compare(who: &Caller, repo: &str, role: &str) -> Result<(), Resp> {
+pub(crate) fn need_compare(who: &Caller, repo: &str, role: &str) -> Result<(), Resp> {
     need_role(role)?;
     need_client_scope(who, "roles:control", false)?;
     if !who.in_repo(repo) {
@@ -3945,7 +3967,7 @@ fn need_compare(who: &Caller, repo: &str, role: &str) -> Result<(), Resp> {
 }
 
 /// The role supervisor's status, or why it was not observed.
-fn role_status(ctx: &Ctx, repo: &str, role: &str) -> Result<Value, String> {
+pub(crate) fn role_status(ctx: &Ctx, repo: &str, role: &str) -> Result<Value, String> {
     let target = &ctx.roles[repo][role];
     if !target.is_object() {
         return Err("no role supervisor configured for this repo and role".into());
@@ -3957,7 +3979,7 @@ fn role_status(ctx: &Ctx, repo: &str, role: &str) -> Result<Value, String> {
     }
 }
 
-fn compare_checkpoint(
+pub(crate) fn compare_checkpoint(
     tx: &mut Transaction,
     repo: &str,
     role: &str,
@@ -4034,6 +4056,15 @@ pub fn judge_resume(
         return reconcile("no current assignment for this repo and role".into());
     };
     let cgen = c["generation"].as_i64().unwrap_or(-1);
+    // an older generation whose last run did not finish is a run to reconcile, not merely stale:
+    // its children, external requests and session record were never observed (§6), so no new
+    // session may start over it either (02-05 step 3, review c11e734 M-1)
+    if c["assignment_id"] == aid.as_str() && cgen < *generation && c["phase"] != "after_run" {
+        return reconcile(format!(
+            "the last run of the older generation {cgen} did not finish (phase {})",
+            c["phase"]
+        ));
+    }
     if c["assignment_id"] == aid.as_str() && cgen < *generation {
         return (
             "stale_generation",
@@ -4128,7 +4159,8 @@ fn bad_field(field: &str, message: &str) -> Resp {
 /// this (repo, role) as the coordinator recorded it — head, sprint revision, digest and sources,
 /// the revision's limits and the attempts issued. Read only. No head → 404
 /// `NO_CURRENT_ASSIGNMENT`. Elapsed time and token consumption are not metered by the coordinator
-/// yet (02-05 step 5) and no delivery is recorded yet (step 3): `last_delivery_id` is null.
+/// yet (02-05 step 5). `last_delivery_id` and `expected_runtime` name the newest delivery of this
+/// head (deliverAssignment, step 3) and the image and profile it expects; null without one.
 fn own_assignment(tx: &mut Transaction, who: &Caller, repo: &str, role: &str) -> R {
     need_role(role)?;
     need_reporter(who, repo, role)?;
@@ -4162,6 +4194,24 @@ fn own_assignment(tx: &mut Transaction, who: &Caller, repo: &str, role: &str) ->
         })
         .collect();
     let limit = |k: &str| spec["limits"][k].as_u64().map_or(Value::Null, |n| json!(n));
+    // the newest delivery of this head (02-05 step 3) and the image and profile it expects
+    let delivery = tx.query_opt(
+        "SELECT delivery_id, coordinator_record FROM role_deliveries
+         WHERE repo_id = $1 AND role = $2 AND assignment_id = $3 AND generation = $4
+         ORDER BY seq DESC LIMIT 1",
+        &[&repo, &role, &r.get::<_, String>(0), &r.get::<_, i64>(1)],
+    )?;
+    let (last_delivery_id, expected_runtime) = match delivery {
+        Some(d) => {
+            let c: Value = d.get(1);
+            (
+                json!(d.get::<_, String>(0)),
+                json!({"image_digest": c["image_digest"], "profile_id": c["profile_id"],
+                       "profile_revision": c["profile_revision"]}),
+            )
+        }
+        None => (Value::Null, Value::Null),
+    };
     ok(
         200,
         json!({"repo_id": repo, "role": role, "assignment_id": r.get::<_, String>(0),
@@ -4174,7 +4224,7 @@ fn own_assignment(tx: &mut Transaction, who: &Caller, repo: &str, role: &str) ->
                           "correction_attempts": limit("correction_attempts")},
                "attempts_issued": r.get::<_, i64>(10),
                "policy_digest": r.get::<_, String>(8), "issued_at": r.get::<_, String>(9),
-               "last_delivery_id": null}),
+               "last_delivery_id": last_delivery_id, "expected_runtime": expected_runtime}),
     )
 }
 
@@ -4532,7 +4582,41 @@ pub fn migrate(db: &mut impl GenericClient) -> Result<(), postgres::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::legacy_split;
+    use super::{judge_resume, legacy_split};
+    use serde_json::json;
+
+    /// The resume judgment by the central checkpoint's assignment, generation and phase (the local
+    /// checkpoint matches it). Review c11e734 M-1: an older generation whose last run did not
+    /// finish is reconciliation, not `stale_generation`; every other outcome is as before.
+    #[test]
+    fn an_unfinished_run_of_an_older_generation_is_reconciliation() {
+        let head = ("A1".to_string(), 2i64);
+        let local = json!({"running": null, "checkpoint_seq": 5, "checkpoint_sha256": "x"});
+        let judge = |aid: &str, generation: i64, phase: &str| {
+            let c = json!({"seq": 5, "checkpoint_sha256": "x", "assignment_id": aid,
+                           "generation": generation, "phase": phase});
+            judge_resume(Some(&c), Some(&head), Ok(&local)).0
+        };
+        assert_eq!(judge("A1", 1, "after_run"), "stale_generation");
+        assert_eq!(
+            judge("A1", 1, "takeover"),
+            "external_reconciliation_required"
+        );
+        assert_eq!(judge("A1", 1, "error"), "external_reconciliation_required");
+        assert_eq!(judge("A1", 2, "after_run"), "resume_allowed");
+        assert_eq!(
+            judge("A1", 2, "takeover"),
+            "external_reconciliation_required"
+        );
+        assert_eq!(
+            judge("A1", 3, "after_run"),
+            "external_reconciliation_required"
+        );
+        assert_eq!(
+            judge("B1", 1, "after_run"),
+            "external_reconciliation_required"
+        );
+    }
 
     #[test]
     fn legacy_reasons_split_fail_closed() {

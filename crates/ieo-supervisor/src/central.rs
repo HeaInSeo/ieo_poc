@@ -54,6 +54,9 @@ pub trait CoordinatorClient: std::fmt::Debug + Send + Sync {
     fn latest_checkpoint(&self, repo: &str, role: &str) -> Reply;
     /// `POST …/checkpoints` / `ReportCheckpoint` with the exact checkpoint bytes.
     fn report_checkpoint(&self, repo: &str, role: &str, seq: u64, raw: &[u8]) -> Reply;
+    /// `GET …/assignment` / `GetOwnAssignment` (02-05 step 3): the current assignment of this
+    /// (repo, role) as the coordinator's database holds it.
+    fn own_assignment(&self, repo: &str, role: &str) -> Reply;
     /// Transport, URL and credential file (configuration identity).
     fn describe(&self) -> String;
 }
@@ -151,6 +154,14 @@ impl CoordinatorClient for HttpClient {
         // conversion (the supervisor writes checkpoints with serde_json, so they are UTF-8)
         let body = json!({"seq": seq, "checkpoint_json": String::from_utf8_lossy(raw)});
         self.call("POST", &Self::path(repo, role), Some(&body))
+    }
+
+    fn own_assignment(&self, repo: &str, role: &str) -> Reply {
+        self.call(
+            "GET",
+            &format!("/v0/repos/{repo}/roles/{role}/assignment"),
+            None,
+        )
     }
 
     fn describe(&self) -> String {
@@ -310,6 +321,27 @@ impl CoordinatorClient for GrpcClient {
         })
     }
 
+    fn own_assignment(&self, repo: &str, role: &str) -> Reply {
+        let token = match read_token(&self.token_file) {
+            Ok(t) => t,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        let m = ieo_proto::v0::GetOwnAssignmentRequest {
+            repo_id: repo.to_string(),
+            role: ieo_proto::role_of(role) as i32,
+        };
+        let req = match Self::request(m, &token) {
+            Ok(r) => r,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        self.run(|mut cl| async move {
+            match cl.get_own_assignment(req).await {
+                Ok(r) => Reply::Answered(200, ieo_proto::own_assignment_to_json(r.get_ref())),
+                Err(st) => reply_of(&st),
+            }
+        })
+    }
+
     fn describe(&self) -> String {
         format!("grpc {} {}", self.url, self.token_file.display())
     }
@@ -392,6 +424,77 @@ impl Central {
             .with("coordinator_answer", v)),
         }
     }
+}
+
+impl Central {
+    /// The coordinator's current assignment of this (repo, role) (02-05 step 3). No answer →
+    /// `NOT_OBSERVED`; no current assignment or any other refusal → external reconciliation.
+    /// `local_only` has none to give: `Ok(None)` (the comparison is a reported capability gap).
+    pub fn own_assignment(&self, repo: &str, role: &str) -> Result<Option<Value>, Refusal> {
+        let Central::Coordinator(c) = self else {
+            return Ok(None);
+        };
+        match c.own_assignment(repo, role) {
+            Reply::NoAnswer(e) => Err(not_observed(format!("current assignment: {e}"))),
+            Reply::Answered(200, v) => Ok(Some(v)),
+            Reply::Answered(st, v) => Err(reconcile(format!(
+                "the coordinator gave no current assignment ({st} {})",
+                code_of(&v)
+            ))
+            .with("coordinator_status", json!(st))),
+        }
+    }
+}
+
+/// The start or reconnect request's coordinator record against the coordinator's current
+/// assignment (02-05 step 3, PLAN §3 step 3): assignment, generation, sprint revision and spec
+/// digest must be the current ones, and the image and profile those the newest delivery
+/// expects (when the coordinator recorded one). An older generation of the same assignment is
+/// `STALE_GENERATION`; any other difference is external reconciliation. Nothing runs on either.
+pub fn check_assignment(
+    own: &Value,
+    record: &crate::checkpoint::CoordinatorRecord<'_>,
+) -> Result<(), Refusal> {
+    if own["assignment_id"] == record.assignment_id
+        && own["generation"]
+            .as_u64()
+            .is_some_and(|g| record.generation < g)
+    {
+        return Err(Refusal {
+            status: 409,
+            body: json!({"code": "STALE_GENERATION",
+                "reason": format!("generation {} is older than the coordinator's current {}",
+                                  record.generation, own["generation"])}),
+        });
+    }
+    let mut want = vec![
+        ("assignment_id", json!(record.assignment_id)),
+        ("generation", json!(record.generation)),
+        ("sprint_id", json!(record.sprint_id)),
+        ("sprint_revision", json!(record.sprint_revision)),
+        ("spec_digest", json!(record.spec_digest)),
+    ];
+    let exp = &own["expected_runtime"];
+    if exp.is_object() {
+        want.extend([
+            ("image_digest", json!(record.image_digest)),
+            ("profile_id", json!(record.profile_id)),
+            ("profile_revision", json!(record.profile_revision)),
+        ]);
+    }
+    for (k, mine) in want {
+        let theirs = if own.get(k).is_some() {
+            &own[k]
+        } else {
+            &exp[k]
+        };
+        if *theirs != mine {
+            return Err(reconcile(format!(
+                "coordinator record {k} {mine} is not the coordinator's current {theirs}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// The error code of a coordinator answer: `code`, or the first rejection's (review 48b1d0e L-4).

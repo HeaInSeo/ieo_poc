@@ -590,6 +590,9 @@ pub fn call(
 /// before the start request starts nothing; after it, the run is recorded as unmeasured with
 /// `stop_required`, and if even that record cannot be written the in-flight marker stays and
 /// blocks every further call.
+///
+/// It is the three steps of the shared budget check in a row: [`admit`], [`Admission::start`],
+/// [`Running::finish`].
 pub fn call_with(
     plan: &Plan,
     c: &Call,
@@ -597,13 +600,57 @@ pub fn call_with(
     poll: Duration,
     margin: Duration,
 ) -> Result<Called, String> {
-    let target = plan
-        .roles
+    plan.roles
         .get(&c.role)
         .ok_or(format!("role {} not in the plan", c.role))?;
     if c.op != "start" && c.op != "reconnect" {
         return Err(format!("op {} is not start or reconnect", c.op));
     }
+    let adm = match admit(plan, &c.role, &c.attempt_id, adapter)? {
+        Ok(a) => a,
+        Err(why) => return Ok(Called::NotStarted(why)),
+    };
+    match adm.start(plan, c, adapter)? {
+        Sent::Refused { why, .. } => Ok(Called::NotStarted(why)),
+        Sent::Lost(r) => Ok(Called::Recorded(r)),
+        Sent::Accepted { running, .. } => {
+            running.finish(adapter, poll, margin).map(Called::Recorded)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The shared budget check (02-05 step 3, PLAN §3 "예산 검사의 위치")
+// ---------------------------------------------------------------------------
+//
+// The host caller above and the coordinator's delivery path (`deliverAssignment`) call a role
+// service only through these three steps, so every run of a budget passes the same checks with
+// the same code, outside the role containers (runtime contract §2.1): the ledger read fail-closed,
+// a record that asks for a person, an unmeasured run, the no-extra-billing observation, the
+// limits of the budget and the role's share, every service idle with its runs known, the
+// in-flight marker, and after the run the measurement and the charge with `stop_required`.
+
+/// A call the budget check admitted. It holds the ledger lock (`caller.lock`) until the call's
+/// record is appended or the call is refused, so one call of a budget runs at a time.
+#[derive(Debug)]
+pub struct Admission {
+    lock: std::fs::File,
+    recs: Vec<Value>,
+    limits: Limits,
+    before: Value,
+}
+
+/// Step 1: the checks before a call (read only apart from the ledger lock). `Ok(Err(why))`: not
+/// admitted, nothing to record; `Err`: the ledger or a service could not be read.
+pub fn admit(
+    plan: &Plan,
+    role: &str,
+    attempt_id: &str,
+    adapter: &dyn Adapter,
+) -> Result<Result<Admission, String>, String> {
+    plan.roles
+        .get(role)
+        .ok_or(format!("role {role} not in the plan"))?;
     // one caller at a time over the ledger
     std::fs::create_dir_all(&plan.ledger_dir).map_err(|e| e.to_string())?;
     let lock = std::fs::OpenOptions::new()
@@ -620,97 +667,245 @@ pub fn call_with(
                 std::thread::sleep(Duration::from_millis(50));
             }
             Err(std::fs::TryLockError::WouldBlock) => {
-                return Ok(Called::NotStarted("another caller holds the ledger".into()));
+                return Ok(Err("another caller holds the ledger".into()));
             }
             Err(std::fs::TryLockError::Error(e)) => return Err(format!("caller lock: {e}")),
         }
     }
     if let Ok(t) = std::fs::read_to_string(inflight_path(plan)) {
-        return Ok(Called::NotStarted(format!(
+        return Ok(Err(format!(
             "a call is in flight without a record ({}): a person reconciles it",
             t.trim()
         )));
     }
     let recs = records(plan)?;
     if let Some(why) = asks_for_a_person(&recs) {
-        return Ok(Called::NotStarted(why));
+        return Ok(Err(why));
     }
-    let known = |a: &str| recs.iter().any(|r| r["attempt_id"] == a);
-    if known(&c.attempt_id) {
-        return Ok(Called::NotStarted(format!(
-            "attempt {} already recorded",
-            c.attempt_id
-        )));
+    if recs.iter().any(|r| r["attempt_id"] == attempt_id) {
+        return Ok(Err(format!("attempt {attempt_id} already recorded")));
     }
-    let limits = match limits_for(plan, &c.role, &recs) {
+    let limits = match limits_for(plan, role, &recs) {
         Ok(l) => l,
-        Err(why) => return Ok(Called::NotStarted(why)),
+        Err(why) => return Ok(Err(why)),
     };
     // every service's state before the run (the target's checkpoint is the resume base
     // candidate)
-    let mut statuses = match services_clear(plan, &recs, adapter, &c.role)? {
+    let mut statuses = match services_clear(plan, &recs, adapter, role)? {
         Ok(s) => s,
-        Err(why) => return Ok(Called::NotStarted(why)),
+        Err(why) => return Ok(Err(why)),
     };
-    let before = statuses.remove(&c.role).unwrap_or_default();
-    let mut body = json!({"attempt_id": c.attempt_id, "prompt": c.prompt,
-        "coordinator": c.coordinator,
-        "limits": {"timeout_ms": limits.timeout.as_millis() as u64,
-                   "grace_ms": limits.grace.as_millis() as u64,
-                   "billable_room": limits.billable_room,
-                   "cache_read_room": limits.cache_read_room,
-                   "timeout_is_total": limits.timeout_is_total}});
-    body[if c.op == "start" {
-        "session_id"
-    } else {
-        "new_session_id"
-    }] = json!(c.session_id);
-    let base_rec = json!({"format": RECORD_FORMAT, "task_id": c.task_id, "budget": plan.budget.name,
-        "attempt_id": c.attempt_id, "command_id": format!("{}-{}", c.role, c.op), "role": c.role,
-        "model_request": true, "started_at": ieo_evidence::time::now(),
-        "started_unix": unix_now(), "limits": body["limits"]});
-    let fail = |reason: String| -> Result<Called, String> {
-        // a run that may have started but whose end or usage is unknown: unmeasured, no
-        // duration, a person decides
-        let mut r = base_rec.clone();
-        r["usage"] = json!({"run": {"state": "unmeasured", "reason": reason}});
-        r["stop_required"] = json!(true);
-        r["stop_reason"] = json!(reason);
-        append(plan, &r)?;
-        clear_inflight(plan)?;
-        Ok(Called::Recorded(r))
-    };
-    mark_inflight(plan, c)?;
-    match adapter.send(target, "POST", &format!("/v0/role/{}", c.op), Some(&body)) {
-        Ok((202, _)) => {}
-        Ok((st, b)) => {
-            // refused: nothing started
-            clear_inflight(plan)?;
-            return Ok(Called::NotStarted(format!(
-                "{} {st} {}: {}",
-                c.op, b["code"], b["reason"]
-            )));
-        }
-        Err(e) => return fail(format!("{} sent but its answer was lost ({e})", c.op)),
+    let before = statuses.remove(role).unwrap_or_default();
+    Ok(Ok(Admission {
+        lock,
+        recs,
+        limits,
+        before,
+    }))
+}
+
+/// What sending an admitted call did.
+#[derive(Debug)]
+pub enum Sent {
+    /// The service answered with a refusal: nothing started, nothing recorded.
+    Refused {
+        status: u16,
+        body: Value,
+        why: String,
+    },
+    /// Sent, but its answer was lost: recorded as an unmeasured run that asks for a person.
+    Lost(Value),
+    /// Accepted (202): the run goes on; [`Running::finish`] records it.
+    Accepted {
+        answer: Value,
+        running: Box<Running>,
+    },
+}
+
+impl Admission {
+    /// The limits the budget and the role's share allow for this call.
+    pub fn limits(&self) -> Limits {
+        self.limits
     }
-    let ctx = After {
-        plan,
-        c,
-        target,
-        adapter,
-        limits: &limits,
-        before: &before,
-        recs: &recs,
-        poll,
-        margin,
-    };
-    match ctx.finish(base_rec.clone()) {
-        Ok(r) => {
-            append(plan, &r)?;
-            clear_inflight(plan)?;
-            Ok(Called::Recorded(r))
+
+    /// Lower the limits (never raise them): the window (timeout + grace) to at most
+    /// `window_seconds`, the billable room to at most `billable`. A window not above the stop
+    /// grace is a refusal (`Err(why)`), as in [`limits_for`].
+    pub fn lower(
+        &mut self,
+        window_seconds: Option<u64>,
+        billable: Option<u64>,
+    ) -> Result<(), String> {
+        // checked first, changed after: a refusal leaves the limits as they were
+        let mut l = self.limits;
+        if let Some(w) = window_seconds {
+            let full = l.timeout + l.grace;
+            let window = full.min(Duration::from_secs(w));
+            if window <= l.grace {
+                return Err(format!("a window of {w} s is not more than the stop grace"));
+            }
+            if window < full {
+                l.timeout = window - l.grace;
+                l.timeout_is_total = true;
+            }
         }
-        Err(reason) => fail(reason),
+        if let Some(b) = billable {
+            if b == 0 {
+                return Err("no billable token room".into());
+            }
+            l.billable_room = l.billable_room.min(b);
+        }
+        self.limits = l;
+        Ok(())
+    }
+
+    /// The start or reconnect request body of `c` under these limits.
+    pub fn body(&self, c: &Call) -> Value {
+        let limits = &self.limits;
+        let mut body = json!({"attempt_id": c.attempt_id, "prompt": c.prompt,
+            "coordinator": c.coordinator,
+            "limits": {"timeout_ms": limits.timeout.as_millis() as u64,
+                       "grace_ms": limits.grace.as_millis() as u64,
+                       "billable_room": limits.billable_room,
+                       "cache_read_room": limits.cache_read_room,
+                       "timeout_is_total": limits.timeout_is_total}});
+        body[if c.op == "start" {
+            "session_id"
+        } else {
+            "new_session_id"
+        }] = json!(c.session_id);
+        body
+    }
+
+    /// Step 2: mark the call in flight and send it ([`Admission::body`], plus `extra` keys).
+    pub fn start(self, plan: &Plan, c: &Call, adapter: &dyn Adapter) -> Result<Sent, String> {
+        self.start_with(plan, c, adapter, &json!({}))
+    }
+
+    /// [`Admission::start`] with extra top-level keys in the body (e.g. `target_sha`).
+    pub fn start_with(
+        self,
+        plan: &Plan,
+        c: &Call,
+        adapter: &dyn Adapter,
+        extra: &Value,
+    ) -> Result<Sent, String> {
+        let target = plan
+            .roles
+            .get(&c.role)
+            .ok_or(format!("role {} not in the plan", c.role))?
+            .clone();
+        let mut body = self.body(c);
+        for (k, v) in extra.as_object().into_iter().flatten() {
+            body[k] = v.clone();
+        }
+        let base_rec = json!({"format": RECORD_FORMAT, "task_id": c.task_id, "budget": plan.budget.name,
+            "attempt_id": c.attempt_id, "command_id": format!("{}-{}", c.role, c.op), "role": c.role,
+            "model_request": true, "started_at": ieo_evidence::time::now(),
+            "started_unix": unix_now(), "limits": body["limits"]});
+        mark_inflight(plan, c)?;
+        match adapter.send(&target, "POST", &format!("/v0/role/{}", c.op), Some(&body)) {
+            Ok((202, answer)) => Ok(Sent::Accepted {
+                answer,
+                running: Box::new(Running {
+                    _lock: self.lock,
+                    plan: plan.clone(),
+                    c: c.clone(),
+                    target,
+                    limits: self.limits,
+                    before: self.before,
+                    recs: self.recs,
+                    base_rec,
+                }),
+            }),
+            Ok((st, b)) => {
+                // refused: nothing started by this call. A 200 `replayed` is the stored answer
+                // of the same attempt accepted earlier — by a caller on another ledger, since
+                // `admit` refuses an attempt this ledger knows (review c11e734 I-4); this call
+                // started nothing and records nothing
+                clear_inflight(plan)?;
+                let why = if st == 200 && b["replayed"] == true {
+                    format!(
+                        "{} 200 replayed: attempt {} was accepted earlier, not by this call",
+                        c.op, c.attempt_id
+                    )
+                } else {
+                    format!("{} {st} {}: {}", c.op, b["code"], b["reason"])
+                };
+                Ok(Sent::Refused {
+                    why,
+                    status: st,
+                    body: b,
+                })
+            }
+            Err(e) => Ok(Sent::Lost(record_lost(
+                plan,
+                &base_rec,
+                format!("{} sent but its answer was lost ({e})", c.op),
+            )?)),
+        }
+    }
+}
+
+/// A run that may have started but whose end or usage is unknown: unmeasured, no duration, a
+/// person decides.
+fn record_lost(plan: &Plan, base_rec: &Value, reason: String) -> Result<Value, String> {
+    let mut r = base_rec.clone();
+    r["usage"] = json!({"run": {"state": "unmeasured", "reason": reason}});
+    r["stop_required"] = json!(true);
+    r["stop_reason"] = json!(reason);
+    append(plan, &r)?;
+    clear_inflight(plan)?;
+    Ok(r)
+}
+
+/// An accepted call whose record is not written yet. It keeps the ledger lock: no other call of
+/// the budget starts until [`Running::finish`] returns (or the process ends, which leaves the
+/// in-flight marker for a person).
+#[derive(Debug)]
+pub struct Running {
+    _lock: std::fs::File,
+    plan: Plan,
+    c: Call,
+    target: RoleTarget,
+    limits: Limits,
+    before: Value,
+    recs: Vec<Value>,
+    base_rec: Value,
+}
+
+impl Running {
+    /// The attempt this run belongs to.
+    pub fn attempt_id(&self) -> &str {
+        &self.c.attempt_id
+    }
+
+    /// Step 3: wait for the run's end, measure and charge it, append its record.
+    pub fn finish(
+        self,
+        adapter: &dyn Adapter,
+        poll: Duration,
+        margin: Duration,
+    ) -> Result<Value, String> {
+        let ctx = After {
+            plan: &self.plan,
+            c: &self.c,
+            target: &self.target,
+            adapter,
+            limits: &self.limits,
+            before: &self.before,
+            recs: &self.recs,
+            poll,
+            margin,
+        };
+        match ctx.finish(self.base_rec.clone()) {
+            Ok(r) => {
+                append(&self.plan, &r)?;
+                clear_inflight(&self.plan)?;
+                Ok(r)
+            }
+            Err(reason) => record_lost(&self.plan, &self.base_rec, reason),
+        }
     }
 }
 
@@ -1142,4 +1337,60 @@ pub fn records_path(plan: &Plan) -> PathBuf {
 pub fn share_json(s: &Share) -> Value {
     json!({"max_runs": s.max_runs, "total_seconds": s.total_seconds,
            "billable_tokens": s.billable_tokens, "cache_read_tokens": s.cache_read_tokens})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn admission(timeout: u64, billable: u64) -> Admission {
+        Admission {
+            lock: std::fs::File::open("/dev/null").expect("file"),
+            recs: vec![],
+            limits: Limits {
+                timeout: Duration::from_secs(timeout),
+                timeout_is_total: false,
+                billable_room: billable,
+                cache_read_room: 500,
+                grace: Duration::from_secs(6),
+            },
+            before: Value::Null,
+        }
+    }
+
+    /// `lower` only lowers (review c11e734 L-1): a bound above the room or window changes
+    /// nothing, one below it lowers, a window not above the grace and a zero room are refused.
+    #[test]
+    fn lower_never_raises_a_limit() {
+        let mut a = admission(114, 1_000);
+        a.lower(Some(3_600), Some(100_000)).expect("lower");
+        assert_eq!(a.limits(), admission(114, 1_000).limits(), "nothing raised");
+        a.lower(Some(60), Some(400)).expect("lower");
+        let l = a.limits();
+        assert_eq!(
+            (
+                l.timeout,
+                l.timeout_is_total,
+                l.billable_room,
+                l.cache_read_room,
+                l.grace
+            ),
+            (
+                Duration::from_secs(54),
+                true,
+                400,
+                500,
+                Duration::from_secs(6)
+            )
+        );
+        a.lower(None, None).expect("no bound");
+        assert_eq!(a.limits(), l);
+        assert!(
+            a.lower(Some(6), None).is_err(),
+            "window not above the grace"
+        );
+        assert!(a.lower(None, Some(0)).is_err(), "no billable room");
+        assert!(a.lower(Some(30), Some(0)).is_err(), "refused as a whole");
+        assert_eq!(a.limits(), l, "a refusal changes nothing");
+    }
 }

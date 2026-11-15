@@ -7,7 +7,7 @@
 | 검토 반영 | 계획 PR 검토 3f9909f I-1(OpenAPI 범위 문장), PR #72 검토 23877c1 I-2(draft 상태 명세의 C2 사례) |
 | 기준 커밋 | main 089fb95. 구현 커밋 15b2f03, 증거 커밋 0574abc |
 | 모델 호출 | 0회. 컨테이너·실제 회차 없음. 영속 PoC DB는 쓰지 않았다(일회성 시험 DB만) |
-| 상태 | 구현과 시험 완료, **독립 검토 전**. 같은 PR의 원장 snapshot이 이 단계를 기록한다 |
+| 상태 | 병합 3701f6b(PR #73, 검토 [a349dc6 승인](reviews/review-pr73-a349dc6.md)). 원장 snapshot 0046이 기록 |
 
 ## 1. 더한 작업
 
@@ -63,7 +63,7 @@
 ## 3. 시험
 
 `crates/ieo-coord/tests/grpc.rs`(실제 PostgreSQL, 실제 HTTP 서버와 gRPC 어댑터):
-- **공통 회귀 확장**(`both_transports_give_the_same_answers_and_the_same_database`): 같은 단계를 HTTP 환경과 gRPC 환경에 각각 보내 (상태, 본문)과 DB 표 내용(새 두 표 포함)이 같은지 본다. 거부에서는 DB가 그대로인지도 본다. 새 작업에 넣은 단계는 72개다.
+- **공통 회귀 확장**(`both_transports_give_the_same_answers_and_the_same_database`): 같은 단계를 HTTP 환경과 gRPC 환경에 각각 보내 (상태, 본문)과 DB 표 내용(새 두 표 포함)이 같은지 본다. 거부에서는 DB가 그대로인지도 본다. 새 작업에 넣은 단계는 63개다(작성 때 72로 잘못 적음, 검토 a349dc6 L-3).
   - 인증·범위: 자격 없음 401, 모델 자격·클라이언트·배정자 403 `SCOPE_DENIED`, 다른 역할 supervisor 403 `ROLE_MISMATCH`, 다른 repo 403 `REPO_SCOPE_DENIED`, 알 수 없는 역할 404, 경로의 `/` 404.
   - 형식 400: `kind` 미지정, 없는 날짜, UTC가 아닌 시각, 빈 attempt_id, 멱등 키 없음·짧음, lifecycle, 0으로 쓴 미추적, 항목 누락·모르는 항목, 짝 없는 digest·세대, JSON 아님, UTF-8 아님, 1 MiB 초과.
   - 멱등: 같은 키 재조회 200(세션 상태는 다른 바이트의 같은 JSON 값도 200), 내용 충돌 409 `EVENT_CONTENT_CONFLICT`·`IDEMPOTENCY_KEY_CONFLICT`.

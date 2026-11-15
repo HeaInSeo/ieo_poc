@@ -176,6 +176,11 @@ impl Config {
     fn pending_tamper_path(&self) -> PathBuf {
         self.state.join("pending-tamper.json")
     }
+    /// The accepted answer of each attempt (02-05 step 3, runtime contract §7): a start or
+    /// reconnect sent again with the same `attempt_id` and the same content gets it back.
+    fn accepted_path(&self, attempt: &str) -> PathBuf {
+        self.state.join("attempts").join(format!("{attempt}.json"))
+    }
     /// Attempts started under this role's budget (append-only, on the persistent volume).
     fn attempts_path(&self) -> PathBuf {
         self.state.join("budget").join("attempts.jsonl")
@@ -536,6 +541,18 @@ impl Service {
                     Err(_) => err(404, "NOT_FOUND", "no such child transcript"),
                 }
             }
+            // the stored answer of an accepted attempt (02-05 step 3): a caller whose answer was
+            // lost asks here without sending anything that could start a run
+            ("GET", ["v0", "role", "attempts", id]) if safe_id(id) => {
+                let _gate = self.launch_gate.lock().unwrap_or_else(|e| e.into_inner());
+                match std::fs::read(self.cfg.accepted_path(id)) {
+                    Ok(b) => match serde_json::from_slice::<Value>(&b) {
+                        Ok(v) => resp(200, v),
+                        Err(_) => err(500, "INTERNAL", "the stored answer cannot be read"),
+                    },
+                    Err(_) => err(404, "NOT_FOUND", "no accepted attempt with this id"),
+                }
+            }
             ("POST", ["v0", "role", op @ ("start" | "reconnect")]) => {
                 let Ok(req) = serde_json::from_slice::<Value>(body) else {
                     return err(400, "SCHEMA_VIOLATION", "body is not JSON");
@@ -558,6 +575,35 @@ impl Service {
                 "attempt_id (1-64 of [A-Za-z0-9_-]) required",
             );
         };
+        // the same attempt again (runtime contract §7, revision 11): the same content gets the
+        // stored answer and starts nothing; other content is ID_CONTENT_CONFLICT
+        let request_sha256 =
+            hex::encode(Sha256::digest(serde_json::to_vec(req).unwrap_or_default()));
+        match std::fs::read(self.cfg.accepted_path(&attempt)) {
+            Ok(b) => {
+                return match serde_json::from_slice::<Value>(&b) {
+                    Ok(rec)
+                        if rec["request_sha256"] == request_sha256.as_str() && rec["op"] == op =>
+                    {
+                        let mut answer = rec["answer"].clone();
+                        answer["replayed"] = json!(true);
+                        resp(200, answer)
+                    }
+                    Ok(_) => err(
+                        409,
+                        "ID_CONTENT_CONFLICT",
+                        "attempt_id already accepted with other content",
+                    ),
+                    Err(_) => err(
+                        409,
+                        "ID_CONTENT_CONFLICT",
+                        "attempt_id already accepted (its stored answer cannot be read)",
+                    ),
+                };
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return err(500, "INTERNAL", &format!("stored answer: {e}")),
+        }
         let Some(prompt) = s("prompt") else {
             return err(400, "SCHEMA_VIOLATION", "prompt required");
         };
@@ -607,6 +653,32 @@ impl Service {
                 409,
                 json!({"code": "ALREADY_RUNNING", "status": self.status()}),
             );
+        }
+        let record = CoordinatorRecord {
+            generation,
+            assignment_id: &assignment_id,
+            sprint_id: &sprint_id,
+            sprint_revision,
+            spec_digest: &spec_digest,
+            image_digest: &image_digest,
+            profile_id: &profile_id,
+            profile_revision,
+        };
+        // the coordinator's current assignment first (02-05 step 3): a request carrying another
+        // assignment, generation, revision or digest — or another image or profile than the
+        // newest delivery expects — runs nothing
+        match self
+            .cfg
+            .central
+            .own_assignment(&self.cfg.repo, self.cfg.role_name())
+        {
+            Ok(Some(own)) => {
+                if let Err(r) = crate::central::check_assignment(&own, &record) {
+                    return resp(r.status, r.body);
+                }
+            }
+            Ok(None) => {}
+            Err(r) => return resp(r.status, r.body),
         }
         // the central record first (§2.1, §5-2): the local checkpoint must match the
         // coordinator's latest one (missing reports are sent from the archive) before anything
@@ -698,16 +770,6 @@ impl Service {
                            "reason": format!("the previous run did not finish (checkpoint phase {phase})")}),
                 );
             }
-            let record = CoordinatorRecord {
-                generation,
-                assignment_id: &assignment_id,
-                sprint_id: &sprint_id,
-                sprint_revision,
-                spec_digest: &spec_digest,
-                image_digest: &image_digest,
-                profile_id: &profile_id,
-                profile_revision,
-            };
             let observed = crate::configdir::observed(&self.cfg.config_dir());
             match checkpoint::decide(cp.as_ref(), &record, &observed, running) {
                 Reconnect::AlreadyRunning { pid } => {
@@ -845,13 +907,25 @@ impl Service {
         if let Err(why) = self.budget_backstop(&limits) {
             return resp(409, json!({"code": "BUDGET_EXCEEDED", "reason": why}));
         }
-        if let Err(e) = self.record_attempt(&attempt, &limits) {
-            return err(500, "INTERNAL", &format!("attempt ledger: {e}"));
-        }
-        let stop = Arc::new(AtomicBool::new(false));
         let info = json!({"attempt_id": attempt, "session_id": session_id, "mode":
             if resume { "resume" } else { "new" }, "tamper": tamper,
             "started_at": ieo_evidence::time::now(), "central": central});
+        // the answer is kept before anything starts, so a resend of the same attempt never starts
+        // a second run (02-05 step 3)
+        let accepted = self.cfg.accepted_path(&attempt);
+        if let Err(e) = crate::central::durable_write(
+            &accepted,
+            &serde_json::to_vec_pretty(&json!({"attempt_id": attempt, "op": op,
+                "request_sha256": request_sha256, "answer": {"accepted": info}}))
+            .unwrap_or_default(),
+        ) {
+            return err(500, "INTERNAL", &format!("stored answer: {e}"));
+        }
+        if let Err(e) = self.record_attempt(&attempt, &limits) {
+            let _ = std::fs::remove_file(&accepted);
+            return err(500, "INTERNAL", &format!("attempt ledger: {e}"));
+        }
+        let stop = Arc::new(AtomicBool::new(false));
         st.running = Some(info.clone());
         st.stop = Some(stop.clone());
         drop(st);

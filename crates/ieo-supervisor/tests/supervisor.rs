@@ -915,3 +915,77 @@ fn a_non_regular_claude_json_is_never_opened() {
     );
     assert_eq!(configdir::observed(l.p()), observed);
 }
+
+/// 02-05 C12 (review f73ac13 P3): the CLI creates empty `projects/*/memory/` directories on its
+/// own. The directive digest is over files (and links), so an empty one is not a tamper and the
+/// session resumes; a file in it is a tamper. Cleanup removes the empty directories.
+#[test]
+fn an_empty_memory_directory_is_not_a_tamper() {
+    let t = template();
+    let d = Tmp::new("cfg-memdir");
+    put(d.p(), "projects/-state-work/s1.jsonl", "{}\n");
+    let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+    for p in [
+        "projects/-state-work/memory",
+        "projects/-state-work-g2/memory",
+    ] {
+        std::fs::create_dir_all(d.p().join(p)).expect("mk");
+    }
+    let observed = configdir::observed(d.p());
+    assert_eq!(observed, digest);
+    assert_eq!(
+        checkpoint::decide(Some(&cp_value(&digest, 0)), &coord(0), &observed, None),
+        Reconnect::Resume {
+            session_id: SID.into()
+        }
+    );
+    // cleanup removes the empty directories and gives the same digest
+    assert_eq!(
+        configdir::clean(d.p(), t.p()).expect("clean").digest,
+        digest
+    );
+    assert!(!d.p().join("projects/-state-work/memory").exists());
+    assert!(!d.p().join("projects/-state-work-g2").exists());
+    // a file in a memory directory is a tamper
+    put(d.p(), "projects/-state-work/memory/m.md", "MARKER");
+    assert_ne!(configdir::observed(d.p()), digest);
+}
+
+/// 02-05 C12 (review bc55edf R5): files outside the directive scope are never opened. Unreadable
+/// ones (mode 000) neither change nor break the digest, and cleanup removes them without reading
+/// them (and keeps an unreadable session record as it is). The same file inside the scope makes
+/// the digest fail closed.
+#[test]
+fn an_unreadable_file_outside_the_directive_scope_is_never_opened() {
+    let t = template();
+    let d = Tmp::new("cfg-unreadable");
+    put(d.p(), "projects/p/s.jsonl", "{}\n");
+    let digest = configdir::clean(d.p(), t.p()).expect("clean").digest;
+    for rel in [
+        "sessions/x.json",
+        "backups/b.json",
+        "projects/p/notes.txt",
+        "plugins/store/cc-plugin-agents-md_builtin-0.json",
+        "projects/p/s.jsonl",
+    ] {
+        if rel != "projects/p/s.jsonl" {
+            put(d.p(), rel, "secret");
+        }
+        std::fs::set_permissions(d.p().join(rel), std::fs::Permissions::from_mode(0o000))
+            .expect("chmod");
+        assert!(std::fs::read(d.p().join(rel)).is_err(), "{rel} unreadable");
+    }
+    assert_eq!(configdir::observed(d.p()), digest);
+    let report = configdir::clean(d.p(), t.p()).expect("clean");
+    assert_eq!(report.digest, digest);
+    assert_eq!(files(d.p()), vec!["projects/p/s.jsonl", "settings.json"]);
+    assert!(report.removed.contains(&"sessions/x.json".to_string()));
+    // inside the scope an unreadable file is never taken for a match
+    put(d.p(), "agents/a.md", "MARKER");
+    std::fs::set_permissions(
+        d.p().join("agents/a.md"),
+        std::fs::Permissions::from_mode(0o000),
+    )
+    .expect("chmod");
+    assert!(configdir::observed(d.p()).starts_with("unreadable"));
+}

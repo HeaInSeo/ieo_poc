@@ -21,7 +21,8 @@ pub mod v0 {
 use v0::{
     AssignmentLimits, ClaimReceipt, Disposition, FirstActionKind, FirstActionReceipt,
     GetLatestCheckpointResponse, GetOwnAssignmentResponse, Outcome, Rejection,
-    ReportCheckpointResponse, ReproState, ReproStatus, Role, SessionStatusReceipt, SpecSource,
+    ReportCheckpointResponse, ReproState, ReproStatus, Role, RuntimeExpectation,
+    SessionStatusReceipt, SpecSource,
 };
 
 /// The fully qualified service name (health service names, §7.3).
@@ -378,6 +379,13 @@ pub fn own_assignment_from_json(v: &Value) -> GetOwnAssignmentResponse {
         policy_digest: s(&v["policy_digest"]),
         issued_at: s(&v["issued_at"]),
         last_delivery_id: opt_s(&v["last_delivery_id"]),
+        expected_runtime: v["expected_runtime"]
+            .is_object()
+            .then(|| RuntimeExpectation {
+                image_digest: s(&v["expected_runtime"]["image_digest"]),
+                profile_id: s(&v["expected_runtime"]["profile_id"]),
+                profile_revision: u(&v["expected_runtime"]["profile_revision"]),
+            }),
     }
 }
 
@@ -393,7 +401,10 @@ pub fn own_assignment_to_json(r: &GetOwnAssignmentResponse) -> Value {
            "limits": {"elapsed_seconds": l.elapsed_seconds, "total_tokens": l.total_tokens,
                       "correction_attempts": l.correction_attempts},
            "attempts_issued": r.attempts_issued, "policy_digest": r.policy_digest,
-           "issued_at": r.issued_at, "last_delivery_id": r.last_delivery_id})
+           "issued_at": r.issued_at, "last_delivery_id": r.last_delivery_id,
+           "expected_runtime": r.expected_runtime.as_ref().map(|e| json!({
+               "image_digest": e.image_digest, "profile_id": e.profile_id,
+               "profile_revision": e.profile_revision}))})
 }
 
 /// `tool_use` / `text` / `""` (unspecified or unknown: refused by the handler as on HTTP).
@@ -579,7 +590,12 @@ mod tests {
                          "observed_at": "2026-11-15T00:00:00Z"}],
             "limits": {"elapsed_seconds": 3600, "total_tokens": null, "correction_attempts": 3},
             "attempts_issued": 1, "policy_digest": "p", "issued_at": "2026-11-15T00:00:00Z",
-            "last_delivery_id": null});
+            "last_delivery_id": null, "expected_runtime": null});
+        assert_eq!(own_assignment_to_json(&own_assignment_from_json(&own)), own);
+        let mut own = own;
+        own["last_delivery_id"] = json!("D-1");
+        own["expected_runtime"] = json!({"image_digest": "sha256:i", "profile_id": "p",
+                                         "profile_revision": 2});
         assert_eq!(own_assignment_to_json(&own_assignment_from_json(&own)), own);
         let fa = json!({"assignment_id": "A", "generation": 0, "attempt_id": "a1",
             "session_id": "s1", "evidence_level": "claim", "current_assignment": false,
