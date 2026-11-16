@@ -1,19 +1,24 @@
-# 02-05 step 4 mutants: each applied alone to the code of bd2cb8b (the tested files are unchanged at 84c61d9), then the named targets in order (RUST_TEST_THREADS=4) until one failed; the file was restored after each (git status clean of code afterwards). Columns: id | mutation | result | first failing target and tests
+# 02-05 step 4 mutants after review 5dbb3d8 (correction 1): each applied alone to the code of 1b7f51c (S4-M9, S4-M17, S4-M18 rerun at 40e2c98 after the fill test (c) was isolated: S4-M18 survived at 1b7f51c), then the named targets in order (RUST_TEST_THREADS=4) until one failed; the file was restored after each (git status clean of code afterwards). Columns: id | mutation | result | first failing target and tests
 # targets: coordinator = cargo test -p ieo-coord --test coordinator -- a_takeover_is_stored a_lost_first_action assignment_chain claims_are_kept; chain_e2e = -p ieo-coord --test chain_e2e; -p ieo-supervisor --lib first_action; -p ieo-supervisor --test serve [checkpoints_carry]
 S4-M1 | remove the delivery check of a takeover | KILLED | ieo-coord --test coordinator: a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation 
 S4-M2 | delivery of another assignment/generation accepted | KILLED | ieo-coord --test coordinator: a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation 
 S4-M3 | a delivery that sent nothing accepted | KILLED | ieo-coord --test coordinator: a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation 
 S4-M4 | takeover row conflict ignored (checkpoint committed without its takeover row) | KILLED | ieo-coord --test coordinator: a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation 
-S4-M5 | no takeover row written | KILLED | ieo-coord --test coordinator: claims_are_kept_apart_from_the_completion_judgment ; a_lost_first_action_report_is_filled_from_the_run_checkpoint ; a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation 
+S4-M5 | no takeover row written | KILLED | ieo-coord --test coordinator: a_lost_first_action_report_is_filled_from_the_run_checkpoint ; claims_are_kept_apart_from_the_completion_judgment ; a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation 
 S4-M6a | events before init count | KILLED | ieo-supervisor --lib first_action: first_action::tests::the_first_action_is_the_first_tool_use_or_text_after_init 
 S4-M6b | an assistant event without content is an action | KILLED | ieo-supervisor --lib first_action: first_action::tests::the_callback_runs_once_with_the_observation ; first_action::tests::the_first_action_is_the_first_tool_use_or_text_after_init 
 S4-M6c | init itself is the first action | KILLED | ieo-supervisor --lib first_action: first_action::tests::the_callback_runs_once_with_the_observation ; first_action::tests::the_first_action_is_the_first_tool_use_or_text_after_init 
 S4-M7 | no action recorded as offset 0 at the start time | KILLED | ieo-supervisor --test serve: checkpoints_carry_the_delivery_and_the_first_action 
 S4-M8 | after_run does not carry the first action | KILLED | ieo-coord --test chain_e2e: the_chain_links_delivery_takeover_and_first_action ; the_chain_links_delivery_takeover_and_first_action_over_grpc 
-S4-M9 | no fill from the checkpoint | KILLED | ieo-coord --test coordinator: claims_are_kept_apart_from_the_completion_judgment ; a_lost_first_action_report_is_filled_from_the_run_checkpoint 
+S4-M9 | no fill from the checkpoint | KILLED | ieo-coord --test coordinator: a_lost_first_action_report_is_filled_from_the_run_checkpoint ; claims_are_kept_apart_from_the_completion_judgment 
 S4-M10 | takeovers labelled verified in the chain | KILLED | ieo-coord --test coordinator: claims_are_kept_apart_from_the_completion_judgment 
 S4-M11 | chain readable outside the repo scope | KILLED | ieo-coord --test coordinator: the_assignment_chain_is_read_by_clients_of_its_repo_only 
 S4-M12 | last_actual_action_at back to the run end | KILLED | ieo-supervisor --test serve: checkpoints_carry_the_delivery_and_the_first_action ; status_reports_the_section_7_fields_and_an_honest_safe_shutdown 
 S4-M13 | takeover lookup back to query_opt (resumed session 500) | KILLED | ieo-coord --test coordinator: a_lost_first_action_report_is_filled_from_the_run_checkpoint 
 S4-M14 | I-2: a re-query without a recorded digest counts as accepted | KILLED | ieo-coord --test chain_e2e: the_chain_links_delivery_takeover_and_first_action ; the_chain_links_delivery_takeover_and_first_action_over_grpc 
 S4-M15 | deliverAssignment does not send the delivery id | KILLED | ieo-coord --test chain_e2e: the_chain_links_delivery_takeover_and_first_action ; the_chain_links_delivery_takeover_and_first_action_over_grpc 
+S4-M16 | takeover attempt check dropped (any start naming the delivery consumes it) | KILLED | ieo-coord --test coordinator: a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation 
+S4-M17 | fill without the takeover linkage (review mutation D) | KILLED | ieo-coord --test coordinator: a_lost_first_action_report_is_filled_from_the_run_checkpoint 
+S4-M18 | fill ignores the checkpoint attempt | KILLED | ieo-coord --test coordinator: a_lost_first_action_report_is_filled_from_the_run_checkpoint 
+S4-M19 | supervisor does not write attempt_id | KILLED | ieo-supervisor --test serve: checkpoints_carry_the_delivery_and_the_first_action 
+# history: S4-M18 SURVIVED at 1b7f51c (case (c) also failed the takeover linkage); KILLED at 40e2c98
