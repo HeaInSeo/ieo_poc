@@ -1026,4 +1026,22 @@ mod tests {
             assert_eq!(checked_bounds(f, d), (120, 75), "{f:?} {d:?}");
         }
     }
+
+    /// Review b38e8df M-1: the budget check gets the person who attached the spare.
+    #[test]
+    fn the_spare_names_the_person_who_attached_it() {
+        let who = Caller {
+            name: "alice-ops".into(),
+            kind: crate::auth::Kind::User,
+            scopes: Default::default(),
+            repos: Default::default(),
+            role: None,
+        };
+        assert_eq!(spare_extra(&Value::Null, &who), json!({}));
+        assert_eq!(
+            spare_extra(&json!({"reason": "env", "replaces": "a7"}), &who),
+            json!({"spare": {"reason": "env", "replaces": "a7",
+                "by": {"name": "alice-ops", "kind": "user", "via": "deliverAssignment"}}})
+        );
+    }
 }

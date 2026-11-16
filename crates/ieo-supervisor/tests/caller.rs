@@ -2589,7 +2589,7 @@ fn a_failed_spare_stops_the_budget_again() {
     let mut m = BTreeMap::new();
     m.insert("dev".to_string(), service_0205(&t.0, "development"));
     m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
-    let a = InProc(m);
+    let a = Seen(InProc(m), std::sync::Mutex::new(Vec::new()));
     let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
         caller::call_with_extra(
             &p,
@@ -2617,6 +2617,33 @@ fn a_failed_spare_stops_the_budget_again() {
     }
     let why = not_started(call("development", "d3", "hi", marker("d1b")));
     assert!(why.contains("used already"), "{why}");
+    // the marker stays with the budget check: no body to the role service carries it (I-4)
+    let bodies = a.1.lock().expect("seen");
+    assert!(
+        bodies.iter().any(|b| b["attempt_id"] == "d1b"),
+        "{bodies:?}"
+    );
+    assert!(
+        bodies.iter().all(|b| b.get("spare").is_none()),
+        "{bodies:?}"
+    );
+}
+
+/// An adapter that keeps every body it forwards.
+struct Seen(InProc, std::sync::Mutex<Vec<Value>>);
+impl Adapter for Seen {
+    fn send(
+        &self,
+        role: &RoleTarget,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+    ) -> Result<(u16, Value), String> {
+        if let Some(b) = body {
+            self.1.lock().expect("seen").push(b.clone());
+        }
+        self.0.send(role, method, path, body)
+    }
 }
 
 /// Review b38e8df L-2 (H4): `ieo-role-call --spare-reason/--replaces` on a 02-05 plan writes
@@ -2687,6 +2714,16 @@ fn ieo_role_call_records_the_spare_marker() {
     // a flag value that is another flag is refused (review b38e8df I-2)
     let (code, out) = cli("d2", "hi", &["--spare-reason", "--replaces", "d1"]);
     assert_eq!(code, Some(1), "{out}");
+    // the reason is capped like the coordinator's (2,000 bytes)
+    let long = "x".repeat(2001);
+    let (code, out) = cli("d2", "hi", &["--spare-reason", &long, "--replaces", "d1"]);
+    assert_eq!(code, Some(1), "{out}");
+    assert!(
+        !t.0.join("ledger/records.jsonl").exists() || {
+            let l = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("l");
+            !l.contains("\"d2\"")
+        }
+    );
     let (code, out) = cli(
         "d2",
         "hi",
