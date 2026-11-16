@@ -575,9 +575,9 @@ CREATE TABLE IF NOT EXISTS role_recoveries (
     FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
 );
 
--- The one execution of an approval: written (and committed) right before the supervisor's start
--- is sent. One row per approval and one per unfinished checkpoint, so an approval never starts
--- two runs and two approvals of one checkpoint never start two either.
+-- The one use of an approval: written (and committed) right before the supervisor's start is
+-- sent. One row per approval. A checkpoint is consumed by a use whose delivery may have run
+-- (accepted, unknown, or no result yet); a new use of it is then refused under the recovery lock.
 CREATE TABLE IF NOT EXISTS role_recovery_uses (
     recovery_id       text        PRIMARY KEY REFERENCES role_recoveries (recovery_id),
     delivery_id       text        NOT NULL UNIQUE REFERENCES role_deliveries (delivery_id),
@@ -585,9 +585,12 @@ CREATE TABLE IF NOT EXISTS role_recovery_uses (
     role              text        NOT NULL,
     checkpoint_seq    bigint      NOT NULL,
     github            jsonb,
-    used_at           timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (repo_id, role, checkpoint_seq)
+    used_at           timestamptz NOT NULL DEFAULT now()
 );
+-- review 185d12b M-1: a use whose delivery ran nothing (refused, not called, not accepted) does
+-- not consume its checkpoint; whether a use consumes it is read from the delivery's result under
+-- the recovery lock, not from a per-checkpoint key (dropped from databases made before)
+ALTER TABLE role_recovery_uses DROP CONSTRAINT IF EXISTS role_recovery_uses_repo_id_role_checkpoint_seq_key;
 
 CREATE OR REPLACE TRIGGER role_recoveries_append_only BEFORE UPDATE OR DELETE ON role_recoveries
     FOR EACH ROW EXECUTE FUNCTION forbid_change();

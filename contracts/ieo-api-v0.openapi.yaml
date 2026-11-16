@@ -20,7 +20,11 @@ info:
     One approval starts at most one run (the use is committed before the call). The delivery shows `recovery`;
     getAssignmentChain has `recoveries` and each delivery's `recovery`. **Behaviour change (accepted 02-04
     supervisor start):** a start over an unfinished checkpoint without `recovery_id` is refused (409
-    `EXTERNAL_RECONCILIATION_REQUIRED`), with `local_only` too. Additive otherwise.
+    `EXTERNAL_RECONCILIATION_REQUIRED`), with `local_only` too; reportCheckpoint refuses a takeover over an
+    unfinished run whose `recovery_id` is not its delivery's used approval (409 `RECOVERY_REQUIRED`). A use whose
+    delivery ran nothing (`refused`, `not_called`, `budget_refused`, `not_accepted`) does not consume the
+    checkpoint; one that may have run (`accepted`, `unknown`, no result) does: a later approval or use of it is a
+    `needs_confirmation` hold / not called. Additive otherwise.
     0.15.0 (02-05 step 7, C10; runtime contract revision 14 §17): the GitHub record as the final basis of a resume.
     New evidence kind `branch_head` {sha, ref (`refs/heads/<name>`), source_ref} — trusted evidence-service input, not
     a live GitHub read. issueAssignment takes an optional `branch_ref`; the delivery's `coordinator_record` carries
@@ -682,7 +686,9 @@ paths:
         assignment and generation, whose `attempt_id` is the checkpoint's (the takeover answers that delivery's
         own call; another or no attempt → 409 `DELIVERY_MISMATCH`), whose newest result is missing (the supervisor reports the takeover while
         the coordinator is still recording the answer), `accepted` or `unknown`, and not taken over before;
-        anything else → 409 `DELIVERY_MISMATCH`. These checks follow every check above; the takeover row
+        anything else → 409 `DELIVERY_MISMATCH`. 0.16.0 (02-05 step 7b): a `takeover` whose previous checkpoint is
+        `takeover`/`error` (an unfinished run) is a recovery: its `recovery_id` must be the approval its delivery used
+        (role_recovery_uses), else 409 `RECOVERY_REQUIRED`. These checks follow every check above; the takeover row
         (delivery, sequence, digest, session, applied revision and digest, received_at; a claim) is
         written in the same transaction as the checkpoint row, and a refusal leaves neither. A request
         alone is never a takeover. An `after_run`/`error` checkpoint whose `first_action` is an object
@@ -1797,7 +1803,7 @@ components:
                  NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE,
                  CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH, ATTEMPT_ID_CONFLICT, DELIVERY_IN_PROGRESS,
                  DELIVERY_REQUIRED, DELIVERY_MISMATCH, LIMITS_ABOVE_SPEC, ASSIGNMENT_LIMIT_REACHED,
-                 ASSIGNMENT_USAGE_UNMEASURED]
+                 ASSIGNMENT_USAGE_UNMEASURED, RECOVERY_RUNNING, RECOVERY_TARGET_MISMATCH, RECOVERY_REQUIRED]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

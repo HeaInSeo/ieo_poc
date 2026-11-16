@@ -56,8 +56,27 @@ fn http(
     let mut out = String::new();
     s.read_to_string(&mut out).ok()?;
     let status = out.split_whitespace().nth(1)?.parse().ok()?;
-    let b = out.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
-    Some((status, serde_json::from_str(b).unwrap_or(Value::Null)))
+    let (head, b) = out.split_once("\r\n\r\n").unwrap_or((&out, ""));
+    // a large answer comes chunked (the assignment chain with its recoveries)
+    let body = if head
+        .to_ascii_lowercase()
+        .contains("transfer-encoding: chunked")
+    {
+        let mut rest = b;
+        let mut body = String::new();
+        while let Some((size, tail)) = rest.split_once("\r\n") {
+            let n = usize::from_str_radix(size.trim(), 16).unwrap_or(0);
+            if n == 0 || tail.len() < n {
+                break;
+            }
+            body.push_str(&tail[..n]);
+            rest = tail[n..].trim_start_matches("\r\n");
+        }
+        body
+    } else {
+        b.to_string()
+    };
+    Some((status, serde_json::from_str(&body).unwrap_or(Value::Null)))
 }
 
 struct Coord {
@@ -309,6 +328,7 @@ fn e2e(transport: &str) {
         {"name": "operator", "token_sha256": digest(&tok("operator")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-a"]},
         {"name": "operator-b", "token_sha256": digest(&tok("operator-b")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-b"]},
         {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"},
+        {"name": "sup-gr", "token_sha256": digest(&tok("sup-gr")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "guardrail"},
         {"name": "ingest", "token_sha256": digest(&tok("ingest")), "kind": "service", "scopes": ["evidence:ingest"], "repo_ids": ["repo-a"]},
         {"name": "alice-ops", "token_sha256": digest(&tok("alice-ops")), "kind": "user", "scopes": ["roles:control"], "repo_ids": ["repo-a"]},
         {"name": "bob-ops", "token_sha256": digest(&tok("bob-ops")), "kind": "user", "scopes": ["roles:control"], "repo_ids": ["repo-b"]},
@@ -626,10 +646,8 @@ fn e2e(transport: &str) {
     };
     // a crash: the takeover checkpoint of a run that never reported its end, as the
     // coordinator and the role volume hold it (its delivery, a fixture, was answered)
-    let crash = |name: &str| {
-        let mut cp = local_cp();
-        let seq = cp["seq"].as_u64().expect("seq") + 1;
-        let id = format!("D-e2e-crash-{name}");
+    // a delivery recorded as the coordinator records one (a fixture), answered `accepted`
+    let fixture = |role_name: &str, id: &str, aid: &str, profile: &str| {
         let mut c2 = cfg.clone();
         c2.dbname(&dbname);
         let mut d = c2.connect(NoTls).expect("db");
@@ -637,13 +655,15 @@ fn e2e(transport: &str) {
             "INSERT INTO role_deliveries (delivery_id, repo_id, role, request_id, body,
                  assignment_id, generation, attempt_id, session_id, logical_name,
                  coordinator_record, target_sha, requested_by)
-             VALUES ($1, 'repo-a', 'development', $1, '{}'::jsonb, 'A1', 0, $1, 'f', 'f', $3, $2,
+             VALUES ($1, 'repo-a', $4, $1, '{}'::jsonb, $5, 0, $1, 'f', 'f', $3, $2,
                      'test-fixture')",
             &[
                 &id,
                 &SHA1,
-                &json!({"image_digest": "sha256:img", "profile_id": "dev-profile",
+                &json!({"image_digest": "sha256:img", "profile_id": profile,
                         "profile_revision": 1}),
+                &role_name,
+                &aid,
             ],
         )
         .expect("fixture delivery");
@@ -664,16 +684,22 @@ fn e2e(transport: &str) {
             writeln!(
                 f,
                 "{}",
-                json!({"format": "ieo-role-run/v0", "attempt_id": id, "role": "development",
+                json!({"format": "ieo-role-run/v0", "attempt_id": id, "role": role_name,
                        "model_request": false, "reason": "reconciled after the crash fixture"})
             )
             .expect("entry");
         }
+    };
+    // a takeover reported over the local checkpoint (a crash: the run never reported its end)
+    let takeover = |id: &str, recovery_id: Value| {
+        let mut cp = local_cp();
+        let seq = cp["seq"].as_u64().expect("seq") + 1;
         cp["seq"] = json!(seq);
         cp["phase"] = json!("takeover");
         cp["delivery_id"] = json!(id);
         cp["attempt_id"] = json!(id);
         cp["first_action"] = Value::Null;
+        cp["recovery_id"] = recovery_id;
         let raw = serde_json::to_string_pretty(&cp).expect("j");
         let (st, b) = c(
             "sup",
@@ -681,13 +707,22 @@ fn e2e(transport: &str) {
             "/v0/repos/repo-a/roles/development/checkpoints",
             Some(&json!({"seq": seq, "checkpoint_json": raw})),
         );
-        assert_eq!(st, 201, "{b}");
+        if st != 201 {
+            return (st, b);
+        }
         std::fs::write(&cp_path, &raw).expect("local");
         std::fs::write(
             state.join("checkpoints").join(format!("{seq:020}.json")),
             &raw,
         )
         .expect("archive");
+        (st, b)
+    };
+    let crash = |name: &str| {
+        let id = format!("D-e2e-crash-{name}");
+        fixture("development", &id, "A1", "dev-profile");
+        let (st, b) = takeover(&id, Value::Null);
+        assert_eq!(st, 201, "{b}");
     };
 
     // 1. a run in progress: its takeover is the latest checkpoint, and a recovery is refused
@@ -757,6 +792,17 @@ fn e2e(transport: &str) {
         (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
         "{b}"
     );
+    // review 185d12b L-1: a takeover over the unfinished checkpoint is a recovery: without the
+    // approval its delivery used, or with another id, the coordinator refuses it
+    fixture("development", "D-e2e-l1", "A1", "dev-profile");
+    for rid in [Value::Null, json!("R-forged")] {
+        let (st, b) = takeover("D-e2e-l1", rid.clone());
+        assert_eq!(
+            (st, b["rejections"][0]["code"].as_str()),
+            (409, Some("RECOVERY_REQUIRED")),
+            "{rid} {b}"
+        );
+    }
     let crashed = local_cp();
     let good = target(
         &crashed,
@@ -835,6 +881,22 @@ fn e2e(transport: &str) {
             .as_str()
             .is_some_and(|r| r.contains("not observed")),
         "{h1}"
+    );
+    // the role's local checkpoint is not the central one (review 185d12b L-3, M5)
+    let kept_cp = std::fs::read(&cp_path).expect("cp");
+    std::fs::write(&cp_path, [kept_cp.clone(), b"\n".to_vec()].concat()).expect("w");
+    let (st, h5) = approve("alice-ops", "rec-key-0013", &good);
+    std::fs::write(&cp_path, &kept_cp).expect("restore");
+    assert_eq!(
+        (st, h5["state"].as_str()),
+        (201, Some("needs_confirmation")),
+        "{h5}"
+    );
+    assert!(
+        h5["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("not the central one")),
+        "{h5}"
     );
     head("gh-head-2", SHA2);
     let (st, h2) = approve("alice-ops", "rec-key-0003", &good);
@@ -968,6 +1030,18 @@ fn e2e(transport: &str) {
         "{b}"
     );
     assert_eq!(recovery(&rid), r);
+    // two identical requests at once: one approval, both answered with it (review 185d12b I-2)
+    let mut both: Vec<(u16, Value)> = std::thread::scope(|sc| {
+        let a = sc.spawn(|| approve("alice-ops", "rec-key-0030", &good));
+        let b = sc.spawn(|| approve("alice-ops", "rec-key-0030", &good));
+        vec![a.join().expect("a"), b.join().expect("b")]
+    });
+    both.sort_by_key(|x| x.0);
+    assert_eq!(
+        (both[0].0, both[1].0, &both[0].1["recovery_id"]),
+        (200, 201, &both[1].1["recovery_id"]),
+        "{both:?}"
+    );
     // an approval changes no usage: the assignment's totals are as before
     let usage_after = c(
         "operator",
@@ -1027,6 +1101,69 @@ fn e2e(transport: &str) {
     assert!(recovery(&rid)["used"].is_null());
     std::fs::write(ledger.join("records.jsonl"), &kept).expect("restore");
 
+    // 8b. review 185d12b M-1: a use whose delivery ran nothing (the supervisor refused the
+    //     start: its attempt id was taken) does not consume the checkpoint; a new approval is
+    //     `approved` and the next use runs once
+    let (st, rx) = approve("alice-ops", "rec-key-0014", &good);
+    assert_eq!((st, rx["state"].as_str()), (201, Some("approved")), "{rx}");
+    let ridx = rx["recovery_id"].as_str().expect("id").to_string();
+    std::fs::create_dir_all(state.join("runs/a6x")).expect("taken attempt");
+    let n = runs();
+    let (st, d) = deliver(
+        "operator",
+        "rcv-key-0016",
+        "development",
+        &dbody("a6x", 0, "s6x", json!({"recovery_id": ridx})),
+    );
+    assert_eq!(
+        outcome(&d),
+        o("recovery_allowed", Some("start"), "refused"),
+        "{st} {d}"
+    );
+    assert_eq!(recovery(&ridx)["used"]["delivery_id"], d["delivery_id"]);
+    assert_eq!(runs(), n, "nothing ran");
+    let (st, ry) = approve("alice-ops", "rec-key-0015", &good);
+    assert_eq!((st, ry["state"].as_str()), (201, Some("approved")), "{ry}");
+    let earlier = &ry["facts"]["earlier_uses"][0];
+    assert_eq!(
+        (
+            earlier["recovery_id"].as_str(),
+            earlier["outcome"].as_str(),
+            earlier["consumes"].as_bool()
+        ),
+        (Some(ridx.as_str()), Some("refused"), Some(false)),
+        "{ry}"
+    );
+    // 8c. review 185d12b L-3 (M3): the approval is checked again once the budget's lock is
+    //     held; the head changes while the delivery waits for it → nothing called, unused
+    {
+        let held = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(ledger.join("caller.lock"))
+            .expect("lock file");
+        held.lock().expect("hold the ledger lock");
+        let bm = dbody("a6m", 0, "s6m", json!({"recovery_id": rid}));
+        let (st, dm) = std::thread::scope(|sc| {
+            let h = sc.spawn(|| deliver("operator", "rcv-key-0017", "development", &bm));
+            std::thread::sleep(Duration::from_millis(600));
+            head("gh-head-6", SHA2);
+            held.unlock().expect("release");
+            h.join().expect("delivery thread")
+        });
+        assert_eq!(st, 201, "{dm}");
+        assert_eq!(dm["result"]["outcome"], "not_called", "{dm}");
+        assert!(
+            dm["result"]["reasons"][0]
+                .as_str()
+                .is_some_and(|r| r.contains("judgment changed")),
+            "{dm}"
+        );
+        assert!(recovery(&rid)["used"].is_null());
+        head("gh-head-7", SHA1);
+    }
+
     // 9. the use: a new session over the unfinished checkpoint, never a resume
     let b6 = dbody("a6", 0, "s6", json!({"recovery_id": rid}));
     let (st, d6) = deliver("operator", "rcv-key-0006", "development", &b6);
@@ -1051,7 +1188,7 @@ fn e2e(transport: &str) {
         d6["result"]["github"]["head_at_approval"]["evidence_id"], "gh-head-3",
         "{d6}"
     );
-    assert_eq!(d6["result"]["github"]["head"]["evidence_id"], "gh-head-5");
+    assert_eq!(d6["result"]["github"]["head"]["evidence_id"], "gh-head-7");
     assert_eq!(
         role.last_launch.lock().expect("last")["recovery_id"],
         rid.as_str()
@@ -1067,6 +1204,14 @@ fn e2e(transport: &str) {
         ),
         (Some("after_run"), Some("s6"), Some(rid.as_str())),
         "{after}"
+    );
+    // the crashed checkpoint was consumed by an accepted use: it is no longer the latest, a new
+    // approval of it is refused
+    let (st, b) = approve("alice-ops", "rec-key-0018", &good);
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("RECOVERY_TARGET_MISMATCH")),
+        "{b}"
     );
     // a finished run is nothing to recover
     let (st, b) = approve(
@@ -1098,7 +1243,7 @@ fn e2e(transport: &str) {
     .1;
     let recs: Vec<&str> = ch["recoveries"]
         .as_array()
-        .expect("recoveries")
+        .unwrap_or_else(|| panic!("recoveries: {ch}"))
         .iter()
         .filter_map(|x| x["recovery_id"].as_str())
         .collect();
@@ -1143,8 +1288,9 @@ fn e2e(transport: &str) {
     assert_eq!((launches(), runs()), n);
 
     // 11. a lost answer and restarts: the use is recorded before the call, the re-query never
-    //     starts anything, and after restarts of the coordinator and the supervisor the
-    //     approval stays used
+    //     starts anything, and after restarts of the coordinator and the supervisor the use row
+    //     stays (a second use cannot be tried here: the lost answer's unmeasured run refuses the
+    //     assignment's next delivery first; review 185d12b I-3)
     crash("2");
     let crashed2 = local_cp();
     let (st, r2) = approve(
@@ -1194,8 +1340,123 @@ fn e2e(transport: &str) {
     );
     assert_eq!(recovery(&rid2)["used"]["delivery_id"], d8["delivery_id"]);
     assert_eq!((launches(), runs()), n, "nothing ran twice");
-    // every request and result is kept; the two approvals each have one use
-    assert_eq!(count("role_recovery_uses"), 2);
+    // every request and result is kept; three approvals were used (one ran nothing)
+    assert_eq!(count("role_recovery_uses"), 3);
+
+    // 12. review 185d12b M-1: a use whose delivery may have run (here `accepted`, its run never
+    //     reported a takeover) consumes the checkpoint: a later approval of it is a hold that
+    //     names that delivery
+    crash("3");
+    let crashed3 = local_cp();
+    let (st, rz) = approve(
+        "alice-ops",
+        "rec-key-0019",
+        &target(&crashed3, "third crash"),
+    );
+    assert_eq!((st, rz["state"].as_str()), (201, Some("approved")), "{rz}");
+    fixture("development", "D-e2e-acc", "A1", "dev-profile");
+    {
+        let mut c2 = cfg.clone();
+        c2.dbname(&dbname);
+        c2.connect(NoTls)
+            .expect("db")
+            .execute(
+                "INSERT INTO role_recovery_uses (recovery_id, delivery_id, repo_id, role,
+                     checkpoint_seq)
+                 VALUES ($1, 'D-e2e-acc', 'repo-a', 'development', $2)",
+                &[
+                    &rz["recovery_id"].as_str().expect("id"),
+                    &crashed3["seq"].as_i64().expect("seq"),
+                ],
+            )
+            .expect("fixture use");
+    }
+    let (st, h6) = approve("alice-ops", "rec-key-0020", &target(&crashed3, "again"));
+    assert_eq!(
+        (st, h6["state"].as_str()),
+        (201, Some("needs_confirmation")),
+        "{h6}"
+    );
+    assert!(
+        h6["reasons"].to_string().contains("D-e2e-acc")
+            && h6["reasons"].to_string().contains("outcome accepted"),
+        "{h6}"
+    );
+
+    // 13. guardrail (review 185d12b L-3, M2): the same approval for the review role, judged on
+    //     its review target instead of a GitHub head; a stale target is refused
+    assert_eq!(assign("guardrail", 0, Value::Null).0, 201);
+    fixture("guardrail", "D-e2e-gr", "G1", "guard-profile");
+    let mut gcp = local_cp();
+    for (k, v) in [
+        ("role", json!("guardrail")),
+        ("assignment_id", json!("G1")),
+        ("generation", json!(0)),
+        ("seq", json!(1)),
+        ("phase", json!("takeover")),
+        ("session_id", json!("gs1")),
+        ("profile_id", json!("guard-profile")),
+        ("delivery_id", json!("D-e2e-gr")),
+        ("attempt_id", json!("D-e2e-gr")),
+        ("recovery_id", Value::Null),
+        ("branch_ref", Value::Null),
+        ("pushed_sha", Value::Null),
+        ("first_action", Value::Null),
+    ] {
+        gcp[k] = v;
+    }
+    let graw = serde_json::to_string_pretty(&gcp).expect("j");
+    let (st, b) = c(
+        "sup-gr",
+        "POST",
+        "/v0/repos/repo-a/roles/guardrail/checkpoints",
+        Some(&json!({"seq": 1, "checkpoint_json": graw})),
+    );
+    assert_eq!(st, 201, "{b}");
+    std::fs::create_dir_all(groot.join("state")).expect("state");
+    std::fs::write(groot.join("state/checkpoint.json"), &graw).expect("local");
+    let gapprove = |key: &str, generation: u64| {
+        http(
+            port,
+            Some(&tok("alice-ops")),
+            Some(key),
+            "POST",
+            "/v0/repos/repo-a/roles/guardrail/recoveries",
+            Some(&json!({"assignment_id": "G1", "generation": generation,
+                         "checkpoint_seq": 1, "checkpoint_sha256": digest_bytes(graw.as_bytes()),
+                         "reason": "guardrail crash"})),
+        )
+        .expect("answer")
+    };
+    let (st, g1) = gapprove("rec-key-0021", 0);
+    assert_eq!(
+        (st, g1["state"].as_str(), g1["github"].is_null()),
+        (201, Some("approved"), true),
+        "{g1}"
+    );
+    let (st, b) = c(
+        "assigner",
+        "POST",
+        "/v0/coordinator/assignments",
+        Some(
+            &json!({"repo_id": "repo-a", "role": "guardrail", "assignment_id": "G1",
+            "generation": 1, "sprint_id": "POC-01", "sprint_revision": 5, "task_id": "01-01",
+            "target_sha": SHA2, "expected_current": {"assignment_id": "G1", "generation": 0}}),
+        ),
+    );
+    assert_eq!(st, 201, "{b}");
+    let (st, b) = gapprove("rec-key-0022", 1);
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("RECOVERY_TARGET_MISMATCH")),
+        "{b}"
+    );
+    assert!(
+        b["rejections"][0]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("new review assignment")),
+        "{b}"
+    );
     drop(db);
     coord.stop();
     let _ = std::fs::remove_dir_all(&dir);

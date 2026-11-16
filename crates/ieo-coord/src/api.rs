@@ -4150,6 +4150,39 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
             delivery_id.as_deref(),
             attempt_id.as_deref(),
         )?;
+        // a new session over an unfinished run (the latest checkpoint at `takeover`/`error`)
+        // is a recovery: it names the approval its delivery used (02-05 step 7b, review
+        // 185d12b L-1)
+        let prev = tx
+            .query_opt(
+                "SELECT phase FROM role_checkpoints WHERE repo_id = $1 AND role = $2
+                 ORDER BY seq DESC LIMIT 1",
+                &[&repo, &role],
+            )?
+            .map(|r| r.get::<_, String>(0));
+        if matches!(prev.as_deref(), Some("takeover" | "error")) {
+            let used: Option<String> = tx
+                .query_opt(
+                    "SELECT recovery_id FROM role_recovery_uses WHERE delivery_id = $1",
+                    &[&delivery_id],
+                )?
+                .map(|r| r.get(0));
+            let named = cp["recovery_id"].as_str();
+            if used.is_none() || used.as_deref() != named {
+                return Err(one(
+                    409,
+                    "RECOVERY_REQUIRED",
+                    "checkpoint_json.recovery_id",
+                    &format!(
+                        "the latest checkpoint is an unfinished run: a takeover over it names the \
+                         approved recovery its delivery used ({}), not {}",
+                        used.as_deref().unwrap_or("none"),
+                        named.unwrap_or("none")
+                    ),
+                    "approve a recovery and deliver with it (approveRecovery)",
+                ));
+            }
+        }
     }
     tx.execute(
         "INSERT INTO role_checkpoints (repo_id, role, seq, checkpoint_sha256, phase, session_id, assignment_id,

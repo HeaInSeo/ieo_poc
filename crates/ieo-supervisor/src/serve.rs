@@ -828,8 +828,10 @@ impl Service {
                 return err(400, "SCHEMA_VIOLATION", "session_id required");
             };
             // a start over a run that did not finish needs a person's approved recovery
-            // (02-05 step 7b, review fe924b7 I-4): the coordinator checked it; with `local_only`
-            // the id is the adapter caller's recorded claim (no coordinator to check it)
+            // (02-05 step 7b, review fe924b7 I-4). The supervisor does not check the id itself:
+            // with a coordinator, the takeover report is refused unless the id is the approval
+            // its delivery used (review 185d12b L-1); with `local_only` the id is the adapter
+            // caller's recorded claim (no coordinator to check it)
             if let Some(phase @ ("takeover" | "error")) =
                 cp.as_ref().and_then(|c| c["phase"].as_str())
                 && recovery_id.is_none()

@@ -600,6 +600,19 @@ pub fn call_with(
     poll: Duration,
     margin: Duration,
 ) -> Result<Called, String> {
+    call_with_extra(plan, c, adapter, poll, margin, &json!({}))
+}
+
+/// [`call_with`] with extra top-level keys in the start body (02-05 step 7b: the approved
+/// `recovery_id` of a start over an unfinished run).
+pub fn call_with_extra(
+    plan: &Plan,
+    c: &Call,
+    adapter: &dyn Adapter,
+    poll: Duration,
+    margin: Duration,
+    extra: &Value,
+) -> Result<Called, String> {
     plan.roles
         .get(&c.role)
         .ok_or(format!("role {} not in the plan", c.role))?;
@@ -610,7 +623,7 @@ pub fn call_with(
         Ok(a) => a,
         Err(why) => return Ok(Called::NotStarted(why)),
     };
-    match adm.start(plan, c, adapter)? {
+    match adm.start_with(plan, c, adapter, extra)? {
         Sent::Refused { why, .. } => Ok(Called::NotStarted(why)),
         Sent::Lost(r) => Ok(Called::Recorded(r)),
         Sent::Accepted { running, .. } => {

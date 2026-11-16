@@ -73,6 +73,42 @@ fn target_mismatch(field: &str, message: &str) -> Resp {
     )
 }
 
+/// The uses of one checkpoint with their delivery's newest outcome. A use consumes the
+/// checkpoint when its delivery may have run: `accepted`, `unknown` or no result yet. One whose
+/// delivery ran nothing (`refused`, `not_called`, `budget_refused`, or `not_accepted`: the
+/// re-query found the attempt unknown to the supervisor) does not (review 185d12b M-1).
+fn checkpoint_uses(
+    tx: &mut Transaction,
+    repo: &str,
+    role: &str,
+    seq: i64,
+) -> Result<Vec<Value>, Resp> {
+    Ok(tx
+        .query(
+            "SELECT u.recovery_id, u.delivery_id,
+                    (SELECT outcome FROM role_delivery_results r WHERE r.delivery_id = u.delivery_id
+                     ORDER BY n DESC LIMIT 1)
+             FROM role_recovery_uses u
+             WHERE u.repo_id = $1 AND u.role = $2 AND u.checkpoint_seq = $3 ORDER BY u.used_at",
+            &[&repo, &role, &seq],
+        )?
+        .iter()
+        .map(|r| {
+            let outcome: Option<String> = r.get(2);
+            let consumes = matches!(outcome.as_deref(), None | Some("accepted" | "unknown"));
+            json!({"recovery_id": r.get::<_, String>(0), "delivery_id": r.get::<_, String>(1),
+                   "outcome": outcome, "consumes": consumes})
+        })
+        .collect())
+}
+
+/// The use that consumed the checkpoint, other than `this_delivery`'s, if any.
+fn consumed_by(uses: &[Value], this_delivery: Option<&str>) -> Option<Value> {
+    uses.iter()
+        .find(|u| u["consumes"] == true && this_delivery.is_none_or(|d| u["delivery_id"] != d))
+        .cloned()
+}
+
 /// The checks shared by the approval and the use: `Err` is a refusal (nothing recorded), `Ok`
 /// gives the hold reasons (empty: approvable), the facts read and the GitHub comparison.
 struct Assessed {
@@ -174,6 +210,18 @@ fn assess(
         }
     }
     let mut holds = Vec::new();
+    // an earlier use of this checkpoint whose delivery may have run: a run may have started over
+    // it; a person confirms (review 185d12b M-1)
+    let uses = checkpoint_uses(tx, repo, role, seq)?;
+    if let Some(u) = consumed_by(&uses, this_delivery) {
+        holds.push(format!(
+            "checkpoint {seq} was used by recovery {} (delivery {}, outcome {}): a run may have \
+             started over it",
+            u["recovery_id"].as_str().unwrap_or_default(),
+            u["delivery_id"].as_str().unwrap_or_default(),
+            u["outcome"].as_str().unwrap_or("none recorded")
+        ));
+    }
     // the supervisor: the old run must not be running; its end and its external requests must
     // be confirmable
     let supervisor = match status {
@@ -255,7 +303,7 @@ fn assess(
     };
     Ok(Assessed {
         holds,
-        facts: json!({"central": central, "supervisor": supervisor,
+        facts: json!({"central": central, "supervisor": supervisor, "earlier_uses": uses,
             "coordinator_pending_deliveries": deliveries,
             // children are not tracked until 04-05: recorded, not a hold (decision 2026-11-15
             // item 3, runtime contract §16 item 20)
@@ -386,6 +434,24 @@ pub fn approve(
     let status = crate::api::role_status(ctx, repo, role);
     run(db, &|tx| {
         lock(tx, &format!("recovery:{repo}:{role}"))?;
+        // the same key again, under the lock: a concurrent identical retry gets the stored
+        // approval, never a key error (review 185d12b I-2)
+        if let Some(r) = tx.query_opt(
+            "SELECT body FROM role_recoveries WHERE repo_id = $1 AND role = $2 AND request_id = $3",
+            &[&repo, &role, &key],
+        )? {
+            return if r.get::<_, Value>(0) == body {
+                ok(200, load(tx, &id)?.unwrap_or_default())
+            } else {
+                Err(one(
+                    409,
+                    "IDEMPOTENCY_KEY_CONFLICT",
+                    "Idempotency-Key",
+                    "this Idempotency-Key was used for another recovery",
+                    "use a new Idempotency-Key",
+                ))
+            };
+        }
         let a = assess(tx, repo, role, &aid, generation, seq, &sha, &status, None)?;
         let state = if a.holds.is_empty() {
             "approved"
@@ -536,6 +602,18 @@ pub fn record_use(
     let Some(seq) = seq else {
         return Err(problem(409, "RECOVERY_USED", "no such recovery"));
     };
+    // under the recovery lock: another use of the checkpoint that may have run consumes it
+    if let Some(u) = consumed_by(&checkpoint_uses(tx, repo, role, seq)?, Some(delivery_id)) {
+        return Err(problem(
+            409,
+            "RECOVERY_USED",
+            &format!(
+                "checkpoint {seq} was used by recovery {} (delivery {}): a run may have started",
+                u["recovery_id"].as_str().unwrap_or_default(),
+                u["delivery_id"].as_str().unwrap_or_default()
+            ),
+        ));
+    }
     let n = tx.execute(
         "INSERT INTO role_recovery_uses (recovery_id, delivery_id, repo_id, role, checkpoint_seq,
              github)
@@ -553,7 +631,7 @@ pub fn record_use(
         return Err(problem(
             409,
             "RECOVERY_USED",
-            "this approval (or another approval of its checkpoint) was used already",
+            "this approval was used already",
         ));
     }
     history(

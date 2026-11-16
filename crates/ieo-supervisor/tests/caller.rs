@@ -664,6 +664,59 @@ fn the_caller_talks_to_the_service_over_http() {
         .expect("c"),
     );
     assert!(why.contains("401"), "{why}");
+    // 02-05 step 7b (review 185d12b L-2): the 02-04 host caller passes a person's recovery id
+    // for a start over a run that did not finish
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("w");
+    let cp_path = t.0.join("development/state/checkpoint.json");
+    let mut cp: Value = serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("j");
+    cp["phase"] = json!("takeover");
+    std::fs::write(&cp_path, serde_json::to_vec_pretty(&cp).expect("j")).expect("w");
+    let plan_v = json!({"budget": "02-04", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first-observation.jsonl"),
+                              "observed_unix": now() - 3600},
+        "roles": {"development": {"url": url, "adapter_token_file": t.0.join("adapter.token"),
+                                  "share": share("development")}}});
+    std::fs::write(t.0.join("plan.json"), plan_v.to_string()).expect("plan");
+    std::fs::write(t.0.join("prompt.txt"), "hi").expect("prompt");
+    std::fs::write(
+        t.0.join("coordinator.json"),
+        call_of("development", "start", "x", "x", "x")
+            .coordinator
+            .to_string(),
+    )
+    .expect("coordinator");
+    let cli = |attempt: &str, session: &str, recovery: Option<&str>| {
+        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"));
+        cmd.arg("--plan")
+            .arg(t.0.join("plan.json"))
+            .args(["--task", "02-04", "--role", "development", "--op", "start"])
+            .args(["--attempt", attempt, "--session", session])
+            .arg("--prompt-file")
+            .arg(t.0.join("prompt.txt"))
+            .arg("--coordinator-file")
+            .arg(t.0.join("coordinator.json"));
+        if let Some(r) = recovery {
+            cmd.args(["--recovery-id", r]);
+        }
+        let out = cmd.output().expect("ieo-role-call");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout).to_string(),
+        )
+    };
+    let (code, out) = cli("d3", "s3", None);
+    assert_eq!(code, Some(2), "{out}");
+    assert!(out.contains("recovery_id"), "{out}");
+    let (code, out) = cli("d3", "s3", Some("../x"));
+    assert_eq!(code, Some(1), "{out}");
+    let (code, out) = cli("d3", "s3", Some("R-cli-1"));
+    assert_eq!(code, Some(0), "{out}");
+    let cp: Value = serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("j");
+    assert_eq!(
+        (cp["phase"].as_str(), cp["recovery_id"].as_str()),
+        (Some("after_run"), Some("R-cli-1")),
+        "{cp}"
+    );
 }
 
 // --- review c4620d2 ---
