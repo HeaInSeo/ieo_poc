@@ -127,6 +127,17 @@ fn check_body(req: &Req) -> Result<Value, Resp> {
     Ok(body)
 }
 
+/// The delivery's spare marker for the shared budget check, with the person who attached it
+/// (the record keeps it; review b38e8df M-1).
+fn spare_extra(spare: &Value, who: &Caller) -> Value {
+    if spare.is_null() {
+        return json!({});
+    }
+    let mut s = spare.clone();
+    s["by"] = json!({"name": who.name, "kind": "user", "via": "deliverAssignment"});
+    json!({"spare": s})
+}
+
 /// The coordinator's configuration of this role: the supervisor and the image and profile it
 /// is expected to run.
 fn target<'a>(ctx: &'a Ctx, repo: &str, role: &str) -> Result<&'a Value, Resp> {
@@ -449,6 +460,15 @@ pub fn deliver(
         need_compare(who, repo, role)?;
         let key = idem_key(req)?;
         let body = check_body(req)?;
+        // the spare marker answers a failed run that asks for a person: a person attaches it
+        // (review b38e8df M-1, as a recovery approval); nothing is recorded or called otherwise
+        if !body["spare"].is_null() && who.kind != crate::auth::Kind::User {
+            return Err(problem(
+                403,
+                "HUMAN_APPROVAL_REQUIRED",
+                "a spare run is attached by a person (a user credential), not a service",
+            ));
+        }
         let t = target(ctx, repo, role)?;
         Ok::<_, Resp>((key, body, t))
     })();
@@ -621,7 +641,7 @@ pub fn deliver(
             role,
             &call.attempt_id,
             &caller::Http,
-            &json!({"spare": body["spare"]}),
+            &spare_extra(&body["spare"], who),
         )??;
         Ok((plan, adm))
     });

@@ -310,6 +310,7 @@ fn e2e(transport: &str) {
         {"name": "operator", "token_sha256": digest(&tok("operator")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-a"]},
         {"name": "operator-b", "token_sha256": digest(&tok("operator-b")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-b"]},
         {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"},
+        {"name": "human-op", "token_sha256": digest(&tok("human-op")), "kind": "user", "scopes": ["roles:control"], "repo_ids": ["repo-a"]},
         {"name": "ingest", "token_sha256": digest(&tok("ingest")), "kind": "service", "scopes": ["evidence:ingest"], "repo_ids": ["repo-a"]},
         {"name": "dev-agent", "token_sha256": digest(&tok("dev-agent")), "kind": "agent", "scopes": ["agent:report"], "repo_ids": ["repo-a"], "role": "development"}]});
     std::fs::write(dir.join("tokens.json"), principals.to_string()).expect("tokens");
@@ -1143,17 +1144,21 @@ fn e2e(transport: &str) {
         );
         assert_eq!(st, 400, "{b}");
     }
-    let (st, d) = deliver(
-        "operator",
-        "dlv-key-0081",
-        "development",
-        &dbody(
-            "a81",
-            1,
-            "s2",
-            json!({"spare": {"reason": "env defect", "replaces": "a7"}}),
-        ),
+    // a person attaches a spare (review b38e8df M-1): a service credential is refused, nothing
+    // recorded
+    let spare_body = dbody(
+        "a81",
+        1,
+        "s2",
+        json!({"spare": {"reason": "env defect", "replaces": "a7"}}),
     );
+    let (st, b) = deliver("operator", "dlv-key-0082", "development", &spare_body);
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (403, Some("HUMAN_APPROVAL_REQUIRED")),
+        "{b}"
+    );
+    let (st, d) = deliver("human-op", "dlv-key-0081", "development", &spare_body);
     assert_eq!(st, 201, "{d}");
     assert_eq!(d["result"]["outcome"], "budget_refused", "{d}");
     assert!(

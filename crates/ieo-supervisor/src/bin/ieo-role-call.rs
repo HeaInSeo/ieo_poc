@@ -106,16 +106,31 @@ fn run() -> Result<i32, String> {
         }
         extra["recovery_id"] = json!(id);
     }
+    // a flag's value is the next argument, never another flag (review b38e8df I-2)
     let flag = |k: &str| {
         args.iter()
             .position(|a| a == k)
-            .map(|i| args.get(i + 1).cloned().ok_or(format!("{k} value")))
+            .map(|i| {
+                args.get(i + 1)
+                    .filter(|v| !v.starts_with("--"))
+                    .cloned()
+                    .ok_or(format!("{k} value"))
+            })
             .transpose()
     };
     match (flag("--spare-reason")?, flag("--replaces")?) {
         (None, None) => {}
         (Some(reason), Some(replaces)) => {
-            extra["spare"] = json!({"reason": reason, "replaces": replaces});
+            if reason.trim().is_empty() || reason.len() > 2000 {
+                return Err("--spare-reason: 1-2000 bytes".into());
+            }
+            // the host caller's operator attaches it; this path is inside the trust boundary
+            // (like --recovery-id) and has no authenticated identity: the record says so and
+            // keeps the local user name (review b38e8df M-1)
+            let user = std::env::var("USER").unwrap_or_else(|_| "unknown".into());
+            extra["spare"] = json!({"reason": reason, "replaces": replaces,
+                "by": {"kind": "host_operator", "name": user,
+                       "authenticated": false, "via": "ieo-role-call"}});
         }
         _ => return Err("--spare-reason and --replaces go together".into()),
     }

@@ -775,6 +775,11 @@ pub fn spare_gate(
     let (Some(reason), Some(replaces)) = (reason, replaces) else {
         return Err("the spare marker needs a reason and the attempt it replaces".into());
     };
+    // who attached it (review b38e8df M-1): a person; the record keeps it
+    let by = &marker["by"];
+    if by["kind"].as_str().is_none_or(str::is_empty) {
+        return Err("the spare marker names no one who attached it (`by`)".into());
+    }
     let found: Vec<&Value> = raw
         .iter()
         .filter(|r| r["format"] == RECORD_FORMAT && r["attempt_id"] == replaces)
@@ -783,6 +788,14 @@ pub fn spare_gate(
         return Err(format!(
             "spare: the replaced attempt {replaces} is not one record of the ledger ({} found)",
             found.len()
+        ));
+    };
+    // the raw line decides "one record"; the effective record (a correction applied) decides
+    // what the run was (review b38e8df L-1)
+    let _one = r;
+    let Some(r) = recs.iter().find(|e| e["attempt_id"] == replaces) else {
+        return Err(format!(
+            "spare: the replaced attempt {replaces} has no effective record"
         ));
     };
     if r["role"] != role || r["model_request"] != true || r["budget"] != plan.budget.name {
@@ -800,7 +813,7 @@ pub fn spare_gate(
         ));
     }
     Ok(Some(
-        serde_json::json!({"reason": reason, "replaces": replaces}),
+        serde_json::json!({"reason": reason, "replaces": replaces, "by": by}),
     ))
 }
 
@@ -1013,7 +1026,13 @@ impl Admission {
             .ok_or(format!("role {} not in the plan", c.role))?
             .clone();
         let mut body = self.body(c);
-        for (k, v) in extra.as_object().into_iter().flatten() {
+        // the spare marker is the budget check's, not the role service's (review b38e8df I-4)
+        for (k, v) in extra
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter(|(k, _)| *k != "spare")
+        {
             body[k] = v.clone();
         }
         let base_rec = json!({"format": RECORD_FORMAT, "task_id": c.task_id, "budget": plan.budget.name,

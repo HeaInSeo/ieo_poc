@@ -2406,8 +2406,8 @@ fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
     m.insert("dev".to_string(), service_0205(&t.0, "development"));
     m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
     let a = InProc(m);
-    let spare =
-        |reason: &str, replaces: &str| json!({"spare": {"reason": reason, "replaces": replaces}});
+    let by = json!({"kind": "user", "name": "alice-ops"});
+    let spare = |reason: &str, replaces: &str| json!({"spare": {"reason": reason, "replaces": replaces, "by": by}});
     let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
         caller::call_with_extra(
             &p,
@@ -2442,6 +2442,11 @@ fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
             "needs a reason",
         ),
         (json!({"spare": {"reason": "env"}}), "needs a reason"),
+        // who attached it is required (review b38e8df M-1)
+        (
+            json!({"spare": {"reason": "env", "replaces": "d2"}}),
+            "names no one",
+        ),
     ] {
         let why = not_started(call("development", "x4", "hi", extra.clone()));
         assert!(why.contains(want), "{extra}: {why}");
@@ -2456,7 +2461,8 @@ fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
     ));
     assert_eq!(
         r3["spare"],
-        json!({"reason": "execution environment defect, cause reported", "replaces": "d2"}),
+        json!({"reason": "execution environment defect, cause reported", "replaces": "d2",
+               "by": {"kind": "user", "name": "alice-ops"}}),
         "{r3}"
     );
     let ledger = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
@@ -2505,7 +2511,8 @@ fn the_0205_spare_may_redo_the_first_planned_run() {
     recorded(call(
         "d1b",
         "hi",
-        json!({"spare": {"reason": "env defect", "replaces": "d1"}}),
+        json!({"spare": {"reason": "env defect", "replaces": "d1",
+                         "by": {"kind": "user", "name": "alice-ops"}}}),
     ));
     recorded(call("d2", "hi", json!({})));
     let why = not_started(call("d3", "hi", json!({})));
@@ -2527,11 +2534,20 @@ fn the_spare_gate_refuses_ambiguous_records() {
                "outcome": {"result": {"subtype": "success", "is_error": failed}}})
     };
     let recs = vec![run("d1", "02-05", false), run("d2", "02-05", true)];
-    let marker = json!({"spare": {"reason": "env", "replaces": "d2"}});
+    let by = json!({"kind": "user", "name": "alice-ops"});
+    let marker = json!({"spare": {"reason": "env", "replaces": "d2", "by": by}});
     assert_eq!(
         caller::spare_gate(&p, "development", &recs, &recs, &marker),
-        Ok(Some(json!({"reason": "env", "replaces": "d2"})))
+        Ok(Some(json!({"reason": "env", "replaces": "d2", "by": by})))
     );
+    // review b38e8df L-1: a run corrected to a clean success (the effective record) is no
+    // failure, although its raw line asked for a person
+    let mut corrected = run("d2", "02-05", false);
+    corrected["corrected_by"] = json!({"decision": "D-1"});
+    let eff = vec![run("d1", "02-05", false), corrected];
+    let raw0 = vec![run("d1", "02-05", false), run("d2", "02-05", true)];
+    let e = caller::spare_gate(&p, "development", &eff, &raw0, &marker).expect_err("corrected");
+    assert!(e.contains("did not fail"), "{e}");
     // two records of the replaced attempt
     let raw = vec![
         run("d1", "02-05", false),
@@ -2542,16 +2558,152 @@ fn the_spare_gate_refuses_ambiguous_records() {
     assert!(e.contains("2 found"), "{e}");
     // a replaced run of another budget
     let raw = vec![run("d1", "02-05", false), run("d2", "02-04", true)];
-    let e = caller::spare_gate(&p, "development", &recs, &raw, &marker).expect_err("budget");
+    let e = caller::spare_gate(&p, "development", &raw, &raw, &marker).expect_err("budget");
     assert!(e.contains("of the 02-05 budget"), "{e}");
     // a failure is a non-success result even without stop_required
     let mut soft = run("d2", "02-05", false);
     soft["outcome"]["result"]["subtype"] = json!("error_max_turns");
     let raw = vec![run("d1", "02-05", false), soft];
-    assert!(caller::spare_gate(&p, "development", &recs, &raw, &marker).is_ok());
+    assert!(caller::spare_gate(&p, "development", &raw, &raw, &marker).is_ok());
     // a missing result is no clean success either
     let mut none = run("d2", "02-05", false);
     none["outcome"]["result"] = Value::Null;
     let raw = vec![run("d1", "02-05", false), none];
-    assert!(caller::spare_gate(&p, "development", &recs, &raw, &marker).is_ok());
+    assert!(caller::spare_gate(&p, "development", &raw, &raw, &marker).is_ok());
+}
+
+/// Review b38e8df L-2 (H3): a spare that fails stops again — its own failure asks for a person,
+/// so R2, G1 and a second spare do not start.
+#[test]
+fn a_failed_spare_stops_the_budget_again() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare-fail");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = InProc(m);
+    let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    let marker = |replaces: &str| {
+        json!({"spare": {"reason": "env defect", "replaces": replaces,
+                         "by": {"kind": "user", "name": "alice-ops"}}})
+    };
+    recorded(call("development", "d1", "AUTHFAIL", json!({})));
+    let s1 = recorded(call("development", "d1b", "AUTHFAIL", marker("d1")));
+    assert_eq!(s1["stop_required"], true, "{s1}");
+    for (role, attempt, extra) in [
+        ("development", "d2", json!({})),
+        ("guardrail", "g1", json!({})),
+    ] {
+        let why = not_started(call(role, attempt, "hi", extra));
+        assert!(why.contains("asks for a person"), "{role}: {why}");
+    }
+    let why = not_started(call("development", "d3", "hi", marker("d1b")));
+    assert!(why.contains("used already"), "{why}");
+}
+
+/// Review b38e8df L-2 (H4): `ieo-role-call --spare-reason/--replaces` on a 02-05 plan writes
+/// exactly those values to the spare run's record, with the host operator as who attached it.
+#[test]
+fn ieo_role_call_records_the_spare_marker() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-cli");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let svc = service_0205(&t.0, "development");
+    drop(svc);
+    let r = t.0.join("development");
+    let cfg = Config::from_json(&json!({"role": "development", "repo": "sori",
+        "state": r.join("state"), "etc": r.join("etc"), "cred": r.join("cred"),
+        "claude": t.0.join("fake-claude"), "quota_group_id": "test-shared",
+        "checkpoint_central": "local_only", "budget": "02-05"}))
+    .expect("cfg");
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|l| l.local_addr())
+        .expect("port")
+        .port();
+    std::thread::spawn(move || ieo_supervisor::serve::serve(cfg, &format!("127.0.0.1:{port}")));
+    let t0 = std::time::Instant::now();
+    while std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+        assert!(t0.elapsed() < Duration::from_secs(10), "serve");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    std::fs::write(
+        t.0.join("plan.json"),
+        json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+               "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+               "roles": {"development": {"url": format!("http://127.0.0.1:{port}"),
+                                         "adapter_token_file": t.0.join("adapter.token")}}})
+        .to_string(),
+    )
+    .expect("plan");
+    std::fs::write(
+        t.0.join("coordinator.json"),
+        call_of("development", "start", "x", "x", "x")
+            .coordinator
+            .to_string(),
+    )
+    .expect("coordinator");
+    let cli = |attempt: &str, prompt: &str, spare: &[&str]| {
+        std::fs::write(t.0.join("prompt.txt"), prompt).expect("prompt");
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"))
+            .arg("--plan")
+            .arg(t.0.join("plan.json"))
+            .args(["--task", "02-05", "--role", "development", "--op", "start"])
+            .args(["--attempt", attempt, "--session", attempt])
+            .arg("--prompt-file")
+            .arg(t.0.join("prompt.txt"))
+            .arg("--coordinator-file")
+            .arg(t.0.join("coordinator.json"))
+            .args(spare)
+            .env("USER", "host-op")
+            .output()
+            .expect("ieo-role-call");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout).to_string(),
+        )
+    };
+    let (code, out) = cli("d1", "AUTHFAIL", &[]);
+    assert_eq!(code, Some(3), "{out}");
+    // a flag value that is another flag is refused (review b38e8df I-2)
+    let (code, out) = cli("d2", "hi", &["--spare-reason", "--replaces", "d1"]);
+    assert_eq!(code, Some(1), "{out}");
+    let (code, out) = cli(
+        "d2",
+        "hi",
+        &["--spare-reason", "env defect", "--replaces", "d1"],
+    );
+    assert_eq!(code, Some(0), "{out}");
+    let recs = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
+    let d2: Value = recs
+        .lines()
+        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .find(|r| r["attempt_id"] == "d2")
+        .expect("d2 record");
+    assert_eq!(
+        d2["spare"],
+        json!({"reason": "env defect", "replaces": "d1",
+               "by": {"kind": "host_operator", "name": "host-op", "authenticated": false,
+                      "via": "ieo-role-call"}}),
+        "{d2}"
+    );
 }

@@ -45,9 +45,9 @@ pub struct Budget {
 }
 
 /// A spare run (user decision 2026-11-17 (나), docs/poc/User_Decisions_2026-11-17_spare.md):
-/// the role's run after its `planned_runs` needs an explicit spare marker (a reason and the
-/// earlier failed run of this role and budget it replaces); one spare only; no other role has
-/// one.
+/// the role runs at most `planned_runs` runs without a marker; its 1 spare carries an explicit
+/// marker (a person's reason and the earlier failed run of this role and budget it replaces)
+/// and may follow either planned run; no other role has one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpareRule {
     pub role: &'static str,
@@ -133,7 +133,8 @@ pub const BUDGET_0205: Budget = Budget {
             cache_read_tokens: 500_000,
         },
     ],
-    // the third development run is the spare (decision 2026-11-17 (나)); Guardrail has none
+    // at most 2 development runs without a marker; the 1 spare carries the marker and replaces
+    // a failed development run (decision 2026-11-17 (나)); Guardrail has none
     spare: Some(SpareRule {
         role: "development",
         planned_runs: 2,

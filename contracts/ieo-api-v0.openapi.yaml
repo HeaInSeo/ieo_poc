@@ -10,8 +10,10 @@ info:
     0.17.0 (02-05 budget PR, additive; user decisions 2026-11-15 (나) and 2026-11-17 (나)): deliverAssignment takes an
     optional `spare` {reason, replaces}: the 02-05 budget's one development spare run. The shared budget check decides
     (outcome `budget_refused` with the reason otherwise): development runs its 2 planned runs without a marker; a spare
-    names an earlier failed development run of the budget; one spare; none for the guardrail or another budget. The
-    marker is written to the run's budget ledger record.
+    names an earlier failed development run of the budget; one spare; none for the guardrail or another budget. Only a
+    person attaches it: a `spare` from a non-`user` credential → 403 `HUMAN_APPROVAL_REQUIRED`, nothing recorded or
+    called. The marker, with who attached it (`by`: name, kind), is written to the run's budget ledger record; it is
+    not forwarded to the role service.
     0.16.1 (02-05 budget PR; PR #80 review d336849 L-a): reportCheckpoint's `RECOVERY_REQUIRED` check binds the use to
     the checkpoint taken over: the delivery's use must be of that very checkpoint (the latest central sequence) and
     its approval of the reported assignment and generation; a use of another checkpoint is refused (409).
@@ -984,8 +986,9 @@ paths:
                 spare:
                   description: |
                     0.17.0 (02-05 budget PR, user decision 2026-11-17 (나)): the 02-05 budget's spare run — a reason
-                    and the attempt id of the earlier failed development run it replaces. The shared budget check
-                    decides; refused → `budget_refused`.
+                    and the attempt id of the earlier failed development run it replaces. Only a `user` credential (a
+                    person) may send it, else 403 `HUMAN_APPROVAL_REQUIRED`; the ledger record keeps who attached it.
+                    The shared budget check decides; refused → `budget_refused`.
                   type: object
                   additionalProperties: false
                   required: [reason, replaces]
