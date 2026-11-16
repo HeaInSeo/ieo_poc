@@ -275,6 +275,7 @@ impl G {
         c: &Call,
         timeout: Option<Duration>,
     ) -> Result<(u16, Value), Status> {
+        prepare(e, c);
         let mut cl = self.client();
         self.rt.block_on(Self::send(&mut cl, e, who, c, timeout))
     }
@@ -307,8 +308,17 @@ fn answer(r: Result<(u16, Value), Status>) -> (u16, Value) {
     }
 }
 
+/// A takeover's fixture delivery (02-05 step 4, [`ensure_delivery`]), recorded before the call
+/// (outside any async context).
+fn prepare(e: &Env, c: &Call) {
+    if let Call::Checkpoint { raw, .. } = c {
+        ensure_delivery(e, raw);
+    }
+}
+
 /// The same call over HTTP, with the bytes the adapter would build.
 fn over_http(e: &Env, who: Option<&str>, c: &Call) -> (u16, Value) {
+    prepare(e, c);
     let role_path = |r: &str| ieo_proto::role_name(ieo_proto::role_of(r) as i32);
     let mut key = None;
     let (m, p, b) = match c {
@@ -407,6 +417,7 @@ fn snapshot(db: &mut postgres::Client) -> Value {
         ("role_tamper_events", "received_at"),
         ("role_first_actions", "received_at"),
         ("role_session_status", "received_at"),
+        ("role_takeovers", "received_at"),
         ("history", "at,seq"),
     ] {
         let v: Value = db
@@ -1866,7 +1877,9 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
             "history",
             "role_checkpoints",
             "role_first_actions",
-            "role_session_status"
+            "role_session_status",
+            // the takeovers' links to their (fixture) deliveries, also claims (02-05 step 4)
+            "role_takeovers"
         ]
     );
     // a new generation: the own assignment follows the head; the old run's facts stay, not current
@@ -2008,6 +2021,7 @@ fn a_call_cancelled_before_commit_rolls_back() {
     );
     let digest = ready_for_checkpoints(&e);
     let c1 = cp(1, cp_raw(1, 0, &digest, json!({"phase": "takeover"})));
+    prepare(&e, &c1);
     let lock = hold_checkpoint_lock(&e);
     let mut cl = g.client();
     // the client gives up (drops the call: RST_STREAM) while the handler waits for the lock
@@ -2143,6 +2157,7 @@ fn an_answer_lost_after_commit_is_found_by_its_key_and_not_stored_twice() {
         ),
     ];
     for (who, c) in &calls {
+        prepare(&e, c);
         let before = e.counts();
         rl.blackhole.store(true, Ordering::SeqCst);
         let lost = g.rt.block_on(async {

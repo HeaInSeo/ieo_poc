@@ -6,8 +6,9 @@
 //! (`compare`, `crate::api::judge_resume`) → the shared budget check
 //! ([`ieo_supervisor::caller::admit`]) → the supervisor's `start` or `reconnect` (outside any
 //! transaction) → its answer, or `unknown` when it was lost, recorded (transaction 2). A delivery
-//! is what the coordinator itself did, so it is stored as `verified`; it is not a takeover (step 4
-//! links the takeover the supervisor reports to it).
+//! is what the coordinator itself did, so it is stored as `verified`; it is not a takeover: the
+//! supervisor's takeover checkpoint names this delivery (`delivery_id`, sent with the start) and
+//! the coordinator links the two when it stores the takeover (step 4).
 //!
 //! * The coordinator record (assignment, generation, sprint revision, spec digest, image,
 //!   profile), the target SHA and the limits are built from the database and the coordinator's
@@ -513,9 +514,12 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     }
-    let extra = json!({"target_sha": d["target_sha"]});
+    // the delivery id travels with the start (02-05 step 4): the supervisor carries it on the
+    // run's checkpoints and the takeover is linked to this delivery
+    let extra = json!({"target_sha": d["target_sha"], "delivery_id": id});
     let mut sent = adm.body(&call);
     sent["target_sha"] = d["target_sha"].clone();
+    sent["delivery_id"] = json!(id);
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));

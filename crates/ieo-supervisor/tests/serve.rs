@@ -1030,7 +1030,9 @@ fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
         s["provider_status_detail"]["observation"]["source"]["overageStatus"], "rejected",
         "{s}"
     );
-    assert!(s["last_actual_action_at"].is_string(), "{s}");
+    // 02-05 step 4 (C14): the time of an observed action, never the run's end; this fake's
+    // assistant event carries no tool_use or text, so no action was observed
+    assert!(s["last_actual_action_at"].is_null(), "{s}");
     // the checkpoint says what it does not track
     let cp: Value =
         serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
@@ -2278,4 +2280,87 @@ fn a_start_is_checked_against_the_coordinators_current_assignment(transport: &'s
     assert_eq!(st, 202, "{b}");
     wait(&svc, "o1");
     assert_eq!(runs(), 1);
+}
+
+// --- 02-05 step 4: the delivery id and the first action on the run's checkpoints ---
+
+#[test]
+fn checkpoints_carry_the_delivery_and_the_first_action() {
+    let _serial = serial();
+    let (t, svc) = setup("fa4");
+    // a malformed delivery id is refused before anything is stored
+    for bad in [json!(7), json!(""), json!("-x"), json!("a/b")] {
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req("a0", "hi", json!({"session_id": "s0", "delivery_id": bad})),
+        );
+        assert_eq!(
+            (st, b["code"].as_str()),
+            (400, Some("SCHEMA_VIOLATION")),
+            "{b}"
+        );
+    }
+    assert!(!t.0.join("state/runs/a0").exists());
+    // this fake's assistant event has no tool_use or text: no first action
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req(
+            "a1",
+            "hi",
+            json!({"session_id": "s1", "delivery_id": "D-1"}),
+        ),
+    );
+    assert_eq!(st, 202, "{b}");
+    let last = wait(&svc, "a1");
+    assert_eq!(last["first_action"], "none", "{last}");
+    let cp: Value =
+        serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
+            .expect("j");
+    assert_eq!(
+        (
+            cp["phase"].as_str(),
+            cp["delivery_id"].as_str(),
+            cp["first_action"].as_str()
+        ),
+        (Some("after_run"), Some("D-1"), Some("none")),
+        "{cp}"
+    );
+    let takeover: Value = serde_json::from_slice(
+        &std::fs::read(t.0.join(format!("state/checkpoints/{:020}.json", 1))).expect("seq 1"),
+    )
+    .expect("j");
+    assert_eq!(
+        (
+            takeover["phase"].as_str(),
+            takeover["delivery_id"].as_str(),
+            takeover["first_action"].is_null()
+        ),
+        (Some("takeover"), Some("D-1"), true)
+    );
+    // every checkpoint names the attempt the delivery called (review 5dbb3d8 M-1)
+    assert_eq!(
+        (cp["attempt_id"].as_str(), takeover["attempt_id"].as_str()),
+        (Some("a1"), Some("a1"))
+    );
+    let s = svc.status();
+    assert!(s["last_actual_action_at"].is_null(), "{s}");
+    assert!(s["first_action_report"].is_null(), "{s}");
+    // a start without a delivery id: the checkpoints say so (null); with a local record nothing
+    // refuses it (the coordinator does, 02-05 step 4)
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a2", "hi", json!({"session_id": "s2"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "a2");
+    let cp: Value =
+        serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
+            .expect("j");
+    assert!(cp["delivery_id"].is_null(), "{cp}");
 }

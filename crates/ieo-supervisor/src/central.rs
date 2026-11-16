@@ -57,6 +57,13 @@ pub trait CoordinatorClient: std::fmt::Debug + Send + Sync {
     /// `GET …/assignment` / `GetOwnAssignment` (02-05 step 3): the current assignment of this
     /// (repo, role) as the coordinator's database holds it.
     fn own_assignment(&self, repo: &str, role: &str) -> Reply;
+    /// `POST …/first-actions` / `RecordFirstAction` (02-05 step 4) with the HTTP body
+    /// `{assignment_id, generation, attempt_id, session_id, event_offset, observed_at, kind}`.
+    /// A client that does not implement it has no answer (the run goes on; the `after_run`
+    /// checkpoint carries the same values).
+    fn record_first_action(&self, _repo: &str, _role: &str, _body: &Value) -> Reply {
+        Reply::NoAnswer("first-action reports are not supported by this client".into())
+    }
     /// Transport, URL and credential file (configuration identity).
     fn describe(&self) -> String;
 }
@@ -161,6 +168,14 @@ impl CoordinatorClient for HttpClient {
             "GET",
             &format!("/v0/repos/{repo}/roles/{role}/assignment"),
             None,
+        )
+    }
+
+    fn record_first_action(&self, repo: &str, role: &str, body: &Value) -> Reply {
+        self.call(
+            "POST",
+            &format!("/v0/repos/{repo}/roles/{role}/first-actions"),
+            Some(body),
         )
     }
 
@@ -342,6 +357,41 @@ impl CoordinatorClient for GrpcClient {
         })
     }
 
+    fn record_first_action(&self, repo: &str, role: &str, body: &Value) -> Reply {
+        let token = match read_token(&self.token_file) {
+            Ok(t) => t,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        let s = |k: &str| body[k].as_str().unwrap_or_default().to_string();
+        let n = |k: &str| body[k].as_u64().unwrap_or_default();
+        let m = ieo_proto::v0::RecordFirstActionRequest {
+            repo_id: repo.to_string(),
+            role: ieo_proto::role_of(role) as i32,
+            assignment_id: s("assignment_id"),
+            generation: n("generation"),
+            attempt_id: s("attempt_id"),
+            session_id: s("session_id"),
+            event_offset: n("event_offset"),
+            observed_at: s("observed_at"),
+            kind: ieo_proto::first_action_kind_of(&s("kind")) as i32,
+        };
+        let req = match Self::request(m, &token) {
+            Ok(r) => r,
+            Err(e) => return Reply::NoAnswer(e),
+        };
+        self.run(|mut cl| async move {
+            match cl.record_first_action(req).await {
+                Ok(r) => Reply::Answered(
+                    ieo_proto::status_of_outcome(r.get_ref().outcome),
+                    ieo_proto::first_action_receipt_to_json(
+                        &r.get_ref().receipt.clone().unwrap_or_default(),
+                    ),
+                ),
+                Err(st) => reply_of(&st),
+            }
+        })
+    }
+
     fn describe(&self) -> String {
         format!("grpc {} {}", self.url, self.token_file.display())
     }
@@ -442,6 +492,24 @@ impl Central {
                 code_of(&v)
             ))
             .with("coordinator_status", json!(st))),
+        }
+    }
+}
+
+impl Central {
+    /// Report the first action of an attempt (02-05 step 4): `{"ok": true, "status", "receipt"}`
+    /// for a stored (201) or same (200) record; otherwise `{"ok": false, …}` with the status and
+    /// answer, or the transport error. Never stops the run.
+    pub fn record_first_action(&self, repo: &str, role: &str, body: &Value) -> Value {
+        let Central::Coordinator(c) = self else {
+            return json!({"ok": false, "reason": "local_only: no coordinator"});
+        };
+        match c.record_first_action(repo, role, body) {
+            Reply::Answered(st @ (200 | 201), v) => json!({"ok": true, "status": st, "receipt": v}),
+            Reply::Answered(st, v) => {
+                json!({"ok": false, "status": st, "code": code_of(&v), "answer": v})
+            }
+            Reply::NoAnswer(e) => json!({"ok": false, "reason": e}),
         }
     }
 }

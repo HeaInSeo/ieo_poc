@@ -415,6 +415,7 @@ impl Env {
             "role_tamper_events",
             "role_first_actions",
             "role_session_status",
+            "role_takeovers",
         ]
         .iter()
         .map(|t| {
@@ -587,5 +588,71 @@ pub fn checkpoint(seq: u64, generation: u64, digest: &str, extra: Value) -> Stri
     for (k, v) in extra.as_object().expect("obj") {
         c[k] = v.clone();
     }
+    // 02-05 step 4: a takeover names its delivery; the test fixture's id (recorded by
+    // [`ensure_delivery`] before the report) unless the test sets `delivery_id` itself
+    if c["phase"] == "takeover"
+        && !extra
+            .as_object()
+            .is_some_and(|m| m.contains_key("delivery_id"))
+    {
+        c["delivery_id"] = json!(format!(
+            "D-t-{}-{}-{}-{}-{}",
+            c["repo_id"].as_str().unwrap_or_default(),
+            c["role"].as_str().unwrap_or_default(),
+            c["assignment_id"].as_str().unwrap_or_default(),
+            c["generation"],
+            c["seq"]
+        ));
+    }
+    // the attempt the delivery called (review 5dbb3d8 M-1): fixture deliveries use their id as
+    // their attempt id, so a checkpoint naming a delivery names that attempt unless the test
+    // sets `attempt_id` itself
+    if c["delivery_id"].is_string()
+        && !extra
+            .as_object()
+            .is_some_and(|m| m.contains_key("attempt_id"))
+    {
+        c["attempt_id"] = c["delivery_id"].clone();
+    }
     serde_json::to_string_pretty(&c).expect("json")
+}
+
+/// Test fixture (02-05 step 4): the delivery a test takeover names (`D-t-…`, from
+/// [`checkpoint`]) recorded directly, as deliverAssignment would have recorded it before its
+/// start, when the named assignment generation was issued to the checkpoint's repo and role.
+/// No result row: a delivery whose answer is not recorded yet. Accepted 02-04 checkpoint tests
+/// keep their meaning; the delivery rules themselves are tested with real deliveries.
+pub fn ensure_delivery(e: &Env, raw: &[u8]) {
+    let Ok(c) = serde_json::from_slice::<Value>(raw) else {
+        return;
+    };
+    let Some(d) = c["delivery_id"].as_str().filter(|d| d.starts_with("D-t-")) else {
+        return;
+    };
+    if c["phase"] != "takeover" {
+        return;
+    }
+    let s = |k: &str| c[k].as_str().unwrap_or_default().to_string();
+    let generation = c["generation"].as_i64().unwrap_or(-1);
+    e.db()
+        .execute(
+            "INSERT INTO role_deliveries (delivery_id, repo_id, role, request_id, body,
+                 assignment_id, generation, attempt_id, session_id, logical_name,
+                 coordinator_record, target_sha, requested_by)
+             SELECT $1, a.repo_id, a.role, $1, '{}'::jsonb, a.assignment_id, a.generation, $1,
+                    $2, 'test-fixture', $7, a.target_sha, 'test-fixture'
+             FROM assignments a WHERE a.assignment_id = $3 AND a.generation = $4
+               AND a.repo_id = $5 AND a.role = $6
+             ON CONFLICT DO NOTHING",
+            &[
+                &d,
+                &s("session_id"),
+                &s("assignment_id"),
+                &generation,
+                &s("repo_id"),
+                &s("role"),
+                &json!({"image_digest": "sha256:img", "profile_id": "p", "profile_revision": 1}),
+            ],
+        )
+        .expect("test delivery");
 }

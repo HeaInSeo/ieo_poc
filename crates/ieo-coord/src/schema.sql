@@ -438,4 +438,36 @@ CREATE OR REPLACE TRIGGER role_deliveries_append_only BEFORE UPDATE OR DELETE ON
 CREATE OR REPLACE TRIGGER role_delivery_results_append_only BEFORE UPDATE OR DELETE ON role_delivery_results
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
+-- Takeovers (02-05 step 4, PLAN §3.2 step 4): a takeover checkpoint the coordinator stored, linked
+-- to the delivery it names. Written in the same transaction as the checkpoint row; one takeover
+-- per delivery (a second one is refused and its checkpoint rolled back). The revision and digest
+-- are the ones the supervisor applied (the checkpoint's). Reported by the supervisor: a claim.
+CREATE TABLE IF NOT EXISTS role_takeovers (
+    delivery_id       text        PRIMARY KEY REFERENCES role_deliveries (delivery_id),
+    repo_id           text        NOT NULL,
+    role              text        NOT NULL CHECK (role IN ('development', 'guardrail')),
+    seq               bigint      NOT NULL,
+    checkpoint_sha256 text        NOT NULL,
+    session_id        text        NOT NULL,
+    assignment_id     text        NOT NULL,
+    generation        bigint      NOT NULL,
+    sprint_id         text        NOT NULL,
+    sprint_revision   bigint      NOT NULL,
+    spec_digest       text        NOT NULL,
+    evidence_level    text        NOT NULL DEFAULT 'claim' CHECK (evidence_level = 'claim'),
+    reported_by       text        NOT NULL,
+    received_at       timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (repo_id, role, seq),
+    FOREIGN KEY (repo_id, role, seq) REFERENCES role_checkpoints (repo_id, role, seq),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
+);
+
+CREATE OR REPLACE TRIGGER role_takeovers_append_only BEFORE UPDATE OR DELETE ON role_takeovers
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
+-- where a first action was recorded from: the supervisor's report, or the `first_action` of a
+-- later checkpoint of the same run when the report was lost (02-05 step 4)
+ALTER TABLE role_first_actions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'report'
+    CHECK (source IN ('report', 'checkpoint'));
+
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;

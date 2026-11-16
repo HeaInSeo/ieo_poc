@@ -10,6 +10,7 @@
 //! * [`serve`]: the role container's PID 1 service (adapter start/reconnect/stop/status)
 //! * [`provider`]: raw provider signals → §7 `provider_status_or_unknown`, with freshness (decision item 4)
 //! * [`central`]: checkpoint reports to the coordinator and the local/central comparison (§2.1, §5-2; decision item 9)
+//! * [`first_action`]: the first actual action of a run, observed in its stream (02-05 step 4)
 //! * [`run`]: in-run enforcement (time, observed tokens, extra-usage signals) and process-group cleanup
 //!
 //! Pods, PID 1 and the adapter wiring around a real `claude` process are separate steps of 02-04.
@@ -21,6 +22,7 @@ pub mod central;
 pub mod checkpoint;
 pub mod configdir;
 pub mod env;
+pub mod first_action;
 pub mod lock;
 pub mod provider;
 pub mod run;

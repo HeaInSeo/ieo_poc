@@ -3406,6 +3406,7 @@ fn central_checkpoints_keep_sequence_identity_and_tamper_reports() {
     let s = ready_sprint(&e, 3);
     let digest = s["digest"].as_str().expect("digest").to_string();
     let report = |who: &str, seq: u64, raw: &str| {
+        ensure_delivery(&e, raw.as_bytes());
         e.post(who, CP, &json!({"seq": seq, "checkpoint_json": raw}))
     };
     // no assignment yet
@@ -4174,4 +4175,683 @@ fn c2_the_startup_check_refuses_a_binding_on_another_repos_sprint() {
         err.contains("owned by a Notion import (repo-a: POCX-T01)"),
         "{err}"
     );
+}
+
+// --- 02-05 step 4: takeover ↔ delivery, first action, getAssignmentChain, claim separation ---
+
+const CHAIN0: &str = "/v0/coordinator/assignments/A1/generations/0/chain";
+
+/// Row counts of the tables a takeover or a first action can write (a refusal leaves them as
+/// they were), the deliveries included.
+fn step4_counts(e: &Env) -> Vec<(String, i64)> {
+    let mut db = e.db();
+    [
+        "role_checkpoints",
+        "role_takeovers",
+        "role_first_actions",
+        "role_tamper_events",
+        "role_deliveries",
+        "role_delivery_results",
+        "history",
+    ]
+    .iter()
+    .map(|t| {
+        let n: i64 = db
+            .query_one(&format!("SELECT count(*) FROM {t}"), &[])
+            .expect("count")
+            .get(0);
+        (t.to_string(), n)
+    })
+    .collect()
+}
+
+/// A delivery as deliverAssignment records it (test fixture, no supervisor), with its results.
+fn delivery_row(e: &Env, id: &str, generation: i64, outcomes: &[&str]) {
+    let mut db = e.db();
+    db.execute(
+        "INSERT INTO role_deliveries (delivery_id, repo_id, role, request_id, body, assignment_id,
+             generation, attempt_id, session_id, logical_name, coordinator_record, target_sha,
+             requested_by)
+         VALUES ($1, 'repo-a', 'development', $1, '{}'::jsonb, 'A1', $2, $1, 's', 'n',
+                 '{}'::jsonb, $3, 'test-fixture')",
+        &[&id, &generation, &SHA1],
+    )
+    .expect("delivery");
+    for (i, o) in outcomes.iter().enumerate() {
+        db.execute(
+            "INSERT INTO role_delivery_results (delivery_id, n, reasons, outcome)
+             VALUES ($1, $2, '[]'::jsonb, $3)",
+            &[&id, &(i32::try_from(i).expect("n") + 1), o],
+        )
+        .expect("result");
+    }
+}
+
+#[test]
+fn a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation() {
+    let Some(e) = start() else { return };
+    let s = ready_sprint(&e, 3);
+    let digest = s["digest"].as_str().expect("digest").to_string();
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    let report = |seq: u64, raw: &str| {
+        e.post(
+            "sup-dev-a",
+            CP,
+            &json!({"seq": seq, "checkpoint_json": raw}),
+        )
+    };
+    let takeover = |delivery: Value| {
+        checkpoint(
+            1,
+            0,
+            &digest,
+            json!({"phase": "takeover", "delivery_id": delivery}),
+        )
+    };
+    // refusals: none of them leaves a row in any table (deliveries included)
+    delivery_row(&e, "D-g1", 0, &[]);
+    assert_eq!(
+        assign(
+            &e,
+            "development",
+            "A1",
+            1,
+            "01-01",
+            SHA1,
+            json!({"assignment_id": "A1", "generation": 0})
+        )
+        .0,
+        201
+    );
+    delivery_row(&e, "D-old", 0, &["accepted"]);
+    delivery_row(&e, "D-nc", 1, &["not_called"]);
+    delivery_row(&e, "D-br", 1, &["budget_refused"]);
+    delivery_row(&e, "D-rf", 1, &["accepted", "refused"]);
+    delivery_row(&e, "D-na", 1, &["unknown", "not_accepted"]);
+    // a delivery still waiting for its own call (review 5dbb3d8 M-1)
+    delivery_row(&e, "D-wait", 1, &[]);
+    let at1 = |delivery: Value| {
+        checkpoint(
+            1,
+            1,
+            &digest,
+            json!({"phase": "takeover", "delivery_id": delivery}),
+        )
+    };
+    let before = step4_counts(&e);
+    for (raw, st, code_want) in [
+        // a takeover without a delivery (every 02-04 direct start)
+        (at1(Value::Null), 409, "DELIVERY_REQUIRED"),
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": null}),
+            ),
+            409,
+            "DELIVERY_REQUIRED",
+        ),
+        // an unknown delivery, one of the older generation, nothing sent
+        (at1(json!("D-none")), 409, "DELIVERY_MISMATCH"),
+        (at1(json!("D-old")), 409, "DELIVERY_MISMATCH"),
+        (at1(json!("D-g1")), 409, "DELIVERY_MISMATCH"),
+        (at1(json!("D-nc")), 409, "DELIVERY_MISMATCH"),
+        (at1(json!("D-br")), 409, "DELIVERY_MISMATCH"),
+        (at1(json!("D-rf")), 409, "DELIVERY_MISMATCH"),
+        (at1(json!("D-na")), 409, "DELIVERY_MISMATCH"),
+        // the right delivery, but not its call: another attempt, or none (review 5dbb3d8 M-1)
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": "D-wait", "attempt_id": "other"}),
+            ),
+            409,
+            "DELIVERY_MISMATCH",
+        ),
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": "D-wait", "attempt_id": null}),
+            ),
+            409,
+            "DELIVERY_MISMATCH",
+        ),
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": "D-wait", "attempt_id": 7}),
+            ),
+            400,
+            "SCHEMA_VIOLATION",
+        ),
+        // format
+        (at1(json!(7)), 400, "SCHEMA_VIOLATION"),
+        (at1(json!("")), 400, "SCHEMA_VIOLATION"),
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": "D-x", "first_action": 0}),
+            ),
+            400,
+            "SCHEMA_VIOLATION",
+        ),
+        // the older generation's takeover with the older generation's delivery: the 02-04
+        // conditions refuse it first
+        (takeover(json!("D-old")), 409, "STALE_ASSIGNMENT"),
+    ] {
+        let (got, b) = report(1, &raw);
+        assert_eq!((got, code(&b)), (st, code_want.to_string()), "{raw} {b}");
+    }
+    assert_eq!(step4_counts(&e), before, "refusals leave no row");
+    // a delivery without a result yet (the supervisor reports while the coordinator records the
+    // answer), accepted, or unknown: stored with its takeover row in the same transaction
+    delivery_row(&e, "D-in", 1, &[]);
+    delivery_row(&e, "D-ok", 1, &["accepted"]);
+    delivery_row(&e, "D-un", 1, &["unknown"]);
+    let (st, b) = report(1, &at1(json!("D-in")));
+    assert_eq!(st, 201, "{b}");
+    let mut db = e.db();
+    let row = db
+        .query_one(
+            "SELECT delivery_id, seq, session_id, sprint_revision, spec_digest, checkpoint_sha256,
+                    evidence_level
+             FROM role_takeovers",
+            &[],
+        )
+        .expect("takeover");
+    assert_eq!(
+        (
+            row.get::<_, String>(0),
+            row.get::<_, i64>(1),
+            row.get::<_, String>(2),
+            row.get::<_, i64>(3),
+            row.get::<_, String>(4),
+            row.get::<_, String>(5),
+            row.get::<_, String>(6)
+        ),
+        (
+            "D-in".to_string(),
+            1,
+            "s1".to_string(),
+            5,
+            digest.clone(),
+            b["checkpoint_sha256"].as_str().expect("sha").to_string(),
+            "claim".to_string()
+        )
+    );
+    // the same takeover again: a duplicate, no second row
+    assert_eq!(report(1, &at1(json!("D-in"))).0, 200);
+    // a delivery is taken over once: a second takeover of it is refused and its checkpoint row
+    // rolled back with it
+    let after_run = checkpoint(2, 1, &digest, json!({"delivery_id": "D-in"}));
+    assert_eq!(report(2, &after_run).0, 201);
+    let before = step4_counts(&e);
+    let again = checkpoint(
+        3,
+        1,
+        &digest,
+        json!({"phase": "takeover", "session_id": "s2", "delivery_id": "D-in"}),
+    );
+    let (st, b) = report(3, &again);
+    assert_eq!((st, code(&b)), (409, "DELIVERY_MISMATCH".into()), "{b}");
+    assert!(b.to_string().contains("already has a takeover"), "{b}");
+    assert_eq!(
+        step4_counts(&e),
+        before,
+        "no checkpoint row without its takeover row"
+    );
+    for (seq, d) in [(3, "D-ok"), (5, "D-un")] {
+        let raw = checkpoint(
+            seq,
+            1,
+            &digest,
+            json!({"phase": "takeover", "session_id": format!("s{seq}"), "delivery_id": d}),
+        );
+        assert_eq!(report(seq, &raw).0, 201, "{d}");
+        let close = checkpoint(
+            seq + 1,
+            1,
+            &digest,
+            json!({"session_id": format!("s{seq}"), "delivery_id": d}),
+        );
+        assert_eq!(report(seq + 1, &close).0, 201, "{d}");
+    }
+    let n: i64 = db
+        .query_one("SELECT count(*) FROM role_takeovers", &[])
+        .expect("n")
+        .get(0);
+    assert_eq!(n, 3);
+}
+
+#[test]
+fn a_lost_first_action_report_is_filled_from_the_run_checkpoint() {
+    let Some(e) = start() else { return };
+    let s = ready_sprint(&e, 3);
+    let digest = s["digest"].as_str().expect("digest").to_string();
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    let report = |seq: u64, raw: &str| {
+        ensure_delivery(&e, raw.as_bytes());
+        e.post(
+            "sup-dev-a",
+            CP,
+            &json!({"seq": seq, "checkpoint_json": raw}),
+        )
+    };
+    let fa_path = "/v0/repos/repo-a/roles/development/first-actions";
+    let t1 = checkpoint(1, 0, &digest, json!({"phase": "takeover"}));
+    assert_eq!(report(1, &t1).0, 201);
+    let d1 = serde_json::from_str::<Value>(&t1).expect("j")["delivery_id"].clone();
+    let fa = json!({"attempt_id": d1, "event_offset": 4, "observed_at": "2026-11-16T01:00:00.250Z",
+                    "kind": "text"});
+    // its own report was lost: the after_run checkpoint carries it and fills the record
+    let a1 = checkpoint(
+        2,
+        0,
+        &digest,
+        json!({"delivery_id": d1, "first_action": fa}),
+    );
+    assert_eq!(report(2, &a1).0, 201);
+    let body = json!({"assignment_id": "A1", "generation": 0, "attempt_id": d1, "session_id": "s1",
+                      "event_offset": 4, "observed_at": "2026-11-16T01:00:00.250Z", "kind": "text"});
+    let mut db = e.db();
+    let row = db
+        .query_one(
+            "SELECT source, body, evidence_level FROM role_first_actions",
+            &[],
+        )
+        .expect("fa");
+    assert_eq!(
+        (
+            row.get::<_, String>(0),
+            row.get::<_, Value>(1),
+            row.get::<_, String>(2)
+        ),
+        ("checkpoint".into(), body.clone(), "claim".into())
+    );
+    // the late report of the same action: 200, nothing new; other content: 409, nothing new
+    let before = step4_counts(&e);
+    let (st, b) = e.post("sup-dev-a", fa_path, &body);
+    assert_eq!(st, 200, "{b}");
+    let mut other = body.clone();
+    other["event_offset"] = json!(5);
+    let (st, b) = e.post("sup-dev-a", fa_path, &other);
+    assert_eq!(
+        (st, code(&b)),
+        (409, "EVENT_CONTENT_CONFLICT".into()),
+        "{b}"
+    );
+    assert_eq!(step4_counts(&e), before);
+    // a run whose report arrived first: the after_run's copy changes nothing; a run without an
+    // action says `none` and records nothing; a checkpoint whose first action differs from the
+    // record keeps the record (the chain shows both)
+    let t3 = checkpoint(
+        3,
+        0,
+        &digest,
+        json!({"phase": "takeover", "session_id": "s3"}),
+    );
+    assert_eq!(report(3, &t3).0, 201);
+    let d3 = serde_json::from_str::<Value>(&t3).expect("j")["delivery_id"].clone();
+    let body3 = json!({"assignment_id": "A1", "generation": 0, "attempt_id": d3, "session_id": "s3",
+                       "event_offset": 2, "observed_at": "2026-11-16T01:05:00.000Z", "kind": "tool_use"});
+    let (st, b) = e.post("sup-dev-a", fa_path, &body3);
+    assert_eq!(st, 201, "{b}");
+    let mut differs = body3.clone();
+    differs["event_offset"] = json!(3);
+    let fa3 = json!({"attempt_id": d3, "event_offset": 3, "observed_at": "2026-11-16T01:05:00.000Z",
+                     "kind": "tool_use"});
+    let before = step4_counts(&e);
+    assert_eq!(
+        report(
+            4,
+            &checkpoint(
+                4,
+                0,
+                &digest,
+                json!({"session_id": "s3", "delivery_id": d3, "first_action": fa3})
+            )
+        )
+        .0,
+        201
+    );
+    let t5 = checkpoint(
+        5,
+        0,
+        &digest,
+        json!({"phase": "takeover", "session_id": "s5"}),
+    );
+    assert_eq!(report(5, &t5).0, 201);
+    let d5 = serde_json::from_str::<Value>(&t5).expect("j")["delivery_id"].clone();
+    assert_eq!(
+        report(
+            6,
+            &checkpoint(
+                6,
+                0,
+                &digest,
+                json!({"session_id": "s5", "delivery_id": d5, "first_action": "none"})
+            )
+        )
+        .0,
+        201
+    );
+    let n: i64 = db
+        .query_one("SELECT count(*) FROM role_first_actions", &[])
+        .expect("n")
+        .get(0);
+    assert_eq!(n, 2, "{before:?}");
+    let (st, chain) = e.get("operator", CHAIN0);
+    assert_eq!(st, 200, "{chain}");
+    let link = |d: &Value| {
+        chain["links"]
+            .as_array()
+            .expect("links")
+            .iter()
+            .find(|l| l["delivery_id"] == *d)
+            .cloned()
+            .expect("link")
+    };
+    assert_eq!(link(&d1)["first_action"]["source"], "checkpoint");
+    assert_eq!(link(&d1)["first_action"]["event_offset"], 4);
+    assert_eq!(link(&d3)["first_action"]["source"], "report");
+    assert_eq!(link(&d3)["first_action_conflict"], true);
+    assert_eq!(link(&d5)["first_action"], "none");
+    assert_eq!(link(&d5)["first_action_conflict"], false);
+    // a resumed session takes over once per run under the same generation: the first action
+    // of its second run is recorded (step 2's lookup failed with 500 on two takeover rows)
+    let t7 = checkpoint(7, 0, &digest, json!({"phase": "takeover"}));
+    assert_eq!(report(7, &t7).0, 201);
+    let d7 = serde_json::from_str::<Value>(&t7).expect("j")["delivery_id"].clone();
+    let (st, b) = e.post(
+        "sup-dev-a",
+        fa_path,
+        &json!({"assignment_id": "A1", "generation": 0, "attempt_id": d7, "session_id": "s1",
+                "event_offset": 2, "observed_at": "2026-11-16T01:10:00Z", "kind": "tool_use"}),
+    );
+    assert_eq!(st, 201, "{b}");
+    assert_eq!(
+        report(
+            8,
+            &checkpoint(
+                8,
+                0,
+                &digest,
+                json!({"delivery_id": d7, "first_action": "none"})
+            )
+        )
+        .0,
+        201
+    );
+    // review 5dbb3d8 L-2, I-2: a first action is filled only for a session whose takeover is
+    // stored and linked to the delivery that called that attempt
+    let before = step4_counts(&e);
+    let fa_x = |attempt: &str| {
+        json!({"attempt_id": attempt, "event_offset": 1, "observed_at": "2026-11-16T01:20:00Z",
+               "kind": "text"})
+    };
+    // (a) a session never taken over (the after_run is current, so it is stored)
+    let a = checkpoint(
+        9,
+        0,
+        &digest,
+        json!({"session_id": "s-none", "first_action": fa_x("att-none")}),
+    );
+    assert_eq!(report(9, &a).0, 201);
+    // (b) a session taken over through d1, with a first action of an attempt d1 did not call
+    let b = checkpoint(
+        10,
+        0,
+        &digest,
+        json!({"delivery_id": d1, "attempt_id": "att-other", "first_action": fa_x("att-other")}),
+    );
+    assert_eq!(report(10, &b).0, 201);
+    // (c) the checkpoint's own attempt differs from the first action's: s5's takeover is linked
+    // to d5, which called the first action's attempt and has no first action yet, but this
+    // checkpoint belongs to another attempt
+    let c = checkpoint(
+        11,
+        0,
+        &digest,
+        json!({"session_id": "s5", "delivery_id": d5, "attempt_id": "att-third",
+               "first_action": fa_x(d5.as_str().expect("d5"))}),
+    );
+    assert_eq!(report(11, &c).0, 201);
+    let after = step4_counts(&e);
+    assert_eq!(
+        (after[2].1, after[0].1),
+        (before[2].1, before[0].1 + 3),
+        "three checkpoints, no first action"
+    );
+    let (_, ch) = e.get("operator", CHAIN0);
+    let none = ["att-none", "att-other", d5.as_str().expect("d5")];
+    assert!(
+        ch["first_actions"]
+            .as_array()
+            .expect("fa")
+            .iter()
+            .all(|f| !none.contains(&f["attempt_id"].as_str().unwrap_or(""))),
+        "{ch}"
+    );
+    // a malformed first action is refused with its checkpoint
+    let before = step4_counts(&e);
+    for bad in [
+        json!({"attempt_id": "x", "event_offset": -1, "observed_at": "2026-11-16T01:00:00Z", "kind": "text"}),
+        json!({"attempt_id": "x", "event_offset": 1, "observed_at": "2026-11-16 01:00:00", "kind": "text"}),
+        json!({"attempt_id": "x", "event_offset": 1, "observed_at": "2026-11-16T01:00:00Z", "kind": "init"}),
+        json!({"attempt_id": "x", "event_offset": 1, "observed_at": "2026-11-16T01:00:00Z", "kind": "text", "extra": 1}),
+        json!("some"),
+        json!(0),
+    ] {
+        let (st, b) = report(
+            12,
+            &checkpoint(
+                12,
+                0,
+                &digest,
+                json!({"session_id": "s5", "first_action": bad}),
+            ),
+        );
+        assert_eq!(
+            (st, code(&b)),
+            (400, "SCHEMA_VIOLATION".into()),
+            "{bad} {b}"
+        );
+    }
+    assert_eq!(step4_counts(&e), before);
+}
+
+#[test]
+fn the_assignment_chain_is_read_by_clients_of_its_repo_only() {
+    let Some(e) = start() else { return };
+    ready_sprint(&e, 3);
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    assert_eq!(e.call(None, "GET", CHAIN0, None, None).0, 401);
+    for who in ["sup-dev-a", "dev-a", "alice", "ingest"] {
+        let (st, b) = e.get(who, CHAIN0);
+        assert_eq!((st, code(&b)), (403, "SCOPE_DENIED".into()), "{who} {b}");
+    }
+    // another repo's client and an unknown generation: the same 404
+    for (who, path) in [
+        ("operator-norepo", CHAIN0),
+        (
+            "operator",
+            "/v0/coordinator/assignments/A1/generations/9/chain",
+        ),
+        (
+            "operator",
+            "/v0/coordinator/assignments/A9/generations/0/chain",
+        ),
+    ] {
+        let (st, b) = e.get(who, path);
+        assert_eq!(
+            (st, code(&b)),
+            (404, "NOT_FOUND".into()),
+            "{who} {path} {b}"
+        );
+    }
+    for g in ["x", "-1", "1.0", "18446744073709551616"] {
+        let (st, b) = e.get(
+            "operator",
+            &format!("/v0/coordinator/assignments/A1/generations/{g}/chain"),
+        );
+        assert_eq!((st, code(&b)), (400, "SCHEMA_VIOLATION".into()), "{g} {b}");
+    }
+    for who in ["operator", "assigner"] {
+        let (st, b) = e.get(who, CHAIN0);
+        assert_eq!(st, 200, "{who} {b}");
+        assert_eq!(b["assignment"]["evidence_level"], "verified");
+        assert_eq!(b["assignment"]["current"], true);
+        assert_eq!(b["assignment"]["issued_by"], "assigner");
+        assert_eq!(b["sprint"]["evidence_level"], "verified");
+        assert_eq!(b["sprint"]["revision"], 5);
+        assert!(b["sprint"]["sources"].is_array(), "{b}");
+        for k in [
+            "deliveries",
+            "takeovers",
+            "first_actions",
+            "checkpoints",
+            "agent_reports",
+        ] {
+            assert_eq!(b[k], json!([]), "{k}");
+        }
+        assert!(b["session_status"].is_null());
+    }
+}
+
+/// PLAN §3.2 step 4: with no agent report, no takeover and no first action the chain and the
+/// completion judgment proceed; claims that arrive later are stored as claims and change no
+/// judgment.
+#[test]
+fn claims_are_kept_apart_from_the_completion_judgment() {
+    let Some(e) = start() else { return };
+    let s = ready_sprint(&e, 3);
+    let digest = s["digest"].as_str().expect("digest").to_string();
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    full_evidence(&e, SHA1, "c");
+    assert_eq!(
+        evidence(
+            &e,
+            "rv-ind",
+            "review",
+            json!({"sha": SHA1, "reviewer": "rev", "author": "dev", "state": "approved",
+                   "source_ref": "pull/1#r2"})
+        )
+        .0,
+        201
+    );
+    // nothing reported by any supervisor or agent yet
+    let (st, j1) = judge(&e, "jc-1", "01-01");
+    assert_eq!(
+        (st, j1["outcome"].as_str()),
+        (201, Some("accepted")),
+        "{j1}"
+    );
+    let (st, c1) = e.get("operator", CHAIN0);
+    assert_eq!(st, 200, "{c1}");
+    for k in ["takeovers", "first_actions", "agent_reports", "checkpoints"] {
+        assert_eq!(c1[k], json!([]), "{k}");
+    }
+    // the claims arrive late: a takeover, an after_run carrying the first action, the
+    // development agent's progress report, a session status
+    let report = |seq: u64, raw: &str| {
+        ensure_delivery(&e, raw.as_bytes());
+        e.post(
+            "sup-dev-a",
+            CP,
+            &json!({"seq": seq, "checkpoint_json": raw}),
+        )
+    };
+    let t1 = checkpoint(1, 0, &digest, json!({"phase": "takeover"}));
+    assert_eq!(report(1, &t1).0, 201);
+    let d1 = serde_json::from_str::<Value>(&t1).expect("j")["delivery_id"].clone();
+    let fa = json!({"attempt_id": d1, "event_offset": 2, "observed_at": "2026-11-16T02:00:00.100Z",
+                    "kind": "tool_use"});
+    assert_eq!(
+        report(
+            2,
+            &checkpoint(
+                2,
+                0,
+                &digest,
+                json!({"delivery_id": d1, "first_action": fa})
+            )
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post("dev-a", "/v0/agent/reports", &report_body("dev-c1"))
+            .0,
+        202
+    );
+    let status = json!({"observed_at": "2026-11-16T02:00:01Z", "lifecycle": "idle", "session_id": "s1",
+        "assignment_id": "A1", "generation": 0, "quota_group_id": "test-shared",
+        "provider_status_or_unknown": "unknown", "last_actual_action_at": "2026-11-16T02:00:00.100Z",
+        "checkpoint_seq": 2, "checkpoint_sha256": "a".repeat(64),
+        "pending_external_requests": "not_tracked", "active_children": "not_tracked"});
+    let (st, b) = e.call(
+        Some("sup-dev-a"),
+        "POST",
+        "/v0/repos/repo-a/roles/development/session-status",
+        Some("status-key-0001"),
+        Some(&status),
+    );
+    assert_eq!(st, 201, "{b}");
+    // the same judgment: claims are not judgment inputs
+    let (st, j2) = judge(&e, "jc-2", "01-01");
+    assert_eq!(st, 201, "{j2}");
+    assert_eq!(
+        (&j2["outcome"], &j2["facts"]),
+        (&j1["outcome"], &j1["facts"]),
+        "{j1} {j2}"
+    );
+    let (st, c2) = e.get("operator", CHAIN0);
+    assert_eq!(st, 200, "{c2}");
+    assert_eq!(
+        c2["evidence_levels"],
+        json!({"verified": ["sprint", "assignment", "deliveries"],
+               "claim": ["takeovers", "first_actions", "checkpoints", "tamper_events",
+                         "agent_reports", "session_status"]})
+    );
+    assert_eq!(c2["agent_reports"].as_array().map(Vec::len), Some(1));
+    assert_eq!(c2["agent_reports"][0]["evidence_level"], "claim");
+    assert_eq!(c2["agent_reports"][0]["event_id"], "dev-c1");
+    assert_eq!(c2["takeovers"][0]["evidence_level"], "claim");
+    assert_eq!(c2["first_actions"][0]["evidence_level"], "claim");
+    assert_eq!(c2["first_actions"][0]["source"], "checkpoint");
+    assert_eq!(c2["session_status"]["evidence_level"], "claim");
+    assert_eq!(c2["session_status"]["names_this_generation"], true);
+    assert_eq!(
+        c2["session_status"]["status"]["last_actual_action_at"],
+        "2026-11-16T02:00:00.100Z"
+    );
+    // the fixture delivery is a coordinator record: verified; its link shows the takeover
+    assert_eq!(c2["deliveries"][0]["evidence_level"], "verified");
+    assert_eq!(c2["links"][0]["taken_over"], true);
+    assert_eq!(c2["links"][0]["takeover_seq"], 1);
+}
+
+fn report_body(event_id: &str) -> Value {
+    report("development", event_id, "A1", 0, "01-01", SHA1)
 }

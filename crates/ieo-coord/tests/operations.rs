@@ -115,6 +115,21 @@ fn routes_resolve_to_their_operations_and_shapes() {
             }),
         ),
         ("GET", "/v0/repos/r/roles/development/deliveries", None),
+        // getAssignmentChain (02-05 step 4)
+        (
+            "GET",
+            "/v0/coordinator/assignments/A1/generations/0/chain",
+            Some(Operation::AssignmentChain {
+                assignment_id: "A1",
+                generation: "0",
+            }),
+        ),
+        (
+            "POST",
+            "/v0/coordinator/assignments/A1/generations/0/chain",
+            None,
+        ),
+        ("GET", "/v0/coordinator/assignments/A1/generations/0", None),
         ("GET", "/v0/agent/reports", None),
         ("GET", "/v0/repos/a/b/roles/x/checkpoints/latest", None),
     ];
@@ -132,6 +147,10 @@ fn routes_resolve_to_their_operations_and_shapes() {
     assert_eq!(
         shape("POST", "/v0/repos/r/roles/development/deliveries"),
         Some(Shape::Delivery)
+    );
+    assert_eq!(
+        shape("GET", "/v0/coordinator/assignments/A1/generations/0/chain"),
+        Some(Shape::Transaction)
     );
     // the five operations of the gRPC surface are one transaction each (contract §9)
     for (m, p) in [

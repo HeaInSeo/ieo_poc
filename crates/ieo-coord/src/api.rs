@@ -324,6 +324,11 @@ pub enum Operation<'a> {
         repo: &'a str,
         role: &'a str,
     },
+    /// 02-05 step 4: the connection of one assignment generation (HTTP only, read only).
+    AssignmentChain {
+        assignment_id: &'a str,
+        generation: &'a str,
+    },
     Ingest,
     Judge,
     ListOutbox,
@@ -406,6 +411,22 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         ("POST", ["v0", "repos", repo, "roles", role, "deliveries"]) => {
             Operation::DeliverAssignment { repo, role }
         }
+        // the connection of one assignment generation (02-05 step 4)
+        (
+            "GET",
+            [
+                "v0",
+                "coordinator",
+                "assignments",
+                assignment_id,
+                "generations",
+                generation,
+                "chain",
+            ],
+        ) => Operation::AssignmentChain {
+            assignment_id,
+            generation,
+        },
         ("POST", ["v0", "coordinator", "evidence"]) => Operation::Ingest,
         ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
         ("GET", ["v0", "coordinator", "outbox"]) => Operation::ListOutbox,
@@ -629,6 +650,12 @@ pub fn dispatch(
         Operation::DeliverAssignment { repo, role } => {
             crate::delivery::deliver(db, ctx, who, repo, role, req, guard)
         }
+        Operation::AssignmentChain {
+            assignment_id,
+            generation,
+        } => run(db, &|tx| {
+            crate::chain::assignment_chain(tx, who, assignment_id, generation)
+        }),
         Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
         Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
@@ -3734,6 +3761,31 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
         n("profile_revision")?,
     );
     let settings = t("settings_digest")?;
+    // 02-05 step 4 (runtime contract revision 12): the delivery the run belongs to, and the
+    // run's first action as a later checkpoint carries it
+    let delivery_id = match &cp["delivery_id"] {
+        Value::Null => None,
+        Value::String(d) if !d.is_empty() && d.len() <= 128 => Some(d.clone()),
+        _ => {
+            return Err(bad(
+                "checkpoint_json.delivery_id",
+                "null or a delivery id (1-128 bytes)",
+            ));
+        }
+    };
+    // the attempt (the delivery's call) the run belongs to (review 5dbb3d8 M-1)
+    let attempt_id = match &cp["attempt_id"] {
+        Value::Null => None,
+        Value::String(a) if !a.is_empty() && a.len() <= 128 => Some(a.clone()),
+        _ => {
+            return Err(bad(
+                "checkpoint_json.attempt_id",
+                "null or an attempt id (1-128 bytes)",
+            ));
+        }
+    };
+    let first_action = checkpoint_first_action(&cp["first_action"])
+        .map_err(|m| bad("checkpoint_json.first_action", m))?;
     let sha = hex::encode(Sha256::digest(raw.as_bytes()));
     lock(tx, &format!("checkpoint:{repo}:{role}"))?;
     let latest = latest_row(tx, repo, role)?;
@@ -3867,6 +3919,19 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
             "reconnect under the current assignment",
         ));
     }
+    // a takeover answers a delivery of this assignment and generation (02-05 step 4): a
+    // request alone is never a takeover, and a takeover without a delivery is refused
+    if phase == "takeover" {
+        check_delivery(
+            tx,
+            repo,
+            role,
+            &aid,
+            generation,
+            delivery_id.as_deref(),
+            attempt_id.as_deref(),
+        )?;
+    }
     tx.execute(
         "INSERT INTO role_checkpoints (repo_id, role, seq, checkpoint_sha256, phase, session_id, assignment_id,
             generation, sprint_id, sprint_revision, spec_digest, target_sha, image_digest, profile_id,
@@ -3876,6 +3941,38 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
           &i64_of(sprint_rev), &spec_digest, &target, &image, &profile, &i64_of(profile_rev), &settings,
           &cp, &who.name, &is_current],
     )?;
+    // the takeover row, in this transaction: one per delivery. A second takeover of the same
+    // delivery is refused and its checkpoint row rolled back with it
+    if phase == "takeover" {
+        let d = delivery_id.as_deref().unwrap_or_default();
+        let n = tx.execute(
+            "INSERT INTO role_takeovers (delivery_id, repo_id, role, seq, checkpoint_sha256, session_id,
+                assignment_id, generation, sprint_id, sprint_revision, spec_digest, reported_by)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (delivery_id) DO NOTHING",
+            &[&d, &repo, &role, &i64_of(seq), &sha, &session, &aid, &i64_of(generation), &sprint,
+              &i64_of(sprint_rev), &spec_digest, &who.name],
+        )?;
+        if n != 1 {
+            return Err(one(
+                409,
+                "DELIVERY_MISMATCH",
+                "checkpoint_json.delivery_id",
+                &format!("delivery {d} already has a takeover"),
+                "a delivery is taken over once; start a new run through a new delivery",
+            ));
+        }
+    }
+    // a first action whose own report was lost is filled from the run's later checkpoint
+    if let Some(fa) = &first_action
+        && phase != "takeover"
+        && attempt_id.as_deref().is_none_or(|a| fa["attempt_id"] == a)
+    {
+        let body = json!({"assignment_id": aid, "generation": generation,
+            "attempt_id": fa["attempt_id"], "session_id": session,
+            "event_offset": fa["event_offset"], "observed_at": fa["observed_at"],
+            "kind": fa["kind"]});
+        fill_first_action(tx, who, repo, role, &body, is_current)?;
+    }
     // a tamper detection travels with the new session's checkpoints (§5-6); recorded once
     let tamper = &cp["config_tamper_detected"];
     let mut tamper_recorded = false;
@@ -3921,6 +4018,216 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
         json!({"stored": true, "seq": seq, "checkpoint_sha256": sha, "tamper_recorded": tamper_recorded,
                "current_assignment": is_current}),
     )
+}
+
+/// The `first_action` of a checkpoint (02-05 step 4): absent, null (not known) or `"none"` → no
+/// value; otherwise `{attempt_id, event_offset, observed_at, kind}`.
+fn checkpoint_first_action(v: &Value) -> Result<Option<Value>, &'static str> {
+    if v.is_null() || v == "none" {
+        return Ok(None);
+    }
+    let ok = v.as_object().is_some_and(|m| {
+        m.len() == 4
+            && v["attempt_id"]
+                .as_str()
+                .is_some_and(|a| !a.is_empty() && a.len() <= 128)
+            && v["event_offset"].is_u64()
+            && v["observed_at"].as_str().is_some_and(is_utc_timestamp)
+            && matches!(v["kind"].as_str(), Some("tool_use" | "text"))
+    });
+    if ok {
+        Ok(Some(v.clone()))
+    } else {
+        Err("null, \"none\" or {attempt_id, event_offset, observed_at (…Z), kind tool_use|text}")
+    }
+}
+
+/// The delivery a takeover names (02-05 step 4): recorded for this repo, role, assignment and
+/// generation, and either still waiting for its result (the supervisor reports the takeover
+/// while the coordinator records the answer) or answered `accepted` or `unknown`. Anything else
+/// — none named, unknown, another assignment or generation, nothing sent — is 409 and leaves no
+/// row. Read under the delivery lock, so a result is never recorded in between.
+fn check_delivery(
+    tx: &mut Transaction,
+    repo: &str,
+    role: &str,
+    aid: &str,
+    generation: u64,
+    delivery_id: Option<&str>,
+    attempt_id: Option<&str>,
+) -> Result<(), Resp> {
+    let field = "checkpoint_json.delivery_id";
+    let Some(d) = delivery_id else {
+        return Err(one(
+            409,
+            "DELIVERY_REQUIRED",
+            field,
+            "a takeover names the delivery it answers",
+            "start runs through deliverAssignment; the supervisor carries its delivery_id",
+        ));
+    };
+    lock(tx, &format!("delivery:{repo}:{role}"))?;
+    let row = tx.query_opt(
+        "SELECT repo_id, role, assignment_id, generation,
+                (SELECT outcome FROM role_delivery_results r WHERE r.delivery_id = d.delivery_id
+                 ORDER BY n DESC LIMIT 1),
+                attempt_id
+         FROM role_deliveries d WHERE delivery_id = $1",
+        &[&d],
+    )?;
+    let mismatch = |why: String| {
+        Err(one(
+            409,
+            "DELIVERY_MISMATCH",
+            field,
+            &why,
+            "take over only what a delivery of the current assignment sent",
+        ))
+    };
+    let Some(r) = row else {
+        return mismatch(format!("no delivery {d} is recorded"));
+    };
+    let (r_repo, r_role, r_aid, r_gen): (String, String, String, i64) =
+        (r.get(0), r.get(1), r.get(2), r.get(3));
+    if r_repo != repo || r_role != role || r_aid != aid || r_gen != i64_of(generation) {
+        return mismatch(format!(
+            "delivery {d} is for {r_repo}/{r_role} {r_aid}/{r_gen}, not {repo}/{role} {aid}/{generation}"
+        ));
+    }
+    // the takeover answers that delivery's own call: the same attempt (review 5dbb3d8 M-1). A
+    // start that only names the delivery — another attempt, or none — never consumes it
+    let r_attempt: String = r.get(5);
+    if attempt_id != Some(r_attempt.as_str()) {
+        return mismatch(format!(
+            "delivery {d} called attempt {r_attempt}, not {}",
+            attempt_id.unwrap_or("(no attempt_id)")
+        ));
+    }
+    match r.get::<_, Option<String>>(4).as_deref() {
+        None | Some("accepted" | "unknown") => Ok(()),
+        Some(o) => mismatch(format!(
+            "delivery {d} sent nothing to take over (its result is {o})"
+        )),
+    }
+}
+
+/// Insert one first action (both sources share the key, the body and the takeover condition).
+fn insert_first_action(
+    tx: &mut Transaction,
+    who: &Caller,
+    repo: &str,
+    role: &str,
+    body: &Value,
+    current: bool,
+    source: &str,
+) -> Result<(), Resp> {
+    let s = |k: &str| body[k].as_str().unwrap_or_default().to_string();
+    let n = |k: &str| i64_of(body[k].as_u64().unwrap_or_default());
+    tx.execute(
+        "INSERT INTO role_first_actions (repo_id, role, assignment_id, generation, attempt_id,
+            session_id, event_offset, observed_at, kind, body, current_assignment, reported_by,
+            source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,CAST($8::text AS timestamptz),$9,$10,$11,$12,$13)",
+        &[
+            &repo,
+            &role,
+            &s("assignment_id"),
+            &n("generation"),
+            &s("attempt_id"),
+            &s("session_id"),
+            &n("event_offset"),
+            &s("observed_at"),
+            &s("kind"),
+            body,
+            &current,
+            &who.name,
+            &source,
+        ],
+    )?;
+    history(
+        tx,
+        &who.name,
+        "first_action.record",
+        &json!({"repo_id": repo, "role": role, "assignment_id": body["assignment_id"],
+                "generation": body["generation"], "attempt_id": body["attempt_id"],
+                "current_assignment": current, "source": source}),
+    )?;
+    Ok(())
+}
+
+/// Whether a takeover checkpoint of `session` is stored under the assignment and generation.
+fn taken_over(
+    tx: &mut Transaction,
+    repo: &str,
+    role: &str,
+    session: &str,
+    aid: &str,
+    generation: u64,
+) -> Result<bool, Resp> {
+    // EXISTS: a resumed session has one takeover per run under the same generation (a
+    // `query_opt` over those rows failed with 500 for its second run's first action)
+    Ok(tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM role_checkpoints WHERE repo_id = $1 AND role = $2
+               AND phase = 'takeover' AND session_id = $3 AND assignment_id = $4
+               AND generation = $5)",
+            &[&repo, &role, &session, &aid, &i64_of(generation)],
+        )?
+        .get(0))
+}
+
+/// The first action an `after_run`/`error` checkpoint carries, recorded when none is recorded for
+/// that attempt yet and the session's takeover is stored and linked to the delivery that called
+/// that attempt (the report was lost or late). The checkpoint's own `attempt_id`, when present,
+/// must be the first action's. A record
+/// already there is kept as it is: the chain shows both when they differ.
+fn fill_first_action(
+    tx: &mut Transaction,
+    who: &Caller,
+    repo: &str,
+    role: &str,
+    body: &Value,
+    current: bool,
+) -> Result<(), Resp> {
+    let (aid, generation) = (
+        body["assignment_id"].as_str().unwrap_or_default(),
+        body["generation"].as_u64().unwrap_or_default(),
+    );
+    let exists = tx
+        .query_opt(
+            "SELECT 1 FROM role_first_actions WHERE repo_id = $1 AND role = $2
+               AND assignment_id = $3 AND generation = $4 AND attempt_id = $5",
+            &[
+                &repo,
+                &role,
+                &aid,
+                &i64_of(generation),
+                &body["attempt_id"].as_str().unwrap_or_default(),
+            ],
+        )?
+        .is_some();
+    // the session's takeover is stored and linked to the delivery that called this attempt
+    // (review 5dbb3d8 L-2, I-2)
+    let linked: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM role_takeovers t
+                 JOIN role_deliveries d ON d.delivery_id = t.delivery_id
+                 WHERE t.repo_id = $1 AND t.role = $2 AND t.session_id = $3
+                   AND t.assignment_id = $4 AND t.generation = $5 AND d.attempt_id = $6)",
+            &[
+                &repo,
+                &role,
+                &body["session_id"].as_str().unwrap_or_default(),
+                &aid,
+                &i64_of(generation),
+                &body["attempt_id"].as_str().unwrap_or_default(),
+            ],
+        )?
+        .get(0);
+    if exists || !linked {
+        return Ok(());
+    }
+    insert_first_action(tx, who, repo, role, body, current, "checkpoint")
 }
 
 /// `GET …/checkpoints/latest`: the reporter itself, or a `roles:control` client of the repo.
@@ -4291,7 +4598,7 @@ fn record_first_action(tx: &mut Transaction, who: &Caller, repo: &str, role: &st
     let generation = u64_field(&body, "generation")?;
     let attempt = str_field(&body, "attempt_id", 128)?;
     let session = str_field(&body, "session_id", 256)?;
-    let offset = u64_field(&body, "event_offset")?;
+    u64_field(&body, "event_offset")?;
     let observed = str_field(&body, "observed_at", 64)?;
     if !is_utc_timestamp(observed) {
         return Err(bad_field(
@@ -4330,14 +4637,7 @@ fn record_first_action(tx: &mut Transaction, who: &Caller, repo: &str, role: &st
         };
     }
     let current = issued_here(tx, repo, role, aid, generation, "assignment_id")?;
-    let taken_over = tx
-        .query_opt(
-            "SELECT 1 FROM role_checkpoints WHERE repo_id = $1 AND role = $2 AND phase = 'takeover'
-               AND session_id = $3 AND assignment_id = $4 AND generation = $5",
-            &[&repo, &role, &session, &aid, &i64_of(generation)],
-        )?
-        .is_some();
-    if !taken_over {
+    if !taken_over(tx, repo, role, session, aid, generation)? {
         return Err(one(
             409,
             "CHECKPOINT_MISMATCH",
@@ -4346,32 +4646,7 @@ fn record_first_action(tx: &mut Transaction, who: &Caller, repo: &str, role: &st
             "report the takeover checkpoint first",
         ));
     }
-    tx.execute(
-        "INSERT INTO role_first_actions (repo_id, role, assignment_id, generation, attempt_id,
-            session_id, event_offset, observed_at, kind, body, current_assignment, reported_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,CAST($8::text AS timestamptz),$9,$10,$11,$12)",
-        &[
-            &repo,
-            &role,
-            &aid,
-            &i64_of(generation),
-            &attempt,
-            &session,
-            &i64_of(offset),
-            &observed,
-            &kind,
-            &body,
-            &current,
-            &who.name,
-        ],
-    )?;
-    history(
-        tx,
-        &who.name,
-        "first_action.record",
-        &json!({"repo_id": repo, "role": role, "assignment_id": aid, "generation": generation,
-                "attempt_id": attempt, "current_assignment": current}),
-    )?;
+    insert_first_action(tx, who, repo, role, &body, current, "report")?;
     let r = tx.query_one(select, &key)?;
     ok(201, receipt(&r))
 }

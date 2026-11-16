@@ -337,8 +337,35 @@ fn e2e(transport: &str) {
         )
         .1
     };
+    // 02-05 step 4: a takeover names the delivery it answers. These 02-04 starts go to the
+    // supervisor directly, so each names a delivery recorded here as deliverAssignment would
+    // record it (test fixture; the delivery path itself is delivery_e2e and chain_e2e)
+    let fixture = |id: &str, generation: u64, attempt: &str| {
+        let mut c2 = cfg.clone();
+        c2.dbname(&dbname);
+        let mut db = c2.connect(NoTls).expect("db");
+        db.execute(
+            "INSERT INTO role_deliveries (delivery_id, repo_id, role, request_id, body,
+                 assignment_id, generation, attempt_id, session_id, logical_name,
+                 coordinator_record, target_sha, requested_by)
+             VALUES ($1, 'repo-a', 'development', $1, '{}'::jsonb, 'A1', $2, $5, 'fixture',
+                     'fixture', $4, $3, 'test-fixture')
+             ON CONFLICT DO NOTHING",
+            &[
+                &id,
+                &i64::try_from(generation).expect("gen"),
+                &SHA1,
+                &json!({"image_digest": "sha256:img", "profile_id": "p", "profile_revision": 1}),
+                &attempt,
+            ],
+        )
+        .expect("fixture delivery");
+    };
     let req = |attempt: &str, generation: u64, prompt: &str, extra: Value| {
+        let delivery = format!("D-e2e-{attempt}-{generation}");
+        fixture(&delivery, generation, attempt);
         let mut v = json!({"attempt_id": attempt, "prompt": prompt, "target_sha": SHA1,
+            "delivery_id": delivery,
             "coordinator": {"generation": generation, "assignment_id": "A1", "sprint_id": "POC-01",
                 "sprint_revision": 5, "spec_digest": sd, "image_digest": "sha256:img",
                 "profile_id": "p", "profile_revision": 1},
@@ -630,6 +657,9 @@ fn e2e(transport: &str) {
     lost["phase"] = json!("takeover");
     lost["session_id"] = json!("s7");
     lost["config_tamper_detected"] = Value::Null;
+    lost["delivery_id"] = json!("D-e2e-lost-2");
+    lost["attempt_id"] = json!("lost-attempt");
+    fixture("D-e2e-lost-2", 2, "lost-attempt");
     let lost = serde_json::to_string_pretty(&lost).expect("j");
     let (st, b) = c(
         "sup",

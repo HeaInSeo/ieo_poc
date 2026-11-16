@@ -180,7 +180,7 @@
 - **회차 한도.** revision의 `elapsed_seconds`·`total_tokens`로 회당 상한만 자른다. 배정의 남은 양은 단계 5다.
 - **새 코드 `ATTEMPT_ID_CONFLICT`·`DELIVERY_IN_PROGRESS`**(추가).
 - **재개 판단 하나를 바꿨다**(검토 c11e734 M-1). compareCheckpoint와 전달의 판단에서, 같은 배정의 낮은 세대라도 마지막 기록이 `after_run`이 아니면 `stale_generation`이 아니라 `external_reconciliation_required`다. 두 판단 모두 재개를 막는다는 점은 같다. 달라지는 것은 판단 이름과 사유, 그리고 `new_session`이 그 위에서 시작하지 못한다는 점이다. 런타임 계약 revision 11 머리와 §13 항목 10에 적었다.
-- 사용자 결정이 필요한 것은 없다고 본다. 정책 파일·판정 규칙·기존 작업의 HTTP 동작은 바꾸지 않았다. 위의 `new_session`은 검토로 확인한다.
+- 사용자 결정이 필요한 것은 없다고 본다. 정책 파일·판정 규칙은 바꾸지 않았고, 기존 작업의 HTTP 동작은 compareCheckpoint 판단 하나(바로 위, 02-04에서 수용한 판단의 닫는 쪽 변경) 말고는 바꾸지 않았다. 위의 `new_session`은 검토로 확인한다. (이 문장은 PR #74 검토 fe924b7 L-1에 따라 단계 4 PR에서 정정했다. 처음 문장은 “기존 작업의 HTTP 동작은 바꾸지 않았다”였다.)
 
 ## 6. 한계
 
