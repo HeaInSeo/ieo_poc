@@ -4620,12 +4620,15 @@ fn a_lost_first_action_report_is_filled_from_the_run_checkpoint() {
         json!({"delivery_id": d1, "attempt_id": "att-other", "first_action": fa_x("att-other")}),
     );
     assert_eq!(report(10, &b).0, 201);
-    // (c) the checkpoint's own attempt differs from the first action's
+    // (c) the checkpoint's own attempt differs from the first action's: s5's takeover is linked
+    // to d5, which called the first action's attempt and has no first action yet, but this
+    // checkpoint belongs to another attempt
     let c = checkpoint(
         11,
         0,
         &digest,
-        json!({"delivery_id": d1, "first_action": fa_x("att-third")}),
+        json!({"session_id": "s5", "delivery_id": d5, "attempt_id": "att-third",
+               "first_action": fa_x(d5.as_str().expect("d5"))}),
     );
     assert_eq!(report(11, &c).0, 201);
     let after = step4_counts(&e);
@@ -4635,7 +4638,7 @@ fn a_lost_first_action_report_is_filled_from_the_run_checkpoint() {
         "three checkpoints, no first action"
     );
     let (_, ch) = e.get("operator", CHAIN0);
-    let none = ["att-none", "att-other", "att-third"];
+    let none = ["att-none", "att-other", d5.as_str().expect("d5")];
     assert!(
         ch["first_actions"]
             .as_array()
