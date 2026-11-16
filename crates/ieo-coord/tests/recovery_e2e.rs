@@ -1068,6 +1068,23 @@ fn e2e(transport: &str) {
         (Some("after_run"), Some("s6"), Some(rid.as_str())),
         "{after}"
     );
+    // a finished run is nothing to recover
+    let (st, b) = approve(
+        "alice-ops",
+        "rec-key-0012",
+        &target(&after, "nothing to recover"),
+    );
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("RECOVERY_TARGET_MISMATCH")),
+        "{b}"
+    );
+    assert!(
+        b["rejections"][0]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("its run finished")),
+        "{b}"
+    );
     let used = recovery(&rid)["used"].clone();
     assert_eq!(used["delivery_id"], d6["delivery_id"], "{used}");
     // the chain shows the approval, its use and the delivery that used it; the crashed
