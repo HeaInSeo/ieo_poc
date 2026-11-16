@@ -1,12 +1,15 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.16.0
+  version: 0.16.1
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.16.1 (02-05 budget PR; PR #80 review d336849 L-a): reportCheckpoint's `RECOVERY_REQUIRED` check binds the use to
+    the checkpoint taken over: the delivery's use must be of that very checkpoint (the latest central sequence) and
+    its approval of the reported assignment and generation; a use of another checkpoint is refused (409).
     0.16.0 (02-05 step 7b; user decision 2026-11-16 (나), runtime contract revision 15 §18): the official recovery
     after a crash. approveRecovery (`POST /v0/repos/{repo_id}/roles/{role}/recoveries`, `Idempotency-Key`, HTTP
     only): a person (a `user` credential with `roles:control` for the repo; services 403 `HUMAN_APPROVAL_REQUIRED`,
@@ -688,7 +691,8 @@ paths:
         the coordinator is still recording the answer), `accepted` or `unknown`, and not taken over before;
         anything else → 409 `DELIVERY_MISMATCH`. 0.16.0 (02-05 step 7b): a `takeover` whose previous checkpoint is
         `takeover`/`error` (an unfinished run) is a recovery: its `recovery_id` must be the approval its delivery used
-        (role_recovery_uses), else 409 `RECOVERY_REQUIRED`. These checks follow every check above; the takeover row
+        (role_recovery_uses) recorded for that very checkpoint, with its approval of the reported assignment and
+        generation (0.16.1), else 409 `RECOVERY_REQUIRED`. These checks follow every check above; the takeover row
         (delivery, sequence, digest, session, applied revision and digest, received_at; a claim) is
         written in the same transaction as the checkpoint row, and a refusal leaves neither. A request
         alone is never a takeover. An `after_run`/`error` checkpoint whose `first_action` is an object

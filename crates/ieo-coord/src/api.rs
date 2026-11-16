@@ -4155,16 +4155,25 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
         // 185d12b L-1)
         let prev = tx
             .query_opt(
-                "SELECT phase FROM role_checkpoints WHERE repo_id = $1 AND role = $2
+                "SELECT phase, seq FROM role_checkpoints WHERE repo_id = $1 AND role = $2
                  ORDER BY seq DESC LIMIT 1",
                 &[&repo, &role],
             )?
-            .map(|r| r.get::<_, String>(0));
-        if matches!(prev.as_deref(), Some("takeover" | "error")) {
+            .map(|r| (r.get::<_, String>(0), r.get::<_, i64>(1)));
+        if let Some(&(_, prev_seq)) = prev
+            .as_ref()
+            .filter(|(p, _)| matches!(p.as_str(), "takeover" | "error"))
+        {
+            // the use must be of exactly this checkpoint, approved for this assignment and
+            // generation (review d336849 L-a): a delivery's use of another checkpoint never
+            // covers this one
             let used: Option<String> = tx
                 .query_opt(
-                    "SELECT recovery_id FROM role_recovery_uses WHERE delivery_id = $1",
-                    &[&delivery_id],
+                    "SELECT u.recovery_id FROM role_recovery_uses u
+                     JOIN role_recoveries r USING (recovery_id)
+                     WHERE u.delivery_id = $1 AND u.checkpoint_seq = $2
+                       AND r.assignment_id = $3 AND r.generation = $4",
+                    &[&delivery_id, &prev_seq, &aid, &i64_of(generation)],
                 )?
                 .map(|r| r.get(0));
             let named = cp["recovery_id"].as_str();
@@ -4174,8 +4183,8 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
                     "RECOVERY_REQUIRED",
                     "checkpoint_json.recovery_id",
                     &format!(
-                        "the latest checkpoint is an unfinished run: a takeover over it names the \
-                         approved recovery its delivery used ({}), not {}",
+                        "the latest checkpoint {prev_seq} is an unfinished run: a takeover over \
+                         it names the approval of that checkpoint its delivery used ({}), not {}",
                         used.as_deref().unwrap_or("none"),
                         named.unwrap_or("none")
                     ),

@@ -111,11 +111,12 @@ impl Config {
                 .as_u64()
                 .unwrap_or(crate::provider::DEFAULT_MAX_AGE_SECONDS),
             central: crate::central::Central::from_json(&v["checkpoint_central"])?,
-            budget: match v["budget"].as_str() {
-                Some("02-04") => crate::budget::BUDGET_0204,
-                Some("X-02") => crate::budget::BUDGET_X02,
-                _ => {
-                    return Err("config.budget must name an approved budget (02-04 or X-02)".into());
+            budget: match v["budget"].as_str().and_then(crate::budget::named) {
+                Some(b) => b,
+                None => {
+                    return Err(
+                        "config.budget must name an approved budget (02-04, X-02 or 02-05)".into(),
+                    );
                 }
             },
             share: Share {
@@ -130,6 +131,40 @@ impl Config {
 
     fn with_share(mut self, v: &Value) -> Result<Config, String> {
         let b = self.budget;
+        // a budget whose approval fixes the role shares (02-05): this role's approved share;
+        // a configured share must equal it
+        if !b.role_shares.is_empty() {
+            let a = b.approved_share(self.role_name()).ok_or(format!(
+                "the {} budget approves no share for role {}",
+                b.name,
+                self.role_name()
+            ))?;
+            let approved = Share {
+                max_runs: a.max_runs,
+                total_seconds: a.total_seconds,
+                billable_tokens: a.billable_tokens,
+                cache_read_tokens: a.cache_read_tokens,
+            };
+            let given = |k: &str| v[k].as_u64();
+            if !v.is_null()
+                && [
+                    given("max_runs") != Some(approved.max_runs),
+                    given("total_seconds") != Some(approved.total_seconds),
+                    given("billable_tokens") != Some(approved.billable_tokens),
+                    given("cache_read_tokens") != Some(approved.cache_read_tokens),
+                ]
+                .contains(&true)
+            {
+                return Err(format!(
+                    "config.share differs from the {} budget's approved share for {} (omit it \
+                     or give exactly the approved values)",
+                    b.name,
+                    self.role_name()
+                ));
+            }
+            self.share = approved;
+            return Ok(self);
+        }
         let f = |k: &str, cap: u64| match v[k].as_u64() {
             Some(x) if x > 0 && x <= cap => Ok(x),
             _ => Err(format!(

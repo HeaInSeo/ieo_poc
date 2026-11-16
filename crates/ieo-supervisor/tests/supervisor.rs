@@ -540,7 +540,8 @@ fn budget_constants_match_decision_1() {
             per_run_seconds: 1_800,
             total_seconds: 14_400,
             billable_tokens: 1_500_000,
-            cache_read_tokens: 15_000_000
+            cache_read_tokens: 15_000_000,
+            role_shares: &[],
         }
     );
     assert_eq!(
@@ -551,9 +552,67 @@ fn budget_constants_match_decision_1() {
             per_run_seconds: 3_600,
             total_seconds: 14_400,
             billable_tokens: 3_000_000,
-            cache_read_tokens: 30_000_000
+            cache_read_tokens: 30_000_000,
+            role_shares: &[],
         }
     );
+    // the 02-05 real-session budget (user decision 2026-11-15 (나), §2.1 table), copied exactly
+    assert_eq!(
+        budget::BUDGET_0205,
+        Budget {
+            name: "02-05",
+            max_runs: 4,
+            per_run_seconds: 600,
+            total_seconds: 2_400,
+            billable_tokens: 200_000,
+            cache_read_tokens: 2_000_000,
+            role_shares: &[
+                budget::RoleShare {
+                    role: "development",
+                    max_runs: 3,
+                    total_seconds: 1_800,
+                    billable_tokens: 150_000,
+                    cache_read_tokens: 1_500_000,
+                },
+                budget::RoleShare {
+                    role: "guardrail",
+                    max_runs: 1,
+                    total_seconds: 600,
+                    billable_tokens: 50_000,
+                    cache_read_tokens: 500_000,
+                },
+            ],
+        }
+    );
+    // the shares add up to the budget exactly: 3 planned runs + the development spare
+    let b = budget::BUDGET_0205;
+    let sum = |f: fn(&budget::RoleShare) -> u64| b.role_shares.iter().map(f).sum::<u64>();
+    assert_eq!(
+        (
+            sum(|s| s.max_runs),
+            sum(|s| s.total_seconds),
+            sum(|s| s.billable_tokens),
+            sum(|s| s.cache_read_tokens)
+        ),
+        (
+            b.max_runs,
+            b.total_seconds,
+            b.billable_tokens,
+            b.cache_read_tokens
+        )
+    );
+    // by name; nothing else is a budget
+    for (name, want) in [
+        ("02-04", Some(BUDGET_0204)),
+        ("X-02", Some(BUDGET_X02)),
+        ("02-05", Some(budget::BUDGET_0205)),
+        ("01-04", None),
+        ("02-5", None),
+    ] {
+        assert_eq!(budget::named(name), want, "{name}");
+    }
+    // the earlier budgets carry no fixed shares (configured per deployment, unchanged)
+    assert!(BUDGET_0204.approved_share("development").is_none());
 }
 
 #[test]
@@ -988,4 +1047,41 @@ fn an_unreadable_file_outside_the_directive_scope_is_never_opened() {
     )
     .expect("chmod");
     assert!(configdir::observed(d.p()).starts_with("unreadable"));
+}
+
+/// The 02-05 budget's caps as the budget check applies them: 4 runs, 600 s per run, 2,400 s,
+/// 200,000 billable tokens, 2,000,000 cache_read; an unmeasured run is never 0.
+#[test]
+fn the_0205_budget_caps_each_number() {
+    let b = budget::BUDGET_0205;
+    let s = ok_stream();
+    let one = measured(1, 1, 1, 1);
+    // the first run's timeout: 600 s (the window; the guard's grace comes out of it)
+    assert_eq!(
+        budget::next(&b, &[], fresh(&s)),
+        Decision::Start {
+            timeout_seconds: 600
+        }
+    );
+    assert!(!stops(&b, &runs(3, one.clone(), 1000)));
+    assert!(stops(&b, &runs(4, one.clone(), 1000)));
+    // time: 2,400 s in all; the last run gets what is left
+    assert_eq!(
+        budget::next(&b, &[rec(one.clone(), 2_000_000)], fresh(&s)),
+        Decision::Start {
+            timeout_seconds: 400
+        }
+    );
+    assert!(stops(&b, &[rec(one.clone(), 2_400_000)]));
+    // billable 200,000 (input + output + cache_creation; reserve = the largest run)
+    assert!(!stops(&b, &[rec(measured(50_000, 0, 50_000, 0), 1000)]));
+    assert!(stops(&b, &[rec(measured(50_000, 0, 50_001, 0), 1000)]));
+    // cache_read 2,000,000 (its own cap)
+    assert!(!stops(&b, &[rec(measured(0, 0, 0, 1_000_000), 1000)]));
+    assert!(stops(&b, &[rec(measured(0, 0, 0, 1_000_001), 1000)]));
+    // an unmeasured run is never 0: no further call
+    assert!(stops(
+        &b,
+        &[rec(json!({"state": "unmeasured", "reason": "x"}), 1000)]
+    ));
 }

@@ -2136,3 +2136,229 @@ fn a_refused_correction_removes_the_copies_it_made() {
     caller::reevaluate(&p, "d2", &tr, "x").expect("correct");
     assert!(dir.join("agent-c1.jsonl").exists() && dir.join("agent-c2.jsonl").exists());
 }
+
+// --- 02-05 budget (user decision 2026-11-15 (나), §2.1) ---
+
+/// A role service of the 02-05 budget: no share configured, the approved one applies.
+fn service_0205(root: &Path, role: &str) -> Arc<Service> {
+    let r = root.join(role);
+    let etc = r.join("etc");
+    std::fs::create_dir_all(etc.join("template")).expect("etc");
+    std::fs::write(
+        etc.join("template/settings.json"),
+        r#"{"autoMemoryEnabled": false}"#,
+    )
+    .expect("template");
+    let cred = r.join("cred");
+    std::fs::create_dir_all(&cred).expect("cred");
+    std::fs::write(cred.join("oauth_token"), "fake-oauth-token\n").expect("token");
+    std::fs::write(
+        cred.join("adapter.sha256"),
+        hex::encode(Sha256::digest(TOKEN.as_bytes())),
+    )
+    .expect("adapter");
+    let v = json!({"role": role, "repo": "sori", "state": r.join("state"), "etc": etc,
+        "cred": cred, "claude": fake_claude(root), "quota_group_id": "test-shared",
+        "checkpoint_central": "local_only", "budget": "02-05"});
+    Arc::new(Service::new(Config::from_json(&v).expect("config")))
+}
+
+#[test]
+fn the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail() {
+    let _serial = serial();
+    let t = Tmp::new("b0205");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let plan_v = |roles: Value| {
+        json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+               "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+               "roles": roles})
+    };
+    let role = |url: &str, share: Value| {
+        let mut r = json!({"url": url, "adapter_token_file": t.0.join("adapter.token")});
+        if !share.is_null() {
+            r["share"] = share;
+        }
+        r
+    };
+    // the approved shares: omitted, or given exactly; anything else is refused
+    let p = Plan::from_json(&plan_v(json!({
+        "development": role("dev", Value::Null), "guardrail": role("gr", Value::Null)})))
+    .expect("plan");
+    let dev = p.roles["development"].share;
+    let gr = p.roles["guardrail"].share;
+    assert_eq!(
+        (
+            dev.max_runs,
+            dev.total_seconds,
+            dev.billable_tokens,
+            dev.cache_read_tokens
+        ),
+        (3, 1_800, 150_000, 1_500_000)
+    );
+    assert_eq!(
+        (
+            gr.max_runs,
+            gr.total_seconds,
+            gr.billable_tokens,
+            gr.cache_read_tokens
+        ),
+        (1, 600, 50_000, 500_000)
+    );
+    let exact = json!({"max_runs": 3, "total_seconds": 1_800, "billable_tokens": 150_000,
+                       "cache_read_tokens": 1_500_000});
+    assert!(Plan::from_json(&plan_v(json!({"development": role("dev", exact.clone())}))).is_ok());
+    for (k, v) in [
+        ("max_runs", 4),
+        ("total_seconds", 2_400),
+        ("billable_tokens", 150_001),
+        ("cache_read_tokens", 1),
+    ] {
+        let mut more = exact.clone();
+        more[k] = json!(v);
+        let e = Plan::from_json(&plan_v(json!({"development": role("dev", more)})))
+            .expect_err("a share other than the approved one");
+        assert!(e.contains("approved share"), "{k}: {e}");
+    }
+    // the guardrail may not take the development share
+    let e = Plan::from_json(&plan_v(json!({"guardrail": role("gr", exact.clone())})))
+        .expect_err("guardrail with the development share");
+    assert!(e.contains("approved share"), "{e}");
+    // the role services take the approved share too; a configured other one is refused
+    let e = Config::from_json(&json!({"role": "guardrail", "repo": "sori",
+        "state": t.0.join("x"), "etc": t.0.join("x"), "cred": t.0.join("x"), "claude": "x",
+        "quota_group_id": "q", "checkpoint_central": "local_only", "budget": "02-05",
+        "share": {"max_runs": 2, "total_seconds": 600, "billable_tokens": 50_000,
+                  "cache_read_tokens": 500_000}}))
+    .expect_err("a guardrail share of 2 runs");
+    assert!(e.contains("approved share"), "{e}");
+    // the per-run window (timeout + grace) is 600 s; the rooms are the role's shares
+    let l = caller::limits_for(&p, "development", &[]).expect("limits");
+    assert_eq!(
+        (
+            (l.timeout + l.grace).as_secs(),
+            l.billable_room,
+            l.cache_read_room
+        ),
+        (600, 150_000, 1_500_000)
+    );
+    let l = caller::limits_for(&p, "guardrail", &[]).expect("limits");
+    assert_eq!(
+        (
+            (l.timeout + l.grace).as_secs(),
+            l.billable_room,
+            l.cache_read_room
+        ),
+        (600, 50_000, 500_000)
+    );
+    // runs: development 3 (its 2 planned and the spare), then its share refuses the 4th; the
+    // guardrail 1, never retried; 4 in all
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = InProc(m);
+    for (i, attempt) in ["d1", "d2", "d3"].iter().enumerate() {
+        let r = recorded(
+            caller::call(
+                &p,
+                &call_of("development", "start", attempt, &format!("s{i}"), "hi"),
+                &a,
+                POLL,
+            )
+            .expect("call"),
+        );
+        assert_eq!(r["budget"], "02-05", "{r}");
+    }
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d4", "s4", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert!(why.contains("3 of 3 runs"), "{why}");
+    recorded(
+        caller::call(
+            &p,
+            &call_of("guardrail", "start", "g1", "g1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("guardrail", "start", "g2", "g2", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert!(why.contains("4 runs used of 4"), "{why}");
+    // the budget's 4 runs are used: nothing more, for either role
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d5", "s5", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert!(why.contains("4 runs used of 4"), "{why}");
+    // the guardrail's own share: one run, never retried, with budget runs left (a fresh ledger)
+    let t2 = Tmp::new("b0205-gr");
+    std::fs::write(t2.0.join("adapter.token"), TOKEN).expect("tok");
+    let mut v = plan_v(json!({"guardrail": role("gr", Value::Null)}));
+    v["ledger_dir"] = json!(t2.0.join("ledger"));
+    v["roles"]["guardrail"]["adapter_token_file"] = json!(t2.0.join("adapter.token"));
+    let p2 = Plan::from_json(&v).expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("gr".to_string(), service_0205(&t2.0, "guardrail"));
+    let a2 = InProc(m);
+    recorded(
+        caller::call(
+            &p2,
+            &call_of("guardrail", "start", "g1", "g1", "hi"),
+            &a2,
+            POLL,
+        )
+        .expect("call"),
+    );
+    let why = not_started(
+        caller::call(
+            &p2,
+            &call_of("guardrail", "start", "g2", "g2", "hi"),
+            &a2,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert!(why.contains("guardrail: 1 of 1 runs"), "{why}");
+}
+
+#[test]
+fn a_ledger_belongs_to_one_budget() {
+    let _serial = serial();
+    let t = Tmp::new("ledger-budget");
+    let p = plan(&t.0, &[("development", "dev")], Some(&rate("rejected")));
+    // a record of another budget in this budget's ledger: refused, never counted or charged
+    std::fs::create_dir_all(t.0.join("ledger")).expect("ledger");
+    std::fs::write(
+        t.0.join("ledger/records.jsonl"),
+        format!(
+            "{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "x1", "role": "development",
+                   "budget": "02-05", "model_request": true, "duration_ms": 1000,
+                   "usage": {"run": {"state": "measured", "tokens": {"input": 1, "output": 1,
+                             "cache_creation": 1, "cache_read": 1}}}})
+        ),
+    )
+    .expect("record");
+    let e = caller::records(&p).expect_err("another budget's record");
+    assert!(e.contains("one ledger per budget"), "{e}");
+}

@@ -37,6 +37,34 @@ pub struct Budget {
     pub total_seconds: u64,
     pub billable_tokens: u64,
     pub cache_read_tokens: u64,
+    /// The role shares the approval itself fixes (02-05). Empty: the shares are configured per
+    /// deployment within the budget (02-04, X-02).
+    pub role_shares: &'static [RoleShare],
+}
+
+/// One role's share of a budget as the user approved it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoleShare {
+    pub role: &'static str,
+    pub max_runs: u64,
+    pub total_seconds: u64,
+    pub billable_tokens: u64,
+    pub cache_read_tokens: u64,
+}
+
+impl Budget {
+    /// The approved share of `role`, when the approval fixes the shares.
+    pub fn approved_share(&self, role: &str) -> Option<RoleShare> {
+        self.role_shares.iter().find(|s| s.role == role).copied()
+    }
+}
+
+/// The approved budgets by name. Each is its own: no budget's usage counts for another, and
+/// none can be used under another's name.
+pub fn named(name: &str) -> Option<Budget> {
+    [BUDGET_0204, BUDGET_X02, BUDGET_0205]
+        .into_iter()
+        .find(|b| b.name == name)
 }
 
 /// 02-04 real-session acceptance tests.
@@ -47,6 +75,7 @@ pub const BUDGET_0204: Budget = Budget {
     total_seconds: 14_400,
     billable_tokens: 1_500_000,
     cache_read_tokens: 15_000_000,
+    role_shares: &[],
 };
 
 /// X-02 PoC development and review on the Notion test task.
@@ -57,6 +86,39 @@ pub const BUDGET_X02: Budget = Budget {
     total_seconds: 14_400,
     billable_tokens: 3_000_000,
     cache_read_tokens: 30_000_000,
+    role_shares: &[],
+};
+
+/// 02-05 real sessions (step 8 only; user decision 2026-11-15 (나),
+/// docs/poc/User_Decisions_2026-11-15_0205-x08.md §2.1): 3 planned runs (development 2,
+/// Guardrail 1) and 1 spare for development only; 600 s per run (the window: timeout + grace);
+/// 2,400 s in all; billable tokens (input + output + cache_creation) 200,000; cache_read
+/// 2,000,000; additional charge USD 0. The role shares are part of the approval: development 3
+/// runs (its 2 planned and the spare), 1,800 s, 150,000, 1,500,000; Guardrail 1 run (never
+/// retried), 600 s, 50,000, 500,000.
+pub const BUDGET_0205: Budget = Budget {
+    name: "02-05",
+    max_runs: 4,
+    per_run_seconds: 600,
+    total_seconds: 2_400,
+    billable_tokens: 200_000,
+    cache_read_tokens: 2_000_000,
+    role_shares: &[
+        RoleShare {
+            role: "development",
+            max_runs: 3,
+            total_seconds: 1_800,
+            billable_tokens: 150_000,
+            cache_read_tokens: 1_500_000,
+        },
+        RoleShare {
+            role: "guardrail",
+            max_runs: 1,
+            total_seconds: 600,
+            billable_tokens: 50_000,
+            cache_read_tokens: 500_000,
+        },
+    ],
 };
 
 /// Oldest no-overage observation a run may start on (7 days). The account setting it reflects

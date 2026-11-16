@@ -57,10 +57,9 @@ pub struct Plan {
 
 impl Plan {
     pub fn from_json(v: &Value) -> Result<Plan, String> {
-        let budget = match v["budget"].as_str() {
-            Some("02-04") => budget::BUDGET_0204,
-            Some("X-02") => budget::BUDGET_X02,
-            _ => return Err("plan.budget must be 02-04 or X-02".into()),
+        let budget = match v["budget"].as_str().and_then(budget::named) {
+            Some(b) => b,
+            None => return Err("plan.budget must be 02-04, X-02 or 02-05".into()),
         };
         let ledger_dir = v["ledger_dir"]
             .as_str()
@@ -80,11 +79,42 @@ impl Plan {
                     .filter(|x| *x > 0)
                     .ok_or(format!("roles.{name}.share.{k}"))
             };
-            let share = Share {
-                max_runs: f("max_runs")?,
-                total_seconds: f("total_seconds")?,
-                billable_tokens: f("billable_tokens")?,
-                cache_read_tokens: f("cache_read_tokens")?,
+            // a budget whose approval fixes the role shares (02-05): exactly those, never
+            // configured; a share given in the plan must equal them
+            let share = if budget.role_shares.is_empty() {
+                Share {
+                    max_runs: f("max_runs")?,
+                    total_seconds: f("total_seconds")?,
+                    billable_tokens: f("billable_tokens")?,
+                    cache_read_tokens: f("cache_read_tokens")?,
+                }
+            } else {
+                let a = budget.approved_share(name).ok_or(format!(
+                    "roles.{name}: the {} budget approves no share for this role",
+                    budget.name
+                ))?;
+                let approved = Share {
+                    max_runs: a.max_runs,
+                    total_seconds: a.total_seconds,
+                    billable_tokens: a.billable_tokens,
+                    cache_read_tokens: a.cache_read_tokens,
+                };
+                if !sh.is_null() {
+                    let given = Share {
+                        max_runs: f("max_runs")?,
+                        total_seconds: f("total_seconds")?,
+                        billable_tokens: f("billable_tokens")?,
+                        cache_read_tokens: f("cache_read_tokens")?,
+                    };
+                    if given != approved {
+                        return Err(format!(
+                            "roles.{name}.share differs from the {} budget's approved share \
+                             (omit it or give exactly the approved values)",
+                            budget.name
+                        ));
+                    }
+                }
+                approved
             };
             for (s, x) in sum.iter_mut().zip([
                 share.max_runs,
@@ -219,7 +249,22 @@ pub const CORRECTION_FORMAT: &str = "ieo-role-run-correction/v0";
 /// later run, a second correction of one run, a missing or changed file, or any difference
 /// makes the ledger unusable.
 pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
-    effective(raw_records(plan)?)
+    let recs = effective(raw_records(plan)?)?;
+    // one ledger belongs to one budget (02-05 budget PR): a record of another budget is never
+    // counted for, or charged to, this one; the ledger is refused instead (fail closed)
+    if let Some(other) = recs
+        .iter()
+        .filter_map(|r| r["budget"].as_str())
+        .find(|b| *b != plan.budget.name)
+    {
+        return Err(format!(
+            "the ledger {} holds records of the budget {other}, not {}: one ledger per budget \
+             (usage is never transferred)",
+            plan.ledger_dir.display(),
+            plan.budget.name
+        ));
+    }
+    Ok(recs)
 }
 
 fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
