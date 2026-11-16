@@ -112,7 +112,7 @@
 
 ## 5. 변이 시험
 
-각 변이를 하나씩 f7cfb93 코드에 넣고(c9be60f에서도 같은 23개가 모두 잡혔고, 재사용 검사로 옮긴 뒤 다시 돌렸다) 대상 시험을 돌린 뒤 파일을 되돌렸다(매번 `git status` 깨끗, [evidence/mutants.txt](evidence/mutants.txt)). **23개 모두 잡혔다.**
+각 변이를 하나씩 f7cfb93 코드에 넣고(c9be60f에서도 같은 23개가 모두 잡혔고, 재사용 검사로 옮긴 뒤 다시 돌렸다) 대상 시험을 돌린 뒤 파일을 되돌렸다(매번 `git status` 깨끗, [evidence/mutants.txt](evidence/mutants.txt)). **25개 모두 잡혔다.**
 
 | id | 변이 | 잡은 시험 |
 | --- | --- | --- |
@@ -136,6 +136,8 @@
 | S7-G18 | 배정 `branch_ref` 검사를 뺌 | coordinator `branch_heads…` |
 | S7-G19 | `branch_head` ref 검사를 뺌 | 같음 |
 | S7-G20 | SHA가 아닌 ref 파일을 받음 | 단위 `gitref` |
+| S7-G21 | 검사가 not_observed를 mismatch로 보고 | `delivery_e2e` |
+| S7-G22 | 검사가 match를 mismatch로 보고 | `delivery_e2e` |
 | S7-N1 | 목록에 넣지 못한 첫 행동을 보냄(단계 6 C1-L1a) | serve `a_refused_first_action…`(단계 7의 재조회) |
 | S7-N2 | 목록에 넣지 못한 체크포인트 보고를 보냄(C1-L1b) | 같음(새 단계 8. 받기 전 확인 뒤로는 takeover 경로로 닿지 않아 회차 중 경로로 확인) |
 | S7-N3 | `not_sent` 답이 `ok: true`(검토 6e0ad85 I-b의 N3) | 같음 |
@@ -180,5 +182,5 @@
 
 ## 10. 검증 명령과 정리
 
-- 로그: [evidence/test.log](evidence/test.log)(fmt·clippy·openapi·전체 시험, 커밋 f7cfb93), [evidence/mutants.txt](evidence/mutants.txt)(23개).
+- 로그: [evidence/test.log](evidence/test.log)(fmt·clippy·openapi·전체 시험, 커밋 f7cfb93), [evidence/mutants.txt](evidence/mutants.txt)(25개).
 - 시험 DB(55432) 정리: 처음 실패한 `chain_e2e` 실행과 두 차례 변이 실행이 남긴 `ieo_t_chain_*`·`ieo_t_dlv_*` 42개(22개, 그 뒤 20개, 모두 이 작업의 끝난 프로세스)를 이름으로 지웠다. 이 종단 시험들은 실패하면 자기 DB를 지우지 않는다(기존 동작). 끝난 뒤 `ieo_t_*`는 0개다. 55433·58090은 건드리지 않았다.
