@@ -60,6 +60,9 @@ struct Coord {
     port: u16,
     args: Vec<String>,
     db_url: String,
+    /// The delivery bounds (in flight, start deadline) in seconds, set short so the lost-result
+    /// and deadline paths are reached without waiting minutes (`delivery::bounds`).
+    bounds: (u64, u64),
 }
 
 impl Coord {
@@ -67,6 +70,14 @@ impl Coord {
         let child = Command::new(env!("CARGO_BIN_EXE_ieo-coord"))
             .args(&self.args)
             .env("IEO_DB_URL", &self.db_url)
+            .env(
+                "IEO_COORD_DELIVERY_IN_FLIGHT_SECS",
+                self.bounds.0.to_string(),
+            )
+            .env(
+                "IEO_COORD_DELIVERY_START_DEADLINE_SECS",
+                self.bounds.1.to_string(),
+            )
             .stderr(std::process::Stdio::null())
             .spawn()
             .expect("spawn coordinator");
@@ -106,6 +117,8 @@ impl Drop for Coord {
 struct Role {
     _svc: Arc<Mutex<Arc<Service>>>,
     port: u16,
+    /// While set, a start or reconnect is handled at once but answered 3 s later.
+    slow_start: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Role {
@@ -114,6 +127,8 @@ impl Role {
         let server = tiny_http::Server::http("127.0.0.1:0").expect("bind");
         let port = server.server_addr().to_ip().expect("ip").port();
         let h = Arc::clone(&svc);
+        let slow_start = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let slow = Arc::clone(&slow_start);
         std::thread::spawn(move || {
             for mut req in server.incoming_requests() {
                 let bearer = req
@@ -125,13 +140,22 @@ impl Role {
                 let _ = req.as_reader().read_to_end(&mut body);
                 let s = Arc::clone(&h.lock().expect("svc"));
                 let r = s.handle(req.method().as_str(), req.url(), bearer.as_deref(), &body);
+                let launch = req.method().as_str() == "POST"
+                    && (req.url().ends_with("/start") || req.url().ends_with("/reconnect"));
+                if launch && slow.load(std::sync::atomic::Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_secs(3));
+                }
                 let _ = req.respond(
                     tiny_http::Response::from_data(serde_json::to_vec(&r.body).unwrap_or_default())
                         .with_status_code(r.status),
                 );
             }
         });
-        Role { _svc: svc, port }
+        Role {
+            _svc: svc,
+            port,
+            slow_start,
+        }
     }
     fn status(&self) -> Value {
         http(
@@ -323,7 +347,7 @@ fn e2e(transport: &str) {
     let first = dir.join("first-observation.jsonl");
     std::fs::write(&first, "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n").expect("obs");
     let ledger = dir.join("ledger");
-    // the development role's share: 8 runs, 120 billable tokens (a test fixture value, PLAN §3.2
+    // the development role's share: 10 runs, 1,000 billable tokens (a test fixture value, PLAN §3.2
     // step 5: no approved 02-05 budget is wired here); the plan's window is 120 s
     let roles_json = |ledger: &Path| {
         json!({"repo-a": {
@@ -339,8 +363,8 @@ fn e2e(transport: &str) {
             "budget_plan": {"budget": "02-04", "ledger_dir": ledger,
                 "first_observation": {"stream": first, "observed_unix": unix_now()},
                 "roles": {"development": {"max_window_seconds": 120,
-                    "share": {"max_runs": 8, "total_seconds": 9_600,
-                              "billable_tokens": 120, "cache_read_tokens": 10_000_000}},
+                    "share": {"max_runs": 10, "total_seconds": 9_600,
+                              "billable_tokens": 1_000, "cache_read_tokens": 10_000_000}},
                 "guardrail": {"max_window_seconds": 120,
                     "share": {"max_runs": 2, "total_seconds": 4_800,
                               "billable_tokens": 500_000, "cache_read_tokens": 5_000_000}}}}}})
@@ -352,6 +376,7 @@ fn e2e(transport: &str) {
         child: None,
         port,
         db_url: format!("{base} dbname={dbname}"),
+        bounds: (47, 2),
         args: vec![
             "serve".into(),
             "--listen".into(),
@@ -509,7 +534,7 @@ fn e2e(transport: &str) {
     assert_eq!(ch["usage"]["operational_state"], "open");
 
     // 2. the run's limits are the smallest of the assignment's, the budget's and the share's:
-    //    tokens from the assignment (40 < share 120), time from the plan (120 s < 3,600 s)
+    //    tokens from the assignment (40 < share 1,000), time from the plan (120 s < 3,600 s)
     let (st, d1) = deliver("lim-key-0001", &dbody("A1", 0, "a1", "s1", json!({})));
     assert_eq!(
         (st, d1["result"]["outcome"].as_str()),
@@ -668,6 +693,15 @@ fn e2e(transport: &str) {
         "{b}"
     );
     assert_eq!(ch2["usage"]["total_tokens"], 40);
+    // review 1548061 I-2: the chain reads against the configured ledger and says so
+    assert_eq!(
+        (
+            ch2["usage"]["ledger_mismatch"].as_bool(),
+            ch2["usage"]["operational_state"].as_str()
+        ),
+        (Some(true), Some("awaiting_human_decision")),
+        "{ch2}"
+    );
     std::fs::write(dir.join("roles.json"), roles_json(&ledger)).expect("roles");
     coord.stop();
     coord.start();
@@ -763,7 +797,7 @@ fn e2e(transport: &str) {
     );
 
     // 7. the budget smaller than the assignment: a generation without its own limits (the
-    //    revision's 100,000 tokens, 99,940 left) gets the role share's 60 tokens left
+    //    revision's 100,000 tokens, 99,940 left) gets the role share's 940 tokens left
     assert_eq!(
         assign(
             "A1",
@@ -783,7 +817,7 @@ fn e2e(transport: &str) {
         (201, Some("accepted")),
         "{d7}"
     );
-    assert_eq!(d7["result"]["limits"]["billable_room"], 60, "{d7}");
+    assert_eq!(d7["result"]["limits"]["billable_room"], 940, "{d7}");
     role.wait("a7");
     settled("a7");
 
@@ -835,14 +869,204 @@ fn e2e(transport: &str) {
         "{r}"
     );
 
-    // 9. a run that uses up its window is stopped by the guard and is unmeasured: the
-    //    assignment's next delivery stops (never counted as 0)
+    // 8b. review 1548061: the deadline before the call (I-3), and a delivery whose result
+    //     transaction is lost after its call (N-M1). This coordinator runs with short bounds:
+    //     in flight 47 s, start deadline 2 s.
+    let total_before = chain("A1", 4)["usage"]["total_tokens"]
+        .as_u64()
+        .expect("total");
     assert_eq!(
         assign(
             "A1",
             5,
             json!({"assignment_id": "A1", "generation": 4}),
-            json!({"elapsed_seconds": used + 1 + 8})
+            json!({"total_tokens": total_before + 40})
+        )
+        .0,
+        201
+    );
+    // (i) the budget's ledger is busy for 2.5 s: the call would start past the deadline, so
+    //     nothing is called
+    let lock_path = ledger.join("caller.lock");
+    let busy = std::thread::spawn(move || {
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&lock_path)
+            .expect("lock file");
+        f.lock().expect("lock");
+        std::thread::sleep(Duration::from_millis(2_500));
+        drop(f);
+    });
+    std::thread::sleep(Duration::from_millis(200));
+    let (st, dl) = deliver(
+        "lim-key-0020",
+        &dbody("A1", 5, "ad", "s20", json!({"new_session": true})),
+    );
+    busy.join().expect("busy");
+    assert_eq!(
+        (st, dl["result"]["outcome"].as_str()),
+        (201, Some("not_called")),
+        "{dl}"
+    );
+    assert!(
+        dl["result"]["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("start deadline")),
+        "{dl}"
+    );
+    assert!(records().iter().all(|r| r["attempt_id"] != "ad"));
+    // the delivery lock is held from 1.5 s to 16.5 s: the call (answered after 3 s) is made,
+    // and the result's transaction waits past the 10 s statement bound and is rolled back
+    let hold_delivery_lock = || {
+        let mut c2 = cfg.clone();
+        c2.dbname(&dbname);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1_500));
+            let mut holder = c2.connect(NoTls).expect("db");
+            let mut tx = holder.transaction().expect("tx");
+            tx.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended('delivery:repo-a:development', 0))",
+                &[],
+            )
+            .expect("hold");
+            std::thread::sleep(Duration::from_secs(15));
+            tx.rollback().expect("release");
+        })
+    };
+    // (ii) the supervisor accepts aL and runs it; the result is lost
+    let bl = dbody("A1", 5, "aL", "s21", json!({"new_session": true}));
+    role.slow_start
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let h = hold_delivery_lock();
+    let (st, b) = deliver("lim-key-0021", &bl);
+    role.slow_start
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(st, 500, "{b}");
+    assert!(b.to_string().contains("rolled back"), "{b}");
+    h.join().expect("released");
+    role.wait("aL");
+    assert_eq!(settled("aL")["usage"]["run"]["state"], "measured");
+    // (iii) the supervisor refuses aR (no model credential); its result is lost too
+    std::fs::rename(root.join("cred/oauth_token"), root.join("cred/oauth.away")).expect("mv");
+    let br = dbody("A1", 5, "aR", "s21", json!({}));
+    role.slow_start
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let h = hold_delivery_lock();
+    let (st, b) = deliver("lim-key-0022", &br);
+    role.slow_start
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(st, 500, "{b}");
+    h.join().expect("released");
+    std::fs::rename(root.join("cred/oauth.away"), root.join("cred/oauth_token")).expect("mv");
+    assert!(records().iter().all(|r| r["attempt_id"] != "aR"));
+    // while the two are younger than the in-flight bound, nothing is settled for them; past
+    // it, they may have run
+    std::thread::sleep(Duration::from_secs(48));
+    // the replay of aL finds the supervisor's stored answer but no digest: `unknown`
+    let (st, r) = deliver("lim-key-0021", &bl);
+    assert_eq!(
+        (
+            st,
+            r["result"]["outcome"].as_str(),
+            r["result"]["sent_sha256"].clone()
+        ),
+        (200, Some("unknown"), Value::Null),
+        "{r}"
+    );
+    // without aL's ledger record, the `unknown` run is missing: the assignment stops
+    let with_al = std::fs::read_to_string(&rec_path).expect("ledger");
+    let without_al: String = with_al
+        .lines()
+        .filter(|l| !l.contains("\"attempt_id\":\"aL\""))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    std::fs::write(&rec_path, &without_al).expect("partial");
+    refused(
+        "lim-key-0023",
+        &dbody("A1", 5, "x23", "s21", json!({})),
+        "ASSIGNMENT_USAGE_UNMEASURED",
+    );
+    // a record with aL's attempt id under another role is not aL's
+    std::fs::write(
+        &rec_path,
+        format!(
+            "{without_al}{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "aL", "role": "guardrail",
+                   "model_request": false, "reason": "another role's entry"})
+        ),
+    )
+    .expect("other role");
+    refused(
+        "lim-key-0024",
+        &dbody("A1", 5, "x24", "s21", json!({})),
+        "ASSIGNMENT_USAGE_UNMEASURED",
+    );
+    std::fs::write(&rec_path, &with_al).expect("restore");
+    let ch = chain("A1", 5);
+    let st_of = |a: &str| {
+        ch["usage_runs"]
+            .as_array()
+            .expect("runs")
+            .iter()
+            .find(|u| u["attempt_id"] == a)
+            .map(|u| u["state"].as_str().unwrap_or_default().to_string())
+    };
+    assert_eq!(st_of("aR").as_deref(), Some("missing"), "{ch}");
+    // the replay of aR: the supervisor holds no accepted attempt → not_accepted; the missing
+    // row of aR is then closed ("sent nothing") at the next settlement
+    let (st, r) = deliver("lim-key-0022", &br);
+    assert_eq!(
+        (st, r["result"]["outcome"].as_str()),
+        (200, Some("not_accepted")),
+        "{r}"
+    );
+    // aL is charged: 20 of the 40 tokens are left (not 40)
+    let (st, dm) = deliver("lim-key-0025", &dbody("A1", 5, "aM", "s21", json!({})));
+    assert_eq!(
+        (st, dm["result"]["outcome"].as_str()),
+        (201, Some("accepted")),
+        "{dm}"
+    );
+    assert_eq!(dm["result"]["limits"]["billable_room"], 20, "{dm}");
+    role.wait("aM");
+    settled("aM");
+    let ch = chain("A1", 5);
+    let row_of = |a: &str| {
+        ch["usage_runs"]
+            .as_array()
+            .expect("runs")
+            .iter()
+            .find(|u| u["attempt_id"] == a)
+            .cloned()
+            .unwrap_or_default()
+    };
+    assert_eq!(row_of("aL")["state"], "measured", "{ch}");
+    assert_eq!(row_of("aR")["state"], "withdrawn", "{ch}");
+    assert!(
+        row_of("aR")["reason"]
+            .as_str()
+            .is_some_and(|r| r.contains("sent nothing")),
+        "{ch}"
+    );
+    assert_eq!(
+        ch["usage"]["total_tokens"],
+        total_before + 20,
+        "aM not settled yet: {ch}"
+    );
+
+    // 9. a run that uses up its window is stopped by the guard and is unmeasured: the
+    //    assignment's next delivery stops (never counted as 0)
+    let used9: u64 = records()
+        .iter()
+        .filter_map(|r| r["duration_ms"].as_u64())
+        .map(|ms| ms.div_ceil(1000))
+        .sum();
+    assert_eq!(
+        assign(
+            "A1",
+            6,
+            json!({"assignment_id": "A1", "generation": 5}),
+            json!({"elapsed_seconds": used9 + 8})
         )
         .0,
         201
@@ -851,7 +1075,7 @@ fn e2e(transport: &str) {
         "lim-key-0010",
         &dbody(
             "A1",
-            5,
+            6,
             "a10",
             "s10",
             json!({"new_session": true, "prompt": "LATEACT"}),
@@ -868,11 +1092,11 @@ fn e2e(transport: &str) {
     assert_ne!(settled("a10")["usage"]["run"]["state"], "measured");
     let r = refused(
         "lim-key-0011",
-        &dbody("A1", 5, "a11", "s10", json!({})),
+        &dbody("A1", 6, "a11", "s10", json!({})),
         "ASSIGNMENT_USAGE_UNMEASURED",
     );
     assert_eq!(r["usage"]["unmeasured_runs"], 1, "{r}");
-    let ch = chain("A1", 5);
+    let ch = chain("A1", 6);
     assert!(
         ch["usage_runs"]
             .as_array()
@@ -883,12 +1107,14 @@ fn e2e(transport: &str) {
     );
     assert_eq!(ch["usage"]["operational_state"], "awaiting_human_decision");
 
-    // totals: six runs and the busy-ledger delivery (budget_refused); a2 has three rows
-    // (measured, missing, measured again); refusals recorded no delivery
+    // totals: eleven deliveries (eight runs, the busy-ledger budget_refused, the deadline
+    // not_called, the refused aR); usage rows: a2 three (measured, missing, measured), aL two
+    // (missing, measured), aR two (missing, withdrawn), the other runs one each — 13
     let n = counts();
-    assert_eq!((n[1], n[3]), (7, 8), "{n:?}");
-    // A1/1 (tokens, then missing/other ledger), A1/2 (tokens), A1/4 (time), A1/5 (unmeasured)
-    assert_eq!(n[4], 5, "{n:?}");
+    assert_eq!((n[1], n[3]), (11, 13), "{n:?}");
+    // A1/1 (tokens, then missing/other ledger), A1/2 (tokens), A1/4 (time), A1/5 (missing),
+    // A1/6 (unmeasured)
+    assert_eq!(n[4], 6, "{n:?}");
     coord.stop();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = admin.batch_execute(&format!("DROP DATABASE IF EXISTS {dbname} WITH (FORCE)"));

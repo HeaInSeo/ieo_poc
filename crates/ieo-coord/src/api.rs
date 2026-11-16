@@ -547,7 +547,7 @@ pub(crate) fn run_tx(
 /// fe924b7 I-5). A statement past it fails with SQLSTATE 57014 and the operation answers 500
 /// with its transaction rolled back (a multi-statement transaction can take a multiple of it).
 /// deliverAssignment does not rely on this sum for its 120 s in-flight window: it sends its call
-/// only before `delivery::START_DEADLINE` (80 s) and records the result right after it (review
+/// only before its start deadline (75 s, `delivery::bounds`) and records the result right after it (review
 /// 97ff0bc L-2).
 pub const HTTP_STATEMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -677,7 +677,7 @@ pub fn dispatch(
             assignment_id,
             generation,
         } => run(db, &|tx| {
-            crate::chain::assignment_chain(tx, who, assignment_id, generation)
+            crate::chain::assignment_chain(tx, who, &ctx.roles, assignment_id, generation)
         }),
         Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),

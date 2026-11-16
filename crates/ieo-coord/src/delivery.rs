@@ -444,7 +444,7 @@ pub fn deliver(
                 )?
                 .is_some();
             if !replay {
-                crate::limits::settle(tx, repo, role, aid, recs, lid)?;
+                crate::limits::settle(tx, repo, role, aid, recs, lid, bounds().0)?;
             }
             ok(200, json!({}))
         })?;
@@ -593,7 +593,7 @@ pub fn deliver(
     let generation = d["generation"].as_i64().unwrap_or_default();
     let lid = ledger_id.clone().unwrap_or_default();
     let st = run_tx(db, guard, &|tx| {
-        crate::limits::settle(tx, repo, role, &aid, adm.records(), &lid)?;
+        crate::limits::settle(tx, repo, role, &aid, adm.records(), &lid, bounds().0)?;
         ok(200, crate::limits::state(tx, &aid, generation, Some(&lid))?)
     })?;
     if st.status != 200 {
@@ -619,14 +619,15 @@ pub fn deliver(
     }
     // the start is sent only while the call (bounded by the adapter's 30 s) still ends inside
     // the in-flight window a replay waits for (review 97ff0bc L-2): later, nothing is called
-    if begun.elapsed() > START_DEADLINE {
+    let (in_flight, deadline) = bounds();
+    if begun.elapsed() > Duration::from_secs(deadline) {
         drop(adm);
         let mut o = base("not_called");
         o.reasons = json!([format!(
             "the delivery took {} s before its call: past the {} s start deadline (the call must \
-             end inside the {IN_FLIGHT} a replay waits)",
+             end inside the {in_flight} s a replay waits)",
             begun.elapsed().as_secs(),
-            START_DEADLINE.as_secs()
+            deadline
         )]);
         o.op = None;
         return run_tx(db, guard, &|tx| {
@@ -697,16 +698,53 @@ fn choose_op(decision: &str, new_session: bool, judged: &Value) -> Option<&'stat
 }
 
 /// A delivery without a result younger than this is still in flight: a replay answers 409
-/// `DELIVERY_IN_PROGRESS` instead of re-querying.
-const IN_FLIGHT: &str = "120 seconds";
+/// `DELIVERY_IN_PROGRESS` instead of re-querying, and the assignment's settlement leaves it for
+/// later (02-05 step 5).
+pub(crate) const IN_FLIGHT_DEFAULT: u64 = 120;
 
-/// The start or reconnect is sent only this long after the delivery began (review 97ff0bc L-2):
-/// the call is bounded by the adapter's 30 s timeout, and the result is then recorded in one
-/// short transaction (each statement ≤ 10 s on HTTP), so the result exists before a replay
-/// re-queries at 120 s: 80 + 30 + 10 = 120. Everything before the call (the request, the
-/// judgments, the budget check with its status reads, the settlements) only has to fit in
-/// these 80 s; a delivery that does not is recorded as `not_called`.
-const START_DEADLINE: Duration = Duration::from_secs(80);
+/// The start or reconnect is sent only this long after the delivery began (review 97ff0bc L-2,
+/// 1548061 I-3): the call is bounded by the adapter's 30 s timeout and the result is then
+/// recorded in one short transaction (each statement ≤ 10 s on HTTP), with 5 s to spare, so the
+/// result exists before a replay re-queries: 75 + 30 + 10 + 5 = 120. Everything before the call
+/// (the request, the judgments, the budget check with its status reads, the settlements) has
+/// to fit in these 75 s; a delivery that does not is recorded as `not_called`.
+pub(crate) const START_DEADLINE_DEFAULT: u64 = 75;
+
+/// The call and the result's transaction after the start deadline: 30 s + 10 s + 5 s.
+const AFTER_START: u64 = 45;
+
+/// The two bounds in seconds: (in flight, start deadline). The defaults, unless the coordinator
+/// process sets `IEO_COORD_DELIVERY_IN_FLIGHT_SECS` and `IEO_COORD_DELIVERY_START_DEADLINE_SECS`
+/// (meant for tests, to reach these paths without waiting minutes) to values that keep
+/// deadline + 45 ≤ in flight; any other setting is ignored with a message.
+pub(crate) fn bounds() -> (u64, u64) {
+    static B: std::sync::OnceLock<(u64, u64)> = std::sync::OnceLock::new();
+    *B.get_or_init(|| {
+        let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<u64>().ok());
+        let (f, d) = (
+            env("IEO_COORD_DELIVERY_IN_FLIGHT_SECS"),
+            env("IEO_COORD_DELIVERY_START_DEADLINE_SECS"),
+        );
+        let b = checked_bounds(f, d);
+        if (f, d) != (None, None) && b == (IN_FLIGHT_DEFAULT, START_DEADLINE_DEFAULT) {
+            eprintln!(
+                "ieo-coord: delivery bounds {f:?}/{d:?} ignored (both are needed, deadline + \
+                 {AFTER_START} <= in flight): using {IN_FLIGHT_DEFAULT} s / \
+                 {START_DEADLINE_DEFAULT} s"
+            );
+        }
+        b
+    })
+}
+
+/// The bounds a setting gives: both values with deadline ≥ 1 and deadline + 45 ≤ in flight,
+/// else the defaults.
+fn checked_bounds(in_flight: Option<u64>, deadline: Option<u64>) -> (u64, u64) {
+    match (in_flight, deadline) {
+        (Some(f), Some(d)) if d >= 1 && d.saturating_add(AFTER_START) <= f => (f, d),
+        _ => (IN_FLIGHT_DEFAULT, START_DEADLINE_DEFAULT),
+    }
+}
 
 /// The same request again: the stored delivery, or — when its result is `unknown` or was never
 /// written — the supervisor's stored answer for the attempt, recorded as the next result.
@@ -722,11 +760,9 @@ fn replay(
         let mut d = load(tx, id)?;
         let young: bool = tx
             .query_one(
-                &format!(
-                    "SELECT now() - requested_at < interval '{IN_FLIGHT}' FROM role_deliveries
-                     WHERE delivery_id = $1"
-                ),
-                &[&id],
+                "SELECT now() - requested_at < make_interval(secs => $2) FROM role_deliveries
+                 WHERE delivery_id = $1",
+                &[&id, &(bounds().0 as f64)],
             )?
             .get(0);
         d["_young"] = json!(young);
@@ -806,4 +842,25 @@ fn replay(
     run_tx(db, guard, &|tx| {
         record_result(tx, repo, role, id, &o, 200, expect_n)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delivery_bounds_keep_the_call_inside_the_in_flight_window() {
+        // the defaults: 75 + 45 = 120
+        assert_eq!(START_DEADLINE_DEFAULT + AFTER_START, IN_FLIGHT_DEFAULT);
+        assert_eq!(checked_bounds(None, None), (120, 75));
+        assert_eq!(checked_bounds(Some(47), Some(2)), (47, 2));
+        for (f, d) in [
+            (Some(46), Some(2)),
+            (Some(47), Some(0)),
+            (Some(47), None),
+            (None, Some(2)),
+        ] {
+            assert_eq!(checked_bounds(f, d), (120, 75), "{f:?} {d:?}");
+        }
+    }
 }

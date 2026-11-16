@@ -42,7 +42,13 @@ fn need_reader(who: &Caller) -> Result<(), crate::api::Resp> {
 }
 
 /// `getAssignmentChain`.
-pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, gen_s: &str) -> R {
+pub(crate) fn assignment_chain(
+    tx: &mut Transaction,
+    who: &Caller,
+    roles: &Value,
+    aid: &str,
+    gen_s: &str,
+) -> R {
     need_reader(who)?;
     let Some(generation) = gen_s
         .parse::<u64>()
@@ -91,7 +97,10 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
     let sprint = json!({"evidence_level": "verified", "sprint_id": a.get::<_, String>(2),
         "revision": a.get::<_, i64>(3), "digest": a.get::<_, String>(9), "sources": sources});
     // the assignment's limits and what its runs used, all generations (02-05 step 5)
-    let usage = crate::limits::state(tx, aid, g, None)?;
+    // read against the configured ledger: rows of another one show the delivery's refusal
+    // (review 1548061 I-2)
+    let ledger = crate::limits::ledger_id(&roles[&repo]["budget_plan"]);
+    let usage = crate::limits::state(tx, aid, g, ledger.as_deref())?;
     let lim = |k: &str| usage["limits"][k].clone();
     let assignment = json!({"evidence_level": "verified", "assignment_id": aid,
         "generation": generation, "repo_id": repo, "role": role,

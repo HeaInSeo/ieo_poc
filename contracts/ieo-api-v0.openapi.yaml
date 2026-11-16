@@ -19,8 +19,8 @@ info:
     every statement at 10 s (500 after it, that step's transaction rolled back; review fe924b7 I-5);
     deliverAssignment of an assignment with an unmeasured run now answers 409 before recording the request (it was
     recorded with `budget_refused`); an `attempt_id` the budget ledger already holds is 409 `ATTEMPT_ID_CONFLICT`; a
-    delivery that reaches its call more than 80 s after it began calls nothing (`not_called`), so its call ends inside
-    the 120 s a replay waits; `coordinator_record.limits` are the assignment's own limits.
+    delivery that reaches its call more than 75 s after it began calls nothing (`not_called`), so its call and result end
+    inside the 120 s a replay waits (75 + 30 + 10 + 5); `coordinator_record.limits` are the assignment's own limits.
     0.12.0 (02-05 step 4, additive): getAssignmentChain (`GET /v0/coordinator/assignments/{assignment_id}/generations/{generation}/chain`,
     `coordinator:assign` or `roles:control`, HTTP only): sprint revision → assignment → deliveries (verified) → takeovers
     → first actions → checkpoints and tamper events → agent reports and the latest session status (claims). Every
@@ -844,8 +844,9 @@ paths:
         `unknown` when the answer was lost (the budget ledger then asks for a person, as for the host caller).
         An accepted run is finished, measured and charged in the background by the same library.
         02-05 step 5, before the request is recorded: the assignment's runs (all generations) are settled from
-        the budget ledger when no call is running (only deliveries that sent a call, matched by attempt and role;
-        a replay settles nothing), and the delivery is refused with 409 `ASSIGNMENT_USAGE_UNMEASURED` (a run
+        the budget ledger when no call is running (a delivery that may have run — newest result `accepted` or
+        `unknown`, or no result and older than the 120 s in-flight bound — or that sent its call, matched by attempt
+        and role; a replay settles nothing; a missing delivery whose result later shows nothing ran is closed), and the delivery is refused with 409 `ASSIGNMENT_USAGE_UNMEASURED` (a run
         unmeasured; the ledger record of a sent call missing — it keeps its last known counts until a person
         reconciles the ledger, by the record coming back or an entry naming the attempt with `model_request: false`;
         or the runs were settled from another ledger than the configured one) or `ASSIGNMENT_LIMIT_REACHED` (no `total_tokens` room, or the

@@ -41,16 +41,22 @@ pub(crate) fn ledger_id(plan_json: &Value) -> Option<String> {
 /// `assignment_run_usage`, adding a row whenever a delivery's settled state changes (the newest
 /// row by `seq` counts). `recs` are the ledger's effective records read while no call was running
 /// (`caller::records_when_idle` or the budget check's own read under the ledger lock); `ledger` is
-/// that ledger's identity.
+/// that ledger's identity; `in_flight` the age (s) below which a delivery without a result may
+/// still be running its steps.
 ///
-/// * Only a delivery that sent a call (a result with a sent digest) is matched, and only with a
-///   record of the same attempt and role: a refused admission never takes another caller's record
-///   (review 97ff0bc I-2).
+/// * A delivery **may have run** when its newest result is `accepted` or `unknown`, or it has no
+///   result and is older than `in_flight` (its result transaction was lost: review 1548061
+///   N-M1). It **sent its call** when a result carries the sent digest. Only such deliveries are
+///   matched, with a record of the same attempt and role: a delivery that never sent a call
+///   (`budget_refused`, `not_called`) never takes another caller's record (review 97ff0bc I-2).
 /// * A record with `model_request: false` naming the attempt is an explicit entry by a person:
 ///   the run counts nothing (`withdrawn`).
-/// * No record while a call was (or may have been) started (newest result `accepted`/`unknown`),
-///   or a record settled before that is gone now: `missing` — it stops the assignment and keeps
-///   the last known counts. A missing record never lowers consumption (review 97ff0bc M-1).
+/// * No record for a delivery that may have run, or a record settled before that is gone now:
+///   `missing` — it stops the assignment and keeps the last known counts. A missing record never
+///   lowers consumption (review 97ff0bc M-1).
+/// * A `missing` delivery whose newest result later proves nothing ran (`not_accepted`,
+///   `refused`, `budget_refused`, `not_called`) and that has no record is closed (`withdrawn`,
+///   "the delivery sent nothing").
 /// * An empty ledger (no records at all) when rows were settled before says nothing: no row is
 ///   added (a truncated or moved file, a ledger not mounted).
 /// * Rows of another ledger are never continued from this one: nothing is settled and
@@ -62,6 +68,7 @@ pub(crate) fn settle(
     aid: &str,
     recs: &[Value],
     ledger: &str,
+    in_flight: u64,
 ) -> Result<(), Resp> {
     let other: bool = tx
         .query_one(
@@ -85,43 +92,66 @@ pub(crate) fn settle(
                           AND r.sent_sha256 IS NOT NULL),
                 (SELECT outcome FROM role_delivery_results r WHERE r.delivery_id = d.delivery_id
                  ORDER BY n DESC LIMIT 1),
+                now() - d.requested_at > make_interval(secs => $4),
                 u.record_sha256, u.seconds, u.input_tokens, u.output_tokens,
                 u.cache_creation_tokens, u.cache_read_tokens, u.state
          FROM role_deliveries d
          LEFT JOIN LATERAL (SELECT * FROM assignment_run_usage x WHERE x.delivery_id = d.delivery_id
                             ORDER BY x.seq DESC LIMIT 1) u ON true
          WHERE d.assignment_id = $1 AND d.repo_id = $2 AND d.role = $3 ORDER BY d.seq",
-        &[&aid, &repo, &role],
+        &[&aid, &repo, &role, &(in_flight as f64)],
     )?;
     for r in rows {
         let (id, generation, attempt): (String, i64, String) = (r.get(0), r.get(1), r.get(2));
         let sent: bool = r.get(3);
         let outcome: Option<String> = r.get(4);
-        let stored: Option<String> = r.get(5);
-        if !sent {
-            continue;
-        }
-        let rec = recs
-            .iter()
-            .find(|x| x["attempt_id"] == attempt.as_str() && x["role"] == role);
-        let started = matches!(outcome.as_deref(), Some("accepted" | "unknown"));
+        let old: bool = r.get(5);
+        let stored: Option<String> = r.get(6);
+        let stored_state: Option<String> = r.get(12);
+        let may_have_run = match outcome.as_deref() {
+            Some("accepted" | "unknown") => true,
+            None => old,
+            Some(_) => false,
+        };
+        let nothing_ran = matches!(
+            outcome.as_deref(),
+            Some("not_accepted" | "refused" | "budget_refused" | "not_called")
+        );
+        let rec = (may_have_run || sent)
+            .then(|| {
+                recs.iter()
+                    .find(|x| x["attempt_id"] == attempt.as_str() && x["role"] == role)
+            })
+            .flatten();
+        let n = |i: usize| r.get::<_, Option<i64>>(i).map(|x| x.max(0) as u64);
         let row = match rec {
             Some(rec) => usage_of(rec),
-            None if stored.is_some() || started => {
+            None if nothing_ran && stored_state.as_deref() == Some("missing") => Usage {
+                sha: "sent-nothing".into(),
+                state: "withdrawn",
+                seconds: None,
+                tokens: None,
+                reason: Some(format!(
+                    "the delivery sent nothing (its result is {})",
+                    outcome.as_deref().unwrap_or_default()
+                )),
+            },
+            // closed before: stays closed while the result still says nothing ran
+            None if nothing_ran && stored.as_deref() == Some("sent-nothing") => continue,
+            None if may_have_run || stored.is_some() => {
                 // keep the last known counts: a missing record never lowers consumption
-                let n = |i: usize| r.get::<_, Option<i64>>(i).map(|x| x.max(0) as u64);
-                let prev = (n(7), n(8), n(9), n(10));
-                let tokens = match prev {
+                let tokens = match (n(8), n(9), n(10), n(11)) {
                     (Some(a), Some(b), Some(c), Some(d)) => Some([a, b, c, d]),
                     _ => None,
                 };
                 Usage {
                     sha: "missing".into(),
                     state: "missing",
-                    seconds: n(6),
+                    seconds: n(7),
                     tokens,
                     reason: Some(
-                        "the budget ledger has no record of this attempt: a person reconciles                          the ledger (the record back, or an entry naming the attempt)"
+                        "the budget ledger has no record of this attempt: a person reconciles \
+                         the ledger (the record back, or an entry naming the attempt)"
                             .into(),
                     ),
                 }
