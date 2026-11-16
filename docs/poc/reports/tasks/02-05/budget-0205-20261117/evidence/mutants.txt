@@ -1,0 +1,19 @@
+# 02-05 budget PR mutants: each applied alone to the code of 8a4d619 (8d999bd adds one test; A3 was re-run on it after it first survived), then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). N: the approved numbers (user decision 2026-11-15 (나) §2.1); R: the share and ledger rules; A: review d336849 L-a/L-b. Columns: id | mutation | result | target: failing tests
+N1 | 4 runs → 5 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
+N2 | 600 s per run → 601 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
+N3 | 2,400 s → 2,401 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
+N4 | billable 200,000 → 200,001 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+N5 | cache_read 2,000,000 → 2,000,001 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+N6 | development share 3 runs → 4 (the spare twice) | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+N7 | guardrail share 1 run → 2 (a retry) | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+N8 | development share 150,000 → 150,001 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+N9 | guardrail share 600 s → 601 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+R1 | the plan ignores the approved shares | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail
+R2 | the plan accepts a share other than the approved one | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail
+R3 | the role service ignores the approved share | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail
+R5 | a ledger may hold another budget's records | KILLED | ieo-supervisor --test caller: a_ledger_belongs_to_one_budget
+R6 | "02-05" is not a budget name | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+A1 | the recovery use is not bound to the checkpoint taken over (d336849 L-a) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
+A2 | only a takeover phase needs a recovery (d336849 L-b, H3) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
+A3 | the approval assignment/generation is not checked (d336849 L-a) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
+# 17 of 17 killed
