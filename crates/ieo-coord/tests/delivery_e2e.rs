@@ -836,6 +836,8 @@ fn e2e(transport: &str) {
                 )
                 .expect("fixture delivery");
             cp["delivery_id"] = json!(id);
+            // the fixture delivery's attempt is its id (review 5dbb3d8 M-1)
+            cp["attempt_id"] = json!(id);
         }
         let raw = serde_json::to_string_pretty(&cp).expect("j");
         let (st, b) = c(

@@ -4271,6 +4271,8 @@ fn a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation() {
     delivery_row(&e, "D-br", 1, &["budget_refused"]);
     delivery_row(&e, "D-rf", 1, &["accepted", "refused"]);
     delivery_row(&e, "D-na", 1, &["unknown", "not_accepted"]);
+    // a delivery still waiting for its own call (review 5dbb3d8 M-1)
+    delivery_row(&e, "D-wait", 1, &[]);
     let at1 = |delivery: Value| {
         checkpoint(
             1,
@@ -4301,6 +4303,37 @@ fn a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation() {
         (at1(json!("D-br")), 409, "DELIVERY_MISMATCH"),
         (at1(json!("D-rf")), 409, "DELIVERY_MISMATCH"),
         (at1(json!("D-na")), 409, "DELIVERY_MISMATCH"),
+        // the right delivery, but not its call: another attempt, or none (review 5dbb3d8 M-1)
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": "D-wait", "attempt_id": "other"}),
+            ),
+            409,
+            "DELIVERY_MISMATCH",
+        ),
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": "D-wait", "attempt_id": null}),
+            ),
+            409,
+            "DELIVERY_MISMATCH",
+        ),
+        (
+            checkpoint(
+                1,
+                1,
+                &digest,
+                json!({"phase": "takeover", "delivery_id": "D-wait", "attempt_id": 7}),
+            ),
+            400,
+            "SCHEMA_VIOLATION",
+        ),
         // format
         (at1(json!(7)), 400, "SCHEMA_VIOLATION"),
         (at1(json!("")), 400, "SCHEMA_VIOLATION"),
@@ -4564,6 +4597,53 @@ fn a_lost_first_action_report_is_filled_from_the_run_checkpoint() {
         .0,
         201
     );
+    // review 5dbb3d8 L-2, I-2: a first action is filled only for a session whose takeover is
+    // stored and linked to the delivery that called that attempt
+    let before = step4_counts(&e);
+    let fa_x = |attempt: &str| {
+        json!({"attempt_id": attempt, "event_offset": 1, "observed_at": "2026-11-16T01:20:00Z",
+               "kind": "text"})
+    };
+    // (a) a session never taken over (the after_run is current, so it is stored)
+    let a = checkpoint(
+        9,
+        0,
+        &digest,
+        json!({"session_id": "s-none", "first_action": fa_x("att-none")}),
+    );
+    assert_eq!(report(9, &a).0, 201);
+    // (b) a session taken over through d1, with a first action of an attempt d1 did not call
+    let b = checkpoint(
+        10,
+        0,
+        &digest,
+        json!({"delivery_id": d1, "attempt_id": "att-other", "first_action": fa_x("att-other")}),
+    );
+    assert_eq!(report(10, &b).0, 201);
+    // (c) the checkpoint's own attempt differs from the first action's
+    let c = checkpoint(
+        11,
+        0,
+        &digest,
+        json!({"delivery_id": d1, "first_action": fa_x("att-third")}),
+    );
+    assert_eq!(report(11, &c).0, 201);
+    let after = step4_counts(&e);
+    assert_eq!(
+        (after[2].1, after[0].1),
+        (before[2].1, before[0].1 + 3),
+        "three checkpoints, no first action"
+    );
+    let (_, ch) = e.get("operator", CHAIN0);
+    let none = ["att-none", "att-other", "att-third"];
+    assert!(
+        ch["first_actions"]
+            .as_array()
+            .expect("fa")
+            .iter()
+            .all(|f| !none.contains(&f["attempt_id"].as_str().unwrap_or(""))),
+        "{ch}"
+    );
     // a malformed first action is refused with its checkpoint
     let before = step4_counts(&e);
     for bad in [
@@ -4575,9 +4655,9 @@ fn a_lost_first_action_report_is_filled_from_the_run_checkpoint() {
         json!(0),
     ] {
         let (st, b) = report(
-            9,
+            12,
             &checkpoint(
-                9,
+                12,
                 0,
                 &digest,
                 json!({"session_id": "s5", "first_action": bad}),

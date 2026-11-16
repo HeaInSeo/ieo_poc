@@ -13,9 +13,10 @@
 //! sprint revision, the assignment and the deliveries (what it sent, what it judged, what it was
 //! answered). Everything a supervisor or an agent reported — takeovers, first actions,
 //! checkpoints, tamper events, agent reports, session status — is a `claim` (runtime contract
-//! §2.1: the supervisor runs as the model's UID). Every section says which it is. Claims are
-//! never an input of the completion judgment (02-03 `judge` reads GitHub and execution evidence
-//! only): the chain shows them, nothing more.
+//! §2.1: the supervisor runs as the model's UID). Every section says which it is. Claims are not
+//! required inputs of the completion judgment; the only claim it reads is the current
+//! guardrail's `guardrail_review` (G3, policy 0.6.0; step-4 REPORT §1.6). Supervisor claims
+//! (takeovers, first actions, checkpoints, session status) are never judgment inputs.
 
 use crate::api::{R, i64_of, ok, problem};
 use crate::auth::{Caller, Kind};
@@ -188,7 +189,8 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
     let checkpoints: Vec<Value> = tx
         .query(
             "SELECT seq, phase, session_id, checkpoint_sha256, current_assignment, reported_by,
-                    iso(received_at), checkpoint->'delivery_id', checkpoint->'first_action'
+                    iso(received_at), checkpoint->'delivery_id', checkpoint->'first_action',
+                    checkpoint->'attempt_id'
              FROM role_checkpoints WHERE assignment_id = $1 AND generation = $2 ORDER BY seq",
             &[&aid, &g],
         )?
@@ -200,7 +202,8 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
                 "current_assignment": r.get::<_, bool>(4), "reported_by": r.get::<_, String>(5),
                 "received_at": r.get::<_, String>(6),
                 "delivery_id": r.get::<_, Option<Value>>(7).unwrap_or(Value::Null),
-                "first_action": r.get::<_, Option<Value>>(8).unwrap_or(Value::Null)})
+                "first_action": r.get::<_, Option<Value>>(8).unwrap_or(Value::Null),
+                "attempt_id": r.get::<_, Option<Value>>(9).unwrap_or(Value::Null)})
         })
         .collect();
     let tamper_events: Vec<Value> = tx
@@ -277,7 +280,11 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
                 .or_else(|| {
                     checkpoints
                         .iter()
-                        .any(|c| c["delivery_id"] == *id && c["first_action"] == "none")
+                        .any(|c| {
+                            c["delivery_id"] == *id
+                                && c["attempt_id"] == d["attempt_id"]
+                                && c["first_action"] == "none"
+                        })
                         .then(|| json!("none"))
                 })
                 .unwrap_or(Value::Null);

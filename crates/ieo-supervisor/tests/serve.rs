@@ -2341,6 +2341,11 @@ fn checkpoints_carry_the_delivery_and_the_first_action() {
         ),
         (Some("takeover"), Some("D-1"), true)
     );
+    // every checkpoint names the attempt the delivery called (review 5dbb3d8 M-1)
+    assert_eq!(
+        (cp["attempt_id"].as_str(), takeover["attempt_id"].as_str()),
+        (Some("a1"), Some("a1"))
+    );
     let s = svc.status();
     assert!(s["last_actual_action_at"].is_null(), "{s}");
     assert!(s["first_action_report"].is_null(), "{s}");

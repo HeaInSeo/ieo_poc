@@ -1207,6 +1207,8 @@ impl Service {
         // the run's first action — `none` after a run that showed none; not known at takeover
         // or after an error without one
         cp["delivery_id"] = c["delivery_id"].clone();
+        // the attempt (the delivery's call) the run belongs to (review 5dbb3d8 M-1)
+        cp["attempt_id"] = json!(job.attempt);
         cp["first_action"] = match phase {
             "takeover" => Value::Null,
             p => first_action_json(job, p == "after_run"),

@@ -604,6 +604,16 @@ pub fn checkpoint(seq: u64, generation: u64, digest: &str, extra: Value) -> Stri
             c["seq"]
         ));
     }
+    // the attempt the delivery called (review 5dbb3d8 M-1): fixture deliveries use their id as
+    // their attempt id, so a checkpoint naming a delivery names that attempt unless the test
+    // sets `attempt_id` itself
+    if c["delivery_id"].is_string()
+        && !extra
+            .as_object()
+            .is_some_and(|m| m.contains_key("attempt_id"))
+    {
+        c["attempt_id"] = c["delivery_id"].clone();
+    }
     serde_json::to_string_pretty(&c).expect("json")
 }
 

@@ -70,7 +70,7 @@ v0은 supervisor → 코디네이터 방향만 정한다. 코디네이터 → su
 - **검사 순서**: 작업마다 처리 코드가 정하고, gRPC는 같은 처리를 부르므로 순서가 같다. OpenAPI 머리말의 일반 순서(401 → 403/409 → 400 → 409 → 422)와 다른 작업이 있다(main 0779850):
   - `SubmitAgentReport`: 401 → 범위·역할(403) → 본문 파싱(400) → 저장된 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`)·배정 확인(409) → 형식(400)·의미(422). 재조회와 식별 검사가 형식 검사보다 먼저다.
   - `SubmitReproRequest`: 401 → 범위·역할(403) → 본문 파싱(400) → 재조회(200)·내용 충돌·현재 배정(409) → 새 요청만 형식(400 `MISSING_FIELD`·`SCHEMA_VIOLATION`).
-  - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(`seq`·`checkpoint_json`, JSON 파싱, `format`이 `ieo-checkpoint/v0`인지, `seq`가 1 이상이고 체크포인트 자신의 `seq`와 같은지, 모두 400) → 체크포인트의 repo·역할 불일치(409 `REPO_MISMATCH`) → 나머지 체크포인트 필드 형식(400) → 잠금 → 순번·내용 식별(200·409 `EVENT_CONTENT_CONFLICT`·`CHECKPOINT_SEQUENCE_GAP`) → 배정 대조(409) → takeover이면 전달 확인(409 `DELIVERY_REQUIRED`·`DELIVERY_MISMATCH`, 02-05 단계 4) → 저장 → takeover이면 인수 행(같은 트랜잭션, 이미 인수된 전달은 409 `DELIVERY_MISMATCH`로 롤백) → after_run·error의 `first_action`으로 첫 행동 채움 → `config_tamper_detected` 형식(400, 롤백). `delivery_id`·`first_action` 형식(400)은 “나머지 체크포인트 필드 형식”에 든다. 그래서 repo가 다르고 `phase`가 빠진 체크포인트는 400이 아니라 409이고, repo가 다르고 `format`이나 `seq`가 틀린 체크포인트는 400이다.
+  - `ReportCheckpoint`: 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(`seq`·`checkpoint_json`, JSON 파싱, `format`이 `ieo-checkpoint/v0`인지, `seq`가 1 이상이고 체크포인트 자신의 `seq`와 같은지, 모두 400) → 체크포인트의 repo·역할 불일치(409 `REPO_MISMATCH`) → 나머지 체크포인트 필드 형식(400) → 잠금 → 순번·내용 식별(200·409 `EVENT_CONTENT_CONFLICT`·`CHECKPOINT_SEQUENCE_GAP`) → 배정 대조(409) → takeover이면 전달 확인(409 `DELIVERY_REQUIRED`·`DELIVERY_MISMATCH`, 그 전달이 부른 `attempt_id`와 같아야 함, 02-05 단계 4) → 저장 → takeover이면 인수 행(같은 트랜잭션, 이미 인수된 전달은 409 `DELIVERY_MISMATCH`로 롤백) → after_run·error의 `first_action`으로 첫 행동 채움 → `config_tamper_detected` 형식(400, 롤백). `delivery_id`·`attempt_id`·`first_action` 형식(400)은 “나머지 체크포인트 필드 형식”에 든다. 그래서 repo가 다르고 `phase`가 빠진 체크포인트는 400이 아니라 409이고, repo가 다르고 `format`이나 `seq`가 틀린 체크포인트는 400이다.
   - `GetReproRequest`·`GetLatestCheckpoint`: 401 → (`GetLatestCheckpoint`만 역할 이름 404) → 권한(403) → 없음(404).
   - `GetOwnAssignment`(02-05): 401 → 역할 이름(404) → 범위·repo·역할(403) → 현재 배정 없음(404 `NO_CURRENT_ASSIGNMENT`).
   - `RecordFirstAction`(02-05): 401 → 역할 이름(404) → 범위·repo·역할(403) → 본문 형식(400) → 잠금 → 같은 키의 재조회(200)·내용 충돌(409 `EVENT_CONTENT_CONFLICT`) → 그 (repo, role)에 발급된 배정인지(409 `STALE_ASSIGNMENT`) → 그 세션의 takeover 체크포인트가 그 배정·세대로 저장됐는지(409 `CHECKPOINT_MISMATCH`) → 저장.
@@ -311,7 +311,7 @@ v0에는 스트림 RPC가 없다. 지금 supervisor가 구독할 사건이 없�
 
 ## 15. 02-05 단계 4에서 바꾼 문장
 
-02-05 단계 4(인수·첫 행동 연결)는 **proto를 바꾸지 않는다.** takeover의 `delivery_id`와 회차의 `first_action`은 체크포인트 JSON의 필드(런타임 계약 revision 12 §15)라서 `ReportCheckpoint`의 `checkpoint_json` 바이트 안에 실린다. 판단은 HTTP와 같은 `reportCheckpoint` 처리 하나가 한다. 새 거부 코드 `DELIVERY_REQUIRED`·`DELIVERY_MISMATCH`는 409이고, §4.1 대응표의 409 규칙(내용 충돌 코드도, 소유·outbox 충돌 코드도 아니므로)대로 `FAILED_PRECONDITION`이다. 대응표는 바꾸지 않는다. 이제 supervisor가 `RecordFirstAction`을 부른다(단계 2에 이미 있던 RPC, 두 전송 모두).
+02-05 단계 4(인수·첫 행동 연결)는 **proto를 바꾸지 않는다.** takeover의 `delivery_id`·`attempt_id`와 회차의 `first_action`은 체크포인트 JSON의 필드(런타임 계약 revision 12 §15)라서 `ReportCheckpoint`의 `checkpoint_json` 바이트 안에 실린다. 판단은 HTTP와 같은 `reportCheckpoint` 처리 하나가 한다. 새 거부 코드 `DELIVERY_REQUIRED`·`DELIVERY_MISMATCH`는 409이고, §4.1 대응표의 409 규칙(내용 충돌 코드도, 소유·outbox 충돌 코드도 아니므로)대로 `FAILED_PRECONDITION`이다. 대응표는 바꾸지 않는다. 이제 supervisor가 `RecordFirstAction`을 부른다(단계 2에 이미 있던 RPC, 두 전송 모두).
 
 | 절 | 바뀐 내용 | 이유 |
 | --- | --- | --- |
