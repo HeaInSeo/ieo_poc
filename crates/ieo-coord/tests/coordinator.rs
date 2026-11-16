@@ -4673,6 +4673,38 @@ fn a_lost_first_action_report_is_filled_from_the_run_checkpoint() {
         );
     }
     assert_eq!(step4_counts(&e), before);
+    // PR #75 review debf413 L-3: a later checkpoint of ANOTHER attempt that names the delivery
+    // and says `none` is not that delivery's "no first action": the link stays null (not known)
+    let t12 = checkpoint(
+        12,
+        0,
+        &digest,
+        json!({"phase": "takeover", "session_id": "s12"}),
+    );
+    assert_eq!(report(12, &t12).0, 201);
+    let d12 = serde_json::from_str::<Value>(&t12).expect("j")["delivery_id"].clone();
+    let foreign = checkpoint(
+        13,
+        0,
+        &digest,
+        json!({"session_id": "s12", "delivery_id": d12, "attempt_id": "att-foreign",
+               "first_action": "none"}),
+    );
+    assert_eq!(report(13, &foreign).0, 201);
+    let (st, ch) = e.get("operator", CHAIN0);
+    assert_eq!(st, 200, "{ch}");
+    let l12 = ch["links"]
+        .as_array()
+        .expect("links")
+        .iter()
+        .find(|l| l["delivery_id"] == d12)
+        .cloned()
+        .expect("link d12");
+    assert_eq!(
+        (l12["taken_over"].as_bool(), l12["first_action"].clone()),
+        (Some(true), Value::Null),
+        "{l12}"
+    );
 }
 
 #[test]
@@ -4830,7 +4862,8 @@ fn claims_are_kept_apart_from_the_completion_judgment() {
     assert_eq!(st, 200, "{c2}");
     assert_eq!(
         c2["evidence_levels"],
-        json!({"verified": ["sprint", "assignment", "deliveries"],
+        json!({"verified": ["sprint", "assignment", "deliveries", "usage", "usage_runs",
+                            "limit_events"],
                "claim": ["takeovers", "first_actions", "checkpoints", "tamper_events",
                          "agent_reports", "session_status"]})
     );
@@ -4854,4 +4887,41 @@ fn claims_are_kept_apart_from_the_completion_judgment() {
 
 fn report_body(event_id: &str) -> Value {
     report("development", event_id, "A1", 0, "01-01", SHA1)
+}
+
+/// PR #74 review fe924b7 I-5: a statement on the HTTP path is bounded (10 s), advisory-lock
+/// waits included. A checkpoint report queued behind a held lock answers 500 after the bound,
+/// nothing is stored, and the next report goes through once the lock is released.
+#[test]
+fn an_http_statement_waits_at_most_the_statement_timeout() {
+    let Some(e) = start() else { return };
+    let s = ready_sprint(&e, 3);
+    let digest = s["digest"].as_str().expect("digest").to_string();
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    let raw = checkpoint(1, 0, &digest, json!({"phase": "takeover"}));
+    ensure_delivery(&e, raw.as_bytes());
+    let mut holder = e.db();
+    let mut tx = holder.transaction().expect("tx");
+    tx.execute(
+        "SELECT pg_advisory_xact_lock(hashtextextended('checkpoint:repo-a:development', 0))",
+        &[],
+    )
+    .expect("hold");
+    let before = e.counts();
+    let t0 = std::time::Instant::now();
+    let (st, b) = e.post("sup-dev-a", CP, &json!({"seq": 1, "checkpoint_json": raw}));
+    let took = t0.elapsed();
+    assert_eq!(st, 500, "{b}");
+    assert!(b.to_string().contains("statement timeout"), "{b}");
+    assert!(
+        took >= std::time::Duration::from_secs(9) && took < std::time::Duration::from_secs(30),
+        "{took:?}"
+    );
+    assert_eq!(e.counts(), before, "nothing stored");
+    tx.rollback().expect("release");
+    let (st, b) = e.post("sup-dev-a", CP, &json!({"seq": 1, "checkpoint_json": raw}));
+    assert_eq!(st, 201, "{b}");
 }

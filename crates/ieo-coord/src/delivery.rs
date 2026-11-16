@@ -267,6 +267,10 @@ fn record_request(
             "use a new attempt_id",
         ));
     }
+    // 02-05 step 5: the assignment's limits (its finished runs were settled just before); a
+    // refusal rolls this transaction back (nothing recorded)
+    let st = crate::limits::state(tx, &aid, generation)?;
+    crate::limits::room(&st)?;
     let spec: Value = h.get(7);
     let record = json!({"generation": generation, "assignment_id": aid,
         "sprint_id": h.get::<_, String>(4), "sprint_revision": h.get::<_, i64>(5),
@@ -391,9 +395,43 @@ pub fn deliver(
         Ok(x) => x,
         Err(r) => return Ok(r),
     };
+    // the budget ledger's records when no call is running (assignment limits, step 5)
+    let idle = budget_plan(ctx, repo)
+        .ok()
+        .and_then(|p| caller::records_when_idle(&p).ok().flatten());
+    // the finished runs of the named assignment are settled first, in their own transaction:
+    // measured facts, kept whatever the delivery's answer (the refusal itself records nothing
+    // but its limit event)
+    if let (Some(recs), Some(aid)) = (idle.as_deref(), body["assignment_id"].as_str()) {
+        let settled = run_tx(db, guard, &|tx| {
+            crate::limits::settle(tx, repo, role, aid, recs)?;
+            ok(200, json!({}))
+        })?;
+        if settled.status != 200 {
+            return Ok(settled);
+        }
+    }
     let first = run_tx(db, guard, &|tx| {
         record_request(tx, who, repo, role, key, &body, t)
     })?;
+    let limit_refusal = first.status == 409
+        && matches!(
+            first.body["rejections"][0]["code"].as_str(),
+            Some("ASSIGNMENT_LIMIT_REACHED" | "ASSIGNMENT_USAGE_UNMEASURED")
+        );
+    if limit_refusal {
+        // the refusal stays visible as one limit event; nothing else is recorded
+        let generation = body["generation"].as_u64().map_or(0, crate::api::i64_of);
+        let aid = body["assignment_id"].as_str().unwrap_or_default();
+        let ev = run_tx(db, guard, &|tx| {
+            crate::limits::record_event(tx, aid, generation, &first, &who.name)?;
+            ok(200, json!({}))
+        })?;
+        if ev.status != 200 {
+            return Ok(ev);
+        }
+        return Ok(first);
+    }
     match first.status {
         201 => {}
         200 => {
@@ -503,13 +541,31 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     }
-    // the revision's limits bound one run too (the remaining amounts are step 5)
-    if let Err(why) = adm.lower(
-        rec["limits"]["elapsed_seconds"].as_u64(),
-        rec["limits"]["total_tokens"].as_u64(),
-    ) {
+    // the assignment's remaining amounts bound the run (02-05 step 5): settled again from the
+    // records the budget check read under its lock, all generations
+    let aid = d["assignment_id"].as_str().unwrap_or_default().to_string();
+    let generation = d["generation"].as_i64().unwrap_or_default();
+    let st = run_tx(db, guard, &|tx| {
+        crate::limits::settle(tx, repo, role, &aid, adm.records())?;
+        ok(200, crate::limits::state(tx, &aid, generation)?)
+    })?;
+    if st.status != 200 {
         drop(adm);
-        let o = budget_refused(format!("the sprint revision's limits: {why}"));
+        return Ok(st);
+    }
+    let room = crate::limits::room(&st.body).map_err(|r| {
+        r.body["rejections"][0]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string()
+    });
+    let lowered = room.and_then(|(secs, tokens)| {
+        adm.lower(secs, tokens)
+            .map_err(|why| format!("the assignment's remaining limits: {why}"))
+    });
+    if let Err(why) = lowered {
+        drop(adm);
+        let o = budget_refused(format!("assignment limits: {why}"));
         return run_tx(db, guard, &|tx| {
             record_result(tx, repo, role, &id, &o, 201, None)
         });

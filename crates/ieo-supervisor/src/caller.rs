@@ -640,6 +640,33 @@ pub struct Admission {
     before: Value,
 }
 
+/// The ledger's effective records when no call of the budget is running (02-05 step 5): the
+/// ledger lock is free and no in-flight marker exists, so every run started so far has its
+/// record. `Ok(None)` when a call holds the lock or a marker is left (nothing can be said yet);
+/// the lock is taken only for the read, without waiting.
+pub fn records_when_idle(plan: &Plan) -> Result<Option<Vec<Value>>, String> {
+    let path = plan.ledger_dir.join("caller.lock");
+    if !plan.ledger_dir.exists() {
+        // a budget with no call yet: no records
+        return Ok(Some(Vec::new()));
+    }
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(path)
+        .map_err(|e| format!("caller lock: {e}"))?;
+    match lock.try_lock() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => return Ok(None),
+        Err(std::fs::TryLockError::Error(e)) => return Err(format!("caller lock: {e}")),
+    }
+    if inflight_path(plan).exists() {
+        return Ok(None);
+    }
+    records(plan).map(Some)
+}
+
 /// Step 1: the checks before a call (read only apart from the ledger lock). `Ok(Err(why))`: not
 /// admitted, nothing to record; `Err`: the ledger or a service could not be read.
 pub fn admit(
@@ -723,6 +750,13 @@ pub enum Sent {
 }
 
 impl Admission {
+    /// The ledger's effective records as this admission read them (under the ledger lock, no
+    /// call in flight): the authority for what every earlier run of the budget used (02-05
+    /// step 5, assignment-level limits).
+    pub fn records(&self) -> &[Value] {
+        &self.recs
+    }
+
     /// The limits the budget and the role's share allow for this call.
     pub fn limits(&self) -> Limits {
         self.limits

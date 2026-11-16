@@ -259,6 +259,11 @@ CREATE TABLE IF NOT EXISTS exec_exceptions (
 ALTER TABLE exec_exceptions ADD COLUMN IF NOT EXISTS content_digest text;
 ALTER TABLE exec_exceptions ADD COLUMN IF NOT EXISTS page_id text;
 
+-- 02-05 step 5: an assignment generation's limits (the request's, else the revision's; never
+-- above the revision's). NULL for generations issued before the column existed: read as the
+-- revision's limits.
+ALTER TABLE assignments ADD COLUMN IF NOT EXISTS limits jsonb;
+
 -- Append-only history: UPDATE/DELETE on these tables is refused by the database itself.
 CREATE OR REPLACE FUNCTION forbid_change() RETURNS trigger LANGUAGE plpgsql AS
 $$ BEGIN RAISE EXCEPTION 'append-only table %', TG_TABLE_NAME; END $$;
@@ -469,5 +474,56 @@ CREATE OR REPLACE TRIGGER role_takeovers_append_only BEFORE UPDATE OR DELETE ON 
 -- later checkpoint of the same run when the report was lost (02-05 step 4)
 ALTER TABLE role_first_actions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'report'
     CHECK (source IN ('report', 'checkpoint'));
+
+-- 02-05 step 5: what each delivered run used, as the shared budget library measured and charged
+-- it (02-01 meter; resume = cumulative difference; children by transcript) — copied from the
+-- budget ledger's record of the attempt. One row per (delivery, record): a ledger correction by a
+-- person gives the delivery a newer row; the newest row counts. `measured` rows carry the four
+-- token counts; an `unmeasured` run is never counted as 0 (it stops the assignment); a record a
+-- person removed from the ledger gives a `withdrawn` row (the ledger is the authority). The
+-- coordinator's own measurement: verified.
+CREATE TABLE IF NOT EXISTS assignment_run_usage (
+    delivery_id       text        NOT NULL REFERENCES role_deliveries (delivery_id),
+    record_sha256     text        NOT NULL,
+    assignment_id     text        NOT NULL,
+    generation        bigint      NOT NULL,
+    attempt_id        text        NOT NULL,
+    state             text        NOT NULL CHECK (state IN ('measured', 'unmeasured', 'withdrawn')),
+    -- duration_ms rounded up to seconds; NULL when the record has none
+    seconds           bigint      CHECK (seconds >= 0),
+    input_tokens      bigint      CHECK (input_tokens >= 0),
+    output_tokens     bigint      CHECK (output_tokens >= 0),
+    cache_creation_tokens bigint  CHECK (cache_creation_tokens >= 0),
+    cache_read_tokens bigint      CHECK (cache_read_tokens >= 0),
+    reason            text,
+    settled_at        timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (delivery_id, record_sha256),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation),
+    CHECK (state <> 'measured' OR (input_tokens IS NOT NULL AND output_tokens IS NOT NULL
+           AND cache_creation_tokens IS NOT NULL AND cache_read_tokens IS NOT NULL
+           AND seconds IS NOT NULL))
+);
+
+-- A delivery refused because the assignment reached a limit or has an unmeasured run (409, the
+-- delivery itself is not recorded): one row per (generation, code, settled runs), so the
+-- refusal is visible while the operational state is "awaiting a person's decision".
+CREATE TABLE IF NOT EXISTS assignment_limit_events (
+    assignment_id   text        NOT NULL,
+    generation      bigint      NOT NULL,
+    code            text        NOT NULL CHECK (code IN ('ASSIGNMENT_LIMIT_REACHED',
+                                                         'ASSIGNMENT_USAGE_UNMEASURED')),
+    settled_runs    bigint      NOT NULL,
+    usage           jsonb       NOT NULL,
+    reason          text        NOT NULL,
+    requested_by    text        NOT NULL,
+    recorded_at     timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (assignment_id, generation, code, settled_runs),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
+);
+
+CREATE OR REPLACE TRIGGER assignment_run_usage_append_only BEFORE UPDATE OR DELETE ON assignment_run_usage
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+CREATE OR REPLACE TRIGGER assignment_limit_events_append_only BEFORE UPDATE OR DELETE ON assignment_limit_events
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;
