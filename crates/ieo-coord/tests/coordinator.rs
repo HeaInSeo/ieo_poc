@@ -4903,25 +4903,35 @@ fn an_http_statement_waits_at_most_the_statement_timeout() {
     );
     let raw = checkpoint(1, 0, &digest, json!({"phase": "takeover"}));
     ensure_delivery(&e, raw.as_bytes());
+    // the lock is held for 20 s at most: without the bound the report would wait and then be
+    // stored (a failing assertion, not a hang; review 97ff0bc I-5)
+    let (held_tx, held_rx) = std::sync::mpsc::channel();
     let mut holder = e.db();
-    let mut tx = holder.transaction().expect("tx");
-    tx.execute(
-        "SELECT pg_advisory_xact_lock(hashtextextended('checkpoint:repo-a:development', 0))",
-        &[],
-    )
-    .expect("hold");
+    let hold = std::thread::spawn(move || {
+        let mut tx = holder.transaction().expect("tx");
+        tx.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended('checkpoint:repo-a:development', 0))",
+            &[],
+        )
+        .expect("hold");
+        held_tx.send(()).expect("held");
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        tx.rollback().expect("release");
+    });
+    held_rx.recv().expect("held");
     let before = e.counts();
     let t0 = std::time::Instant::now();
     let (st, b) = e.post("sup-dev-a", CP, &json!({"seq": 1, "checkpoint_json": raw}));
     let took = t0.elapsed();
     assert_eq!(st, 500, "{b}");
     assert!(b.to_string().contains("statement timeout"), "{b}");
+    assert!(b.to_string().contains("rolled back"), "{b}");
     assert!(
         took >= std::time::Duration::from_secs(9) && took < std::time::Duration::from_secs(30),
         "{took:?}"
     );
     assert_eq!(e.counts(), before, "nothing stored");
-    tx.rollback().expect("release");
+    hold.join().expect("released");
     let (st, b) = e.post("sup-dev-a", CP, &json!({"seq": 1, "checkpoint_json": raw}));
     assert_eq!(st, 201, "{b}");
 }
