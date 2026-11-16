@@ -9,6 +9,17 @@ const TOKEN: &str = "adapter-token";
 /// A fake role supervisor: `running` until a stop arrives (it then ends after `stop_ms`),
 /// reporting a safe-shutdown block. Records the requests it saw.
 fn fake(name: &'static str, stop_ms: u64, children: Value) -> (String, Arc<Mutex<Vec<String>>>) {
+    fake_with(name, stop_ms, children, json!("not_tracked"), Value::Null)
+}
+
+/// [`fake`] with the role's pending external requests and its `checkpoint_reported`.
+fn fake_with(
+    name: &'static str,
+    stop_ms: u64,
+    children: Value,
+    pending: Value,
+    reported: Value,
+) -> (String, Arc<Mutex<Vec<String>>>) {
     let server = tiny_http::Server::http("127.0.0.1:0").expect("bind");
     let url = format!("http://{}", server.server_addr().to_ip().expect("ip"));
     let seen = Arc::new(Mutex::new(Vec::new()));
@@ -36,7 +47,8 @@ fn fake(name: &'static str, stop_ms: u64, children: Value) -> (String, Arc<Mutex
                 json!({"role": name, "running": if running { json!({"attempt_id": "a1"}) } else { Value::Null },
                        "safe_shutdown": {"running": running, "checkpoint_phase": if running { "takeover" } else { "after_run" },
                                          "checkpoint_saved": !running, "active_children": children,
-                                         "pending_external_requests": "not_tracked"}})
+                                         "pending_external_requests": pending,
+                                         "checkpoint_reported": reported}})
             };
             let _ = req.respond(tiny_http::Response::from_string(body.to_string()));
         }
@@ -329,4 +341,48 @@ fn a_shared_quota_group_carries_a_usage_limit_to_every_member() {
         v["groups"][0]["member_status"][1]["provider_status_or_unknown"], "unknown",
         "{v}"
     );
+}
+
+/// 02-05 step 6: the roles report their pending external requests as lists. A non-empty list is
+/// a reason the stop is not confirmed; an empty one is not, but the children stay untracked
+/// (until 04-05), so the stop is never confirmed (user decision 2026-11-15 item 3).
+#[test]
+fn pending_external_requests_are_reasons_and_untracked_children_keep_a_stop_unconfirmed() {
+    let d = tmp("pending");
+    let (dev, _) = fake_with(
+        "development",
+        50,
+        json!("not_tracked"),
+        json!([{"request_id": "first-action:a1", "kind": "first_action_report",
+                "sent_at": "2026-11-16T00:00:00.000Z", "target": "coordinator recordFirstAction"}]),
+        json!(true),
+    );
+    let (gr, _) = fake_with(
+        "guardrail",
+        50,
+        json!("not_tracked"),
+        json!([]),
+        json!(true),
+    );
+    let r = roles(&dev, &gr, &d);
+    let (st, b) = ieo_coord::roles::stop(
+        &r,
+        "repo-a",
+        Duration::from_secs(5),
+        Duration::from_millis(50),
+    );
+    assert_eq!(st, 200, "{b}");
+    assert_eq!(b["safe_shutdown_confirmed"], false, "{b}");
+    let u: Vec<String> = serde_json::from_value(b["unconfirmed"].clone()).expect("u");
+    assert!(
+        u.iter()
+            .any(|x| x.contains("development: pending_external_requests")
+                && x.contains("first-action:a1")),
+        "{u:?}"
+    );
+    // no external request is pending for the guardrail: only its untracked children remain
+    let gr_reasons: Vec<&String> = u.iter().filter(|x| x.starts_with("guardrail:")).collect();
+    assert_eq!(gr_reasons.len(), 1, "{u:?}");
+    assert!(gr_reasons[0].contains("active_children"), "{u:?}");
+    let _ = std::fs::remove_dir_all(&d);
 }

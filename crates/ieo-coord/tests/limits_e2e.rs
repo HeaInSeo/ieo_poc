@@ -959,6 +959,35 @@ fn e2e(transport: &str) {
     h.join().expect("released");
     std::fs::rename(root.join("cred/oauth.away"), root.join("cred/oauth_token")).expect("mv");
     assert!(records().iter().all(|r| r["attempt_id"] != "aR"));
+    // 02-05 step 6: the repo stop reports the coordinator's two deliveries whose outcome is not
+    // known as pending external requests; the roles' own lists are empty, and the untracked
+    // children keep the stop unconfirmed (user decision 2026-11-15 item 3)
+    let (st, stop) = c(
+        "operator",
+        "POST",
+        "/v0/repos/repo-a/stop",
+        Some(&json!({})),
+    );
+    assert_eq!(st, 200, "{stop}");
+    assert_eq!(stop["safe_shutdown_confirmed"], false, "{stop}");
+    let pend: Vec<String> = stop["coordinator_pending_external_requests"]
+        .as_array()
+        .expect("pending")
+        .iter()
+        .map(|p| p["attempt_id"].as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(
+        pend.contains(&"aL".to_string()) && pend.contains(&"aR".to_string()),
+        "{stop}"
+    );
+    let reasons = stop["unconfirmed"].to_string();
+    assert!(reasons.contains("coordinator: delivery"), "{stop}");
+    assert!(reasons.contains("development: active_children"), "{stop}");
+    assert_eq!(
+        stop["roles"]["development"]["safe_shutdown"]["pending_external_requests"],
+        json!([]),
+        "{stop}"
+    );
     // while the two are younger than the in-flight bound, nothing is settled for them; past
     // it, they may have run
     std::thread::sleep(Duration::from_secs(48));

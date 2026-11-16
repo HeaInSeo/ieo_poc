@@ -86,6 +86,8 @@ fn run() -> Result<(), String> {
             }
             let server = tiny_http::Server::http(&listen).map_err(|e| format!("listen {listen}: {e}"))?;
             eprintln!("ieo-coord listening on {listen}; policy {}", policy.digest);
+            // the delivery bounds, read once (logged when not the defaults)
+            let _ = ieo_coord::delivery::bounds();
             let app = App {
                 ctx: Ctx {
                     policy,

@@ -190,6 +190,10 @@ impl Config {
         let c = args::cwd(&self.role, &self.repo);
         self.state.join(c.trim_start_matches("/state/"))
     }
+    /// The role's pending external requests (02-05 step 6).
+    fn pending_path(&self) -> PathBuf {
+        self.state.join("pending-requests.json")
+    }
     fn role_name(&self) -> &'static str {
         match self.role {
             Role::Development { .. } => "development",
@@ -226,6 +230,8 @@ pub struct Service {
     previous_provider: Value,
     /// Serializes `launch`.
     launch_gate: Mutex<()>,
+    /// The requests sent to the coordinator whose answer is not known (02-05 step 6).
+    pending: crate::pending::Pending,
 }
 
 pub struct Response {
@@ -325,6 +331,7 @@ impl Service {
             .unwrap_or(Value::Null);
         let central_last = Some(rec["last"].clone()).filter(|v| v.is_object());
         let central_accepted = Some(rec["accepted"].clone()).filter(|v| v.is_object());
+        let cfg_pending = cfg.pending_path();
         Service {
             cfg,
             state: Mutex::new(State {
@@ -336,6 +343,7 @@ impl Service {
             restored,
             previous_provider,
             launch_gate: Mutex::new(()),
+            pending: crate::pending::Pending::new(cfg_pending),
         }
     }
 
@@ -462,7 +470,10 @@ impl Service {
             "checkpoint_saved": saved,
             "checkpoint_reported": reported,
             "active_children": "not_tracked",
-            "pending_external_requests": "not_tracked",
+            // the requests sent through this supervisor whose answer is not known (02-05 step
+            // 6); the model's own network requests cannot be observed here
+            "pending_external_requests": self.pending.report(),
+            "direct_network_requests": "not_observable",
         });
         let last = st.last.as_ref();
         // §7 provider status: only what this service observed, and only while fresh; a running
@@ -486,7 +497,7 @@ impl Service {
         );
         let mut gaps = vec![
             "active_children not tracked",
-            "pending_external_requests not tracked",
+            "direct network requests of the model not observable",
             "worktree_head not tracked",
         ];
         if self.cfg.central == crate::central::Central::LocalOnly {
@@ -733,12 +744,35 @@ impl Service {
         {
             self.mark_accepted(n, &crate::central::sha256(&b));
         }
+        // the pending external requests, re-queried (02-05 step 6). A reconnect does not
+        // resume over a request whose outcome is still unknown (runtime contract §5-1, §6):
+        // external reconciliation. A list that cannot be read stops it too.
+        let live = self.requery_pending(central["compared"] == true);
+        if op == "reconnect" {
+            match &live {
+                Ok(l) if l.is_empty() => {}
+                Ok(_) | Err(_) => {
+                    return resp(
+                        409,
+                        json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+                               "reason": "external requests of this role are still pending: their outcome is not known",
+                               "pending_external_requests": self.pending.report()}),
+                    );
+                }
+            }
+        }
         // decide what runs
         let cp_raw = std::fs::read(self.cfg.checkpoint_path());
         let cp = cp_raw
             .as_ref()
             .ok()
             .and_then(|b| serde_json::from_slice::<Value>(b).ok());
+        // the checkpoint's list is what was pending when it was written; the reconnect decision
+        // reads the live list after the re-query above (02-05 step 6)
+        let cp_live = cp.clone().map(|mut c| {
+            c["pending_external_requests"] = json!(live.as_ref().cloned().unwrap_or_default());
+            c
+        });
         let (session_id, resume, tamper) = if op == "start" {
             let Some(sid) = s("session_id").filter(|x| safe_id(x)) else {
                 return err(400, "SCHEMA_VIOLATION", "session_id required");
@@ -805,7 +839,7 @@ impl Service {
                 );
             }
             let observed = crate::configdir::observed(&self.cfg.config_dir());
-            match checkpoint::decide(cp.as_ref(), &record, &observed, running) {
+            match checkpoint::decide(cp_live.as_ref(), &record, &observed, running) {
                 Reconnect::AlreadyRunning { pid } => {
                     return resp(
                         409,
@@ -827,7 +861,12 @@ impl Service {
                 }
                 Reconnect::Resume { session_id } => (session_id, true, None),
                 Reconnect::NewSession | Reconnect::TamperDetected { .. } => {
-                    let detected = match checkpoint::decide(cp.as_ref(), &record, &observed, None) {
+                    let detected = match checkpoint::decide(
+                        cp_live.as_ref(),
+                        &record,
+                        &observed,
+                        None,
+                    ) {
                         Reconnect::TamperDetected {
                             old_session_id,
                             checkpoint_digest,
@@ -1201,6 +1240,9 @@ impl Service {
             pending_external_requests: vec![],
             session_cumulative: Value::Null,
         });
+        // the requests still pending when this checkpoint is written (02-05 step 6, runtime
+        // contract revision 13); its own report is added after
+        let pending_now = self.pending.report();
         let mut cp = cp;
         cp["phase"] = json!(phase);
         // 02-05 step 4 (runtime contract revision 12): the delivery this run belongs to, and
@@ -1213,8 +1255,10 @@ impl Service {
             "takeover" => Value::Null,
             p => first_action_json(job, p == "after_run"),
         };
-        // the empty lists above are not observations: these are not tracked yet (§7 report)
-        cp["tracked"] = json!({"active_children": false, "pending_external_requests": false,
+        cp["pending_external_requests"] = pending_now;
+        cp["direct_network_requests"] = json!("not_observable");
+        // the empty children list is not an observation: not tracked yet (§7 report, 04-05)
+        cp["tracked"] = json!({"active_children": false, "pending_external_requests": true,
                                "worktree_head": false});
         // the resume base (§11 item 7): this run's own result if it wrote one; otherwise, on a
         // resume, the previous base of the same session carried forward with the attempt it
@@ -1283,8 +1327,7 @@ impl Service {
             // coordinator holds exactly it (review accd6c8 M-1r). A clear refusal drops it.
             crate::central::durable_write(&cfg.staged_path(), &bytes)
                 .map_err(|e| format!("staged checkpoint: {e}"))?;
-            let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
-            self.record_report(seq, phase, &answer, &bytes);
+            let answer = self.report_tracked(seq, phase, &bytes);
             let a = match answer {
                 Ok(a) => a,
                 Err(r) => {
@@ -1317,8 +1360,7 @@ impl Service {
             // a later phase that is not accepted stays unreported: the status says so and the
             // next start sends it from the archive or stops for reconciliation
             if central {
-                let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, &bytes);
-                self.record_report(seq, phase, &answer, &bytes);
+                let _ = self.report_tracked(seq, phase, &bytes);
             }
         }
         // a tamper detection is reported once its takeover is recorded (review accd6c8 M-2);
@@ -1557,6 +1599,89 @@ fn first_action_json(job: &Job, ended: bool) -> Value {
 }
 
 impl Service {
+    /// Report one checkpoint to the coordinator as a tracked external request (02-05 step 6): on
+    /// the list before it is sent, off it when the coordinator answers (stored, duplicate, or a
+    /// 4xx refusal). A server error or no answer leaves it for the next re-query.
+    fn report_tracked(
+        &self,
+        seq: u64,
+        phase: &str,
+        bytes: &[u8],
+    ) -> Result<Value, crate::central::Refusal> {
+        let cfg = &self.cfg;
+        let id = format!("checkpoint:{seq}:{}", &crate::central::sha256(bytes)[..12]);
+        let _ = self.pending.add(crate::pending::entry(
+            &id,
+            "checkpoint_report",
+            "coordinator reportCheckpoint",
+            json!({"seq": seq, "phase": phase, "sha256": crate::central::sha256(bytes)}),
+        ));
+        let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, bytes);
+        self.record_report(seq, phase, &answer, bytes);
+        let answered = match &answer {
+            Ok(_) => true,
+            Err(r) => r.body["coordinator_status"]
+                .as_u64()
+                .is_some_and(|c| (400..500).contains(&c)),
+        };
+        if answered {
+            let _ = self.pending.remove(&id);
+        }
+        answer
+    }
+
+    /// Send a first-action report as a tracked external request; removed from the list when the
+    /// coordinator answers (recorded, the same, or a 4xx refusal).
+    fn first_action_tracked(&self, body: &Value) -> Value {
+        if self.cfg.central == crate::central::Central::LocalOnly {
+            // nothing is sent: nothing can be pending
+            return self.cfg.central.record_first_action(
+                &self.cfg.repo,
+                self.cfg.role_name(),
+                body,
+            );
+        }
+        let id = format!(
+            "first-action:{}",
+            body["attempt_id"].as_str().unwrap_or_default()
+        );
+        let _ = self.pending.add(crate::pending::entry(
+            &id,
+            "first_action_report",
+            "coordinator recordFirstAction",
+            json!({"body": body}),
+        ));
+        let r = self
+            .cfg
+            .central
+            .record_first_action(&self.cfg.repo, self.cfg.role_name(), body);
+        let answered = r["ok"] == true
+            || r["status"]
+                .as_u64()
+                .is_some_and(|c| (400..500).contains(&c));
+        if answered {
+            let _ = self.pending.remove(&id);
+        }
+        r
+    }
+
+    /// The re-query before a start or reconnect (02-05 step 6): the central comparison has just
+    /// matched the local checkpoint with the coordinator's record, so every checkpoint report on
+    /// the list is settled (applied, or confirmed not applied and dropped); each first-action
+    /// report is sent again with the same body. Returns what is still pending.
+    fn requery_pending(&self, compared: bool) -> Result<Vec<Value>, String> {
+        if compared {
+            self.pending
+                .remove_where(|e| e["kind"] == "checkpoint_report")?;
+        }
+        for e in self.pending.list()? {
+            if e["kind"] == "first_action_report" {
+                let _ = self.first_action_tracked(&e["detail"]["body"]);
+            }
+        }
+        self.pending.list()
+    }
+
     /// The probe of one run: on its first action, `last_actual_action_at` moves to the
     /// observation and the action is reported to the coordinator from another thread. A failed
     /// report never stops the run; the `after_run` checkpoint carries the same values.
@@ -1574,10 +1699,7 @@ impl Service {
                     Some(json!({"attempt_id": body["attempt_id"], "pending": true}));
             }
             std::thread::spawn(move || {
-                let r = me
-                    .cfg
-                    .central
-                    .record_first_action(&me.cfg.repo, me.cfg.role_name(), &body);
+                let r = me.first_action_tracked(&body);
                 let mut st = me.state.lock().unwrap_or_else(|e| e.into_inner());
                 st.first_action_report = Some(json!({"attempt_id": body["attempt_id"],
                     "pending": false, "result": r}));

@@ -138,7 +138,12 @@ fn routes_resolve_to_their_operations_and_shapes() {
     }
     let shape = |m, p| route(m, p).map(|o| o.shape());
     assert_eq!(shape("GET", "/v0/health"), Some(Shape::Unauthenticated));
-    assert_eq!(shape("POST", "/v0/repos/r/stop"), Some(Shape::NoDatabase));
+    // the repo stop reads the coordinator's pending deliveries after the stops (02-05 step 6)
+    assert_eq!(
+        shape("POST", "/v0/repos/r/stop"),
+        Some(Shape::CallThenTransaction)
+    );
+    assert_eq!(shape("GET", "/v0/repos/r/roles"), Some(Shape::NoDatabase));
     assert_eq!(
         shape("GET", "/v0/repos/r/roles/x/checkpoints/compare"),
         Some(Shape::CallThenTransaction)
