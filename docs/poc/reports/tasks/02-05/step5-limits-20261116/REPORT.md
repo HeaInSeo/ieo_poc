@@ -215,4 +215,3 @@
 | I-5 설계 메모 | 기록 | §7(다시 여는 주체, 옛 세대 연결 조회). S5-M12는 이제 실패로 잡힌다 | S5-M12 |
 
 교정 뒤 결과: fmt·clippy·openapi-spec-validator·`validate_package.py` 통과, `cargo test --workspace --locked` **379 통과, 0 실패**, 변이 23개 중 22개 잡힘(§5).
-
