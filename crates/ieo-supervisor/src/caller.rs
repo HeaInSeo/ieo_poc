@@ -762,7 +762,8 @@ pub fn spare_gate(
         }
         return Err(format!(
             "role {role}: its {} planned runs are used; the spare run needs a marker with a \
-             reason and the failed run it replaces (--spare-reason, --replaces)",
+             person's reason, evidence reference and the failed run it replaces (deliverAssignment \
+             `spare`, a user credential)",
             rule.planned_runs
         ));
     }

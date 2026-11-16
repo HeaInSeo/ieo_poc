@@ -38,6 +38,22 @@ fn main() {
 
 fn run() -> Result<i32, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // a spare run (02-05 budget) is attached only by a person with an authenticated user
+    // credential, through the coordinator's deliverAssignment (user decision 2026-11-17 and its
+    // addition §2; review b38e8df M-1). This host caller has no authenticated identity, so a
+    // self-declared approver is no `kind: user` person: any spare flag is refused before
+    // anything is read or started.
+    if let Some(k) = args.iter().find(|a| {
+        matches!(
+            a.as_str(),
+            "--spare-reason" | "--replaces" | "--evidence-ref" | "--approver"
+        )
+    }) {
+        return Err(format!(
+            "{k}: a spare run is attached only by a person with a user credential through \
+             deliverAssignment; ieo-role-call has no authenticated identity"
+        ));
+    }
     let get = |k: &str| {
         args.iter()
             .position(|a| a == k)
@@ -105,58 +121,6 @@ fn run() -> Result<i32, String> {
             return Err("--recovery-id: 1-64 of [A-Za-z0-9_-]".into());
         }
         extra["recovery_id"] = json!(id);
-    }
-    // a flag's value is the next argument, never another flag (review b38e8df I-2)
-    let flag = |k: &str| {
-        args.iter()
-            .position(|a| a == k)
-            .map(|i| {
-                args.get(i + 1)
-                    .filter(|v| !v.starts_with("--"))
-                    .cloned()
-                    .ok_or(format!("{k} value"))
-            })
-            .transpose()
-    };
-    let spare = [
-        flag("--spare-reason")?,
-        flag("--replaces")?,
-        flag("--evidence-ref")?,
-        flag("--approver")?,
-    ];
-    match spare {
-        [None, None, None, None] => {}
-        [
-            Some(reason),
-            Some(replaces),
-            Some(evidence_ref),
-            Some(approver),
-        ] => {
-            for (k, v, max) in [
-                ("--spare-reason", &reason, 2000),
-                ("--evidence-ref", &evidence_ref, 2000),
-                ("--approver", &approver, 128),
-            ] {
-                if v.trim().is_empty() || v.len() > max {
-                    return Err(format!("{k}: 1-{max} bytes"));
-                }
-            }
-            // the person who approves the spare names themself; this path is inside the trust
-            // boundary (like --recovery-id) and has no authenticated identity: the record says
-            // so and keeps the local user name too (review b38e8df M-1, user decision
-            // 2026-11-17 addition)
-            let host_user = std::env::var("USER").unwrap_or_else(|_| "unknown".into());
-            extra["spare"] = json!({"reason": reason, "replaces": replaces,
-                "evidence_ref": evidence_ref,
-                "by": {"kind": "user", "name": approver, "authenticated": false,
-                       "via": "ieo-role-call", "host_user": host_user},
-                "approved_at": ieo_evidence::time::now()});
-        }
-        _ => {
-            return Err(
-                "--spare-reason, --replaces, --evidence-ref and --approver go together".into(),
-            );
-        }
     }
     match caller::call_with_extra(
         &plan,

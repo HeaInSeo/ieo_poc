@@ -717,8 +717,9 @@ fn the_caller_talks_to_the_service_over_http() {
     assert!(out.contains("recovery_id"), "{out}");
     let (code, out) = cli("d3", "s3", Some("../x"));
     assert_eq!(code, Some(1), "{out}");
-    // the spare flags (02-05 budget, user decision 2026-11-17 (나)): both or neither; this
-    // 02-04 budget has no spare, so the marker is refused before anything starts
+    // the spare flags: the host caller refuses every one of them (a spare is attached only by
+    // a person with a user credential through deliverAssignment; user decision 2026-11-17
+    // addition §2), before anything is read or started
     let spare_cli = |args: &[&str]| {
         let out = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"))
             .arg("--plan")
@@ -741,29 +742,30 @@ fn the_caller_talks_to_the_service_over_http() {
             .expect("ieo-role-call");
         (
             out.status.code(),
-            String::from_utf8_lossy(&out.stdout).to_string(),
+            String::from_utf8_lossy(&out.stdout).to_string()
+                + &String::from_utf8_lossy(&out.stderr),
         )
     };
-    let (code, out) = spare_cli(&["--spare-reason", "env"]);
-    assert_eq!(code, Some(1), "{out}");
-    // the four go together (user decision 2026-11-17, addition: evidence and approver)
-    let (code, out) = spare_cli(&["--spare-reason", "env", "--replaces", "d1"]);
-    assert_eq!(code, Some(1), "{out}");
-    let (code, out) = spare_cli(&[
-        "--spare-reason",
-        "env",
-        "--replaces",
-        "d1",
-        "--evidence-ref",
-        "rep#1",
-        "--approver",
-        "alice",
-    ]);
-    assert_eq!(code, Some(2), "{out}");
-    assert!(
-        out.contains("has no spare run in the 02-04 budget"),
-        "{out}"
-    );
+    for args in [
+        &["--spare-reason", "env"][..],
+        &["--replaces", "d1"],
+        &["--evidence-ref", "rep#1"],
+        &["--approver", "alice"],
+        &[
+            "--spare-reason",
+            "env",
+            "--replaces",
+            "d1",
+            "--evidence-ref",
+            "rep#1",
+            "--approver",
+            "alice",
+        ],
+    ] {
+        let (code, out) = spare_cli(args);
+        assert_eq!(code, Some(1), "{args:?}: {out}");
+        assert!(out.contains("only by a person"), "{args:?}: {out}");
+    }
     let (code, out) = cli("d3", "s3", Some("R-cli-1"));
     assert_eq!(code, Some(0), "{out}");
     let cp: Value = serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("j");
@@ -2767,10 +2769,12 @@ impl Adapter for Seen {
     }
 }
 
-/// Review b38e8df L-2 (H4): `ieo-role-call --spare-reason/--replaces` on a 02-05 plan writes
-/// exactly those values to the spare run's record, with the host operator as who attached it.
+/// User decision 2026-11-17 addition §2 (replaces the review b38e8df L-2 H4 mapping test): on a
+/// 02-05 plan with a failed R1, `ieo-role-call` refuses the spare flags — it has no
+/// authenticated identity — and no spare reaches the ledger through the host path; R1's stop
+/// stays.
 #[test]
-fn ieo_role_call_records_the_spare_marker() {
+fn ieo_role_call_refuses_a_spare_marker() {
     let _serial = serial();
     let t = Tmp::new("b0205-cli");
     std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
@@ -2827,68 +2831,36 @@ fn ieo_role_call_records_the_spare_marker() {
             .expect("ieo-role-call");
         (
             out.status.code(),
-            String::from_utf8_lossy(&out.stdout).to_string(),
+            String::from_utf8_lossy(&out.stdout).to_string()
+                + &String::from_utf8_lossy(&out.stderr),
         )
     };
     let (code, out) = cli("d1", "AUTHFAIL", &[]);
     assert_eq!(code, Some(3), "{out}");
-    // a flag value that is another flag is refused (review b38e8df I-2)
-    let flags = |reason: &str, evidence: &str, approver: &str| {
-        vec![
-            "--spare-reason".to_string(),
-            reason.into(),
-            "--replaces".into(),
-            "d1".into(),
-            "--evidence-ref".into(),
-            evidence.into(),
-            "--approver".into(),
-            approver.into(),
-        ]
-    };
-    let cli_f = |attempt: &str, f: Vec<String>| {
-        let f: Vec<&str> = f.iter().map(String::as_str).collect();
-        cli(attempt, "hi", &f)
-    };
-    let (code, out) = cli("d2", "hi", &["--spare-reason", "--replaces", "d1"]);
+    let before = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
+    let (code, out) = cli(
+        "d2",
+        "hi",
+        &[
+            "--spare-reason",
+            "env defect",
+            "--replaces",
+            "d1",
+            "--evidence-ref",
+            "cause-report#7",
+            "--approver",
+            "alice",
+        ],
+    );
     assert_eq!(code, Some(1), "{out}");
-    // the reason and the evidence reference are capped like the coordinator's (2,000 bytes),
-    // the approver at 128; a flag is no value; blank values are refused
-    let long = "x".repeat(2001);
-    for f in [
-        flags(&long, "rep#1", "alice"),
-        flags("env defect", &long, "alice"),
-        flags("env defect", "rep#1", &"a".repeat(129)),
-        flags("env defect", " ", "alice"),
-        flags("env defect", "rep#1", "--x"),
-    ] {
-        let (code, out) = cli_f("d2", f.clone());
-        assert_eq!(code, Some(1), "{f:?}: {out}");
-    }
-    assert!(
-        !t.0.join("ledger/records.jsonl").exists() || {
-            let l = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("l");
-            !l.contains("\"d2\"")
-        }
-    );
-    let (code, out) = cli_f("d2", flags("env defect", "cause-report#7", "alice"));
-    assert_eq!(code, Some(0), "{out}");
-    let recs = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
-    let d2: Value = recs
-        .lines()
-        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .find(|r| r["attempt_id"] == "d2")
-        .expect("d2 record");
-    let mut spare = d2["spare"].clone();
-    let at = spare["approved_at"].take();
-    assert!(at.as_str().is_some_and(|a| a.ends_with('Z')), "{d2}");
-    assert_eq!(
-        spare,
-        json!({"reason": "env defect", "replaces": "d1", "evidence_ref": "cause-report#7",
-               "by": {"kind": "user", "name": "alice", "authenticated": false,
-                      "via": "ieo-role-call", "host_user": "host-op"},
-               "approved_at": null}),
-        "{d2}"
-    );
+    assert!(out.contains("deliverAssignment"), "{out}");
+    let after = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
+    assert_eq!(before, after, "nothing recorded");
+    assert!(!after.contains("\"spare\":{"), "no spare in the ledger");
+    // without the flags R1's failure still asks for a person
+    let (code, out) = cli("d2", "hi", &[]);
+    assert_eq!(code, Some(2), "{out}");
+    assert!(out.contains("asks for a person"), "{out}");
 }
 
 /// User decision 2026-11-17, addition §3: a marker releases only the named run's stop for its

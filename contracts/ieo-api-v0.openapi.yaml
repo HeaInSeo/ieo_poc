@@ -18,7 +18,8 @@ info:
     overage signal, a failed cleanup, another record that asks for a person and every budget limit keep blocking. The
     marker, with who approved it (`by`: name, kind) and when (`approved_at`, the coordinator's clock), is appended to
     the spare run's budget ledger record; the failed run's record and usage stay. It is not forwarded to the role
-    service.
+    service. This is the only path for a spare: the host caller `ieo-role-call` has no authenticated identity and
+    refuses spare flags.
     0.16.1 (02-05 budget PR; PR #80 review d336849 L-a): reportCheckpoint's `RECOVERY_REQUIRED` check binds the use to
     the checkpoint taken over: the delivery's use must be of that very checkpoint (the latest central sequence) and
     its approval of the reported assignment and generation; a use of another checkpoint is refused (409).
