@@ -3396,6 +3396,53 @@ fn repo_scope_role_control_needs_its_scope_and_reports_unreachable_roles() {
     assert_eq!((st, b["code"].as_str()), (403, Some("SCOPE_DENIED")), "{b}");
 }
 
+#[test]
+fn a_repo_stop_keeps_its_report_when_the_pending_deliveries_cannot_be_read() {
+    // review 1b362ec M-1: the stops are sent before the read; a failed read must not turn the
+    // stop report into a bare 500
+    let Some(env) = start() else { return };
+    let (st, b) = env.post("operator", "/v0/repos/repo-a/stop", &json!({}));
+    assert_eq!(st, 200, "{b}");
+    assert_eq!(b["coordinator_pending_external_requests"], json!([]), "{b}");
+    // every server connection of the test database is cut; the next request of each worker
+    // runs the stops, then its read fails
+    let mut admin = env.db();
+    let mut cut = false;
+    for _ in 0..50 {
+        let (st, b) = {
+            admin
+                .execute(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+                     WHERE datname = $1 AND pid <> pg_backend_pid()",
+                    &[&env.dbname],
+                )
+                .expect("terminate");
+            env.post("operator", "/v0/repos/repo-a/stop", &json!({}))
+        };
+        assert_eq!(st, 200, "the stops ran; the answer must say so: {b}");
+        assert_eq!(b["roles"]["development"]["reachable"], false, "{b}");
+        assert_eq!(b["roles"]["guardrail"]["reachable"], false, "{b}");
+        assert_eq!(b["safe_shutdown_confirmed"], false, "{b}");
+        if b["coordinator_pending_external_requests"] == "unreadable" {
+            let u: Vec<&str> = b["unconfirmed"]
+                .as_array()
+                .expect("unconfirmed")
+                .iter()
+                .filter_map(Value::as_str)
+                .collect();
+            assert_eq!(u.len(), 3, "{b}");
+            assert!(
+                u[2].starts_with("coordinator: pending deliveries could not be read (500 "),
+                "{b}"
+            );
+            cut = true;
+            break;
+        }
+        assert_eq!(b["coordinator_pending_external_requests"], json!([]), "{b}");
+    }
+    assert!(cut, "no stop met a cut connection");
+}
+
 // --- 02-04 decision item 9: the central checkpoint record ---
 
 const CP: &str = "/v0/repos/repo-a/roles/development/checkpoints";

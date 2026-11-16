@@ -607,8 +607,9 @@ pub fn dispatch(
     };
     let run = |db: &mut Client, f: &dyn Fn(&mut Transaction) -> R| run_tx(db, guard, f);
     match op {
-        // repo-scope role control (§7): no database; service and user credentials with
-        // `roles:control`
+        // repo-scope role control (§7), service and user credentials with `roles:control`:
+        // RoleStatus uses no database; RoleStop sends the stops, then reads the repo's
+        // deliveries of unknown outcome in one transaction (02-05 step 6)
         Operation::RoleStatus { repo } | Operation::RoleStop { repo } => {
             if let Err(r) = need_client_scope(who, "roles:control", false) {
                 return Ok(r);
@@ -632,24 +633,42 @@ pub fn dispatch(
                 std::time::Duration::from_millis(250),
             );
             // the coordinator's own external requests of the repo (02-05 step 6): deliveries
-            // whose call's outcome is not known (no result yet, or `unknown`)
-            let pending = run(db, &|tx| ok(200, json!(pending_deliveries(tx, repo)?)))?;
-            if pending.status != 200 {
-                return Ok(pending);
-            }
+            // whose call's outcome is not known (no result yet, or `unknown`). The stops are
+            // already sent: a failed read never replaces the stop report (review 1b362ec M-1);
+            // the list is then "unreadable", a reason says why, and the stop stays unconfirmed.
+            let pending = run(db, &|tx| ok(200, json!(pending_deliveries(tx, repo)?)));
             if status == 200 {
-                for p in pending.body.as_array().into_iter().flatten() {
-                    let why = format!(
-                        "coordinator: delivery {} to {} has no known outcome ({})",
-                        p["request_id"].as_str().unwrap_or_default(),
-                        p["target"].as_str().unwrap_or_default(),
-                        p["state"].as_str().unwrap_or_default()
-                    );
-                    if let Some(u) = body["unconfirmed"].as_array_mut() {
-                        u.push(json!(why));
+                let mut why = Vec::new();
+                match &pending {
+                    Ok(p) if p.status == 200 => {
+                        for d in p.body.as_array().into_iter().flatten() {
+                            why.push(format!(
+                                "coordinator: delivery {} to {} has no known outcome ({})",
+                                d["request_id"].as_str().unwrap_or_default(),
+                                d["target"].as_str().unwrap_or_default(),
+                                d["state"].as_str().unwrap_or_default()
+                            ));
+                        }
+                        body["coordinator_pending_external_requests"] = p.body.clone();
+                    }
+                    failed => {
+                        let cause = match failed {
+                            Ok(p) => format!(
+                                "{} {}",
+                                p.status,
+                                p.body["message"].as_str().unwrap_or_default()
+                            ),
+                            Err(a) => format!("{a:?}"),
+                        };
+                        why.push(format!(
+                            "coordinator: pending deliveries could not be read ({cause})"
+                        ));
+                        body["coordinator_pending_external_requests"] = json!("unreadable");
                     }
                 }
-                body["coordinator_pending_external_requests"] = pending.body.clone();
+                if let Some(u) = body["unconfirmed"].as_array_mut() {
+                    u.extend(why.into_iter().map(Value::from));
+                }
                 body["safe_shutdown_confirmed"] =
                     json!(body["unconfirmed"].as_array().is_some_and(Vec::is_empty));
             }

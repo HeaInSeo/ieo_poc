@@ -1610,12 +1610,23 @@ impl Service {
     ) -> Result<Value, crate::central::Refusal> {
         let cfg = &self.cfg;
         let id = format!("checkpoint:{seq}:{}", &crate::central::sha256(bytes)[..12]);
-        let _ = self.pending.add(crate::pending::entry(
+        // a request that cannot be put on the list is not sent (review 1b362ec L-1): its
+        // outcome stays known (not applied); the next start sends it from the archive
+        if let Err(e) = self.pending.add(crate::pending::entry(
             &id,
             "checkpoint_report",
             "coordinator reportCheckpoint",
             json!({"seq": seq, "phase": phase, "sha256": crate::central::sha256(bytes)}),
-        ));
+        )) {
+            let answer = Err(crate::central::Refusal {
+                status: 503,
+                body: json!({"code": "EXTERNAL_REQUEST_NOT_TRACKED",
+                    "reason": format!("checkpoint report {seq} not sent: it could not be put on \
+                                       the pending external requests list ({e})")}),
+            });
+            self.record_report(seq, phase, &answer, bytes);
+            return answer;
+        }
         let answer = cfg.central.report(&cfg.repo, cfg.role_name(), seq, bytes);
         self.record_report(seq, phase, &answer, bytes);
         let answered = match &answer {
@@ -1645,12 +1656,17 @@ impl Service {
             "first-action:{}",
             body["attempt_id"].as_str().unwrap_or_default()
         );
-        let _ = self.pending.add(crate::pending::entry(
+        // not on the list: not sent (review 1b362ec L-1); an entry already on the list stays
+        if let Err(e) = self.pending.add(crate::pending::entry(
             &id,
             "first_action_report",
             "coordinator recordFirstAction",
             json!({"body": body}),
-        ));
+        )) {
+            return json!({"ok": false, "not_sent": true,
+                          "reason": format!("not sent: it could not be put on the pending \
+                                             external requests list ({e})")});
+        }
         let r = self
             .cfg
             .central

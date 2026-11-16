@@ -17,7 +17,11 @@
 //!
 //! The list lives on the role volume (`/state/pending-requests.json`), so a restarted service
 //! still knows it. A file that cannot be read is reported as `unreadable` and stops a reconnect
-//! (fail closed).
+//! (fail closed). A request that cannot be put on the list is not sent (review 1b362ec L-1).
+//!
+//! **Not an integrity guarantee.** The file is on the role volume and the model runs as the
+//! same UID: development code can change it (the N5 limit of the checkpoint, runtime contract
+//! §2.1). The final resume basis is the coordinator's record and the GitHub comparison.
 
 use serde_json::{Value, json};
 use std::path::PathBuf;

@@ -13,7 +13,9 @@ info:
     stopRepo also reads the coordinator's own deliveries whose outcome is not known (no result, or `unknown`) and
     lists them in `coordinator_pending_external_requests` and as reasons; children stay `not_tracked`, so the stop
     stays unconfirmed. **Behaviour change:** stopRepo now runs one read transaction after the stops (execution shape
-    CallThenTransaction instead of NoDatabase).
+    CallThenTransaction instead of NoDatabase). If that read fails, the stops have still been sent: the answer is the
+    same stop report (200) with `coordinator_pending_external_requests: "unreadable"`, a reason carrying the database
+    error, and `safe_shutdown_confirmed: false` — never a bare error (review 1b362ec M-1).
     0.13.0 (02-05 step 5): assignment-level time and token limits (C7, 02-04 item 1a; user decision 2026-11-16:
     `total_tokens` = input + output + cache_creation, `elapsed_seconds` = the sum of run durations, both over all
     generations of the assignment). issueAssignment takes an optional `limits {elapsed_seconds, total_tokens}`
@@ -582,6 +584,8 @@ paths:
         coordinator reads, in one transaction, the repo's deliveries whose call has no known
         outcome (no result yet, or `unknown`): `coordinator_pending_external_requests` (request id
         = delivery id, kind `delivery`, sent time, target, attempt id, state), each also a reason.
+        If that read fails, the stops were still sent and the same report is returned: the list
+        is `"unreadable"`, a reason carries the database error, and the stop is unconfirmed.
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
       responses:
@@ -598,17 +602,20 @@ paths:
                   safe_shutdown_confirmed: { type: boolean }
                   unconfirmed: { type: array, items: { type: string } }
                   coordinator_pending_external_requests:
-                    type: array
-                    items:
-                      type: object
-                      required: [request_id, kind, sent_at, target, attempt_id, state]
-                      properties:
-                        request_id: { type: string }
-                        kind: { type: string, const: delivery }
-                        sent_at: { type: string, format: date-time }
-                        target: { type: string }
-                        attempt_id: { type: string }
-                        state: { type: string, enum: [no result recorded, result unknown] }
+                    oneOf:
+                      - type: array
+                        items:
+                          type: object
+                          required: [request_id, kind, sent_at, target, attempt_id, state]
+                          properties:
+                            request_id: { type: string }
+                            kind: { type: string, const: delivery }
+                            sent_at: { type: string, format: date-time }
+                            target: { type: string }
+                            attempt_id: { type: string }
+                            state: { type: string, enum: [no result recorded, result unknown] }
+                      - type: string
+                        const: unreadable
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
