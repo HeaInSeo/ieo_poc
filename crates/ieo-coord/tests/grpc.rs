@@ -1991,7 +1991,10 @@ fn a_statement_past_the_deadline_rolls_back_as_deadline_exceeded() {
     );
     let lock = hold_checkpoint_lock(&e);
     let st = g2.raw(&e, Some("sup-dev-a"), &c1, None).expect_err("cap");
+    // the server's own answer, never the transport layer's CANCELLED at the same instant (the
+    // layer is set 1 s past the cap; 02-05 step 7b, a CI flake)
     assert_eq!(st.code(), Code::DeadlineExceeded, "{st:?}");
+    assert!(st.message().contains("rolled back"), "{st:?}");
     release(lock);
     assert_eq!(checkpoints(&e), 0);
     // too little time left: nothing starts

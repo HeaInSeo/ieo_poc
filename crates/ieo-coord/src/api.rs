@@ -4749,10 +4749,17 @@ pub(crate) fn github_head_check(
             r.get::<_, Option<String>>(2),
         )
     });
+    // a checkpoint that names no branch observed no push (runtime contract item 22): its
+    // `pushed_sha`, if any, is not read and the target SHA is expected (review 47e4e3f L-4)
+    let pushed = if checkpoint["branch_ref"].is_string() {
+        checkpoint["pushed_sha"].clone()
+    } else {
+        Value::Null
+    };
     let (d, why, expected) = github_judgment(
         branch.as_deref(),
         &target_sha,
-        &checkpoint["pushed_sha"],
+        &pushed,
         gh_head.as_ref().map(|x| x.1.as_str()),
     );
     // the checkpoint's pushed SHA is the assignment branch's only when the checkpoint names that

@@ -66,6 +66,13 @@ impl Default for GrpcConfig {
 /// (tonic's own timeout layer drops the call at the deadline itself and answers CANCELLED).
 pub const ANSWER_MARGIN: Duration = Duration::from_millis(50);
 
+/// tonic's timeout layer is set this much past the server's own cap (02-05 step 7b, the flaky
+/// grpc.rs `a_statement_past_the_deadline_rolls_back_as_deadline_exceeded`): without a client
+/// deadline the server's cap is its work deadline, and its own `DEADLINE_EXCEEDED` answer must
+/// not race the layer's `CANCELLED` at the same instant. A client deadline (`grpc-timeout`) still
+/// cuts the call at that deadline.
+pub const TRANSPORT_SLACK: Duration = Duration::from_secs(1);
+
 // ---------------------------------------------------------------------------
 // Worker pool
 // ---------------------------------------------------------------------------
@@ -633,7 +640,7 @@ impl GrpcServer {
                     .max_decoding_message_size(ieo_proto::MAX_MESSAGE)
                     .max_encoding_message_size(ieo_proto::MAX_MESSAGE);
                 let r = tonic::transport::Server::builder()
-                    .timeout(cfg.max_deadline)
+                    .timeout(cfg.max_deadline + TRANSPORT_SLACK)
                     .add_service(health)
                     .add_service(server)
                     .serve_with_incoming_shutdown(incoming, async {
