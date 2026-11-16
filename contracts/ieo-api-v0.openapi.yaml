@@ -1,12 +1,17 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.16.1
+  version: 0.17.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.17.0 (02-05 budget PR, additive; user decisions 2026-11-15 (나) and 2026-11-17 (나)): deliverAssignment takes an
+    optional `spare` {reason, replaces}: the 02-05 budget's one development spare run. The shared budget check decides
+    (outcome `budget_refused` with the reason otherwise): development runs its 2 planned runs without a marker; a spare
+    names an earlier failed development run of the budget; one spare; none for the guardrail or another budget. The
+    marker is written to the run's budget ledger record.
     0.16.1 (02-05 budget PR; PR #80 review d336849 L-a): reportCheckpoint's `RECOVERY_REQUIRED` check binds the use to
     the checkpoint taken over: the delivery's use must be of that very checkpoint (the latest central sequence) and
     its approval of the reported assignment and generation; a use of another checkpoint is refused (409).
@@ -976,6 +981,17 @@ paths:
                 prompt: { type: string, minLength: 1, maxLength: 65536 }
                 logical_name: { type: string, minLength: 1, maxLength: 128 }
                 new_session: { type: boolean, default: false }
+                spare:
+                  description: |
+                    0.17.0 (02-05 budget PR, user decision 2026-11-17 (나)): the 02-05 budget's spare run — a reason
+                    and the attempt id of the earlier failed development run it replaces. The shared budget check
+                    decides; refused → `budget_refused`.
+                  type: object
+                  additionalProperties: false
+                  required: [reason, replaces]
+                  properties:
+                    reason: { type: string, minLength: 1, maxLength: 2000 }
+                    replaces: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$' }
                 recovery_id:
                   description: |
                     0.16.0 (02-05 step 7b): an approved recovery (approveRecovery). Checked again at use (the

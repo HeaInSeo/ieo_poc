@@ -1127,6 +1127,41 @@ fn e2e(transport: &str) {
             .is_some_and(|r| r.contains("4 of 4 runs")),
         "{d}"
     );
+    // the 02-05 spare marker travels in the delivery body to the shared budget check (user
+    // decision 2026-11-17 (나)): a malformed one is refused; this 02-04 budget has no spare
+    for bad in [
+        json!({"reason": "x"}),
+        json!({"reason": "", "replaces": "a7"}),
+        json!({"reason": "x", "replaces": "a/7"}),
+        json!({"reason": "x", "replaces": "a7", "more": 1}),
+    ] {
+        let (st, b) = deliver(
+            "operator",
+            "dlv-key-0080",
+            "development",
+            &dbody("a80", 1, "s2", json!({"spare": bad})),
+        );
+        assert_eq!(st, 400, "{b}");
+    }
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0081",
+        "development",
+        &dbody(
+            "a81",
+            1,
+            "s2",
+            json!({"spare": {"reason": "env defect", "replaces": "a7"}}),
+        ),
+    );
+    assert_eq!(st, 201, "{d}");
+    assert_eq!(d["result"]["outcome"], "budget_refused", "{d}");
+    assert!(
+        d["result"]["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("has no spare run in the 02-04 budget")),
+        "{d}"
+    );
     assert_eq!(launches(), n, "a budget refusal calls nothing");
 
     // 9. the coordinator restarts with a larger share: the stored deliveries and the judgment
@@ -1384,12 +1419,12 @@ fn e2e(transport: &str) {
     assert_eq!(runs(), 5);
     // 20 deliveries (the 21st is refused unrecorded, 02-05 step 5; two are step 7's gated new
     // sessions) and the fixture of step 7's crafted takeover (02-05 step 4)
-    assert_eq!(count("role_deliveries"), 21);
+    assert_eq!(count("role_deliveries"), 22);
     // each run that started reported its takeover and after_run; refusals reported nothing
     assert_eq!(count("role_checkpoints"), 12);
     // every takeover is linked to its delivery: the five runs and step 7's (02-05 step 4)
     assert_eq!(count("role_takeovers"), 6);
-    assert_eq!(count("role_delivery_results"), 23);
+    assert_eq!(count("role_delivery_results"), 24);
     let n: i64 = db
         .query_one(
             "SELECT count(*) FROM role_delivery_results WHERE outcome = 'accepted'",

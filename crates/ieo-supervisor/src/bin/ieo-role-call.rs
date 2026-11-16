@@ -1,9 +1,11 @@
 //! `ieo-role-call --plan <plan.json> --task <id> --role <role> --op start|reconnect
-//!  --attempt <id> --session <id> --prompt-file <f> --coordinator-file <f> [--recovery-id <id>]`
+//!  --attempt <id> --session <id> --prompt-file <f> --coordinator-file <f> [--recovery-id <id>]
+//!  [--spare-reason <text> --replaces <attempt>]`
 //!
 //! One budgeted call to a role service (see `ieo_supervisor::caller`). `--recovery-id`: a start
 //! over a run that did not finish carries a person's recovery id (02-05 step 7b; the service
-//! refuses such a start without one). Prints a summary
+//! refuses such a start without one). `--spare-reason`/`--replaces`: the 02-05 budget's spare
+//! run (user decision 2026-11-17 (나)), both or neither; the shared budget check decides. Prints a summary
 //! without secrets. Exit 0: recorded, nothing to look at; 2: nothing started (refused or held);
 //! 3: recorded with `stop_required`; 1: an error (bad arguments, or a failure the caller could
 //! not record — its in-flight marker then blocks every further call). **Anything but 0 or 2
@@ -103,6 +105,19 @@ fn run() -> Result<i32, String> {
             return Err("--recovery-id: 1-64 of [A-Za-z0-9_-]".into());
         }
         extra["recovery_id"] = json!(id);
+    }
+    let flag = |k: &str| {
+        args.iter()
+            .position(|a| a == k)
+            .map(|i| args.get(i + 1).cloned().ok_or(format!("{k} value")))
+            .transpose()
+    };
+    match (flag("--spare-reason")?, flag("--replaces")?) {
+        (None, None) => {}
+        (Some(reason), Some(replaces)) => {
+            extra["spare"] = json!({"reason": reason, "replaces": replaces});
+        }
+        _ => return Err("--spare-reason and --replaces go together".into()),
     }
     match caller::call_with_extra(
         &plan,

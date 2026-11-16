@@ -40,6 +40,18 @@ pub struct Budget {
     /// The role shares the approval itself fixes (02-05). Empty: the shares are configured per
     /// deployment within the budget (02-04, X-02).
     pub role_shares: &'static [RoleShare],
+    /// The approval's spare run, if any (02-05: one, development only).
+    pub spare: Option<SpareRule>,
+}
+
+/// A spare run (user decision 2026-11-17 (나), docs/poc/User_Decisions_2026-11-17_spare.md):
+/// the role's run after its `planned_runs` needs an explicit spare marker (a reason and the
+/// earlier failed run of this role and budget it replaces); one spare only; no other role has
+/// one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpareRule {
+    pub role: &'static str,
+    pub planned_runs: u64,
 }
 
 /// One role's share of a budget as the user approved it.
@@ -76,6 +88,7 @@ pub const BUDGET_0204: Budget = Budget {
     billable_tokens: 1_500_000,
     cache_read_tokens: 15_000_000,
     role_shares: &[],
+    spare: None,
 };
 
 /// X-02 PoC development and review on the Notion test task.
@@ -87,6 +100,7 @@ pub const BUDGET_X02: Budget = Budget {
     billable_tokens: 3_000_000,
     cache_read_tokens: 30_000_000,
     role_shares: &[],
+    spare: None,
 };
 
 /// 02-05 real sessions (step 8 only; user decision 2026-11-15 (나),
@@ -119,6 +133,11 @@ pub const BUDGET_0205: Budget = Budget {
             cache_read_tokens: 500_000,
         },
     ],
+    // the third development run is the spare (decision 2026-11-17 (나)); Guardrail has none
+    spare: Some(SpareRule {
+        role: "development",
+        planned_runs: 2,
+    }),
 };
 
 /// Oldest no-overage observation a run may start on (7 days). The account setting it reflects

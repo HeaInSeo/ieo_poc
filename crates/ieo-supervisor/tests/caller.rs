@@ -709,6 +709,41 @@ fn the_caller_talks_to_the_service_over_http() {
     assert!(out.contains("recovery_id"), "{out}");
     let (code, out) = cli("d3", "s3", Some("../x"));
     assert_eq!(code, Some(1), "{out}");
+    // the spare flags (02-05 budget, user decision 2026-11-17 (나)): both or neither; this
+    // 02-04 budget has no spare, so the marker is refused before anything starts
+    let spare_cli = |args: &[&str]| {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"))
+            .arg("--plan")
+            .arg(t.0.join("plan.json"))
+            .args(["--task", "02-04", "--role", "development", "--op", "start"])
+            .args([
+                "--attempt",
+                "d3",
+                "--session",
+                "s3",
+                "--recovery-id",
+                "R-cli-1",
+            ])
+            .arg("--prompt-file")
+            .arg(t.0.join("prompt.txt"))
+            .arg("--coordinator-file")
+            .arg(t.0.join("coordinator.json"))
+            .args(args)
+            .output()
+            .expect("ieo-role-call");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout).to_string(),
+        )
+    };
+    let (code, out) = spare_cli(&["--spare-reason", "env"]);
+    assert_eq!(code, Some(1), "{out}");
+    let (code, out) = spare_cli(&["--spare-reason", "env", "--replaces", "d1"]);
+    assert_eq!(code, Some(2), "{out}");
+    assert!(
+        out.contains("has no spare run in the 02-04 budget"),
+        "{out}"
+    );
     let (code, out) = cli("d3", "s3", Some("R-cli-1"));
     assert_eq!(code, Some(0), "{out}");
     let cp: Value = serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("j");
@@ -2252,13 +2287,13 @@ fn the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail() {
         ),
         (600, 50_000, 500_000)
     );
-    // runs: development 3 (its 2 planned and the spare), then its share refuses the 4th; the
-    // guardrail 1, never retried; 4 in all
+    // runs: development its 2 planned runs, then without a spare marker no 3rd (user decision
+    // 2026-11-17 (나)); the guardrail 1, never retried
     let mut m = BTreeMap::new();
     m.insert("dev".to_string(), service_0205(&t.0, "development"));
     m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
     let a = InProc(m);
-    for (i, attempt) in ["d1", "d2", "d3"].iter().enumerate() {
+    for (i, attempt) in ["d1", "d2"].iter().enumerate() {
         let r = recorded(
             caller::call(
                 &p,
@@ -2273,13 +2308,13 @@ fn the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail() {
     let why = not_started(
         caller::call(
             &p,
-            &call_of("development", "start", "d4", "s4", "hi"),
+            &call_of("development", "start", "d3", "s3", "hi"),
             &a,
             POLL,
         )
         .expect("call"),
     );
-    assert!(why.contains("3 of 3 runs"), "{why}");
+    assert!(why.contains("planned runs are used"), "{why}");
     recorded(
         caller::call(
             &p,
@@ -2298,18 +2333,7 @@ fn the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail() {
         )
         .expect("call"),
     );
-    assert!(why.contains("4 runs used of 4"), "{why}");
-    // the budget's 4 runs are used: nothing more, for either role
-    let why = not_started(
-        caller::call(
-            &p,
-            &call_of("development", "start", "d5", "s5", "hi"),
-            &a,
-            POLL,
-        )
-        .expect("call"),
-    );
-    assert!(why.contains("4 runs used of 4"), "{why}");
+    assert!(why.contains("guardrail: 1 of 1 runs"), "{why}");
     // the guardrail's own share: one run, never retried, with budget runs left (a fresh ledger)
     let t2 = Tmp::new("b0205-gr");
     std::fs::write(t2.0.join("adapter.token"), TOKEN).expect("tok");
@@ -2361,4 +2385,129 @@ fn a_ledger_belongs_to_one_budget() {
     .expect("record");
     let e = caller::records(&p).expect_err("another budget's record");
     assert!(e.contains("one ledger per budget"), "{e}");
+}
+
+/// The 02-05 spare run (user decision 2026-11-17 (나)): a marker with a reason and the replaced
+/// attempt, which must be an earlier failed development run of this budget; one spare only;
+/// never for the guardrail; the marker is written to the run's record.
+#[test]
+fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = InProc(m);
+    let spare =
+        |reason: &str, replaces: &str| json!({"spare": {"reason": reason, "replaces": replaces}});
+    let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    // R1 succeeds; a spare that replaces it is refused (it did not fail)
+    recorded(call("development", "d1", "hi", json!({})));
+    let why = not_started(call("development", "x1", "hi", spare("env", "d1")));
+    assert!(why.contains("did not fail"), "{why}");
+    // G1; the guardrail has no spare
+    recorded(call("guardrail", "g1", "hi", json!({})));
+    let why = not_started(call("guardrail", "x2", "hi", spare("env", "d1")));
+    assert!(why.contains("has no spare"), "{why}");
+    // R2 fails (an error result: a record that asks for a person)
+    let r2 = recorded(call("development", "d2", "AUTHFAIL", json!({})));
+    assert_eq!(r2["stop_required"], true, "{r2}");
+    // no marker: development stops at its 2 planned runs
+    let why = not_started(call("development", "x3", "hi", json!({})));
+    assert!(why.contains("planned runs are used"), "{why}");
+    // a marker naming the guardrail's run, an unknown attempt, or without a reason: refused
+    for (extra, want) in [
+        (spare("env", "g1"), "is not a development run"),
+        (spare("env", "nope"), "0 found"),
+        (
+            json!({"spare": {"reason": " ", "replaces": "d2"}}),
+            "needs a reason",
+        ),
+        (json!({"spare": {"reason": "env"}}), "needs a reason"),
+    ] {
+        let why = not_started(call("development", "x4", "hi", extra.clone()));
+        assert!(why.contains(want), "{extra}: {why}");
+    }
+    // the spare: replaces the failed R2 with a reason; recorded with its marker; R2's record no
+    // longer stops the budget (the marker is the person's decision about it)
+    let r3 = recorded(call(
+        "development",
+        "d3",
+        "hi",
+        spare("execution environment defect, cause reported", "d2"),
+    ));
+    assert_eq!(
+        r3["spare"],
+        json!({"reason": "execution environment defect, cause reported", "replaces": "d2"}),
+        "{r3}"
+    );
+    let ledger = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
+    assert!(
+        ledger.contains("execution environment defect, cause reported"),
+        "the marker is in the ledger"
+    );
+    // one spare only (also the budget's 4 runs are used now)
+    let why = not_started(call("development", "x5", "hi", spare("again", "d2")));
+    assert!(why.contains("used already"), "{why}");
+    let why = not_started(call("development", "x6", "hi", json!({})));
+    assert!(why.contains("planned runs are used"), "{why}");
+}
+
+/// The spare may redo R1 too (the run after a failure, not only the third), and R2 then runs
+/// without a marker: 2 planned + 1 spare.
+#[test]
+fn the_0205_spare_may_redo_the_first_planned_run() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare1");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    let a = InProc(m);
+    let call = |attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of("development", "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    recorded(call("d1", "AUTHFAIL", json!({})));
+    // R1's failure asks for a person: nothing runs without the spare marker
+    let why = not_started(call("x1", "hi", json!({})));
+    assert!(why.contains("asks for a person"), "{why}");
+    recorded(call(
+        "d1b",
+        "hi",
+        json!({"spare": {"reason": "env defect", "replaces": "d1"}}),
+    ));
+    recorded(call("d2", "hi", json!({})));
+    let why = not_started(call("d3", "hi", json!({})));
+    assert!(why.contains("planned runs are used"), "{why}");
 }

@@ -39,7 +39,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
-const BODY_KEYS: [&str; 8] = [
+const BODY_KEYS: [&str; 9] = [
     "assignment_id",
     "generation",
     "attempt_id",
@@ -48,6 +48,7 @@ const BODY_KEYS: [&str; 8] = [
     "logical_name",
     "new_session",
     "recovery_id",
+    "spare",
 ];
 
 /// An id the supervisor accepts as a file name and CLI argument (its `safe_id`).
@@ -106,6 +107,22 @@ fn check_body(req: &Req) -> Result<Value, Resp> {
             "recovery_id",
             "`recovery_id` is an approved recovery's id (R-…)",
         ));
+    }
+    // the 02-05 budget's spare run (user decision 2026-11-17 (나)): a reason and the failed
+    // attempt it replaces; the shared budget check decides
+    if !body["spare"].is_null() {
+        let s = &body["spare"];
+        let ok = s.as_object().is_some_and(|o| o.len() == 2)
+            && s["reason"]
+                .as_str()
+                .is_some_and(|r| !r.trim().is_empty() && r.len() <= 2000)
+            && s["replaces"].as_str().is_some_and(safe_id);
+        if !ok {
+            return Err(bad(
+                "spare",
+                "`spare` is {reason (1-2000 bytes), replaces (the failed attempt id)}",
+            ));
+        }
     }
     Ok(body)
 }
@@ -599,7 +616,13 @@ pub fn deliver(
             "profile_id": rec["profile_id"], "profile_revision": rec["profile_revision"]}),
     };
     let admitted = budget_plan(ctx, repo).and_then(|plan| {
-        let adm = caller::admit(&plan, role, &call.attempt_id, &caller::Http)??;
+        let adm = caller::admit_with(
+            &plan,
+            role,
+            &call.attempt_id,
+            &caller::Http,
+            &json!({"spare": body["spare"]}),
+        )??;
         Ok((plan, adm))
     });
     let (plan, mut adm) = match admitted {

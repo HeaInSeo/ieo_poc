@@ -542,6 +542,7 @@ fn budget_constants_match_decision_1() {
             billable_tokens: 1_500_000,
             cache_read_tokens: 15_000_000,
             role_shares: &[],
+            spare: None,
         }
     );
     assert_eq!(
@@ -554,6 +555,7 @@ fn budget_constants_match_decision_1() {
             billable_tokens: 3_000_000,
             cache_read_tokens: 30_000_000,
             role_shares: &[],
+            spare: None,
         }
     );
     // the 02-05 real-session budget (user decision 2026-11-15 (나), §2.1 table), copied exactly
@@ -582,6 +584,11 @@ fn budget_constants_match_decision_1() {
                     cache_read_tokens: 500_000,
                 },
             ],
+            // the spare: development's third run (decision 2026-11-17 (나))
+            spare: Some(budget::SpareRule {
+                role: "development",
+                planned_runs: 2,
+            }),
         }
     );
     // the shares add up to the budget exactly: 3 planned runs + the development spare
