@@ -1,4 +1,4 @@
-# 02-05 budget PR mutants: each applied alone to the code of 1cf098a (the spare gate of user decision 2026-11-17 (나) and its addition, and the PR #81 review b38e8df fixes included), then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). N: the approved numbers (decision 2026-11-15 (나) §2.1); R: the share and ledger rules; S: the spare rules (decision 2026-11-17 (나)); A: review d336849 L-a/L-b; C: review b38e8df (M-1 a person attaches the spare and is recorded, L-1 effective record, L-2 H3/H4, I-2, I-4); D: decision 2026-11-17 addition (evidence_ref, approver and time, release scope). Columns: id | mutation | result | target: failing tests
+# 02-05 budget PR mutants: each applied alone to the code of 03531f1 (the spare gate of user decision 2026-11-17 (나) and its addition, the PR #81 review b38e8df fixes, the host caller's refusal), then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). N: the approved numbers (decision 2026-11-15 (나) §2.1); R: the share and ledger rules; S: the spare rules (decision 2026-11-17 (나)); A: review d336849 L-a/L-b; C: review b38e8df (M-1, L-1, L-2 H3, I-4); D: decision 2026-11-17 addition (evidence_ref, approver and time, release scope); E: the host caller refuses a spare. S12, C7-C9, D11, D12 (the host-path marker) were dropped with that code. Columns: id | mutation | result | target: failing tests
 N1 | 4 runs → 5 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
 N2 | 600 s per run → 601 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
 N3 | 2,400 s → 2,401 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
@@ -13,7 +13,7 @@ R2 | the plan accepts a share other than the approved one | KILLED | ieo-supervi
 R3 | the role service ignores the approved share | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail; the_0205_spare_may_redo_the_first_planned_run; the_0205_spare_run_needs_a_marker_and_a_failed_development_run
 R5 | a ledger may hold another budget's records | KILLED | ieo-supervisor --test caller: a_ledger_belongs_to_one_budget
 R6 | "02-05" is not a budget name | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
-S1 | no marker: development runs past its 2 planned runs | KILLED | ieo-supervisor --test caller: the_0205_spare_may_redo_the_first_planned_run; the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail; the_0205_spare_run_needs_a_marker_and_a_failed_development_run
+S1 | no marker: development runs past its 2 planned runs | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail; the_0205_spare_may_redo_the_first_planned_run; the_0205_spare_run_needs_a_marker_and_a_failed_development_run
 S2 | the replaced attempt need not have failed | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
 S3 | the replaced attempt may be another role or budget | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
 S4 | a second spare is allowed | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
@@ -24,7 +24,6 @@ S8 | a recorded spare does not answer its run for later calls | KILLED | ieo-sup
 S9 | an ambiguous replaced attempt takes the first record | KILLED | ieo-supervisor --test caller: the_spare_gate_refuses_ambiguous_records
 S10 | the delivery body's spare is not checked | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
 S11 | the delivery does not pass its spare to the budget check | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
-S12 | ieo-role-call drops the spare flags | KILLED | ieo-supervisor --test caller: ieo_role_call_records_the_spare_marker
 A1 | the recovery use is not bound to the checkpoint taken over (d336849 L-a) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
 A2 | only a takeover phase needs a recovery (d336849 L-b, H3) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
 A3 | the approval assignment/generation is not checked (d336849 L-a) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
@@ -34,9 +33,6 @@ C3 | the gate does not keep who attached it (M-1) | KILLED | ieo-supervisor --te
 C4 | deliverAssignment records another name (M-1) | KILLED | ieo-coord --lib the_spare_names: delivery::tests::the_spare_names_the_person_who_attached_it
 C5 | "failed" read from the raw line, not the effective record (L-1) | KILLED | ieo-supervisor --test caller: the_spare_gate_refuses_ambiguous_records
 C6 | a spare's own stop_required does not stop (L-2 H3) | KILLED | ieo-supervisor --test caller: a_failed_spare_stops_the_budget_again
-C7 | ieo-role-call swaps reason and replaces (L-2 H4) | KILLED | ieo-supervisor --test caller: ieo_role_call_records_the_spare_marker
-C8 | ieo-role-call takes a flag as a value (I-2) | KILLED | ieo-supervisor --test caller: ieo_role_call_records_the_spare_marker
-C9 | ieo-role-call takes a reason over 2,000 bytes (I-2) | KILLED | ieo-supervisor --test caller: ieo_role_call_records_the_spare_marker
 C10 | the spare is forwarded to the role service (I-4) | KILLED | ieo-supervisor --test caller: a_failed_spare_stops_the_budget_again
 D1 | the gate takes a marker without evidence_ref (addition §2) | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
 D2 | the gate takes a marker without an approval time (addition §2) | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
@@ -48,6 +44,6 @@ D7 | a stop without a reason is releasable (fail-closed) | KILLED | ieo-supervis
 D8 | the delivery body needs no evidence_ref (addition §2) | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
 D9 | the delivery takes a client-written `by` (4 keys) | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
 D10 | the delivery does not write the approval time | KILLED | ieo-coord --lib the_spare_names: delivery::tests::the_spare_names_the_person_who_attached_it
-D11 | ieo-role-call needs no evidence reference | KILLED | ieo-supervisor --test caller: ieo_role_call_records_the_spare_marker
-D12 | ieo-role-call records the host user as the approver | KILLED | ieo-supervisor --test caller: ieo_role_call_records_the_spare_marker
-# 51 of 51 killed
+E1 | ieo-role-call takes the spare flags (addition §2: person-only) | KILLED | ieo-supervisor --test caller: ieo_role_call_refuses_a_spare_marker
+E2 | ieo-role-call takes --evidence-ref and --approver alone | KILLED | ieo-supervisor --test caller: the_caller_talks_to_the_service_over_http
+# 47 of 47 killed
