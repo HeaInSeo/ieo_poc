@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS repro_requests (
 CREATE TABLE IF NOT EXISTS evidence (
     repo_id     text        NOT NULL,
     evidence_id text        NOT NULL,
-    kind        text        NOT NULL CHECK (kind IN ('ci_run', 'run_record', 'review', 'merge', 'main_ci', 'output', 'followups')),
+    kind        text        NOT NULL CHECK (kind IN ('ci_run', 'run_record', 'review', 'merge', 'main_ci', 'output', 'followups', 'branch_head')),
     sha         text        NOT NULL CHECK (sha ~ '^[a-f0-9]{40,64}$'),
     body        jsonb       NOT NULL,
     ingested_by text        NOT NULL,
@@ -533,5 +533,19 @@ CREATE OR REPLACE TRIGGER assignment_run_usage_append_only BEFORE UPDATE OR DELE
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 CREATE OR REPLACE TRIGGER assignment_limit_events_append_only BEFORE UPDATE OR DELETE ON assignment_limit_events
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
+-- 02-05 step 7 (PLAN §3.2 step 7, C10): the GitHub branch head as an evidence kind, the input of
+-- the resume judgment's final basis. Databases created before it get the wider CHECK.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'evidence_kind_check'
+                   AND pg_get_constraintdef(oid) LIKE '%branch_head%') THEN
+    ALTER TABLE evidence DROP CONSTRAINT IF EXISTS evidence_kind_check;
+    ALTER TABLE evidence ADD CONSTRAINT evidence_kind_check CHECK (kind IN ('ci_run', 'run_record',
+        'review', 'merge', 'main_ci', 'output', 'followups', 'branch_head'));
+  END IF;
+END $$;
+-- the GitHub comparison a delivery's judgment made (head, CI at the head, CI claim), as compare
+-- returned it; NULL when the judgment made none (02-05 step 7)
+ALTER TABLE role_delivery_results ADD COLUMN IF NOT EXISTS github jsonb;
 
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;

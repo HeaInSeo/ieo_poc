@@ -2687,9 +2687,15 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "target_sha",
             "expected_current",
             "limits",
+            "branch_ref",
         ],
     )?;
     let asked_limits = assignment_limits_field(&body["limits"])?;
+    // the branch the assignment's work is pushed to (02-05 step 7): the GitHub head of this
+    // branch is the final basis of a development resume; optional, absent → not observed
+    if !body["branch_ref"].is_null() {
+        branch_ref_of(&body, "branch_ref")?;
+    }
     let role = str_field(&body, "role", 16)?.to_string();
     if role != "development" && role != "guardrail" {
         return Err(one(
@@ -3151,6 +3157,28 @@ const CONCLUSIONS: [&str; 7] = [
     "action_required",
 ];
 
+/// A full branch ref (`refs/heads/<name>`, at most 256 bytes, no whitespace or control
+/// characters, no `..`): the assignment's branch and a `branch_head`'s ref (02-05 step 7).
+pub(crate) fn branch_ref_of<'a>(v: &'a Value, field: &str) -> Result<&'a str, Resp> {
+    let r = str_field(v, field, 256)?;
+    let name = r.strip_prefix("refs/heads/").unwrap_or_default();
+    if name.is_empty()
+        || name.contains("..")
+        || name.starts_with('/')
+        || name.ends_with('/')
+        || r.chars().any(|c| c.is_whitespace() || c.is_control())
+    {
+        return Err(one(
+            400,
+            "SCHEMA_VIOLATION",
+            field,
+            "not a branch ref (refs/heads/<name>)",
+            "send the full branch ref",
+        ));
+    }
+    Ok(r)
+}
+
 fn validate_evidence(v: &Value) -> Result<(String, String), Resp> {
     let kind = str_field(v, "kind", 32)?.to_string();
     let sha_of = |k: &str| -> Result<String, Resp> {
@@ -3236,6 +3264,14 @@ fn validate_evidence(v: &Value) -> Result<(String, String), Resp> {
             str_field(v, "source_ref", 512)?;
             sha_of("merged_sha")?;
             sha_of("head_sha")?
+        }
+        // 02-05 step 7: the head of one GitHub branch as the evidence service read it (trusted
+        // service input; no live GitHub read in this PoC)
+        "branch_head" => {
+            only_keys(v, &keys(&["sha", "ref", "source_ref"]))?;
+            str_field(v, "source_ref", 512)?;
+            branch_ref_of(v, "ref")?;
+            sha_of("sha")?
         }
         "output" => {
             only_keys(v, &keys(&["sha", "task_id", "artifact_id", "ref"]))?;
@@ -4455,15 +4491,316 @@ pub(crate) fn compare_checkpoint(
     )?;
     let head = head.map(|h| (h.get::<_, String>(0), h.get::<_, i64>(1)));
     let (decision, reasons) = judge_resume(central.as_ref(), head.as_ref(), local.as_ref());
+    // 02-05 step 7: the GitHub record as the final basis (development) and the review target
+    // (guardrail)
+    let (decision, reasons, github) = github_gate(
+        tx,
+        repo,
+        role,
+        decision,
+        reasons,
+        central.as_ref(),
+        head.as_ref(),
+    )?;
     ok(
         200,
         json!({"repo_id": repo, "role": role, "decision": decision, "reasons": reasons,
+        "github": github,
         "central": central,
         "local": local.as_ref().ok().map(|s| json!({"checkpoint_seq": s["checkpoint_seq"],
             "checkpoint_sha256": s["checkpoint_sha256"], "running": s["running"],
             "central_checkpoint": s["central_checkpoint"]})),
         "current_assignment": head.map(|(a, g)| json!({"assignment_id": a, "generation": g}))}),
     )
+}
+
+/// The GitHub head comparison of a development resume (02-05 step 7, runtime contract revision
+/// 14 §17): the expected SHA is the checkpoint's pushed SHA, or the assignment's target SHA when
+/// nothing was pushed. Returns the decision (`resume_allowed`, `not_observed` or
+/// `external_reconciliation_required`), the reason of a refusal, and the expected SHA with where
+/// it came from. Pure: the caller reads the records.
+pub fn github_judgment(
+    branch_ref: Option<&str>,
+    target_sha: &str,
+    pushed_sha: &Value,
+    head_sha: Option<&str>,
+) -> (&'static str, Option<String>, Option<(String, &'static str)>) {
+    let Some(branch) = branch_ref else {
+        return (
+            "not_observed",
+            Some("the assignment names no branch_ref: no GitHub head to compare".into()),
+            None,
+        );
+    };
+    let (expected, from) = match pushed_sha {
+        Value::Null => (target_sha.to_string(), "target_sha"),
+        Value::String(p) if is_sha(p) => (p.clone(), "pushed_sha"),
+        _ => {
+            return (
+                "external_reconciliation_required",
+                Some("the checkpoint's pushed_sha is neither null nor a SHA".into()),
+                None,
+            );
+        }
+    };
+    let Some(head) = head_sha else {
+        return (
+            "not_observed",
+            Some(format!(
+                "no GitHub record of {branch} (branch_head evidence)"
+            )),
+            Some((expected, from)),
+        );
+    };
+    if head != expected {
+        let what = if from == "pushed_sha" {
+            "the checkpoint's pushed SHA"
+        } else {
+            "the assignment's target SHA (nothing pushed)"
+        };
+        return (
+            "external_reconciliation_required",
+            Some(format!(
+                "the GitHub head of {branch} is {head}, not {what} {expected}"
+            )),
+            Some((expected, from)),
+        );
+    }
+    ("resume_allowed", None, Some((expected, from)))
+}
+
+/// The CI result at one SHA from `ci_run` evidence only (latest per `source_ref`): `success`
+/// when every one succeeded, `failure` when one did not, `none` without any. CI of other SHAs is
+/// never read (02-05 step 7).
+fn ci_at(tx: &mut Transaction, repo: &str, sha: &str) -> Result<Value, Resp> {
+    let rows = tx.query(
+        "SELECT DISTINCT ON (body->>'source_ref') evidence_id, body->>'conclusion' FROM evidence
+         WHERE repo_id = $1 AND kind = 'ci_run' AND sha = $2
+         ORDER BY body->>'source_ref', seq DESC",
+        &[&repo, &sha],
+    )?;
+    let result = if rows.is_empty() {
+        "none"
+    } else if rows
+        .iter()
+        .all(|r| r.get::<_, Option<String>>(1).as_deref() == Some("success"))
+    {
+        "success"
+    } else {
+        "failure"
+    };
+    let ids: Vec<String> = rows.iter().map(|r| r.get(0)).collect();
+    Ok(json!({"sha": sha, "result": result, "evidence": ids}))
+}
+
+/// The agent's own CI claim at the head SHA: the newest current `development_progress` report of
+/// the assignment whose `target_sha` is that SHA, read from its `internal_checks` (a FAIL →
+/// `failure`; all PASS → `success`; otherwise no claim). Compared with the GitHub record, which
+/// is the one used (02-05 step 7).
+fn ci_claim(
+    tx: &mut Transaction,
+    repo: &str,
+    head: &(String, i64),
+    sha: &str,
+    github: &str,
+) -> Result<Value, Resp> {
+    let row = tx.query_opt(
+        "SELECT event_id, report->'body'->'internal_checks' FROM events
+         WHERE scope_repo = $1 AND scope_role = 'development' AND report_type = 'development_progress'
+           AND disposition = 'current' AND assignment_id = $2 AND generation = $3
+           AND report->'body'->>'target_sha' = $4
+         ORDER BY stored_at DESC, sprint_seq DESC LIMIT 1",
+        &[&repo, &head.0, &head.1, &sha],
+    )?;
+    let Some(row) = row else {
+        return Ok(Value::Null);
+    };
+    let checks: Value = row.get(1);
+    let results: Vec<&str> = checks
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|c| c["result"].as_str())
+        .collect();
+    let claimed = if results.contains(&"FAIL") {
+        "failure"
+    } else if !results.is_empty() && results.iter().all(|r| *r == "PASS") {
+        "success"
+    } else {
+        return Ok(Value::Null);
+    };
+    Ok(
+        json!({"event_id": row.get::<_, String>(0), "claimed": claimed,
+              "matches_github": claimed == github}),
+    )
+}
+
+/// 02-05 step 7 on top of [`judge_resume`]. Development: a resume needs the assigned branch's
+/// GitHub head (the newest `branch_head` evidence) to equal the checkpoint's pushed SHA (or the
+/// target SHA when nothing was pushed); the CI result at that head and any differing agent CI
+/// claim are recorded. Guardrail: nothing runs (`stale_target`) while the review target is not
+/// the current development assignment's target SHA. The GitHub records are evidence-service
+/// input, not a live GitHub read.
+fn github_gate(
+    tx: &mut Transaction,
+    repo: &str,
+    role: &str,
+    decision: &'static str,
+    reasons: Vec<String>,
+    central: Option<&Value>,
+    head: Option<&(String, i64)>,
+) -> Result<(&'static str, Vec<String>, Value), Resp> {
+    let Some(h) = head else {
+        return Ok((decision, reasons, Value::Null));
+    };
+    let target = |tx: &mut Transaction, aid: &str, generation: i64| {
+        tx.query_one(
+            "SELECT target_sha, request->>'branch_ref' FROM assignments
+             WHERE assignment_id = $1 AND generation = $2",
+            &[&aid, &generation],
+        )
+        .map(|r| (r.get::<_, String>(0), r.get::<_, Option<String>>(1)))
+    };
+    if role == "guardrail" {
+        if !matches!(
+            decision,
+            "resume_allowed" | "no_checkpoint" | "stale_generation"
+        ) {
+            return Ok((decision, reasons, Value::Null));
+        }
+        let (review, _) = target(tx, &h.0, h.1)?;
+        let dev = tx
+            .query_opt(
+                "SELECT a.target_sha FROM assignment_heads h JOIN assignments a
+                   ON (a.assignment_id, a.generation) = (h.assignment_id, h.generation)
+                 WHERE h.repo_id = $1 AND h.role = 'development'",
+                &[&repo],
+            )?
+            .map(|r| r.get::<_, String>(0));
+        if dev.as_deref() == Some(review.as_str()) {
+            return Ok((decision, reasons, Value::Null));
+        }
+        let why = match &dev {
+            Some(d) => format!(
+                "the review target {review} is not the current development assignment's target \
+                 SHA {d}: a new review assignment is needed"
+            ),
+            None => format!(
+                "the review target {review} has no current development assignment: a new review \
+                 assignment is needed"
+            ),
+        };
+        return Ok(("stale_target", vec![why], Value::Null));
+    }
+    if decision != "resume_allowed" {
+        return Ok((decision, reasons, Value::Null));
+    }
+    let cp: Value = match central {
+        Some(c) => tx
+            .query_opt(
+                "SELECT checkpoint FROM role_checkpoints WHERE repo_id = $1 AND role = $2 AND seq = $3",
+                &[&repo, &role, &c["seq"].as_i64().unwrap_or(-1)],
+            )?
+            .map(|r| r.get(0))
+            .unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+    let (d, why, github) = github_head_check(tx, repo, h, &cp)?;
+    match why {
+        None => Ok((d, reasons, github)),
+        Some(w) => Ok((d, vec![w], github)),
+    }
+}
+
+/// The GitHub head check of one development checkpoint against one assignment generation (02-05
+/// step 7), reusable by any judgment that needs it (the recovery of step 7b among them): the
+/// assignment's `branch_ref` and `target_sha`, the checkpoint's `pushed_sha`, and the newest
+/// `branch_head` evidence of that branch. Returns the decision (`resume_allowed` on a match,
+/// `external_reconciliation_required` on a mismatch, `not_observed` without a branch or a
+/// record), the reason of a refusal, and the comparison with its evidence: `result`
+/// (`match`/`mismatch`/`not_observed`), `source` (the input is evidence-service records, not a
+/// live GitHub read), the head's evidence id, the CI result at that head and an agent's
+/// differing CI claim. Read-only.
+pub(crate) fn github_head_check(
+    tx: &mut Transaction,
+    repo: &str,
+    assignment: &(String, i64),
+    checkpoint: &Value,
+) -> Result<(&'static str, Option<String>, Value), Resp> {
+    let row = tx.query_one(
+        "SELECT target_sha, request->>'branch_ref' FROM assignments
+         WHERE assignment_id = $1 AND generation = $2",
+        &[&assignment.0, &assignment.1],
+    )?;
+    let (target_sha, branch) = (row.get::<_, String>(0), row.get::<_, Option<String>>(1));
+    let gh_head = match &branch {
+        Some(b) => tx.query_opt(
+            "SELECT evidence_id, sha, body->>'source_ref' FROM evidence
+             WHERE repo_id = $1 AND kind = 'branch_head' AND body->>'ref' = $2
+             ORDER BY seq DESC LIMIT 1",
+            &[&repo, b],
+        )?,
+        None => None,
+    }
+    .map(|r| {
+        (
+            r.get::<_, String>(0),
+            r.get::<_, String>(1),
+            r.get::<_, Option<String>>(2),
+        )
+    });
+    let (d, why, expected) = github_judgment(
+        branch.as_deref(),
+        &target_sha,
+        &checkpoint["pushed_sha"],
+        gh_head.as_ref().map(|x| x.1.as_str()),
+    );
+    // the checkpoint's pushed SHA is the assignment branch's only when the checkpoint names that
+    // branch (review f0e0ca9 L-2): another branch is never read as this one's; without a branch
+    // the checkpoint observed no push, and the target SHA is expected for that reason
+    let cp_branch = checkpoint["branch_ref"].as_str();
+    let (d, why) = match (cp_branch, branch.as_deref()) {
+        (Some(c), Some(a)) if c != a && d != "not_observed" => (
+            "external_reconciliation_required",
+            Some(format!(
+                "the checkpoint's branch_ref {c} is not the assignment's {a}: its pushed SHA is \
+                 not this branch's"
+            )),
+        ),
+        _ => (d, why),
+    };
+    let provenance = match (cp_branch, &checkpoint["pushed_sha"]) {
+        (Some(c), _) if branch.as_deref().is_some_and(|a| a != c) => {
+            "checkpoint names another branch"
+        }
+        (Some(_), Value::String(_)) => "pushed SHA recorded by the checkpoint",
+        (Some(_), _) => "no push observed on the branch (target SHA expected)",
+        (None, _) => "the checkpoint names no branch: no push observed (target SHA expected)",
+    };
+    let result = match d {
+        "resume_allowed" => "match",
+        "not_observed" => "not_observed",
+        _ => "mismatch",
+    };
+    let mut github = json!({
+        "result": result,
+        "source": "evidence:ingest (trusted service input; not a live GitHub read)",
+        "assignment_id": assignment.0, "generation": assignment.1,
+        "branch_ref": branch, "worktree_head": checkpoint["worktree_head"],
+        "pushed_sha": checkpoint["pushed_sha"],
+        "expected_sha": expected.as_ref().map(|e| e.0.clone()),
+        "expected_from": expected.as_ref().map(|e| e.1),
+        "checkpoint_branch_ref": checkpoint["branch_ref"], "push_provenance": provenance,
+        "head": gh_head.as_ref().map(|(id, sha, src)| json!({"evidence_id": id, "sha": sha,
+                                                                "source_ref": src})),
+        "matches": d == "resume_allowed", "ci": null, "ci_claim": null});
+    if let Some((_, sha, _)) = &gh_head {
+        let ci = ci_at(tx, repo, sha)?;
+        let ci_result = ci["result"].as_str().unwrap_or("none").to_string();
+        github["ci"] = ci;
+        github["ci_claim"] = ci_claim(tx, repo, assignment, sha, &ci_result)?;
+    }
+    Ok((d, why, github))
 }
 
 /// The §5-2 resume judgment from the central record, the current assignment and the
@@ -5014,8 +5351,50 @@ pub fn migrate(db: &mut impl GenericClient) -> Result<(), postgres::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{judge_resume, legacy_split};
-    use serde_json::json;
+    use super::{github_judgment, judge_resume, legacy_split};
+    use serde_json::{Value, json};
+
+    /// 02-05 step 7: the GitHub head of the assigned branch against the checkpoint's pushed SHA
+    /// (or the target SHA when nothing was pushed).
+    #[test]
+    fn the_github_head_is_the_final_basis_of_a_development_resume() {
+        let (t, p, f) = ("1".repeat(40), "3".repeat(40), "4".repeat(40));
+        let b = Some("refs/heads/feat/x");
+        let d =
+            |branch, pushed: &Value, head: Option<&str>| github_judgment(branch, &t, pushed, head);
+        // no branch named, or no GitHub record: not observed
+        assert_eq!(d(None, &Value::Null, Some(&t)).0, "not_observed");
+        assert_eq!(d(b, &Value::Null, None).0, "not_observed");
+        // nothing pushed: the head must be the target SHA
+        assert_eq!(
+            d(b, &Value::Null, Some(&t)),
+            ("resume_allowed", None, Some((t.clone(), "target_sha")))
+        );
+        let (dec, why, _) = d(b, &Value::Null, Some(&p));
+        assert_eq!(dec, "external_reconciliation_required");
+        assert!(why.is_some_and(|w| w.contains("nothing pushed")));
+        // pushed: the head must be the pushed SHA
+        assert_eq!(
+            d(b, &json!(p), Some(&p)),
+            ("resume_allowed", None, Some((p.clone(), "pushed_sha")))
+        );
+        assert_eq!(
+            d(b, &json!(p), Some(&t)).0,
+            "external_reconciliation_required"
+        );
+        assert_eq!(
+            d(b, &json!(f), Some(&p)).0,
+            "external_reconciliation_required"
+        );
+        // a pushed_sha that is not a SHA is never taken as "nothing pushed"
+        for bad in [json!("HEAD"), json!(5), json!(p.to_uppercase())] {
+            assert_eq!(
+                d(b, &bad, Some(&t)).0,
+                "external_reconciliation_required",
+                "{bad}"
+            );
+        }
+    }
 
     /// The resume judgment by the central checkpoint's assignment, generation and phase (the local
     /// checkpoint matches it). Review c11e734 M-1: an older generation whose last run did not

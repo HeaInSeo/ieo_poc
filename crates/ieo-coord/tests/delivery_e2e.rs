@@ -17,6 +17,10 @@ use std::time::{Duration, Instant};
 
 const MANIFEST: &str = include_str!("../../../docs/poc/Console_Coordinator_Sprints_v0.json");
 const SHA1: &str = "1111111111111111111111111111111111111111";
+const SHA2: &str = "2222222222222222222222222222222222222222";
+const SHA_P: &str = "3333333333333333333333333333333333333333";
+const SHA_F: &str = "4444444444444444444444444444444444444444";
+const BRANCH: &str = "refs/heads/feat/a1";
 const ADAPTER: &str = "e2e-adapter-token";
 
 fn digest(t: &str) -> String {
@@ -114,6 +118,8 @@ struct Role {
     launches: Arc<std::sync::atomic::AtomicUsize>,
     /// While set, the status answers 503 (the coordinator cannot observe the role).
     fail_status: Arc<std::sync::atomic::AtomicBool>,
+    /// The body of the last start or reconnect that reached the service.
+    last_launch: Arc<Mutex<Value>>,
 }
 
 impl Role {
@@ -125,10 +131,12 @@ impl Role {
         let drop_next = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let launches = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let fail_status = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let (d, n, f) = (
+        let last_launch = Arc::new(Mutex::new(Value::Null));
+        let (d, n, f, last) = (
             Arc::clone(&drop_next),
             Arc::clone(&launches),
             Arc::clone(&fail_status),
+            Arc::clone(&last_launch),
         );
         std::thread::spawn(move || {
             for mut req in server.incoming_requests() {
@@ -144,6 +152,8 @@ impl Role {
                     && (req.url().ends_with("/start") || req.url().ends_with("/reconnect"));
                 if launch {
                     n.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    *last.lock().expect("last") =
+                        serde_json::from_slice(&body).unwrap_or(Value::Null);
                 }
                 if req.url().ends_with("/status") && f.load(std::sync::atomic::Ordering::SeqCst) {
                     let _ =
@@ -171,6 +181,7 @@ impl Role {
             drop_next,
             launches,
             fail_status,
+            last_launch,
         }
     }
     fn call(&self, method: &str, path: &str, body: &Value) -> (u16, Value) {
@@ -298,7 +309,9 @@ fn e2e(transport: &str) {
         {"name": "assigner", "token_sha256": digest(&tok("assigner")), "kind": "service", "scopes": ["coordinator:assign"], "repo_ids": ["repo-a"]},
         {"name": "operator", "token_sha256": digest(&tok("operator")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-a"]},
         {"name": "operator-b", "token_sha256": digest(&tok("operator-b")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-b"]},
-        {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"}]});
+        {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"},
+        {"name": "ingest", "token_sha256": digest(&tok("ingest")), "kind": "service", "scopes": ["evidence:ingest"], "repo_ids": ["repo-a"]},
+        {"name": "dev-agent", "token_sha256": digest(&tok("dev-agent")), "kind": "agent", "scopes": ["agent:report"], "repo_ids": ["repo-a"], "role": "development"}]});
     std::fs::write(dir.join("tokens.json"), principals.to_string()).expect("tokens");
     let root = dir.join("dev");
     std::fs::create_dir_all(root.join("etc/template")).expect("etc");
@@ -547,8 +560,35 @@ fn e2e(transport: &str) {
             Some(&json!({"repo_id": "repo-a",
             "role": role_name, "assignment_id": if role_name == "guardrail" { "G1" } else { "A1" },
             "generation": generation, "sprint_id": "POC-01",
-            "sprint_revision": 5, "task_id": "01-01", "target_sha": SHA1, "expected_current": expected})),
+            "sprint_revision": 5, "task_id": "01-01", "target_sha": SHA1, "expected_current": expected,
+            "branch_ref": if role_name == "guardrail" { Value::Null } else { json!(BRANCH) }})),
         )
+    };
+    // GitHub records come from the evidence service (02-05 step 7): trusted input, fixed here
+    let ingest = |id: &str, kind: &str, extra: Value| {
+        let mut b = json!({"evidence_id": id, "repo_id": "repo-a", "kind": kind});
+        for (k, x) in extra.as_object().expect("obj") {
+            b[k] = x.clone();
+        }
+        let (st, r) = c("ingest", "POST", "/v0/coordinator/evidence", Some(&b));
+        assert_eq!(st, 201, "{r}");
+    };
+    let head = |id: &str, sha: &str| {
+        ingest(
+            id,
+            "branch_head",
+            json!({"sha": sha, "ref": BRANCH, "source_ref": format!("fixture://github/{id}")}),
+        )
+    };
+    let compare = |role_name: &str| {
+        let (st, b) = c(
+            "operator",
+            "GET",
+            &format!("/v0/repos/repo-a/roles/{role_name}/checkpoints/compare"),
+            None,
+        );
+        assert_eq!(st, 200, "{b}");
+        b
     };
     assert_eq!(assign("development", 0, Value::Null).0, 201);
     // another generation than the head: refused, nothing recorded
@@ -581,6 +621,7 @@ fn e2e(transport: &str) {
         json!({"generation": 0, "assignment_id": "A1", "sprint_id": "POC-01",
                "sprint_revision": 5, "spec_digest": sd, "image_digest": "sha256:img",
                "profile_id": "dev-profile", "profile_revision": 1, "task_id": "01-01",
+               "branch_ref": BRANCH,
                "limits": {"elapsed_seconds": 3600, "total_tokens": 100000}}),
         "{d1}"
     );
@@ -634,6 +675,79 @@ fn e2e(transport: &str) {
     );
     assert_eq!((launches(), runs(), count("role_deliveries")), (1, 1, 1));
 
+    // 02-05 step 7: without a GitHub record of the assigned branch, nothing resumes
+    let cmp = compare("development");
+    assert_eq!(cmp["decision"], "not_observed", "{cmp}");
+    assert!(
+        cmp["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("no GitHub record of refs/heads/feat/a1")),
+        "{cmp}"
+    );
+    assert_eq!(cmp["github"]["expected_from"], "target_sha", "{cmp}");
+    // the reusable check's own result and the nature of its input (02-05 step 7b reuses it)
+    assert_eq!(cmp["github"]["result"], "not_observed", "{cmp}");
+    assert!(
+        cmp["github"]["source"]
+            .as_str()
+            .is_some_and(|x| x.contains("not a live GitHub read")),
+        "{cmp}"
+    );
+    // the run's checkpoint names the branch and observed no push: the target SHA is expected
+    assert_eq!(
+        (
+            cmp["github"]["checkpoint_branch_ref"].as_str(),
+            cmp["github"]["push_provenance"].as_str()
+        ),
+        (
+            Some(BRANCH),
+            Some("no push observed on the branch (target SHA expected)")
+        ),
+        "{cmp}"
+    );
+    // review f0e0ca9 M-1 (developer decision, fail closed): an explicit new session chosen from
+    // `resume_allowed` (same generation: the same branch and work tree) is GitHub-gated too. No
+    // record → not_called with the GitHub decision; a different head → not_called
+    let n = (launches(), runs());
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0090",
+        "development",
+        &dbody("a90", 0, "s90", json!({"new_session": true})),
+    );
+    assert_eq!(st, 201, "{d}");
+    assert_eq!(outcome(&d), o("not_observed", None, "not_called"), "{d}");
+    assert_eq!(d["result"]["github"]["result"], "not_observed", "{d}");
+    head("gh-head-0", SHA2);
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0091",
+        "development",
+        &dbody("a91", 0, "s91", json!({"new_session": true})),
+    );
+    assert_eq!(st, 201, "{d}");
+    assert_eq!(
+        outcome(&d),
+        o("external_reconciliation_required", None, "not_called"),
+        "{d}"
+    );
+    assert_eq!(d["result"]["github"]["result"], "mismatch", "{d}");
+    assert_eq!((launches(), runs()), n, "nothing was called");
+    // the evidence service records the branch at the target SHA (nothing pushed yet)
+    head("gh-head-1", SHA1);
+    let cmp = compare("development");
+    assert_eq!(cmp["decision"], "resume_allowed", "{cmp}");
+    assert_eq!(
+        (
+            cmp["github"]["head"]["sha"].as_str(),
+            cmp["github"]["matches"].as_bool(),
+            cmp["github"]["ci"]["result"].as_str()
+        ),
+        (Some(SHA1), Some(true), Some("none")),
+        "{cmp}"
+    );
+    assert_eq!(cmp["github"]["result"], "match", "{cmp}");
+
     // 4. a normal after_run → reconnect with the same session; the logical name is recorded but
     //    is not the resume key (C1)
     let (st, d2) = deliver(
@@ -655,8 +769,31 @@ fn e2e(transport: &str) {
         "{d2}"
     );
     assert_eq!(d2["logical_name"], "renamed");
+    // 02-05 step 7: the judgment's GitHub comparison is recorded with the result and sent with
+    // the reconnect (the head and the CI result at it), with the assignment's branch
+    assert_eq!(d2["result"]["github"]["head"]["sha"], SHA1, "{d2}");
+    assert_eq!(
+        role.last_launch.lock().expect("last")["github"],
+        json!({"branch_ref": BRANCH, "head_sha": SHA1, "ci": "none"})
+    );
+    assert_eq!(role.last_launch.lock().expect("last")["branch_ref"], BRANCH);
     role.wait("a2");
     settled("a2");
+    // CI is read at the head SHA only: another SHA's failure is never used
+    ingest(
+        "ci-other",
+        "ci_run",
+        json!({"sha": SHA2, "conclusion": "failure", "source_ref": "fixture://ci/other"}),
+    );
+    assert_eq!(
+        compare("development")["github"]["ci"],
+        json!({"sha": SHA1, "result": "none", "evidence": []})
+    );
+    ingest(
+        "ci-head",
+        "ci_run",
+        json!({"sha": SHA1, "conclusion": "success", "source_ref": "fixture://ci/head"}),
+    );
 
     // 5. the supervisor checks a start against the coordinator's current assignment and the
     //    newest delivery's image and profile: nothing runs on a mismatch
@@ -696,12 +833,32 @@ fn e2e(transport: &str) {
         "operator",
         "dlv-key-0003",
         "development",
-        &dbody("a3", 0, "s9", json!({"prompt": "SLEEP"})),
+        &dbody(
+            "a3",
+            0,
+            "s9",
+            json!({"prompt": "SLEEP", "new_session": true}),
+        ),
     );
+    // review f0e0ca9 M-1: with a matching head, the explicit new session starts, and its start
+    // carries the GitHub comparison too
     assert_eq!(
         outcome(&d3),
-        o("resume_allowed", Some("reconnect"), "accepted"),
+        o("resume_allowed", Some("start"), "accepted"),
         "{st} {d3}"
+    );
+    assert_eq!(
+        d3["result"]["supervisor"]["body"]["accepted"]["session_id"], "s9",
+        "{d3}"
+    );
+    assert_eq!(
+        d3["result"]["github"]["ci"],
+        json!({"sha": SHA1, "result": "success", "evidence": ["ci-head"]}),
+        "{d3}"
+    );
+    assert_eq!(
+        role.last_launch.lock().expect("last")["github"]["ci"],
+        "success"
     );
     std::thread::sleep(Duration::from_millis(300));
     let n = launches();
@@ -1225,14 +1382,14 @@ fn e2e(transport: &str) {
 
     // every run went through a delivery; the database holds every request and result
     assert_eq!(runs(), 5);
-    // 18 deliveries (the 19th is refused unrecorded, 02-05 step 5) and the fixture of step 7's
-    // crafted takeover (02-05 step 4)
-    assert_eq!(count("role_deliveries"), 19);
+    // 20 deliveries (the 21st is refused unrecorded, 02-05 step 5; two are step 7's gated new
+    // sessions) and the fixture of step 7's crafted takeover (02-05 step 4)
+    assert_eq!(count("role_deliveries"), 21);
     // each run that started reported its takeover and after_run; refusals reported nothing
     assert_eq!(count("role_checkpoints"), 12);
     // every takeover is linked to its delivery: the five runs and step 7's (02-05 step 4)
     assert_eq!(count("role_takeovers"), 6);
-    assert_eq!(count("role_delivery_results"), 21);
+    assert_eq!(count("role_delivery_results"), 23);
     let n: i64 = db
         .query_one(
             "SELECT count(*) FROM role_delivery_results WHERE outcome = 'accepted'",
@@ -1241,6 +1398,221 @@ fn e2e(transport: &str) {
         .expect("q")
         .get(0);
     assert_eq!(n, 5);
+
+    // 12. 02-05 step 7: the GitHub record is the final basis of a development resume (compare
+    //     is read-only; head and CI are evidence-service input, not a live GitHub read)
+    let cmp = compare("development");
+    assert_eq!(cmp["decision"], "resume_allowed", "{cmp}");
+    assert_eq!(cmp["github"]["ci"]["result"], "success", "{cmp}");
+    // an agent's CI claim that differs from the GitHub record: the record is used, the
+    // difference recorded
+    let mut claim: Value = serde_json::from_str(include_str!(
+        "../../../docs/poc/reports/contract_examples/development_progress.json"
+    ))
+    .expect("example");
+    for (k, v) in [
+        ("event_id", json!("dev-ci-1")),
+        ("event_revision", json!(1)),
+        ("sprint_id", json!("POC-01")),
+        ("sprint_revision", json!(5)),
+        ("task_id", json!("01-01")),
+        ("repo_id", json!("repo-a")),
+        ("assignment_id", json!("A1")),
+        ("generation", json!(1)),
+    ] {
+        claim[k] = v;
+    }
+    claim["body"]["target_sha"] = json!(SHA1);
+    claim["body"]["internal_checks"] = json!([{"name": "ci", "result": "FAIL", "evidence": []}]);
+    let (st, b) = c("dev-agent", "POST", "/v0/agent/reports", Some(&claim));
+    assert_eq!(st, 202, "{b}");
+    let cmp = compare("development");
+    assert_eq!(
+        (
+            cmp["decision"].as_str(),
+            cmp["github"]["ci"]["result"].as_str()
+        ),
+        (Some("resume_allowed"), Some("success")),
+        "{cmp}"
+    );
+    assert_eq!(
+        cmp["github"]["ci_claim"],
+        json!({"event_id": "dev-ci-1", "claimed": "failure", "matches_github": false}),
+        "{cmp}"
+    );
+    // a push: the after_run checkpoint names the pushed SHA (crafted here as the supervisor
+    // reports it; its own recording from the work tree is tested in ieo-supervisor)
+    let push_report_on = |branch: &str, seq: u64, pushed: Value, report_it: bool| {
+        let mut cp: Value =
+            serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("cp");
+        cp["seq"] = json!(seq);
+        cp["branch_ref"] = json!(branch);
+        cp["pushed_sha"] = pushed;
+        let raw = serde_json::to_string_pretty(&cp).expect("j");
+        if report_it {
+            let (st, b) = c(
+                "sup",
+                "POST",
+                "/v0/repos/repo-a/roles/development/checkpoints",
+                Some(&json!({"seq": seq, "checkpoint_json": raw})),
+            );
+            assert_eq!(st, 201, "{b}");
+            std::fs::write(
+                state.join("checkpoints").join(format!("{seq:020}.json")),
+                &raw,
+            )
+            .expect("archive");
+        }
+        std::fs::write(&cp_path, &raw).expect("local");
+    };
+    let push_report =
+        |seq: u64, pushed: Value, report_it: bool| push_report_on(BRANCH, seq, pushed, report_it);
+    let seq =
+        serde_json::from_slice::<Value>(&std::fs::read(&cp_path).expect("cp")).expect("cp")["seq"]
+            .as_u64()
+            .expect("seq");
+    push_report(seq + 1, json!(SHA_P), true);
+    let cmp = compare("development");
+    assert_eq!(cmp["decision"], "external_reconciliation_required", "{cmp}");
+    assert!(
+        cmp["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains(&format!(
+                "is {SHA1}, not the checkpoint's pushed SHA {SHA_P}"
+            ))),
+        "{cmp}"
+    );
+    assert_eq!(cmp["github"]["expected_from"], "pushed_sha", "{cmp}");
+    assert_eq!(
+        (
+            cmp["github"]["result"].as_str(),
+            cmp["github"]["assignment_id"].as_str(),
+            cmp["github"]["generation"].as_i64()
+        ),
+        (Some("mismatch"), Some("A1"), Some(1)),
+        "{cmp}"
+    );
+    // the evidence service sees the push: resume; the CI of the old head is not this head's
+    head("gh-head-2", SHA_P);
+    let cmp = compare("development");
+    assert_eq!(cmp["decision"], "resume_allowed", "{cmp}");
+    assert_eq!(
+        cmp["github"]["ci"],
+        json!({"sha": SHA_P, "result": "none", "evidence": []}),
+        "{cmp}"
+    );
+    assert!(cmp["github"]["ci_claim"].is_null(), "{cmp}");
+    // every CI run at the head counts: one failure among them is a failure
+    for (id, conclusion) in [("ci-p-a", "success"), ("ci-p-b", "failure")] {
+        ingest(
+            id,
+            "ci_run",
+            json!({"sha": SHA_P, "conclusion": conclusion, "source_ref": format!("fixture://ci/{id}")}),
+        );
+    }
+    let cmp = compare("development");
+    assert_eq!(
+        (
+            cmp["decision"].as_str(),
+            cmp["github"]["ci"]["result"].as_str()
+        ),
+        (Some("resume_allowed"), Some("failure")),
+        "{cmp}"
+    );
+    // the local checkpoint changed after it was reported (another pushed SHA): the digest
+    // differs from the central record
+    let kept_cp = std::fs::read(&cp_path).expect("cp");
+    push_report(seq + 1, json!(SHA_F), false);
+    let cmp = compare("development");
+    assert_eq!(cmp["decision"], "external_reconciliation_required", "{cmp}");
+    std::fs::write(&cp_path, &kept_cp).expect("restore");
+    // development code moved the remote-tracking ref without pushing: the supervisor reports a
+    // pushed SHA that GitHub does not have
+    // another branch's head is not this branch's
+    ingest(
+        "gh-other",
+        "branch_head",
+        json!({"sha": SHA_F, "ref": "refs/heads/other", "source_ref": "fixture://github/other"}),
+    );
+    push_report(seq + 2, json!(SHA_F), true);
+    let cmp = compare("development");
+    assert_eq!(cmp["decision"], "external_reconciliation_required", "{cmp}");
+    assert!(
+        cmp["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains(&format!(
+                "is {SHA_P}, not the checkpoint's pushed SHA {SHA_F}"
+            ))),
+        "{cmp}"
+    );
+    // review f0e0ca9 L-2: a checkpoint written for another branch: its pushed SHA is not this
+    // branch's, even when it equals this branch's GitHub head
+    push_report_on("refs/heads/other", seq + 3, json!(SHA_P), true);
+    let cmp = compare("development");
+    assert_eq!(
+        (
+            cmp["decision"].as_str(),
+            cmp["github"]["result"].as_str(),
+            cmp["github"]["push_provenance"].as_str()
+        ),
+        (
+            Some("external_reconciliation_required"),
+            Some("mismatch"),
+            Some("checkpoint names another branch")
+        ),
+        "{cmp}"
+    );
+    assert!(
+        cmp["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("refs/heads/other is not the assignment's")),
+        "{cmp}"
+    );
+    // a guardrail whose review target is not the development assignment's target SHA runs
+    // nothing: a new review assignment is needed
+    assert_eq!(compare("guardrail")["decision"], "no_checkpoint");
+    let assign_g = |generation: u64, sha: &str, expected: Value| {
+        c(
+            "assigner",
+            "POST",
+            "/v0/coordinator/assignments",
+            Some(
+                &json!({"repo_id": "repo-a", "role": "guardrail", "assignment_id": "G1",
+                "generation": generation, "sprint_id": "POC-01", "sprint_revision": 5,
+                "task_id": "01-01", "target_sha": sha, "expected_current": expected}),
+            ),
+        )
+        .0
+    };
+    assert_eq!(
+        assign_g(1, SHA2, json!({"assignment_id": "G1", "generation": 0})),
+        201
+    );
+    let cmp = compare("guardrail");
+    assert_eq!(cmp["decision"], "stale_target", "{cmp}");
+    assert!(
+        cmp["reasons"][0]
+            .as_str()
+            // one line, no run of spaces from a broken continuation (review f0e0ca9 L-1)
+            .is_some_and(|r| r.contains("target SHA 1111") && !r.contains("  ")),
+        "{cmp}"
+    );
+    let n = launches();
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0070",
+        "guardrail",
+        &json!({"assignment_id": "G1", "generation": 1, "attempt_id": "g70", "session_id": "gs70",
+                "prompt": "hi"}),
+    );
+    assert_eq!(st, 201, "{d}");
+    assert_eq!(outcome(&d), o("stale_target", None, "not_called"), "{d}");
+    assert_eq!(launches(), n);
+    assert_eq!(
+        assign_g(2, SHA1, json!({"assignment_id": "G1", "generation": 1})),
+        201
+    );
+    assert_eq!(compare("guardrail")["decision"], "no_checkpoint");
     drop(db);
     coord.stop();
     let _ = std::fs::remove_dir_all(&dir);

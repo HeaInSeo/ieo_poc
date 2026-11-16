@@ -311,7 +311,8 @@ fn e2e(transport: &str) {
         {"name": "bob", "token_sha256": digest(&tok("bob")), "kind": "user", "scopes": ["review:semantic", "sprints:read"], "repo_ids": ["repo-a"]},
         {"name": "assigner", "token_sha256": digest(&tok("assigner")), "kind": "service", "scopes": ["coordinator:assign"], "repo_ids": ["repo-a"]},
         {"name": "operator", "token_sha256": digest(&tok("operator")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-a"]},
-        {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"}]});
+        {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"},
+        {"name": "ingest", "token_sha256": digest(&tok("ingest")), "kind": "service", "scopes": ["evidence:ingest"], "repo_ids": ["repo-a"]}]});
     std::fs::write(dir.join("tokens.json"), principals.to_string()).expect("tokens");
     let root = dir.join("dev");
     std::fs::create_dir_all(root.join("etc/template")).expect("etc");
@@ -520,7 +521,7 @@ fn e2e(transport: &str) {
                 &json!({"repo_id": "repo-a", "role": "development", "assignment_id": aid,
                 "generation": generation, "sprint_id": "POC-01", "sprint_revision": 5,
                 "task_id": "01-01", "target_sha": SHA1, "expected_current": expected,
-                "limits": limits}),
+                "limits": limits, "branch_ref": "refs/heads/feat/a1"}),
             ),
         )
     };
@@ -538,6 +539,18 @@ fn e2e(transport: &str) {
     }
     assert_eq!(counts(), before);
     let (st, b) = assign("A1", 0, Value::Null, json!({"total_tokens": 40}));
+    assert_eq!(st, 201, "{b}");
+    // 02-05 step 7: the evidence service's record of the assigned branch at the target SHA
+    // (trusted input, fixed here): the GitHub basis of every development resume below
+    let (st, b) = c(
+        "ingest",
+        "POST",
+        "/v0/coordinator/evidence",
+        Some(
+            &json!({"evidence_id": "gh-head-1", "repo_id": "repo-a", "kind": "branch_head",
+                     "sha": SHA1, "ref": "refs/heads/feat/a1", "source_ref": "fixture://github/head"}),
+        ),
+    );
     assert_eq!(st, 201, "{b}");
     let ch = chain("A1", 0);
     assert_eq!(
@@ -902,16 +915,20 @@ fn e2e(transport: &str) {
     // (i) the budget's ledger is busy for 2.5 s: the call would start past the deadline, so
     //     nothing is called
     let lock_path = ledger.join("caller.lock");
+    // the delivery is sent once the lock is held (a signal, not a 200 ms guess; review 6e0ad85
+    // I-a)
+    let (locked_tx, locked) = std::sync::mpsc::channel();
     let busy = std::thread::spawn(move || {
         let f = std::fs::OpenOptions::new()
             .write(true)
             .open(&lock_path)
             .expect("lock file");
         f.lock().expect("lock");
+        locked_tx.send(()).expect("signal");
         std::thread::sleep(Duration::from_millis(2_500));
         drop(f);
     });
-    std::thread::sleep(Duration::from_millis(200));
+    locked.recv().expect("the ledger lock is held");
     let (st, dl) = deliver(
         "lim-key-0020",
         &dbody("A1", 5, "ad", "s20", json!({"new_session": true})),

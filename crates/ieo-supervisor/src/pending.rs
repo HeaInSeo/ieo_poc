@@ -72,6 +72,19 @@ impl Pending {
         .map_err(|e| format!("pending requests: {e}"))
     }
 
+    /// The list file.
+    pub fn path(&self) -> &std::path::Path {
+        &self.path
+    }
+
+    /// Read the list and write it back unchanged: `Err` when it cannot be read or written (review
+    /// 6e0ad85 L-a, checked before a start or reconnect is accepted).
+    pub fn probe(&self) -> Result<(), String> {
+        let _g = self.gate.lock().unwrap_or_else(|e| e.into_inner());
+        let l = self.read()?;
+        self.write(&l)
+    }
+
     /// The list (`Err` when the file cannot be read: the caller fails closed).
     pub fn list(&self) -> Result<Vec<Value>, String> {
         let _g = self.gate.lock().unwrap_or_else(|e| e.into_inner());

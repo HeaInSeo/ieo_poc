@@ -282,7 +282,8 @@ fn e2e(transport: &str) {
         {"name": "assigner", "token_sha256": digest(&tok("assigner")), "kind": "service", "scopes": ["coordinator:assign"], "repo_ids": ["repo-a"]},
         {"name": "operator", "token_sha256": digest(&tok("operator")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-a"]},
         {"name": "operator-b", "token_sha256": digest(&tok("operator-b")), "kind": "service", "scopes": ["roles:control"], "repo_ids": ["repo-b"]},
-        {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"}]});
+        {"name": "sup-dev", "token_sha256": digest(&tok("sup")), "kind": "agent", "scopes": ["checkpoint:report"], "repo_ids": ["repo-a"], "role": "development"},
+        {"name": "ingest", "token_sha256": digest(&tok("ingest")), "kind": "service", "scopes": ["evidence:ingest"], "repo_ids": ["repo-a"]}]});
     std::fs::write(dir.join("tokens.json"), principals.to_string()).expect("tokens");
     let root = dir.join("dev");
     std::fs::create_dir_all(root.join("etc/template")).expect("etc");
@@ -519,11 +520,24 @@ fn e2e(transport: &str) {
             Some(
                 &json!({"repo_id": "repo-a", "role": "development", "assignment_id": "A1",
                 "generation": generation, "sprint_id": "POC-01", "sprint_revision": 5,
-                "task_id": "01-01", "target_sha": SHA1, "expected_current": expected}),
+                "task_id": "01-01", "target_sha": SHA1, "expected_current": expected,
+                "branch_ref": "refs/heads/feat/a1"}),
             ),
         )
     };
     assert_eq!(assign(0, Value::Null).0, 201);
+    // 02-05 step 7: the evidence service's record of the assigned branch at the target SHA
+    // (trusted input, fixed here): the GitHub basis of every development resume below
+    let (st, b) = c(
+        "ingest",
+        "POST",
+        "/v0/coordinator/evidence",
+        Some(
+            &json!({"evidence_id": "gh-head-1", "repo_id": "repo-a", "kind": "branch_head",
+                     "sha": SHA1, "ref": "refs/heads/feat/a1", "source_ref": "fixture://github/head"}),
+        ),
+    );
+    assert_eq!(st, 201, "{b}");
     // the chain of a generation with nothing delivered yet
     let ch = chain(0);
     assert_eq!(
