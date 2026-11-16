@@ -1,0 +1,25 @@
+# 02-05 step 7 mutants: each applied alone to the code of c9be60f, then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). S7-N1..N3 re-check the step-6 not-sent paths (C1-L1a, C1-L1b; review 6e0ad85 I-b "N3") on the new serve step 8. Columns: id | mutation | result | target: failing tests
+S7-G1 | development resume not gated by GitHub | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G2 | a different GitHub head still resumes | KILLED | ieo-coord --lib github: api::tests::the_github_head_is_the_final_basis_of_a_development_resume
+S7-G3 | the pushed SHA is ignored (target SHA expected) | KILLED | ieo-coord --lib github: api::tests::the_github_head_is_the_final_basis_of_a_development_resume
+S7-G4 | a pushed_sha that is not a SHA counts as nothing pushed | KILLED | ieo-coord --lib github: api::tests::the_github_head_is_the_final_basis_of_a_development_resume
+S7-G5 | no GitHub record resumes | KILLED | ieo-coord --lib github: api::tests::the_github_head_is_the_final_basis_of_a_development_resume
+S7-G6 | CI of other SHAs is read | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G7 | one successful CI run is enough | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G8 | a differing CI claim is recorded as matching | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G9 | a CI claim of another SHA is used | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G10 | the guardrail review target is not checked | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G11 | another branch head is used | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G12 | the delivery result does not record github | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G13 | the reconnect body does not carry github | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G14 | the start body does not carry branch_ref | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S7-G15 | the supervisor does not record the pushed SHA | KILLED | ieo-supervisor --test serve: a_run_records_its_worktree_head_and_the_pushed_sha
+S7-G16 | the supervisor does not record the work tree HEAD | KILLED | ieo-supervisor --test serve: a_run_records_its_worktree_head_and_the_pushed_sha
+S7-G17 | the pending list is not checked before a launch (L-a) | KILLED | ieo-supervisor --test serve: a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::grpc; a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::http
+S7-G18 | an assignment branch_ref is not checked | KILLED | ieo-coord --test coordinator: branch_heads_and_assignment_branches_are_checked_refs
+S7-G19 | a branch_head ref is not checked | KILLED | ieo-coord --test coordinator: branch_heads_and_assignment_branches_are_checked_refs
+S7-G20 | a ref file that is not a SHA is taken | KILLED | ieo-supervisor --lib gitref: gitref::tests::head_and_pushed_sha_are_read_from_the_ref_files_only
+S7-N1 | a first action that could not be listed is sent (C1-L1a) | KILLED | ieo-supervisor --test serve: a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::grpc; a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::http
+S7-N2 | a checkpoint report that could not be listed is sent (C1-L1b) | KILLED | ieo-supervisor --test serve: a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::grpc; a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::http
+S7-N3 | the not_sent answer says ok (review 6e0ad85 I-b) | KILLED | ieo-supervisor --test serve: a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::grpc; a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent::http
+# 23 of 23 killed
