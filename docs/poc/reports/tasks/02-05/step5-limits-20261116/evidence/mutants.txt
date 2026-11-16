@@ -1,0 +1,15 @@
+# 02-05 step 5 mutants: each applied alone to the code of 43fad72, then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean of code afterwards). Columns: id | mutation | result | target: failing tests
+S5-M1 | no refusal before the request is recorded | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M2 | the run is not bounded by the assignment remaining | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M3 | total_tokens counts cache_read too | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M4 | an unmeasured run is not a stop | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M5 | consumption of the named generation only | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M6 | time refused only at 0 s left (not the stop grace) | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M7 | request limits above the revision accepted | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M8 | no settlement before the request is checked | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M9 | a record removed from the ledger keeps its row (no withdrawn) | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor ; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc 
+S5-M10 | limit event not recorded | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M11 | assignment limits ignored (revision limits only) | KILLED | ieo-coord --test limits_e2e: assignment_limits_bound_and_stop_deliveries ; assignment_limits_bound_and_stop_deliveries_over_grpc 
+S5-M12 | HTTP statements unbounded (NoGuard) | KILLED | ieo-coord --test coordinator: 
+S5-F | review debf413 mutant F: chain none link ignores the attempt | KILLED | ieo-coord --test coordinator: a_lost_first_action_report_is_filled_from_the_run_checkpoint 
+# S5-M12: the statement-timeout test never returned (the held lock is released only after the request answers); the 1800 s wrapper ended it — a failing test, counted as killed
