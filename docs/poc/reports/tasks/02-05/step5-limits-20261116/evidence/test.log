@@ -1,11 +1,11 @@
-# commit e8ce65886a075d30b463cdf078a75d9d62662666 · 2026-11-16T05:44:49Z · git status --porcelain (before run): 0 entries
+# commit 9f0cb933c7f97286f48ba1a0094724060a432037 · 2026-11-16T06:42:21Z · git status --porcelain (before run): 0 entries
 rustc 1.99.1 (58cf8f9c3 2026-10-13)
 cargo 1.99.1 (5f94df478 2026-08-27)
 # cargo fmt --all -- --check
 fmt ok
 # cargo clippy -j 4 --workspace --all-targets --locked -- -D warnings
     Checking ieo-coord v0.1.0 (/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s5wt/crates/ieo-coord)
-    Finished `dev` profile [unoptimized] target(s) in 1.22s
+    Finished `dev` profile [unoptimized] target(s) in 5.48s
 clippy rc=0
 # proto: git diff --stat 1b5bc1f -- contracts/proto (empty: no proto change, buf not run)
 # openapi-spec-validator
@@ -14,15 +14,15 @@ contracts/ieo-api-v0.openapi.yaml: OK
   "schema_errors": 0,
 validate rc=0
 # cargo test -j 4 --workspace --locked (RUST_TEST_THREADS=4; IEO_TEST_DB_URL: throwaway test DB 55432, value not recorded)
-   Compiling ieo-coord v0.1.0 (<scratchpad>/s5wt/crates/ieo-coord)
-    Finished `test` profile [unoptimized] target(s) in 3.34s
+    Finished `test` profile [unoptimized] target(s) in 0.19s
      Running unittests src/lib.rs (<scratchpad>/target-x08/debug/deps/ieo_coord-095b99a5902ddf99)
 
-running 2 tests
-test api::tests::legacy_reasons_split_fail_closed ... ok
+running 3 tests
+test delivery::tests::delivery_bounds_keep_the_call_inside_the_in_flight_window ... ok
 test api::tests::an_unfinished_run_of_an_older_generation_is_reconciliation ... ok
+test api::tests::legacy_reasons_split_fail_closed ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
      Running unittests src/bin/ieo-coord.rs (<scratchpad>/target-x08/debug/deps/ieo_coord-65fe9c73f25f024b)
 
@@ -36,7 +36,7 @@ running 2 tests
 test the_chain_links_delivery_takeover_and_first_action ... ok
 test the_chain_links_delivery_takeover_and_first_action_over_grpc ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.38s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.86s
 
      Running tests/checkpoint_e2e.rs (<scratchpad>/target-x08/debug/deps/checkpoint_e2e-a24a46d67e89f440)
 
@@ -44,7 +44,7 @@ running 2 tests
 test checkpoints_are_reported_compared_and_judged_across_restarts ... ok
 test checkpoints_are_reported_compared_and_judged_across_restarts_over_grpc ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.79s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.58s
 
      Running tests/coordinator.rs (<scratchpad>/target-x08/debug/deps/coordinator-fe5c9b551ffac7cc)
 
@@ -54,8 +54,8 @@ test a_draft_with_unbound_limits_does_not_block_a_running_execution ... ok
 test a_draft_revision_never_changes_a_running_execution ... ok
 test a_failure_after_the_first_write_rolls_back_the_whole_request ... ok
 test a_pinned_continuation_obeys_the_latest_attempt_ceiling ... ok
-test a_raised_ceiling_reached_again_asks_again ... ok
 test a_running_assignment_stays_on_its_revision ... ok
+test a_raised_ceiling_reached_again_asks_again ... ok
 test a_sprint_cannot_be_moved_to_another_repo ... ok
 test a_test_id_cannot_take_over_an_existing_sprint_or_the_notion_id ... ok
 test a_lost_first_action_report_is_filled_from_the_run_checkpoint ... ok
@@ -63,60 +63,60 @@ test an_import_replay_answers_only_within_its_repo ... ok
 test an_import_owned_sprint_changes_only_through_imports ... ok
 test a_takeover_is_stored_only_for_a_delivery_of_its_assignment_generation ... ok
 test an_imported_draft_can_be_promoted_only_with_its_own_tasks_and_source ... ok
-test an_imported_draft_with_unresolved_reasons_cannot_execute ... ok
 test an_import_whose_url_names_another_page_is_refused ... ok
+test an_imported_draft_with_unresolved_reasons_cannot_execute ... ok
 test attempt_ceiling_is_cumulative_and_records_one_decision_request ... ok
 test authentication_and_scope_refusals_change_nothing ... ok
 test c2_a_copy_under_another_sprint_id_is_still_gated ... ok
 test c2_a_re_gating_import_stops_a_running_assignment ... ok
 test c2_a_binding_sprint_id_is_reserved_for_its_repo ... ok
 test c2_a_trusted_release_and_review_allow_execution ... ok
-test c2_an_exception_covers_only_the_content_it_approved ... ok
 test c2_a_user_exception_applies_only_to_its_test_and_repo ... ok
+test c2_an_exception_covers_only_the_content_it_approved ... ok
 test c2_an_exception_does_not_lift_missing_inputs ... ok
 test c2_claimed_release_without_a_trusted_record_is_refused ... ok
 test c2_content_returning_to_a_gated_state_gates_again ... ok
 test c2_the_startup_check_refuses_a_binding_on_another_repos_sprint ... ok
 test c2_gated_import_cannot_execute_even_with_reasons_removed ... ok
-test claims_are_kept_apart_from_the_completion_judgment ... ok
 test claims_late_duplicate_stale_and_mismatched ... ok
-test central_checkpoints_keep_sequence_identity_and_tamper_reports ... ok
-test credentials_refuse_inconsistent_principals ... ok
+test claims_are_kept_apart_from_the_completion_judgment ... ok
 test converting_a_sprint_again_is_a_new_revision_not_a_task_conflict ... ok
+test credentials_refuse_inconsistent_principals ... ok
+test central_checkpoints_keep_sequence_identity_and_tamper_reports ... ok
 test concurrent_duplicates_and_competing_issuers ... ok
-test development_and_guardrail_claims_race_into_one_ordered_stream ... ok
 test draft_and_superseded_revisions_are_not_assignable ... ok
 test every_emitted_code_is_declared_in_the_openapi_contract ... ok
-test g2_identical_content_on_two_pages_is_gated_and_excepted_per_page ... ok
+test development_and_guardrail_claims_race_into_one_ordered_stream ... ok
 test event_pages_are_append_only_and_reads_change_nothing ... ok
-test g4_migration_from_earlier_keys_keeps_a_page_imported_under_two_test_ids ... ok
+test g2_identical_content_on_two_pages_is_gated_and_excepted_per_page ... ok
 test g1_a_copy_with_a_relabelled_kind_or_another_digest_is_still_gated ... ok
+test g4_migration_from_earlier_keys_keeps_a_page_imported_under_two_test_ids ... ok
 test g3_a_page_belongs_to_one_test_id ... ok
+test h2_every_reader_takes_the_same_latest_import ... ok
 test github_reviews_count_only_at_the_head_and_comments_do_not_clear_changes_requested ... ok
 test h1_a_reference_rewritten_to_another_imported_page_does_not_hide_the_cited_content ... ok
-test h2_every_reader_takes_the_same_latest_import ... ok
 test health_is_liveness_only_and_needs_no_credential ... ok
-test human_input_conversion_needs_an_approved_binding ... ok
 test h3_an_exception_recorded_without_a_page_never_matches ... ok
+test human_input_conversion_needs_an_approved_binding ... ok
 test i2_a_replay_matches_the_highest_revision_whatever_the_clock ... ok
-test i1_only_the_named_pages_latest_content_hides_the_cited_digest ... ok
 test i2_an_import_is_stamped_after_the_registry_lock ... ok
+test i1_only_the_named_pages_latest_content_hides_the_cited_digest ... ok
+test independent_repos_progress_separately ... ok
 test i2_the_gate_reads_the_highest_revision_whatever_the_clock ... ok
 test import_sprint_numbers_and_own_revisions_do_not_conflict ... ok
-test independent_repos_progress_separately ... ok
 test label_and_estimate_changes_keep_a_prerequisite_verdict_but_definition_changes_void_it ... ok
 test k1_a_page_imported_under_two_test_ids_fails_closed ... ok
 test l3_page_ids_are_accepted_only_in_canonical_form ... ok
-test n2_a_re_gated_page_keeps_an_unchanged_executable_copy_refused ... ok
 test notion_import_registers_a_draft_once_and_revises_on_change ... ok
+test n2_a_re_gated_page_keeps_an_unchanged_executable_copy_refused ... ok
 test only_an_executable_reviewed_newer_revision_sets_a_pinned_ceiling ... ok
-test ownership_head_is_compare_and_swap ... ok
 test policy_is_pinned_and_fails_closed ... ok
+test ownership_head_is_compare_and_swap ... ok
 test one_assignment_id_raced_by_two_roles_never_errors ... ok
-test prerequisites_need_a_verified_accepted_verdict ... ok
 test registration_is_format_intake_and_semantic_review_is_separate ... ok
-test resume_judgment_compares_local_central_and_assignment ... ok
 test repo_scope_role_control_needs_its_scope_and_reports_unreachable_roles ... ok
+test prerequisites_need_a_verified_accepted_verdict ... ok
+test resume_judgment_compares_local_central_and_assignment ... ok
 test self_review_is_refused ... ok
 test review_inputs_are_current_independent_and_for_the_head ... ok
 test repro_requests_new_must_be_current_replays_are_not_requeued ... ok
@@ -124,13 +124,13 @@ test the_assignment_chain_is_read_by_clients_of_its_repo_only ... ok
 test u2_an_older_revision_of_an_imported_sprint_gets_the_revision_code_first ... ok
 test u2_an_imported_sprint_with_a_01_07_error_gets_the_01_07_code_first ... ok
 test u2_ownership_covers_every_outcome_the_01_07_checks_accept ... ok
-test verdict_uses_github_and_run_evidence_for_the_recorded_sha_only ... ok
 test verdicts_judge_the_assigned_revision_and_a_changed_task_needs_a_new_verdict ... ok
+test verdict_uses_github_and_run_evidence_for_the_recorded_sha_only ... ok
 test whoever_registered_or_promoted_a_revision_cannot_review_it ... ok
 test u2_the_import_gate_follows_the_01_07_checks_and_the_repo_rule ... ok
 test an_http_statement_waits_at_most_the_statement_timeout ... ok
 
-test result: ok. 80 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.91s
+test result: ok. 80 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.84s
 
      Running tests/delivery_e2e.rs (<scratchpad>/target-x08/debug/deps/delivery_e2e-64cf0e8bb4cde8af)
 
@@ -138,7 +138,7 @@ running 2 tests
 test deliveries_go_through_compare_budget_and_the_supervisor ... ok
 test deliveries_go_through_compare_budget_and_the_supervisor_over_grpc ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.21s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.14s
 
      Running tests/grpc.rs (<scratchpad>/target-x08/debug/deps/grpc-8412b192e82ac3c6)
 
@@ -154,15 +154,17 @@ test transport_limits_and_utf8_refusals ... ok
 test an_answer_lost_after_commit_is_found_by_its_key_and_not_stored_twice ... ok
 test both_transports_give_the_same_answers_and_the_same_database ... ok
 
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.58s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.33s
 
      Running tests/limits_e2e.rs (<scratchpad>/target-x08/debug/deps/limits_e2e-53b1ba2688c30f8c)
 
 running 2 tests
+test assignment_limits_bound_and_stop_deliveries has been running for over 60 seconds
+test assignment_limits_bound_and_stop_deliveries_over_grpc has been running for over 60 seconds
 test assignment_limits_bound_and_stop_deliveries ... ok
 test assignment_limits_bound_and_stop_deliveries_over_grpc ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.22s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 125.99s
 
      Running tests/operations.rs (<scratchpad>/target-x08/debug/deps/operations-a4e8e67dbc2b23da)
 
@@ -182,7 +184,7 @@ test repo_stop_sends_a_role_stop_to_each_and_reports_each_role ... ok
 test a_role_that_does_not_stop_in_time_or_is_unreachable_is_reported ... ok
 test both_roles_get_their_stop_before_either_is_waited_for ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s
 
      Running tests/shutdown.rs (<scratchpad>/target-x08/debug/deps/shutdown-60912105f33ac1d5)
 
@@ -252,7 +254,7 @@ test stray_background_process_does_not_hang_the_collector ... ok
 test timeout_escalates_to_kill_when_term_ignored ... ok
 test output_held_by_detached_descendant_is_kept_and_flagged ... ok
 
-test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.39s
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.38s
 
      Running unittests src/lib.rs (<scratchpad>/target-x08/debug/deps/ieo_notion-3895cd797aa7f42a)
 
@@ -280,7 +282,7 @@ test snapshot_round_trips_and_detects_tampering ... ok
 test notion_failures_are_errors_and_never_leak_the_token ... ok
 test rest_api_reader_produces_the_same_shape ... ok
 
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running unittests src/lib.rs (<scratchpad>/target-x08/debug/deps/ieo_proto-d66e54db9f326233)
 
@@ -307,18 +309,18 @@ test body_sha_must_match_the_assignment_sha ... ok
 test completion_summary_scopes ... ok
 test claim_authorization ... ok
 test bad_next_check_at_is_rejected ... ok
+test decision_mismatch ... ok
 test delay_reasons_are_rendered ... ok
 test decision_deadline_is_not_a_date ... ok
-test decision_mismatch ... ok
+test estimated_without_measurement ... ok
 test delay_without_reason ... ok
 test developer_claims_verified ... ok
-test estimated_without_measurement ... ok
 test finding_lacks_original_log ... ok
-test fractional_seconds_are_ordered ... ok
 test headline_states_evidence_level_and_claimed_completion ... ok
+test fractional_seconds_are_ordered ... ok
 test input1_current_ci_with_old_sha_approval_needs_current_review ... ok
-test four_role_examples_are_valid ... ok
 test input2_lost_response_is_held_without_user_resend ... ok
+test four_role_examples_are_valid ... ok
 test input3_decision_request_is_actionable ... ok
 test input4_reobservation_is_suppressed ... ok
 test late_before_deadline_rejected ... ok
@@ -327,9 +329,9 @@ test missing_contract_revision ... ok
 test old_actor_string ... ok
 test never_issued_assignment_or_generation_is_409 ... ok
 test options_mismatch_alone_is_rejected ... ok
+test material_changes_notify_and_reorders_do_not ... ok
 test recommendation_must_be_an_option ... ok
 test reject_without_findings ... ok
-test material_changes_notify_and_reorders_do_not ... ok
 test render_has_five_parts_in_order ... ok
 test same_id_replay_is_checked_before_assignment ... ok
 test reversed_forecast ... ok
@@ -365,9 +367,9 @@ test deadline_set_requires_timestamp ... ok
 test generated_id_colliding_with_registered_task_is_rejected ... ok
 test integral_float_minutes_are_converted_not_zeroed ... ok
 test missing_required_human_field ... ok
+test ids_are_stable_for_same_input ... ok
 test overflowing_minutes_are_rejected_not_panicking ... ok
 test reversed_estimate ... ok
-test ids_are_stable_for_same_input ... ok
 test sprint_number_must_fit_two_digits ... ok
 test undecided_deadline_needs_reason ... ok
 test set_deadline_reason_and_generated_fields_are_recorded ... ok
@@ -381,24 +383,24 @@ test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 running 25 tests
 test all_nine_package_digests_reproduce ... ok
+test bound_ready_spec_accepted_for_executable_registration ... ok
 test baseline_poc01_draft_accepted_and_digest_matches_package ... ok
 test dependency_cycle ... ok
-test bound_ready_spec_accepted_for_executable_registration ... ok
 test digest_mismatch ... ok
 test duplicate_task_id_within_spec ... ok
 test duplicate_task_id_across_registered_sprint ... ok
 test every_rejection_has_field_and_correction ... ok
-test missing_field_is_distinguished ... ok
 test draft_registered_spec_is_not_idempotent_for_executable_intake ... ok
 test lower_revision_after_higher_is_superseded ... ok
+test missing_field_is_distinguished ... ok
 test historical_lookup_of_old_revision_does_not_reactivate_it ... ok
 test prerequisite_with_wrong_plan_version_is_undefined ... ok
 test old_draft_revision_cannot_be_promoted_after_newer_exists ... ok
-test ready_with_unresolved_bindings_is_format_error ... ok
 test non_integer_numbers_rejected_before_digest ... ok
+test ready_with_unresolved_bindings_is_format_error ... ok
 test ready_without_repository_url_fails_format_layer ... ok
-test registry_never_overwrites_a_revision_or_narrows_its_mode ... ok
 test revision_identity_conflict_and_idempotent_resubmit ... ok
+test registry_never_overwrites_a_revision_or_narrows_its_mode ... ok
 test schema_violation_other_than_missing ... ok
 test registry_recomputes_the_digest_and_refuses_missing_or_forged_ones ... ok
 test spec_estimate_range_order_checked ... ok
@@ -418,7 +420,7 @@ test first_action::tests::the_first_action_is_the_first_tool_use_or_text_after_i
 test provider::tests::contract_values_from_raw_signals ... ok
 test serve::tests::a_stop_before_the_spawn_starts_nothing ... ok
 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
      Running unittests src/bin/ieo-role-call.rs (<scratchpad>/target-x08/debug/deps/ieo_role_call-6b4e515846c98faa)
 
@@ -443,9 +445,9 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 32 tests
 test a_breaking_signal_during_the_run_stops_the_budget ... ok
+test a_call_left_in_flight_blocks_until_reconciled ... ok
 test a_call_is_held_without_a_no_overage_observation ... ok
 test a_call_waits_briefly_for_a_released_lock ... ok
-test a_call_left_in_flight_blocks_until_reconciled ... ok
 test a_cleanup_failure_or_a_run_error_asks_for_a_person ... ok
 test a_correction_is_measured_again_when_read ... ok
 test a_correction_must_match_the_run_it_corrects ... ok
@@ -475,7 +477,7 @@ test the_environment_the_stop_and_the_guard_observation_decide_the_charge ... ok
 test the_role_share_bounds_runs_and_time ... ok
 test transcripts_only_for_the_run_s_own_children_and_kept_privately ... ok
 
-test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.48s
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.81s
 
      Running tests/central.rs (<scratchpad>/target-x08/debug/deps/central-5dc628f7d6dce8c6)
 
@@ -485,7 +487,7 @@ test answers_are_classified_alike_over_both_transports ... ok
 test a_status_without_a_trailer_is_unknown_and_is_not_resent ... ok
 test the_size_pre_check_refuses_locally_like_the_http_400 ... ok
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
 
      Running tests/run_guard.rs (<scratchpad>/target-x08/debug/deps/run_guard-32c0f3b0acbce939)
 
@@ -497,14 +499,14 @@ test a_stop_with_sigterm_first_lets_the_process_exit_within_the_grace ... ok
 test a_process_ignoring_sigterm_is_killed_after_the_grace ... ok
 test a_closed_or_unreadable_stream_stops_a_running_process ... ok
 test a_stopped_run_is_charged_unmeasured_even_with_a_result_written_on_the_way_out ... ok
-kill: sending signal to 299325 failed: No such process
+kill: sending signal to 414311 failed: No such process
 test an_error_return_keeps_the_cleanup_report ... ok
 test a_stopped_run_is_unmeasured_even_when_its_late_result_looks_complete ... ok
 test an_extra_usage_or_limit_signal_stops_the_run ... ok
 test charge_compares_every_part_and_never_fills_a_gap ... ok
-test a_failed_group_kill_is_reported_and_the_leader_is_still_stopped ... ok
-test limits_for_the_next_run_come_from_the_pre_run_decision ... ok
 test an_exited_run_is_charged_with_the_collector_figure_unless_it_is_below_the_observed ... ok
+test limits_for_the_next_run_come_from_the_pre_run_decision ... ok
+test a_failed_group_kill_is_reported_and_the_leader_is_still_stopped ... ok
 test an_unwritable_evidence_path_fails_before_anything_starts ... ok
 test observed_cache_read_reaching_the_room_stops_the_run ... ok
 test observed_tokens_reaching_the_room_stop_the_run ... ok
@@ -519,7 +521,7 @@ test the_drain_after_exit_is_bounded_and_descendants_are_killed ... ok
 test the_copy_after_a_stop_is_bounded_even_if_a_descendant_holds_the_pipe ... ok
 test the_total_time_left_ends_the_run ... ok
 
-test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.88s
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.93s
 
      Running tests/serve.rs (<scratchpad>/target-x08/debug/deps/serve-d1fe532b4874bed6)
 
@@ -564,7 +566,7 @@ test the_largest_end_line_of_an_attempt_counts ... ok
 test the_same_attempt_with_the_same_content_replays_the_stored_answer ... ok
 test the_service_enforces_its_own_budget_ceiling ... ok
 
-test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.72s
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.05s
 
      Running tests/supervisor.rs (<scratchpad>/target-x08/debug/deps/supervisor-42f47433f8984bd4)
 
