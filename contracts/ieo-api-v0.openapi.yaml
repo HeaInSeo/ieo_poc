@@ -1590,7 +1590,10 @@ components:
         input (`branch_head`, `ci_run`), not a live GitHub read; null when no comparison was made.
       type: [object, 'null']
       properties:
-        source: { type: string }
+        result: { type: string, enum: [match, mismatch, not_observed] }
+        source: { type: string, description: 'states that the input is evidence-service records, not a live GitHub read' }
+        assignment_id: { type: string }
+        generation: { type: integer }
         branch_ref: { type: [string, 'null'] }
         worktree_head: { description: the central checkpoint's claim (a SHA or `not_observed`) }
         pushed_sha: { description: the central checkpoint's claim (a SHA or null) }

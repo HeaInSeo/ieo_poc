@@ -685,6 +685,14 @@ fn e2e(transport: &str) {
         "{cmp}"
     );
     assert_eq!(cmp["github"]["expected_from"], "target_sha", "{cmp}");
+    // the reusable check's own result and the nature of its input (02-05 step 7b reuses it)
+    assert_eq!(cmp["github"]["result"], "not_observed", "{cmp}");
+    assert!(
+        cmp["github"]["source"]
+            .as_str()
+            .is_some_and(|x| x.contains("not a live GitHub read")),
+        "{cmp}"
+    );
     // the evidence service records the branch at the target SHA (nothing pushed yet)
     head("gh-head-1", SHA1);
     let cmp = compare("development");
@@ -698,6 +706,7 @@ fn e2e(transport: &str) {
         (Some(SHA1), Some(true), Some("none")),
         "{cmp}"
     );
+    assert_eq!(cmp["github"]["result"], "match", "{cmp}");
 
     // 4. a normal after_run → reconnect with the same session; the logical name is recorded but
     //    is not the resume key (C1)
@@ -1421,6 +1430,15 @@ fn e2e(transport: &str) {
         "{cmp}"
     );
     assert_eq!(cmp["github"]["expected_from"], "pushed_sha", "{cmp}");
+    assert_eq!(
+        (
+            cmp["github"]["result"].as_str(),
+            cmp["github"]["assignment_id"].as_str(),
+            cmp["github"]["generation"].as_i64()
+        ),
+        (Some("mismatch"), Some("A1"), Some(1)),
+        "{cmp}"
+    );
     // the evidence service sees the push: resume; the CI of the old head is not this head's
     head("gh-head-2", SHA_P);
     let cmp = compare("development");

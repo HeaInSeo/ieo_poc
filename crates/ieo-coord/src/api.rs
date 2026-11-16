@@ -4693,7 +4693,6 @@ fn github_gate(
     if decision != "resume_allowed" {
         return Ok((decision, reasons, Value::Null));
     }
-    let (target_sha, branch) = target(tx, &h.0, h.1)?;
     let cp: Value = match central {
         Some(c) => tx
             .query_opt(
@@ -4704,6 +4703,34 @@ fn github_gate(
             .unwrap_or(Value::Null),
         None => Value::Null,
     };
+    let (d, why, github) = github_head_check(tx, repo, h, &cp)?;
+    match why {
+        None => Ok((d, reasons, github)),
+        Some(w) => Ok((d, vec![w], github)),
+    }
+}
+
+/// The GitHub head check of one development checkpoint against one assignment generation (02-05
+/// step 7), reusable by any judgment that needs it (the recovery of step 7b among them): the
+/// assignment's `branch_ref` and `target_sha`, the checkpoint's `pushed_sha`, and the newest
+/// `branch_head` evidence of that branch. Returns the decision (`resume_allowed` on a match,
+/// `external_reconciliation_required` on a mismatch, `not_observed` without a branch or a
+/// record), the reason of a refusal, and the comparison with its evidence: `result`
+/// (`match`/`mismatch`/`not_observed`), `source` (the input is evidence-service records, not a
+/// live GitHub read), the head's evidence id, the CI result at that head and an agent's
+/// differing CI claim. Read-only.
+pub(crate) fn github_head_check(
+    tx: &mut Transaction,
+    repo: &str,
+    assignment: &(String, i64),
+    checkpoint: &Value,
+) -> Result<(&'static str, Option<String>, Value), Resp> {
+    let row = tx.query_one(
+        "SELECT target_sha, request->>'branch_ref' FROM assignments
+         WHERE assignment_id = $1 AND generation = $2",
+        &[&assignment.0, &assignment.1],
+    )?;
+    let (target_sha, branch) = (row.get::<_, String>(0), row.get::<_, Option<String>>(1));
     let gh_head = match &branch {
         Some(b) => tx.query_opt(
             "SELECT evidence_id, sha, body->>'source_ref' FROM evidence
@@ -4723,12 +4750,20 @@ fn github_gate(
     let (d, why, expected) = github_judgment(
         branch.as_deref(),
         &target_sha,
-        &cp["pushed_sha"],
+        &checkpoint["pushed_sha"],
         gh_head.as_ref().map(|x| x.1.as_str()),
     );
+    let result = match d {
+        "resume_allowed" => "match",
+        "not_observed" => "not_observed",
+        _ => "mismatch",
+    };
     let mut github = json!({
+        "result": result,
         "source": "evidence:ingest (trusted service input; not a live GitHub read)",
-        "branch_ref": branch, "worktree_head": cp["worktree_head"], "pushed_sha": cp["pushed_sha"],
+        "assignment_id": assignment.0, "generation": assignment.1,
+        "branch_ref": branch, "worktree_head": checkpoint["worktree_head"],
+        "pushed_sha": checkpoint["pushed_sha"],
         "expected_sha": expected.as_ref().map(|e| e.0.clone()),
         "expected_from": expected.as_ref().map(|e| e.1),
         "head": gh_head.as_ref().map(|(id, sha, src)| json!({"evidence_id": id, "sha": sha,
@@ -4736,14 +4771,11 @@ fn github_gate(
         "matches": d == "resume_allowed", "ci": null, "ci_claim": null});
     if let Some((_, sha, _)) = &gh_head {
         let ci = ci_at(tx, repo, sha)?;
-        let result = ci["result"].as_str().unwrap_or("none").to_string();
+        let ci_result = ci["result"].as_str().unwrap_or("none").to_string();
         github["ci"] = ci;
-        github["ci_claim"] = ci_claim(tx, repo, h, sha, &result)?;
+        github["ci_claim"] = ci_claim(tx, repo, assignment, sha, &ci_result)?;
     }
-    match why {
-        None => Ok((d, reasons, github)),
-        Some(w) => Ok((d, vec![w], github)),
-    }
+    Ok((d, why, github))
 }
 
 /// The §5-2 resume judgment from the central record, the current assignment and the
