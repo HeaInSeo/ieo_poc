@@ -693,6 +693,46 @@ fn e2e(transport: &str) {
             .is_some_and(|x| x.contains("not a live GitHub read")),
         "{cmp}"
     );
+    // the run's checkpoint names the branch and observed no push: the target SHA is expected
+    assert_eq!(
+        (
+            cmp["github"]["checkpoint_branch_ref"].as_str(),
+            cmp["github"]["push_provenance"].as_str()
+        ),
+        (
+            Some(BRANCH),
+            Some("no push observed on the branch (target SHA expected)")
+        ),
+        "{cmp}"
+    );
+    // review f0e0ca9 M-1 (developer decision, fail closed): an explicit new session chosen from
+    // `resume_allowed` (same generation: the same branch and work tree) is GitHub-gated too. No
+    // record → not_called with the GitHub decision; a different head → not_called
+    let n = (launches(), runs());
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0090",
+        "development",
+        &dbody("a90", 0, "s90", json!({"new_session": true})),
+    );
+    assert_eq!(st, 201, "{d}");
+    assert_eq!(outcome(&d), o("not_observed", None, "not_called"), "{d}");
+    assert_eq!(d["result"]["github"]["result"], "not_observed", "{d}");
+    head("gh-head-0", SHA2);
+    let (st, d) = deliver(
+        "operator",
+        "dlv-key-0091",
+        "development",
+        &dbody("a91", 0, "s91", json!({"new_session": true})),
+    );
+    assert_eq!(st, 201, "{d}");
+    assert_eq!(
+        outcome(&d),
+        o("external_reconciliation_required", None, "not_called"),
+        "{d}"
+    );
+    assert_eq!(d["result"]["github"]["result"], "mismatch", "{d}");
+    assert_eq!((launches(), runs()), n, "nothing was called");
     // the evidence service records the branch at the target SHA (nothing pushed yet)
     head("gh-head-1", SHA1);
     let cmp = compare("development");
@@ -793,12 +833,23 @@ fn e2e(transport: &str) {
         "operator",
         "dlv-key-0003",
         "development",
-        &dbody("a3", 0, "s9", json!({"prompt": "SLEEP"})),
+        &dbody(
+            "a3",
+            0,
+            "s9",
+            json!({"prompt": "SLEEP", "new_session": true}),
+        ),
     );
+    // review f0e0ca9 M-1: with a matching head, the explicit new session starts, and its start
+    // carries the GitHub comparison too
     assert_eq!(
         outcome(&d3),
-        o("resume_allowed", Some("reconnect"), "accepted"),
+        o("resume_allowed", Some("start"), "accepted"),
         "{st} {d3}"
+    );
+    assert_eq!(
+        d3["result"]["supervisor"]["body"]["accepted"]["session_id"], "s9",
+        "{d3}"
     );
     assert_eq!(
         d3["result"]["github"]["ci"],
@@ -1331,14 +1382,14 @@ fn e2e(transport: &str) {
 
     // every run went through a delivery; the database holds every request and result
     assert_eq!(runs(), 5);
-    // 18 deliveries (the 19th is refused unrecorded, 02-05 step 5) and the fixture of step 7's
-    // crafted takeover (02-05 step 4)
-    assert_eq!(count("role_deliveries"), 19);
+    // 20 deliveries (the 21st is refused unrecorded, 02-05 step 5; two are step 7's gated new
+    // sessions) and the fixture of step 7's crafted takeover (02-05 step 4)
+    assert_eq!(count("role_deliveries"), 21);
     // each run that started reported its takeover and after_run; refusals reported nothing
     assert_eq!(count("role_checkpoints"), 12);
     // every takeover is linked to its delivery: the five runs and step 7's (02-05 step 4)
     assert_eq!(count("role_takeovers"), 6);
-    assert_eq!(count("role_delivery_results"), 21);
+    assert_eq!(count("role_delivery_results"), 23);
     let n: i64 = db
         .query_one(
             "SELECT count(*) FROM role_delivery_results WHERE outcome = 'accepted'",
@@ -1391,11 +1442,11 @@ fn e2e(transport: &str) {
     );
     // a push: the after_run checkpoint names the pushed SHA (crafted here as the supervisor
     // reports it; its own recording from the work tree is tested in ieo-supervisor)
-    let push_report = |seq: u64, pushed: Value, report_it: bool| {
+    let push_report_on = |branch: &str, seq: u64, pushed: Value, report_it: bool| {
         let mut cp: Value =
             serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("cp");
         cp["seq"] = json!(seq);
-        cp["branch_ref"] = json!(BRANCH);
+        cp["branch_ref"] = json!(branch);
         cp["pushed_sha"] = pushed;
         let raw = serde_json::to_string_pretty(&cp).expect("j");
         if report_it {
@@ -1414,6 +1465,8 @@ fn e2e(transport: &str) {
         }
         std::fs::write(&cp_path, &raw).expect("local");
     };
+    let push_report =
+        |seq: u64, pushed: Value, report_it: bool| push_report_on(BRANCH, seq, pushed, report_it);
     let seq =
         serde_json::from_slice::<Value>(&std::fs::read(&cp_path).expect("cp")).expect("cp")["seq"]
             .as_u64()
@@ -1492,6 +1545,29 @@ fn e2e(transport: &str) {
             ))),
         "{cmp}"
     );
+    // review f0e0ca9 L-2: a checkpoint written for another branch: its pushed SHA is not this
+    // branch's, even when it equals this branch's GitHub head
+    push_report_on("refs/heads/other", seq + 3, json!(SHA_P), true);
+    let cmp = compare("development");
+    assert_eq!(
+        (
+            cmp["decision"].as_str(),
+            cmp["github"]["result"].as_str(),
+            cmp["github"]["push_provenance"].as_str()
+        ),
+        (
+            Some("external_reconciliation_required"),
+            Some("mismatch"),
+            Some("checkpoint names another branch")
+        ),
+        "{cmp}"
+    );
+    assert!(
+        cmp["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("refs/heads/other is not the assignment's")),
+        "{cmp}"
+    );
     // a guardrail whose review target is not the development assignment's target SHA runs
     // nothing: a new review assignment is needed
     assert_eq!(compare("guardrail")["decision"], "no_checkpoint");
@@ -1517,7 +1593,8 @@ fn e2e(transport: &str) {
     assert!(
         cmp["reasons"][0]
             .as_str()
-            .is_some_and(|r| r.contains("new review assignment")),
+            // one line, no run of spaces from a broken continuation (review f0e0ca9 L-1)
+            .is_some_and(|r| r.contains("target SHA 1111") && !r.contains("  ")),
         "{cmp}"
     );
     let n = launches();

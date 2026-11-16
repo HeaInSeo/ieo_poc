@@ -644,6 +644,8 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     }
+    // the GitHub comparison of the judgment made under the budget's lock (review f0e0ca9 I-6)
+    let github = Some(again.body["github"].clone()).filter(|g| !g.is_null());
     // the delivery id travels with the start (02-05 step 4): the supervisor carries it on the
     // run's checkpoints and the takeover is linked to this delivery
     let mut extra = json!({"target_sha": d["target_sha"], "delivery_id": id});
@@ -664,6 +666,7 @@ pub fn deliver(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
     let mut o = base("unknown");
+    o.github = github.clone();
     o.limits = Some(sent["limits"].clone());
     o.sent_sha256 = Some(sent_sha256);
     match adm.start_with(&plan, &call, &caller::Http, &extra) {

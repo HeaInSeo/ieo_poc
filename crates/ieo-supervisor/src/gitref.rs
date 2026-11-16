@@ -129,6 +129,11 @@ mod tests {
         assert_eq!(pushed(&d, "refs/heads/feat/x"), None);
         assert_eq!(pushed(&d, "feat/x"), None);
         assert_eq!(pushed(&d, "refs/heads/../../HEAD"), None);
+        // a symbolic HEAD that climbs out of refs/ to a file holding a SHA is not followed
+        // (review f0e0ca9 L-3)
+        std::fs::write(g.join("HEAD-sha"), format!("{A}\n")).expect("HEAD-sha");
+        std::fs::write(g.join("HEAD"), "ref: refs/../HEAD-sha\n").expect("HEAD");
+        assert_eq!(head(&d), None);
         // a detached HEAD
         std::fs::write(g.join("HEAD"), format!("{B}\n")).expect("detached");
         assert_eq!(head(&d).as_deref(), Some(B));

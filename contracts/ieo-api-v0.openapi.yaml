@@ -16,9 +16,13 @@ info:
     `github` holds the comparison, the CI result at that head from `ci_run` only (`success`/`failure`/`none`; other
     SHAs never read) and an agent's differing CI claim (the GitHub record is used). Guardrail: new decision
     `stale_target` (nothing runs) while the review target is not the current development assignment's
-    `target_sha`. deliverAssignment records `github` with its result and sends `branch_ref` and, on a resume,
-    `github` {branch_ref, head_sha, ci} with the start or reconnect. **Behaviour changes:** a development resume
-    without a matching GitHub record is no longer `resume_allowed` (compareCheckpoint and deliverAssignment); the
+    `target_sha`. deliverAssignment records `github` with its result and sends `branch_ref` and, whenever the call
+    is chosen from `resume_allowed` (a reconnect, or an explicit new session of the same generation), `github`
+    {branch_ref, head_sha, ci} with the start or reconnect. **Behaviour changes:** a development resume
+    without a matching GitHub record is no longer `resume_allowed` (compareCheckpoint and deliverAssignment), and
+    so an explicit `new_session` of the same generation over an after_run checkpoint is not called either
+    (review f0e0ca9 M-1, fail closed); a new session of a new generation (`stale_generation`) and a `no_checkpoint`
+    start are not GitHub-gated; the
     guardrail's `resume_allowed`, `no_checkpoint` and `stale_generation` become `stale_target` while its target is
     stale; `decision` has a new value.
     0.14.0 (02-05 step 6, additive): external-request tracking (C9, 02-04 item 3; runtime contract revision 13 §16).
@@ -757,7 +761,9 @@ paths:
         and the CI result at that head (`ci_run` evidence of that SHA only). Guardrail: `stale_target` while its
         assignment's `target_sha` is not the current development assignment's (would otherwise be `resume_allowed`,
         `no_checkpoint` or `stale_generation`): a new review assignment is needed. The GitHub records are
-        evidence-service input, not a live GitHub read.
+        evidence-service input, not a live GitHub read. deliverAssignment chooses every call from this decision, so
+        an explicit `new_session` of the same generation is gated the same way; `no_checkpoint` and
+        `stale_generation` are not.
         Read-only. The supervisor is asked before the database reads, which run under the same
         lock as the reports. An unknown role → 404 `NOT_FOUND`.
       parameters:
@@ -1229,7 +1235,9 @@ paths:
                   description: |
                     0.15.0 (02-05 step 7): the branch the work is pushed to (`refs/heads/<name>`, at most 256 bytes);
                     its GitHub head is the final basis of a development resume. Absent or null → none (a development
-                    resume is then `not_observed`).
+                    resume is then `not_observed`). The server also refuses (400) an empty name, `..`, a leading or
+                    trailing `/` in the name, and whitespace or control characters (the pattern below does not express
+                    these).
                   type: [string, 'null']
                   pattern: '^refs/heads/'
                   maxLength: 256
@@ -1586,7 +1594,8 @@ components:
                 - $ref: '#/components/schemas/GithubComparison'
     GithubComparison:
       description: |
-        0.15.0 (02-05 step 7): what a development resume judgment compared. The GitHub records are evidence-service
+        0.15.0 (02-05 step 7): what a development judgment of `resume_allowed` compared (it accompanies the reconnect
+        and the explicit new session of the same generation alike). The GitHub records are evidence-service
         input (`branch_head`, `ci_run`), not a live GitHub read; null when no comparison was made.
       type: [object, 'null']
       properties:
@@ -1599,6 +1608,8 @@ components:
         pushed_sha: { description: the central checkpoint's claim (a SHA or null) }
         expected_sha: { type: [string, 'null'] }
         expected_from: { type: [string, 'null'], enum: [pushed_sha, target_sha, null] }
+        checkpoint_branch_ref: { description: the branch the central checkpoint names (null when none) }
+        push_provenance: { type: string, description: why the expected SHA is what it is (pushed SHA recorded, no push observed, or the checkpoint names another branch) }
         head:
           type: [object, 'null']
           properties:

@@ -4682,10 +4682,12 @@ fn github_gate(
         }
         let why = match &dev {
             Some(d) => format!(
-                "the review target {review} is not the current development assignment's target                  SHA {d}: a new review assignment is needed"
+                "the review target {review} is not the current development assignment's target \
+                 SHA {d}: a new review assignment is needed"
             ),
             None => format!(
-                "the review target {review} has no current development assignment: a new review                  assignment is needed"
+                "the review target {review} has no current development assignment: a new review \
+                 assignment is needed"
             ),
         };
         return Ok(("stale_target", vec![why], Value::Null));
@@ -4753,6 +4755,28 @@ pub(crate) fn github_head_check(
         &checkpoint["pushed_sha"],
         gh_head.as_ref().map(|x| x.1.as_str()),
     );
+    // the checkpoint's pushed SHA is the assignment branch's only when the checkpoint names that
+    // branch (review f0e0ca9 L-2): another branch is never read as this one's; without a branch
+    // the checkpoint observed no push, and the target SHA is expected for that reason
+    let cp_branch = checkpoint["branch_ref"].as_str();
+    let (d, why) = match (cp_branch, branch.as_deref()) {
+        (Some(c), Some(a)) if c != a && d != "not_observed" => (
+            "external_reconciliation_required",
+            Some(format!(
+                "the checkpoint's branch_ref {c} is not the assignment's {a}: its pushed SHA is \
+                 not this branch's"
+            )),
+        ),
+        _ => (d, why),
+    };
+    let provenance = match (cp_branch, &checkpoint["pushed_sha"]) {
+        (Some(c), _) if branch.as_deref().is_some_and(|a| a != c) => {
+            "checkpoint names another branch"
+        }
+        (Some(_), Value::String(_)) => "pushed SHA recorded by the checkpoint",
+        (Some(_), _) => "no push observed on the branch (target SHA expected)",
+        (None, _) => "the checkpoint names no branch: no push observed (target SHA expected)",
+    };
     let result = match d {
         "resume_allowed" => "match",
         "not_observed" => "not_observed",
@@ -4766,6 +4790,7 @@ pub(crate) fn github_head_check(
         "pushed_sha": checkpoint["pushed_sha"],
         "expected_sha": expected.as_ref().map(|e| e.0.clone()),
         "expected_from": expected.as_ref().map(|e| e.1),
+        "checkpoint_branch_ref": checkpoint["branch_ref"], "push_provenance": provenance,
         "head": gh_head.as_ref().map(|(id, sha, src)| json!({"evidence_id": id, "sha": sha,
                                                                 "source_ref": src})),
         "matches": d == "resume_allowed", "ci": null, "ci_claim": null});
