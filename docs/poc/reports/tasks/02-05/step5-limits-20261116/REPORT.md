@@ -5,10 +5,10 @@
 | 작업 | 02-05 구현 단계 5([계획](../plan-20261115/PLAN.md) §3.2 단계 5). 이월 C7(02-04 수용 항목 1a)을 닫는다 |
 | 착수 근거 | 단계 4 병합(PR #75, main 1b5bc1f). 원장 PR #76(7dcb2fb) 위로 다시 쌓음 |
 | 사용자 결정 | [사용자 결정 2026-11-16](../../../../User_Decisions_2026-11-16_l01-step5.md) (L01 토큰 정의 (가), 시간 정의 (i)): `total_tokens` = input + output + cache_creation(cache_read 제외), `elapsed_seconds` = 배정 회차 시간의 합(벽시계 아님), 둘 다 배정의 모든 세대 합계. 이 결정은 **정의만** 정한다. L01의 값은 정하지 않았고, 실제 스프린트는 `total_tokens = null`(등록 검사 `UNBOUND_DRAFT`) 그대로다 |
-| 검토 반영 | PR #75 검토 debf413 L-3(시험·변이 F), PR #74 검토 fe924b7 I-5(HTTP `statement_timeout`). PR #77 검토 97ff0bc(변경 요청)의 M-1·L-1·L-2·I-1~I-5(§11) |
-| 기준 커밋 | main 7dcb2fb. 구현 커밋 43fad72, 첫 증거 be95fc2, 보고·결정 기록·원장 97ff0bc. 검토 97ff0bc 교정 커밋 9f6889a·e8ce658, 다시 만든 증거 1c05b88(evidence/test.log 첫 줄이 e8ce658, 작업 트리 깨끗) |
+| 검토 반영 | PR #75 검토 debf413 L-3(시험·변이 F), PR #74 검토 fe924b7 I-5(HTTP `statement_timeout`). PR #77 검토 97ff0bc(변경 요청)의 M-1·L-1·L-2·I-1~I-5(§11), 검토 1548061(변경 요청)의 N-M1·I-1~I-3(§12) |
+| 기준 커밋 | main 7dcb2fb. 구현 커밋 43fad72, 첫 증거 be95fc2, 보고·결정 기록·원장 97ff0bc. 검토 97ff0bc 교정 커밋 9f6889a·e8ce658(증거 1c05b88). 검토 1548061 교정 커밋 9f0cb93, 다시 만든 증거 ba63f70(evidence/test.log 첫 줄이 9f0cb93, 작업 트리 깨끗) |
 | 모델 호출 | 0회. 실제 `claude`·컨테이너·실제 회차 없음. 영속 PoC DB(55433)·58090 코디네이터는 쓰지 않았다(일회성 시험 DB 55432만) |
-| 상태 | 구현과 시험 완료. 검토 97ff0bc(변경 요청)를 교정했고 **재검토 전**이다. 이 PR의 커밋 97ff0bc가 원장 snapshot 0049(`state.json`)를 기록했다(검토 97ff0bc I-3). 교정 커밋은 원장을 고치지 않았다 |
+| 상태 | 구현과 시험 완료. 검토 97ff0bc와 1548061(둘 다 변경 요청)을 교정했고 **재검토 전**이다. 이 PR의 커밋 97ff0bc가 원장 snapshot 0049(`state.json`)를 기록했다(검토 97ff0bc I-3). 교정 커밋은 원장을 고치지 않았다 |
 
 ## 1. 더한 작업과 바뀐 동작
 
@@ -24,7 +24,9 @@
 - 회차의 측정은 단계 3의 공유 예산 라이브러리가 그대로 한다. 회차가 끝나면 코디네이터가 역할 서비스의 stream과 자식 전사를 받아 02-01 계측기로 회차 몫을 계산하고(재개는 누적 차분, 자식은 전사 기준, 런타임 계약 §11·§12) 원장(`records.jsonl`)에 기록한다.
 - 새 모듈 `crates/ieo-coord/src/limits.rs`가 원장 기록을 DB로 옮긴다(`assignment_run_usage`, 추가 전용). 행에는 순번 `seq`, 정산한 원장(`<예산>@<ledger_dir>`), 네 토큰 수(input·output·cache_creation·cache_read), 시간(`duration_ms`를 초로 올림), 상태, 원장 기록의 digest가 있다. 전달의 정산 상태가 바뀔 때마다 새 행을 더하고 **가장 큰 `seq`의 행**이 센다(검토 97ff0bc M-1).
 - 상태는 넷이다: `measured`(네 토큰 수와 시간), `unmeasured`(배정을 멈춤), `missing`(보낸 호출의 원장 기록이 없거나 전에 정산한 기록이 사라짐: 배정을 멈추고 **마지막으로 알던 수를 그대로 유지**), `withdrawn`(사람이 그 시도를 이름 붙여 `model_request: false`로 적은 항목: 아무것도 세지 않음).
-- 짝 맞추기는 호출을 보낸 전달(보낸 digest가 있는 결과)만, 같은 시도·같은 역할의 기록으로 한다(검토 97ff0bc I-2). 원장에 이미 있는 시도 id로 온 새 전달은 409 `ATTEMPT_ID_CONFLICT`다.
+- **실행했을 수 있는 전달**(검토 1548061 N-M1): 마지막 결과가 `accepted`·`unknown`이거나, 결과가 아직 없고 요청한 지 in-flight 한계(120초)가 지난 전달이다. 결과 트랜잭션을 잃은 전달(코디네이터 중단, 결과 기록의 문장 상한 초과)이 여기에 든다. 120초 안이면 아직 진행 중일 수 있어 다음 정산으로 미룬다. 보낸 digest가 있는 결과가 있는 전달(호출을 보낸 것)도 짝 맞추기 대상이다.
+- 짝 맞추기는 이 전달들만, 같은 시도·같은 역할의 기록으로 한다(검토 97ff0bc I-2). 호출을 보내지 않은 전달(`budget_refused`·`not_called`만 있음)은 다른 호출자의 기록을 가져가지 않는다. 원장에 이미 있는 시도 id로 온 새 전달은 409 `ATTEMPT_ID_CONFLICT`다.
+- 실행했을 수 있는데 기록이 없으면 `missing`이다. `missing`인 전달에 나중에 아무것도 실행되지 않았음을 보이는 결과(`not_accepted`·`refused`·`budget_refused`·`not_called`, 예: 재조회에서 supervisor가 그 시도를 모름)가 오고 기록도 없으면, 닫는 행(`withdrawn`, “the delivery sent nothing”)을 더한다.
 - **원장이 측정의 권한이지만, 기록이 없다는 것이 소비를 줄이지는 못한다.** 라이브러리는 보낸 모든 호출(계측됨, 미계측, 사람 확인을 요청하는 답 유실)의 기록을 원장 잠금을 놓기 전에 쓴다. 그래서 정산은 원장이 쉬고 있을 때(잠금 비어 있음, 진행 중 표식 없음, `caller::records_when_idle`)와 예산 잠금 안에서만 한다.
   - 보낸 호출의 기록이 없거나 사라지면 `missing`이다(위). 기록이 다시 나타나거나 사람의 보정 기록으로 바뀌면 digest가 달라져 새 행이 생기고 다시 센다.
   - 기록이 하나도 없는 원장(파일이 옮겨졌거나 잘렸거나 마운트되지 않음)은 이미 정산한 행이 있으면 아무것도 말하지 않는 것으로 본다. 새 행을 만들지 않는다.
@@ -43,7 +45,7 @@
   - 결정 요청(decision_request)은 만들지 않는다. 정책 G5의 범위를 넓히는 일이라 새 정책 버전이 필요하다(계획 그대로).
 - 통과하면 지금처럼 판단·예산 검사를 하고, 예산 잠금을 쥔 뒤 다시 정산해 회차의 창과 billable 여유를 배정의 남은 양으로 낮춘다(`Admission::lower`, 올리지 않음). 결과 한도는 배정 남은 양, 승인 예산 남은 양, 역할 몫 중 가장 작은 값이다. 이 계산은 코디네이터 안, 역할 컨테이너 밖이다.
   - 여기서 처음 드러난 한도(경합)는 `budget_refused`(사유 “assignment limits: …”)로 기록한다. 종단 시험이 원장을 바쁘게 해 이 경로를 지난다(검토 97ff0bc L-1).
-  - 전달이 시작한 지 80초(`START_DEADLINE`)가 지났으면 호출하지 않고 `not_called`로 기록한다(검토 97ff0bc L-2, §1.5).
+  - 전달이 시작한 지 75초(시작 기한)가 지났으면 호출하지 않고 `not_called`로 기록한다(검토 97ff0bc L-2·1548061 I-3, §1.5).
   - 단계 3의 “revision 한도로 회당 상한을 자름”은 이 남은 양으로 바뀌었다(배정 한도 ≤ revision 한도라 더 엄격하거나 같다).
 - 승인된 02-05 예산 (나)는 연결하지 않았다. 예산 이름·상한 코드는 계획대로 별도 PR이다. 시험의 역할 몫은 시험 고정값이다.
 
@@ -55,7 +57,8 @@
 ### 1.5 HTTP 문장 상한(검토 fe924b7 I-5)
 
 - HTTP 경로의 모든 트랜잭션에 `SET LOCAL statement_timeout = 10 s`를 둔다(`api::HttpGuard`, `HTTP_STATEMENT_TIMEOUT`). advisory 잠금 대기도 포함한다. 넘으면 그 작업은 500(“statement timeout or cancellation (SQLSTATE 57014); nothing was stored”)이고 트랜잭션은 롤백된다.
-- 120초 `DELIVERY_IN_PROGRESS`는 이제 **집행된다**(검토 97ff0bc L-2). 처음 제출본의 “최악 약 95초” 계산은 틀렸다. 문장 상한은 문장마다라 여러 문장 트랜잭션은 그 몇 배일 수 있고, 예산 잠금 뒤 정산 트랜잭션을 빠뜨렸고, `admit`의 역할 상태 조회(역할마다 30초, 둘이면 60초)를 빠뜨렸다. 바르게 더하면 약 163초로 120초를 넘는다. 그래서 전달은 시작한 지 80초가 지나면 supervisor를 부르지 않는다(`delivery::START_DEADLINE`). 호출은 어댑터 시간 제한 30초 안에 끝나고 결과는 바로 짧은 트랜잭션 하나로 기록되므로 80 + 30 + 10 = 120초 안에 결과가 있다. 그 앞의 단계는 얼마가 걸리든 80초 안에 들어와야만 호출한다.
+- 120초 `DELIVERY_IN_PROGRESS`는 이제 **집행된다**(검토 97ff0bc L-2). 처음 제출본의 “최악 약 95초” 계산은 틀렸다. 문장 상한은 문장마다라 여러 문장 트랜잭션은 그 몇 배일 수 있고, 예산 잠금 뒤 정산 트랜잭션을 빠뜨렸고, `admit`의 역할 상태 조회(역할마다 30초, 둘이면 60초)를 빠뜨렸다. 바르게 더하면 약 163초로 120초를 넘는다. 그래서 전달은 시작한 지 75초가 지나면 supervisor를 부르지 않는다(`delivery::bounds`의 시작 기한). 호출은 어댑터 시간 제한 30초 안에 끝나고 결과는 바로 짧은 트랜잭션 하나(문장마다 10초)로 기록되며 5초 여유를 둔다: 75 + 30 + 10 + 5 = 120초(처음 교정의 80초는 여유가 0이었다, 검토 1548061 I-3). 그 앞의 단계는 얼마가 걸리든 75초 안에 들어와야만 호출한다.
+- 두 값(in-flight 120초, 시작 기한 75초)은 코디네이터 프로세스의 환경 변수 `IEO_COORD_DELIVERY_IN_FLIGHT_SECS`·`IEO_COORD_DELIVERY_START_DEADLINE_SECS`로 바꿀 수 있다. 시험이 이 경로를 몇 분 기다리지 않고 지나기 위한 것이다. 둘 다 있고 기한 + 45 ≤ in-flight일 때만 쓰고, 아니면 기본값을 쓰며 메시지를 남긴다. 운영 설정에서는 쓰지 않는다.
 - 57014의 500 메시지는 “this step's transaction was rolled back”이다. 전달처럼 여러 트랜잭션을 쓰는 작업에서 앞 단계가 남긴 행은 그대로이므로 “nothing was stored”는 지나친 말이었다.
 - 이 단계의 긴 일(회차 끝 기다림·계측)은 트랜잭션 밖 배경 스레드에서 돈다.
 
@@ -67,7 +70,7 @@
 
 - `crates/ieo-coord`
   - `src/limits.rs`(새 파일): 정산(`missing`·`withdrawn`·원장 바인딩), 상태, 여유, 한도 사건.
-  - `src/delivery.rs`: 요청 전 정산(재전송 제외)과 거부, 원장에 있는 시도 id 거부, 예산 잠금 뒤 정산과 한도 낮추기, 80초 호출 기한, `coordinator_record.limits` = 배정 자신의 한도.
+  - `src/delivery.rs`: 요청 전 정산(재전송 제외)과 거부, 원장에 있는 시도 id 거부, 예산 잠금 뒤 정산과 한도 낮추기, 75초 시작 기한(`bounds`, 시험용 환경 변수와 단위 시험), `coordinator_record.limits` = 배정 자신의 한도.
   - `src/api.rs`: 배정 `limits`(형식·`effective_limits`), getOwnAssignment, `HttpGuard`, SQLSTATE 57014 답.
   - `src/chain.rs`: `usage`·`usage_runs`·`limit_events`.
   - `src/schema.sql`: `assignments.limits` 열, `assignment_run_usage`·`assignment_limit_events`(추가 전용 트리거). 영속 DB는 다음 `migrate`에 새 열·표만 생긴다.
@@ -82,7 +85,7 @@
 1. **모든 HTTP 작업(02-03·02-04 수용 작업 포함) — 문장 상한 10초.** 지금까지는 잠금을 무한히 기다렸다. 이제 한 문장(잠금 대기 포함)이 10초를 넘으면 500이고 아무것도 저장되지 않는다. 정상 부하에서는 일어나지 않는다. 57014의 500 메시지가 구체적이 됐다(gRPC는 지금처럼 `DEADLINE_EXCEEDED`·`CANCELLED`).
 2. **issueAssignment(02-03 수용) — `limits` 필드 추가.** 이전에는 모르는 키라 400이던 요청이 이제 받아들여질 수 있다. revision보다 큰 값은 422 `LIMITS_ABOVE_SPEC`. 없는 경우의 동작은 같다.
 3. 02-05 진행 중 작업(수용 전)의 변경:
-   - deliverAssignment: 미계측 회차나 한도 도달은 요청을 기록하기 **전에** 409다(이전에는 요청을 기록하고 `budget_refused`). 회차 한도는 revision 한도 대신 배정의 남은 양이다. 원장에 이미 있는 시도 id는 409 `ATTEMPT_ID_CONFLICT`다. 시작 뒤 80초가 지나 호출 단계에 닿은 전달은 호출하지 않고 `not_called`다(120초 `IN_FLIGHT`는 그대로). 저장·전송하는 `coordinator_record.limits`가 revision 값에서 배정 자신의 한도로 바뀌었다(supervisor는 이 필드를 읽지 않는다, 검토 97ff0bc I-1).
+   - deliverAssignment: 미계측 회차나 한도 도달은 요청을 기록하기 **전에** 409다(이전에는 요청을 기록하고 `budget_refused`). 회차 한도는 revision 한도 대신 배정의 남은 양이다. 원장에 이미 있는 시도 id는 409 `ATTEMPT_ID_CONFLICT`다. 시작 뒤 75초가 지나 호출 단계에 닿은 전달은 호출하지 않고 `not_called`다(120초 in-flight는 그대로). 저장·전송하는 `coordinator_record.limits`가 revision 값에서 배정 자신의 한도로 바뀌었다(supervisor는 이 필드를 읽지 않는다, 검토 97ff0bc I-1).
    - 단계 3 종단 시험 `delivery_e2e` 10단계의 사람 보정(원장 기록 삭제)에 a41을 이름 붙인 `model_request: false` 항목을 더했다. 보낸 호출의 기록이 그냥 사라지면 이제 배정이 멈추기 때문이다. 그래서 단계 3 종단 시험 `delivery_e2e`의 마지막 단계 기대를 바꿨다: 답 유실로 미계측이 된 뒤의 전달은 `budget_refused`(201) 대신 409 `ASSIGNMENT_USAGE_UNMEASURED`, 끝 집계는 전달 20 → 19, 결과 22 → 21, 한도 사건 1.
    - getOwnAssignment `limits`: revision 값 대신 배정 자신의 값.
    - getAssignmentChain: `evidence_levels.verified`에 세 절 추가(`claims_are_kept…` 시험 기대 변경).
@@ -96,38 +99,40 @@
 | `crates/ieo-coord/tests/limits_e2e.rs` `assignment_limits_bound_and_stop_deliveries`(HTTP)·`…_over_grpc` | 코디네이터 바이너리, 실제 PostgreSQL, supervisor 서비스(가짜 `claude`), 공유 예산 검사. 아래 표 |
 | `tests/coordinator.rs` `an_http_statement_waits_at_most_the_statement_timeout` | 체크포인트 잠금을 쥔 동안의 보고가 9~30초 사이에 500(57014), 행 수 불변. 잠금을 놓은 뒤 201 |
 | `a_lost_first_action_report_is_filled_from_the_run_checkpoint`(사례 추가) | 검토 debf413 L-3 |
+| `ieo-coord` 단위 `delivery::tests::delivery_bounds_keep_the_call_inside_the_in_flight_window` | 기본값 75 + 45 = 120, 시험 값(47/2), 받아들이지 않는 설정 4가지는 기본값(검토 1548061 I-3) |
 
-종단 시험 단계(두 전송 같음. 역할 몫: 8회, billable 120 — 시험 고정값):
+종단 시험 단계(두 전송 같음. 역할 몫: 10회, billable 1,000 — 시험 고정값. 코디네이터는 in-flight 47초·시작 기한 2초로 돈다):
 
 | 단계 | 확인 |
 | --- | --- |
 | 1 | 배정 `limits` 형식·한도: `total_tokens` 100,001·`elapsed_seconds` 3,601 → 422 `LIMITS_ABOVE_SPEC`, 0·모르는 키·숫자 → 400, 행 수 불변. A1/0을 `total_tokens` 40으로 발급, 연결 조회의 한도 40·3,600, `open` |
-| 2 | 첫 회차: billable 여유 40(배정 < 역할 몫 120), 창 114,000 ms(계획 창 120초 < 배정 3,600초: 예산 쪽 적용) |
+| 2 | 첫 회차: billable 여유 40(배정 < 역할 몫 1,000), 창 114,000 ms(계획 창 120초 < 배정 3,600초: 예산 쪽 적용) |
 | 3 | 재개 회차: 여유 20(40 − 20), 계측됨. 몫은 누적 차분(행의 input 3·output 7·cache_creation 10·cache_read 20, 세션 누적은 그 두 배) |
 | 4 | 새 세대 A1/1(한도 40): 모든 세대 합계 40/40 → 409 `ASSIGNMENT_LIMIT_REACHED`(“total_tokens: 40 of 40”), 전달·결과 행 불변, 한도 사건 1. 같은 거부를 다시 해도 사건 1. 연결 조회: 정산 행 2, 합계 40, cache_read 40(세지 않음), 남은 0, `awaiting_human_decision` |
 | 5 | A1/2(한도 60): 여유 20, 계측 뒤 60/60 → 409 |
 | 6 | 코디네이터 재시작: 연결 조회가 같은 JSON(합계 60, 회차 3), 같은 409 |
-| 7 | 예산이 배정보다 작음: A1/3(한도 없음 → revision 100,000, 99,940 남음) → 여유는 역할 몫의 남은 60 |
+| 7 | 예산이 배정보다 작음: A1/3(한도 없음 → revision 100,000, 99,940 남음) → 여유는 역할 몫의 남은 940 |
 | 8 | 시간 한도: 원장의 사용 시간 + 7초를 한도로 → 창 7초(timeout 1,000 ms), 계측된 1초 회차 뒤 6초 남음 ≤ 유예 → 409 `ASSIGNMENT_LIMIT_REACHED`(“elapsed_seconds: n+1 of n+7”) |
-| 4b | 검토 97ff0bc M-1(검토자의 재현과 같은 경우): (a) `records.jsonl`을 옮김 → 아무것도 말하지 않음, 409 `ASSIGNMENT_LIMIT_REACHED`, 합계 40·회차 2 그대로. (b) a2의 기록만 지움 → a2 `missing`, 409 `ASSIGNMENT_USAGE_UNMEASURED`(“record is missing”), 합계 40 그대로(줄지 않음). (c) 기록을 되돌림 → 새 행으로 다시 셈, 409 `ASSIGNMENT_LIMIT_REACHED`, 합계 40·미계측 0. (d) 예산 계획을 새 `ledger_dir`로 바꿔 재시작 → 409 `ASSIGNMENT_USAGE_UNMEASURED`(“settled from the ledger”), 합계 40. 되돌리면 다시 `ASSIGNMENT_LIMIT_REACHED`. 검토 97ff0bc I-2: 원장에만 있는 시도 id(`x-host`)의 전달 → 409 `ATTEMPT_ID_CONFLICT` |
+| 4b | 검토 97ff0bc M-1(검토자의 재현과 같은 경우): (a) `records.jsonl`을 옮김 → 아무것도 말하지 않음, 409 `ASSIGNMENT_LIMIT_REACHED`, 합계 40·회차 2 그대로. (b) a2의 기록만 지움 → a2 `missing`, 409 `ASSIGNMENT_USAGE_UNMEASURED`(“record is missing”), 합계 40 그대로(줄지 않음). (c) 기록을 되돌림 → 새 행으로 다시 셈, 409 `ASSIGNMENT_LIMIT_REACHED`, 합계 40·미계측 0. (d) 예산 계획을 새 `ledger_dir`로 바꿔 재시작 → 409 `ASSIGNMENT_USAGE_UNMEASURED`(“settled from the ledger”), 합계 40, 연결 조회도 `ledger_mismatch: true`·`awaiting_human_decision`(검토 1548061 I-2). 되돌리면 다시 `ASSIGNMENT_LIMIT_REACHED`. 검토 97ff0bc I-2: 원장에만 있는 시도 id(`x-host`)의 전달 → 409 `ATTEMPT_ID_CONFLICT` |
 | 5b | 검토 97ff0bc L-1: 시험이 `caller.lock`을 1초 쥔 채 전달 → 요청 전 정산은 건너뜀(40/60으로 통과) → 예산 검사가 잠금을 기다린 뒤 잠금 안의 정산이 60/60을 찾아 `budget_refused`(“assignment limits”), 호출 없음. 5단계의 전달 기록 `coordinator_record.limits.total_tokens`가 60(검토 97ff0bc I-1) |
+| 8b | 검토 1548061: A1/5(한도 = 그때까지 합계 + 40). (i) 시험이 `caller.lock`을 2.5초 쥠 → 호출 단계가 시작 기한(2초)을 넘김 → `not_called`(“start deadline”), 원장에 기록 없음. (ii) supervisor가 aL을 받아 실행했는데(답은 3초 늦게) 결과 트랜잭션은 시험이 쥔 `delivery:` 잠금 때문에 10초 상한에 걸려 500(“rolled back”). aL은 원장에 계측됨. (iii) supervisor가 aR을 거부(자격 파일 없음)했고 결과 트랜잭션을 같은 방식으로 잃음. 48초 뒤(in-flight 47초 넘김): aL 재조회 → `unknown`(digest 없음). aL의 원장 기록을 빼면 → aL·aR `missing`, 409 `ASSIGNMENT_USAGE_UNMEASURED`. 다른 역할(guardrail)의 aL 항목을 넣어도 → 그대로 409(검토 1548061 I-1, N1). 기록을 되돌림. aR 재조회 → `not_accepted`. 다음 전달 aM → aR은 닫힘(`withdrawn`, “sent nothing”), aL은 계측됨으로 셈 → **여유 20**(40이 아님), 수락 |
 | 9 | 창을 다 쓰는 회차: 한도 = 사용 + 9초 → 창 8초(timeout 2,000 ms), 가짜 런타임이 4초 실행 → 감시가 `TotalTimeout`으로 정지, 미계측 → 다음 전달 409 `ASSIGNMENT_USAGE_UNMEASURED`, 연결 조회의 정산 행 `unmeasured` |
-| 끝 | 전달 7(바쁜 원장의 `budget_refused` 포함), 정산 행 8(a2는 measured·missing·measured 세 행), 한도 사건 5 |
+| 끝 | 전달 11(바쁜 원장의 `budget_refused`, 기한의 `not_called`, 거부된 aR 포함), 정산 행 13(a2 세 행, aL·aR 두 행씩), 한도 사건 6 |
 
 `withdrawn`은 `delivery_e2e` 10단계가 지난다. 사람의 보정이 a41을 이름 붙인 `model_request: false` 항목을 원장에 더하고, 그 뒤 전달이 지나간다. 재전송은 정산하지 않는다(같은 단계).
 
-결과([evidence/test.log](evidence/test.log), 커밋 e8ce658. 검토 97ff0bc 교정은 기존 시험 안의 사례로 더했으므로 시험 수는 같다):
+결과([evidence/test.log](evidence/test.log), 커밋 9f0cb93. 검토 교정의 사례는 대부분 기존 시험 안에 더했다):
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`: 통과.
 - `openapi-spec-validator`: OK. proto 변경 없음.
-- `cargo test --workspace --locked`(시험 DB, `RUST_TEST_THREADS=4`): **379 통과, 0 실패, 0 무시**. 기준(1b5bc1f) 376에 새 시험 3개.
+- `cargo test --workspace --locked`(시험 DB, `RUST_TEST_THREADS=4`): **380 통과, 0 실패, 0 무시**. 기준(1b5bc1f) 376에 새 시험 4개(종단 2, 문장 상한 1, 기한 단위 1).
 - `validate_package.py`: `schema_errors` 0.
-- 공유 대상 디렉터리에 다른 작업 트리에서 빌드된 `ieo-evidence` 시험 바이너리가 남아 첫 실행에서 fixture 경로 실패(19건)가 났다(단계 3 보고 §7.3과 같은 현상). 작업 공간 일곱 패키지를 `cargo clean -p` 한 뒤 통과했다. 코드 문제는 아니다.
+- 공유 대상 디렉터리에 다른 작업 트리에서 빌드된 `ieo-evidence` 시험 바이너리가 남아 첫 실행에서 fixture 경로 실패(19건)가 났다(단계 3 보고 §7.3과 같은 현상, 두 교정 모두). 작업 공간 일곱 패키지를 `cargo clean -p` 한 뒤 통과했다. 코드 문제는 아니다.
 
 ## 5. 변이 시험
 
-각 변이를 하나씩 교정 뒤 코드(9f6889a, S5-C7~C10·S5-M12는 e8ce658)에 넣고 대상 시험을 돌린 뒤 파일을 되돌렸다([evidence/mutants.txt](evidence/mutants.txt)). 처음 13개를 다시 돌리고(S5-M8·S5-M9는 교정에 맞게 다시 적음) 교정의 10개를 더했다. **23개 중 22개를 잡았다.**
+각 변이를 하나씩 9f0cb93 코드에 넣고 대상 시험을 돌린 뒤 파일을 되돌렸다([evidence/mutants.txt](evidence/mutants.txt)). 앞 교정의 23개(S5-C1·C10은 바뀐 코드에 맞게 다시 적음)에 검토 1548061의 5개를 더했다. **28개 모두 잡혔다.**
 
-| id | 변이 | 결과 |
+| id | 변이 | 잡은 시험 |
 | --- | --- | --- |
 | S5-M1 | 요청 기록 전 거부 없음 | `limits_e2e` |
 | S5-M2 | 회차를 배정 남은 양으로 낮추지 않음 | `limits_e2e` |
@@ -140,18 +145,23 @@
 | S5-M9 | `model_request: false` 항목이 철회가 아님 | `delivery_e2e` |
 | S5-M10 | 한도 사건을 기록하지 않음 | `limits_e2e` |
 | S5-M11 | 배정 한도 무시(revision 값만) | `limits_e2e` |
-| S5-M12 | HTTP 문장 상한 없음(`NoGuard`) | `an_http_statement_waits_at_most_the_statement_timeout`(이제 실패로 잡힘: 잠금을 20초 뒤 놓으므로 끝나지 않는 일이 없다, 검토 97ff0bc I-5) |
+| S5-M12 | HTTP 문장 상한 없음(`NoGuard`) | `an_http_statement_waits_at_most_the_statement_timeout` |
 | S5-F | 검토 debf413 변이 F: 연결의 `"none"`이 시도를 보지 않음 | `a_lost_first_action_report_is_filled_from_the_run_checkpoint` |
-| S5-C1 | 보낸 호출의 기록이 없어도 `missing`이 아님(M-1) | `limits_e2e` |
-| S5-C2 | `missing` 행이 마지막 수를 버림(M-1) | `limits_e2e` |
-| S5-C3 | 빈 원장을 권한으로 읽음(M-1) | `limits_e2e` |
-| S5-C4 | 다시 나타난 기록을 다시 정산하지 않음(M-1, 검토자의 재현) | `limits_e2e` |
-| S5-C5 | 다른 원장의 행을 이 원장 것으로 읽음(M-1) | `limits_e2e` |
-| S5-C6 | 원장에 있는 시도 id를 받아들임(I-2) | `limits_e2e` |
+| S5-C1 | 실행했을 수 있는 전달의 기록이 없어도 `missing`이 아님(이전 정산 행이 있을 때만) | `limits_e2e` |
+| S5-C2 | `missing` 행이 마지막 수를 버림 | `limits_e2e` |
+| S5-C3 | 빈 원장을 권한으로 읽음 | `limits_e2e` |
+| S5-C4 | 다시 나타난 기록을 다시 정산하지 않음 | `limits_e2e` |
+| S5-C5 | 다른 원장의 행을 이 원장 것으로 읽음 | `limits_e2e` |
+| S5-C6 | 원장에 있는 시도 id를 받아들임 | `limits_e2e` |
 | S5-C7 | 재전송도 정산함 | `delivery_e2e` |
-| S5-C8 | 예산 잠금 뒤 정산 없음(검토의 변이 RB, L-1) | `limits_e2e` |
-| S5-C9 | `coordinator_record.limits`가 revision 값(I-1) | `limits_e2e` |
-| S5-C10 | 80초 호출 기한 검사 제거(L-2) | **살아남음**. 80초 넘게 걸리는 전달을 만드는 시험이 없다(§8) |
+| S5-C8 | 예산 잠금 뒤 정산 없음(검토 97ff0bc의 RB) | `limits_e2e` |
+| S5-C9 | `coordinator_record.limits`가 revision 값 | `limits_e2e` |
+| S5-C10 | 시작 기한 검사 제거 | `limits_e2e`(8b (i), 이제 잡힘) |
+| S5-N1 | 시도만으로 짝 맞춤(역할 무시, 검토 1548061 I-1) | `limits_e2e` |
+| S5-N2 | 결과가 없는 전달은 늘 진행 중으로 봄(검토 1548061 N-M1) | `limits_e2e` |
+| S5-N3 | `unknown`을 실행했을 수 있는 전달로 보지 않음(검토 1548061 I-1, N3) | `limits_e2e` |
+| S5-N4 | `missing` 행을 닫지 않음 | `limits_e2e` |
+| S5-N5 | 연결 조회가 설정된 원장을 넘기지 않음(검토 1548061 I-2) | `limits_e2e` |
 
 ## 6. 이월 항목
 
@@ -182,9 +192,10 @@
 | 승인 예산 (나) | 02-05 예산 이름·상한 코드는 별도 PR(단계 8 전). 이 PR은 시험 고정값만 쓴다 | 단계 8 전 PR |
 | 결정 요청 | 한도 도달 때 decision_request를 자동으로 만들지 않는다(G5 범위 확대 = 정책 새 버전) | 사용자 결정 시 |
 | HTTP 10초 상한 | 영속 DB에서 긴 문장이 생기면 500이 된다. 지금 작업에는 그런 문장이 없다 | 관찰 |
-| 변이 S5-C10 | 80초 호출 기한은 코드로 집행하지만 시험이 그 경로를 지나지 않는다(가짜 역할 서비스의 상태 응답을 80초 넘게 늦춰야 한다) | 다음 검토 때 보강 가능 |
+| 시험용 시간 설정 | 시작 기한과 in-flight 한계를 환경 변수로 바꿀 수 있다(§1.5). 기한 + 45 ≤ in-flight를 지키지 않으면 무시한다. 운영 설정에 넣지 않는다 | 관찰 |
+| 결과를 잃은 전달의 정산 시점 | 결과가 없는 전달은 요청한 지 120초가 지나야 실행했을 수 있는 것으로 정산된다. 그 전의 전달은 다음 정산에서 다룬다(그 사이에 같은 배정의 전달이 오면 이 회차는 아직 합계에 없다. 예산·역할 몫은 원장으로 그대로 막는다) | 설계 한계 |
 | 다른 원장 + 기록 있음 | 다른 원장에 같은 시도 id의 기록이 있는 경우는 시험하지 않았다. 코드는 그 원장으로 정산하지 않는다 | — |
-| 보내지 않았다고 본 전달 | 결과에 보낸 digest가 없는 전달(예산 거부 등)은 원장과 짝 맞추지 않는다. 같은 시도 id가 원장에 있으면 새 전달 단계에서 409로 막는다 | — |
+| 보내지 않았다고 본 전달 | 결과가 `budget_refused`·`not_called`뿐인 전달(보낸 digest 없음)만 호출하지 않은 것으로 본다. 결과가 `unknown`이거나 없고 오래된 전달은 실행했을 수 있는 것으로 보고 원장과 짝 맞추며, 기록이 없으면 `missing`이다(검토 1548061 N-M1). 처음 교정은 “보낸 digest가 없으면 보내지 않음”으로 보아 결과를 잃은 실제 회차를 세지 않았다 | — |
 
 ## 9. 검토 잔여 처리
 
@@ -215,3 +226,18 @@
 | I-5 설계 메모 | 기록 | §7(다시 여는 주체, 옛 세대 연결 조회). S5-M12는 이제 실패로 잡힌다 | S5-M12 |
 
 교정 뒤 결과: fmt·clippy·openapi-spec-validator·`validate_package.py` 통과, `cargo test --workspace --locked` **379 통과, 0 실패**, 변이 23개 중 22개 잡힘(§5).
+
+## 12. 검토 반영(PR #77 검토 1548061)
+
+교정 커밋 9f0cb93. 다시 만든 증거 ba63f70.
+
+| 항목 | 처분 | 바꾼 것 | 시험·변이 |
+| --- | --- | --- | --- |
+| N-M1 결과를 잃은 전달이 배정에 청구되지 않음 | 교정 | “실행했을 수 있는 전달”(마지막 결과 `accepted`·`unknown`, 또는 결과 없이 in-flight 한계보다 오래됨)과 호출을 보낸 전달을 시도·역할로 짝 맞춤. 기록이 없으면 `missing`. 나중의 결과가 아무것도 실행되지 않았음을 보이면 `missing`을 닫음(`withdrawn`, “sent nothing”). §1.2·§8 고침 | `limits_e2e` 8b (ii)(iii): 결과를 잃은 수락 회차가 보정 뒤 청구됨(여유 20), 결과를 잃은 거부가 `missing`에서 닫힘. S5-N2, S5-N4 |
+| I-1 짝 맞추기의 두 갈래에 시험 없음 | 교정 | — | 8b: 다른 역할의 같은 시도 기록(N1), 기록 없는 `unknown`(N3). S5-N1, S5-N3 |
+| I-2 연결 조회가 원장 불일치를 보이지 않음 | 교정 | 연결 조회가 설정된 원장으로 상태를 읽음 → `awaiting_human_decision` | 4b (d). S5-N5 |
+| I-3 작은 항목 | 교정 | `missing` 사유 문자열의 공백, 시작 기한 75초(75 + 30 + 10 + 5 = 120), 두 한계의 시험용 환경 변수와 단위 시험, `mutants.txt` 줄 끝 공백 | 기한 단위 시험, 8b (i). S5-C10이 이제 잡힘 |
+
+§3의 동작 변경에 더할 것: 시작 기한이 80초에서 75초가 됐다(02-05 진행 중 작업 deliverAssignment). 그 밖의 수용된 작업의 동작은 이 교정에서 바뀌지 않았다.
+
+교정 뒤 결과: fmt·clippy·openapi-spec-validator·`validate_package.py` 통과, `cargo test --workspace --locked` **380 통과, 0 실패**, 변이 28개 모두 잡힘(§5).
