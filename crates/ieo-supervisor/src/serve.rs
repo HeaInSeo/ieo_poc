@@ -473,6 +473,9 @@ impl Service {
             // the requests sent through this supervisor whose answer is not known (02-05 step
             // 6); the model's own network requests cannot be observed here
             "pending_external_requests": self.pending.report(),
+            // where that list lives: what a person repairs when it cannot be read or written
+            // (review 6e0ad85 L-a)
+            "pending_external_requests_file": self.pending.path(),
             "direct_network_requests": "not_observable",
         });
         let last = st.last.as_ref();
@@ -498,7 +501,6 @@ impl Service {
         let mut gaps = vec![
             "active_children not tracked",
             "direct network requests of the model not observable",
-            "worktree_head not tracked",
         ];
         if self.cfg.central == crate::central::Central::LocalOnly {
             gaps.push("central checkpoint comparison off (local_only)");
@@ -688,6 +690,25 @@ impl Service {
                 );
             }
         };
+        // the assignment's branch (02-05 step 7): the run's checkpoints record the SHA pushed to it
+        let branch_ref = match &req["branch_ref"] {
+            Value::Null => None,
+            Value::String(b)
+                if b.len() <= 256
+                    && b.strip_prefix("refs/heads/").is_some_and(|n| !n.is_empty())
+                    && !b.contains("..")
+                    && !b.chars().any(|c| c.is_whitespace() || c.is_control()) =>
+            {
+                Some(b.clone())
+            }
+            _ => {
+                return err(
+                    400,
+                    "SCHEMA_VIOLATION",
+                    "branch_ref (refs/heads/<name>) when present",
+                );
+            }
+        };
         if self.cfg.runs().join(&attempt).exists() {
             return err(409, "ID_CONTENT_CONFLICT", "attempt_id already used");
         }
@@ -748,6 +769,23 @@ impl Service {
         // resume over a request whose outcome is still unknown (runtime contract §5-1, §6):
         // external reconciliation. A list that cannot be read stops it too.
         let live = self.requery_pending(central["compared"] == true);
+        // the list must be readable and writable before anything is accepted (review 6e0ad85
+        // L-a): otherwise every tracked request of the run would go unsent, its takeover first,
+        // and a run that never started would reach the caller's ledger. Refused at once, so the
+        // attempt id is not used. Not for `local_only`, which sends nothing.
+        if self.cfg.central != crate::central::Central::LocalOnly
+            && let Err(e) = self.pending.probe()
+        {
+            return resp(
+                409,
+                json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+                       "reason": format!("the pending external requests list {} cannot be read \
+                                          and written ({e}): a person repairs it",
+                                         self.pending.path().display()),
+                       "file": self.pending.path(),
+                       "pending_external_requests": self.pending.report()}),
+            );
+        }
         if op == "reconnect" {
             match &live {
                 Ok(l) if l.is_empty() => {}
@@ -1018,7 +1056,7 @@ impl Service {
                 "spec_digest": spec_digest, "image_digest": image_digest,
                 "profile_id": profile_id, "profile_revision": profile_revision,
                 "target_sha": req["target_sha"].as_str().unwrap_or("unknown"),
-                "delivery_id": delivery_id}),
+                "delivery_id": delivery_id, "branch_ref": branch_ref}),
             tamper,
             stop,
             probe,
@@ -1230,7 +1268,8 @@ impl Service {
             profile_id: &t("profile_id"),
             profile_revision: n("profile_revision"),
             settings_digest,
-            worktree_head: "none",
+            worktree_head: &crate::gitref::head(&cfg.cwd())
+                .unwrap_or_else(|| "not_observed".into()),
             diff_sha256: "none",
             last_event_offset: stdout
                 .and_then(|p| std::fs::read_to_string(p).ok())
@@ -1256,10 +1295,18 @@ impl Service {
             p => first_action_json(job, p == "after_run"),
         };
         cp["pending_external_requests"] = pending_now;
+        // 02-05 step 7 (runtime contract revision 14 §17): the assigned branch and the SHA last
+        // pushed to it as the work tree records it (null: nothing pushed, or not observed). A
+        // claim of the role volume; the coordinator compares it with the GitHub record.
+        cp["branch_ref"] = c["branch_ref"].clone();
+        cp["pushed_sha"] = c["branch_ref"]
+            .as_str()
+            .and_then(|b| crate::gitref::pushed(&cfg.cwd(), b))
+            .map_or(Value::Null, Value::from);
         cp["direct_network_requests"] = json!("not_observable");
         // the empty children list is not an observation: not tracked yet (§7 report, 04-05)
         cp["tracked"] = json!({"active_children": false, "pending_external_requests": true,
-                               "worktree_head": false});
+                               "worktree_head": true});
         // the resume base (§11 item 7): this run's own result if it wrote one; otherwise, on a
         // resume, the previous base of the same session carried forward with the attempt it
         // came from (the caller checks it is the run actually resumed); else unknown
@@ -1622,7 +1669,9 @@ impl Service {
                 status: 503,
                 body: json!({"code": "EXTERNAL_REQUEST_NOT_TRACKED",
                     "reason": format!("checkpoint report {seq} not sent: it could not be put on \
-                                       the pending external requests list ({e})")}),
+                                       the pending external requests list {} ({e})",
+                                      self.pending.path().display()),
+                    "file": self.pending.path()}),
             });
             self.record_report(seq, phase, &answer, bytes);
             return answer;
@@ -1665,7 +1714,9 @@ impl Service {
         )) {
             return json!({"ok": false, "not_sent": true,
                           "reason": format!("not sent: it could not be put on the pending \
-                                             external requests list ({e})")});
+                                             external requests list {} ({e})",
+                                            self.pending.path().display()),
+                          "file": self.pending.path()});
         }
         let r = self
             .cfg

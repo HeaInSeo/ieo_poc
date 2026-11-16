@@ -168,7 +168,7 @@ fn load(tx: &mut Transaction, id: &str) -> Result<Value, Resp> {
     )?;
     let r = tx.query_opt(
         "SELECT n, decision, reasons, op, outcome, limits, sent_sha256, supervisor_status,
-                supervisor_body, requeried, iso(recorded_at)
+                supervisor_body, requeried, iso(recorded_at), github
          FROM role_delivery_results WHERE delivery_id = $1 ORDER BY n DESC LIMIT 1",
         &[&id],
     )?;
@@ -179,7 +179,8 @@ fn load(tx: &mut Transaction, id: &str) -> Result<Value, Resp> {
                "sent_sha256": r.get::<_, Option<String>>(6),
                "supervisor": r.get::<_, Option<i32>>(7).map(|st| json!({"http_status": st,
                    "body": r.get::<_, Option<Value>>(8)})),
-               "requeried": r.get::<_, bool>(9), "recorded_at": r.get::<_, String>(10)})
+               "requeried": r.get::<_, bool>(9), "recorded_at": r.get::<_, String>(10),
+               "github": r.get::<_, Option<Value>>(11)})
     });
     Ok(
         json!({"delivery_id": d.get::<_, String>(0), "request_id": d.get::<_, String>(1),
@@ -234,7 +235,7 @@ fn record_request(
     }
     let head = tx.query_opt(
         "SELECT a.assignment_id, a.generation, a.task_id, a.target_sha, a.sprint_id,
-                a.sprint_revision, s.digest, s.spec
+                a.sprint_revision, s.digest, s.spec, a.request->>'branch_ref'
          FROM assignment_heads h
          JOIN assignments a ON (a.assignment_id, a.generation) = (h.assignment_id, h.generation)
          JOIN sprint_revisions s ON (s.sprint_id, s.revision) = (a.sprint_id, a.sprint_revision)
@@ -301,6 +302,8 @@ fn record_request(
         "spec_digest": h.get::<_, String>(6), "image_digest": t["image_digest"],
         "profile_id": t["profile_id"], "profile_revision": t["profile_revision"],
         "task_id": h.get::<_, String>(2),
+        // the branch the work is pushed to (02-05 step 7); null when the assignment names none
+        "branch_ref": h.get::<_, Option<String>>(8),
         // the assignment's own limits (review 97ff0bc I-1)
         "limits": {"elapsed_seconds": st["limits"]["elapsed_seconds"],
                    "total_tokens": st["limits"]["total_tokens"]}});
@@ -348,6 +351,8 @@ struct Outcome<'a> {
     sent_sha256: Option<String>,
     supervisor: Option<(u16, Value)>,
     requeried: bool,
+    /// The judgment's GitHub comparison (02-05 step 7), or none.
+    github: Option<Value>,
 }
 
 fn record_result(
@@ -377,9 +382,9 @@ fn record_result(
     let sb = o.supervisor.as_ref().map(|(_, b)| b.clone());
     tx.execute(
         "INSERT INTO role_delivery_results (delivery_id, n, decision, reasons, op, outcome, limits,
-             sent_sha256, supervisor_status, supervisor_body, requeried)
+             sent_sha256, supervisor_status, supervisor_body, requeried, github)
          VALUES ($1, coalesce((SELECT max(n) FROM role_delivery_results WHERE delivery_id = $1), 0)
-                 + 1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                 + 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
         &[
             &id,
             &o.decision,
@@ -391,6 +396,7 @@ fn record_result(
             &st,
             &sb,
             &o.requeried,
+            &o.github,
         ],
     )?;
     ok(status, load(tx, id)?)
@@ -503,6 +509,8 @@ pub fn deliver(
     }
     let decision = judged.body["decision"].as_str().unwrap_or_default();
     let reasons = judged.body["reasons"].clone();
+    // the GitHub comparison of the judgment (02-05 step 7): recorded with the result
+    let github = Some(judged.body["github"].clone()).filter(|g| !g.is_null());
     let new_session = body["new_session"] == true;
     let op = choose_op(decision, new_session, &judged.body);
     let base = |outcome| Outcome {
@@ -514,6 +522,7 @@ pub fn deliver(
         sent_sha256: None,
         supervisor: None,
         requeried: false,
+        github: github.clone(),
     };
     let Some(op) = op else {
         let o = base("not_called");
@@ -582,6 +591,7 @@ pub fn deliver(
             sent_sha256: None,
             supervisor: None,
             requeried: false,
+            github: Some(again.body["github"].clone()).filter(|g| !g.is_null()),
         };
         return run_tx(db, guard, &|tx| {
             record_result(tx, repo, role, &id, &o, 201, None)
@@ -636,10 +646,20 @@ pub fn deliver(
     }
     // the delivery id travels with the start (02-05 step 4): the supervisor carries it on the
     // run's checkpoints and the takeover is linked to this delivery
-    let extra = json!({"target_sha": d["target_sha"], "delivery_id": id});
+    let mut extra = json!({"target_sha": d["target_sha"], "delivery_id": id});
+    // 02-05 step 7: the assignment's branch (the supervisor records the pushed SHA of it), and on
+    // a resume the GitHub head and the CI result at it, as the judgment read them
+    if let Some(b) = rec["branch_ref"].as_str() {
+        extra["branch_ref"] = json!(b);
+    }
+    if let Some(g) = &github {
+        extra["github"] = json!({"branch_ref": g["branch_ref"], "head_sha": g["head"]["sha"],
+                                 "ci": g["ci"]["result"]});
+    }
     let mut sent = adm.body(&call);
-    sent["target_sha"] = d["target_sha"].clone();
-    sent["delivery_id"] = json!(id);
+    for (k, v) in extra.as_object().into_iter().flatten() {
+        sent[k] = v.clone();
+    }
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
@@ -825,6 +845,7 @@ fn replay(
         sent_sha256: sent.map(str::to_string),
         supervisor: None,
         requeried: true,
+        github: Some(res["github"].clone()).filter(|g| !g.is_null()),
     };
     match crate::roles::call(t, "GET", &format!("/v0/role/attempts/{attempt}")) {
         // the stored answer counts only for exactly what this delivery sent; without a recorded

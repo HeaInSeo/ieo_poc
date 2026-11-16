@@ -1012,9 +1012,11 @@ fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
         "not_observable"
     );
     assert!(
-        s["capability_gaps"].as_array().is_some_and(|g| g.len() == 4
+        // 02-05 step 7: the work tree's HEAD is tracked now (no "worktree_head not tracked")
+        s["capability_gaps"].as_array().is_some_and(|g| g.len() == 3
             && g.iter()
-                .any(|x| x == "direct network requests of the model not observable")),
+                .any(|x| x == "direct network requests of the model not observable")
+            && !g.iter().any(|x| x == "worktree_head not tracked")),
         "{s}"
     );
     call(
@@ -2688,8 +2690,21 @@ fn a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent(transp
     );
     assert_eq!(sent("p9"), 0, "an untracked request must not be sent");
     assert!(!state.join("runs/p10").exists());
-    // a start over a list that cannot be written: its takeover report is not sent, so the
-    // run stops before the model (the coordinator never sees an untracked report)
+    // the refusal names the file a person repairs (review 6e0ad85 L-a)
+    let list_file = state.join("pending-requests.json");
+    assert_eq!(b["file"], json!(list_file), "{b}");
+    assert!(
+        b["reason"]
+            .as_str()
+            .is_some_and(|r| r.contains(&list_file.display().to_string())),
+        "{b}"
+    );
+    assert_eq!(
+        svc.status()["safe_shutdown"]["pending_external_requests_file"],
+        json!(list_file)
+    );
+    // a start over a list that cannot be written is refused before anything is accepted
+    // (review 6e0ad85 L-a): no attempt, no run, no report, nothing for a caller's ledger
     let reports = c.store.lock().expect("store").len();
     let (st, b) = call(
         &svc,
@@ -2697,13 +2712,13 @@ fn a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent(transp
         "/v0/role/start",
         &req("p11", "hi", json!({"session_id": "s11"})),
     );
-    assert_eq!(st, 202, "{b}");
-    assert_eq!(wait(&svc, "p11")["stop"], "CentralRefused");
-    let s = svc.status();
     assert_eq!(
-        s["central_checkpoint"]["last_report"]["refusal"]["code"], "EXTERNAL_REQUEST_NOT_TRACKED",
-        "{s}"
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
     );
+    assert!(!state.join("runs/p11").exists());
+    assert!(!state.join("attempts/p11.json").exists());
     assert_eq!(c.store.lock().expect("store").len(), reports);
     assert_eq!(sent("p11"), 0);
     std::fs::remove_dir_all(&blocker).expect("unblock");
@@ -2722,6 +2737,55 @@ fn a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent(transp
         "the re-query sent it once the list could be written"
     );
     assert_eq!(pending_of(&svc.status()), json!([]));
+    // 8. the list breaks during a run (development code, same UID, creates the temporary
+    //    file's name as a directory): the first action and the after_run report are not sent
+    //    (review 1b362ec L-1; 6e0ad85 I-b: the answer says so)
+    let script = t.0.join("fake-claude");
+    let body = std::fs::read_to_string(&script).expect("script");
+    std::fs::write(
+        &script,
+        body.replacen(
+            "head -c 4096 >/dev/null\n",
+            &format!(
+                "head -c 4096 >/dev/null\nmkdir -p '{}'\n",
+                blocker.join("x").display()
+            ),
+            1,
+        ),
+    )
+    .expect("breaking script");
+    let reports = c.store.lock().expect("store").len();
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p13", "hi", json!({"session_id": "s13"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "p13");
+    settled(&svc);
+    let s = svc.status();
+    let fa = &s["first_action_report"]["result"];
+    assert_eq!(
+        (fa["ok"].as_bool(), fa["not_sent"].as_bool()),
+        (Some(false), Some(true)),
+        "{s}"
+    );
+    assert_eq!(fa["file"], json!(list_file), "{s}");
+    assert_eq!(sent("p13"), 0);
+    assert_eq!(
+        s["central_checkpoint"]["last_report"]["refusal"]["code"], "EXTERNAL_REQUEST_NOT_TRACKED",
+        "{s}"
+    );
+    assert_eq!(
+        s["central_checkpoint"]["last_report"]["refusal"]["file"],
+        json!(list_file),
+        "{s}"
+    );
+    // the takeover went out before the list broke; the after_run report did not
+    assert_eq!(c.store.lock().expect("store").len(), reports + 1);
+    std::fs::remove_dir_all(&blocker).expect("unblock");
+    std::fs::write(&script, body).expect("restore script");
 }
 
 // 02-05 step 6, review 1b362ec L-3 (R6): without a coordinator nothing is sent, so a first
@@ -2773,4 +2837,109 @@ fn a_local_only_role_has_no_pending_external_requests() {
     assert_eq!(st, 202, "{b}");
     assert_eq!(b["accepted"]["mode"], "resume", "{b}");
     wait(&svc, "l2");
+}
+
+// 02-05 step 7 (runtime contract revision 14 §17): the run's checkpoints record the work tree's
+// HEAD and the SHA pushed to the assigned branch, read from the git files only
+#[test]
+fn a_run_records_its_worktree_head_and_the_pushed_sha() {
+    const HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const PUSHED: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    let (t, svc) = setup("gitref");
+    let script = scripted_claude(
+        &t,
+        "fake-claude",
+        &[
+            r#"{"type":"system","subtype":"init","session_id":"s1"}"#,
+            RL_ALLOWED,
+            r#"{"type":"result","subtype":"success","is_error":false,"session_id":"s1","usage":{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20},"modelUsage":{"m":{"inputTokens":3,"outputTokens":7,"cacheReadInputTokens":20,"cacheCreationInputTokens":10}},"total_cost_usd":0.01}"#,
+        ],
+        0,
+    );
+    let cp = || -> Value {
+        serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
+            .expect("j")
+    };
+    // no repository in the work tree and no branch named: nothing observed, nothing pushed
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("g1", "hi", json!({"session_id": "s1"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "g1");
+    let c = cp();
+    assert_eq!(
+        (&c["worktree_head"], &c["pushed_sha"], &c["branch_ref"]),
+        (&json!("not_observed"), &Value::Null, &Value::Null),
+        "{c}"
+    );
+    assert_eq!(c["tracked"]["worktree_head"], true, "{c}");
+    // the run commits and pushes (as git would leave the ref files)
+    let body = std::fs::read_to_string(&script).expect("script");
+    std::fs::write(
+        &script,
+        body.replacen(
+            "head -c 4096 >/dev/null\n",
+            &format!(
+                "head -c 4096 >/dev/null\nmkdir -p .git/refs/heads/feat .git/refs/remotes/origin/feat\n\
+                 echo 'ref: refs/heads/feat/x' > .git/HEAD\necho {HEAD} > .git/refs/heads/feat/x\n\
+                 echo {PUSHED} > .git/refs/remotes/origin/feat/x\n"
+            ),
+            1,
+        ),
+    )
+    .expect("pushing script");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req(
+            "g2",
+            "hi",
+            json!({"session_id": "s2", "branch_ref": "refs/heads/feat/x"}),
+        ),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "g2");
+    let c = cp();
+    assert_eq!(c["phase"], "after_run", "{c}");
+    assert_eq!(
+        (
+            c["worktree_head"].as_str(),
+            c["pushed_sha"].as_str(),
+            c["branch_ref"].as_str()
+        ),
+        (Some(HEAD), Some(PUSHED), Some("refs/heads/feat/x")),
+        "{c}"
+    );
+    // another branch was not pushed
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req(
+            "g3",
+            "hi",
+            json!({"session_id": "s3", "branch_ref": "refs/heads/other"}),
+        ),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "g3");
+    assert_eq!(cp()["pushed_sha"], Value::Null);
+    // a branch_ref that is not a branch ref is refused
+    for bad in [json!("feat/x"), json!("refs/heads/../x"), json!(5)] {
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req("g4", "hi", json!({"session_id": "s4", "branch_ref": bad})),
+        );
+        assert_eq!(
+            (st, b["code"].as_str()),
+            (400, Some("SCHEMA_VIOLATION")),
+            "{b}"
+        );
+    }
 }

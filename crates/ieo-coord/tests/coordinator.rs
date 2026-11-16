@@ -3366,6 +3366,57 @@ fn an_import_whose_url_names_another_page_is_refused() {
     }
 }
 
+// 02-05 step 7: the branch head is an evidence kind from the trusted evidence service, and an
+// assignment may name its branch; both are checked as branch refs
+#[test]
+fn branch_heads_and_assignment_branches_are_checked_refs() {
+    let Some(e) = start() else { return };
+    let head = |id: &str, extra: Value| evidence(&e, id, "branch_head", extra);
+    let good = json!({"sha": SHA1, "ref": "refs/heads/feat/x", "source_ref": "fixture://gh"});
+    let (st, b) = head("h1", good.clone());
+    assert_eq!((st, b["kind"].as_str()), (201, Some("branch_head")), "{b}");
+    assert_eq!(
+        head("h1", good.clone()).0,
+        200,
+        "the same record again is a replay"
+    );
+    for (field, bad) in [
+        ("ref", json!("feat/x")),
+        ("ref", json!("refs/heads/")),
+        ("ref", json!("refs/heads/a..b")),
+        ("ref", json!("refs/heads/a b")),
+        ("sha", json!("HEAD")),
+        ("conclusion", json!("success")),
+    ] {
+        let mut v = good.clone();
+        v[field] = bad.clone();
+        let (st, b) = head("h2", v);
+        assert_eq!(st, 400, "{field}={bad} {b}");
+    }
+    // only the evidence service ingests it
+    let mut v = json!({"evidence_id": "h3", "repo_id": "repo-a", "kind": "branch_head"});
+    for (k, x) in good.as_object().expect("o") {
+        v[k] = x.clone();
+    }
+    assert_eq!(e.post("operator", "/v0/coordinator/evidence", &v).0, 403);
+    ready_sprint(&e, 3);
+    let assign_b = |branch: Value| {
+        e.post(
+            "assigner",
+            "/v0/coordinator/assignments",
+            &json!({"repo_id": "repo-a", "role": "development", "assignment_id": "A1",
+                    "generation": 0, "sprint_id": "POC-01", "sprint_revision": 5,
+                    "task_id": "01-01", "target_sha": SHA1, "expected_current": null,
+                    "branch_ref": branch}),
+        )
+    };
+    for bad in [json!("main"), json!(""), json!(7)] {
+        let (st, b) = assign_b(bad.clone());
+        assert_eq!(st, 400, "{bad} {b}");
+    }
+    assert_eq!(assign_b(json!("refs/heads/feat/x")).0, 201);
+}
+
 #[test]
 fn repo_scope_role_control_needs_its_scope_and_reports_unreachable_roles() {
     let Some(env) = start() else { return };
