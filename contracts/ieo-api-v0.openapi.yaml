@@ -1,12 +1,26 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.12.0
+  version: 0.13.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.13.0 (02-05 step 5): assignment-level time and token limits (C7, 02-04 item 1a; user decision 2026-11-16:
+    `total_tokens` = input + output + cache_creation, `elapsed_seconds` = the sum of run durations, both over all
+    generations of the assignment). issueAssignment takes an optional `limits {elapsed_seconds, total_tokens}`
+    (absent → the revision's; above it, or where the revision has none → 422 `LIMITS_ABOVE_SPEC`). deliverAssignment
+    refuses with 409 `ASSIGNMENT_LIMIT_REACHED` (no token room, or time left not above the run guard's 6 s stop
+    grace) or 409 `ASSIGNMENT_USAGE_UNMEASURED` (a run unmeasured, a sent call's ledger record missing, or runs settled
+    from another ledger: never counted as 0, never lowered); nothing is recorded except one limit event; otherwise the run's limits are the smallest of the assignment's remaining
+    amounts, the budget's and the role share's. getAssignmentChain adds `usage`, `usage_runs` and `limit_events`
+    (verified); getOwnAssignment's `limits` are the assignment's own. **Behaviour changes:** the HTTP path bounds
+    every statement at 10 s (500 after it, that step's transaction rolled back; review fe924b7 I-5);
+    deliverAssignment of an assignment with an unmeasured run now answers 409 before recording the request (it was
+    recorded with `budget_refused`); an `attempt_id` the budget ledger already holds is 409 `ATTEMPT_ID_CONFLICT`; a
+    delivery that reaches its call more than 75 s after it began calls nothing (`not_called`), so its call and result end
+    inside the 120 s a replay waits (75 + 30 + 10 + 5); `coordinator_record.limits` are the assignment's own limits.
     0.12.0 (02-05 step 4, additive): getAssignmentChain (`GET /v0/coordinator/assignments/{assignment_id}/generations/{generation}/chain`,
     `coordinator:assign` or `roles:control`, HTTP only): sprint revision → assignment → deliveries (verified) → takeovers
     → first actions → checkpoints and tamper events → agent reports and the latest session status (claims). Every
@@ -808,7 +822,8 @@ paths:
         §1.2). `Idempotency-Key` (8–128 bytes) is the delivery's request id within (repo, role).
         Shape: (1) the request is recorded (`verified`, transaction 1) when `assignment_id`/`generation` are the
         current head (else 409 `STALE_ASSIGNMENT`; no head → 404 `NO_CURRENT_ASSIGNMENT`; an `attempt_id` used
-        by another delivery → 409 `ATTEMPT_ID_CONFLICT`); (2) the resume judgment of compareCheckpoint:
+        by another delivery, or one the budget ledger already holds → 409 `ATTEMPT_ID_CONFLICT`); (2) the resume
+        judgment of compareCheckpoint:
         `no_checkpoint` → `start`, `resume_allowed` → `reconnect` (`new_session: true` asks for `start` on
         `resume_allowed`, and on `stale_generation` only when that older generation's last run finished
         (`after_run`); an older generation whose last run did not finish is judged
@@ -828,6 +843,18 @@ paths:
         by another caller — nothing was started by this delivery), or
         `unknown` when the answer was lost (the budget ledger then asks for a person, as for the host caller).
         An accepted run is finished, measured and charged in the background by the same library.
+        02-05 step 5, before the request is recorded: the assignment's runs (all generations) are settled from
+        the budget ledger when no call is running (a delivery that may have run — newest result `accepted` or
+        `unknown`, or no result and older than the 120 s in-flight bound — or that sent its call, matched by attempt
+        and role; a replay settles nothing; a missing delivery whose result later shows nothing ran is closed), and the delivery is refused with 409 `ASSIGNMENT_USAGE_UNMEASURED` (a run
+        unmeasured; the ledger record of a sent call missing — it keeps its last known counts until a person
+        reconciles the ledger, by the record coming back or an entry naming the attempt with `model_request: false`;
+        or the runs were settled from another ledger than the configured one) or `ASSIGNMENT_LIMIT_REACHED` (no `total_tokens` room, or the
+        `elapsed_seconds` left is not more than the run guard's 6 s stop grace). The refusal records nothing but one
+        limit event per (generation, code, settled runs); the answer carries `usage` and `operational_state:
+        awaiting_human_decision` (no decision request is created). After the budget check the runs are settled
+        again from the records it read under its lock and the run's window and billable room are lowered to the
+        assignment's remaining amounts; a limit found there is `budget_refused`.
         The same key with the same body answers the stored delivery (200). A delivery with no result yet that
         was requested less than 120 s ago is still in flight: 409 `DELIVERY_IN_PROGRESS`, nothing recorded.
         A stored `unknown` (or a result still missing after that) is re-queried first: the supervisor's stored answer for the attempt (`GET /v0/role/attempts/{id}`,
@@ -889,7 +916,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Problem' }
         '409':
-          description: '`STALE_ASSIGNMENT`, `ATTEMPT_ID_CONFLICT`, `IDEMPOTENCY_KEY_CONFLICT` or `DELIVERY_IN_PROGRESS`; nothing recorded'
+          description: '`STALE_ASSIGNMENT`, `ATTEMPT_ID_CONFLICT`, `IDEMPOTENCY_KEY_CONFLICT`, `DELIVERY_IN_PROGRESS`, `ASSIGNMENT_LIMIT_REACHED` or `ASSIGNMENT_USAGE_UNMEASURED` (one limit event); nothing else recorded'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RejectionList' }
@@ -1144,6 +1171,19 @@ paths:
                       properties:
                         assignment_id: { type: string, minLength: 1 }
                         generation: { type: integer, minimum: 0 }
+                limits:
+                  description: |
+                    02-05 step 5: the assignment's limits, each at most the revision's `limits` value (no new numbers:
+                    policy `numeric_values`); absent or null → the revision's. Above the revision's, or where the
+                    revision has none → 422 `LIMITS_ABOVE_SPEC`. Consumption is summed over all generations of the
+                    assignment; the current head's limits apply (user decision 2026-11-16).
+                  oneOf:
+                    - type: 'null'
+                    - type: object
+                      additionalProperties: false
+                      properties:
+                        elapsed_seconds: { type: [integer, 'null'], minimum: 1, description: 'the sum of run durations' }
+                        total_tokens: { type: [integer, 'null'], minimum: 1, description: 'input + output + cache_creation' }
       responses:
         '201': { $ref: '#/components/responses/CoordinatorResult' }
         '202': { $ref: '#/components/responses/CoordinatorResult' }
@@ -1406,6 +1446,15 @@ components:
         tamper_events: { type: array, items: { type: object } }
         agent_reports: { type: array, items: { type: object } }
         session_status: { type: [object, 'null'] }
+        usage:
+          description: |
+            02-05 step 5 (verified): the assignment's limits and what its settled runs used over all generations —
+            `runs`, `unmeasured_runs`, `elapsed_seconds` (sum of run durations), `total_tokens` (input + output +
+            cache_creation), `tokens` (all four), `remaining`, `operational_state` (`open` or
+            `awaiting_human_decision`). Runs are settled at deliveries; a run not yet settled is not in it.
+          type: object
+        usage_runs: { type: array, items: { type: object } }
+        limit_events: { type: array, items: { type: object } }
         links:
           type: array
           items:
@@ -1491,7 +1540,8 @@ components:
                  SEMANTIC_REVIEW_NOT_PASSED, UNKNOWN_SPRINT_REVISION, UNKNOWN_TASK, REPO_MISMATCH,
                  NO_CURRENT_ASSIGNMENT, OUTBOX_STATE_CONFLICT, SPRINT_REPO_CONFLICT, IMPORT_GATED, IMPORT_INCOMPLETE,
                  CHECKPOINT_SEQUENCE_GAP, CHECKPOINT_MISMATCH, ATTEMPT_ID_CONFLICT, DELIVERY_IN_PROGRESS,
-                 DELIVERY_REQUIRED, DELIVERY_MISMATCH]
+                 DELIVERY_REQUIRED, DELIVERY_MISMATCH, LIMITS_ABOVE_SPEC, ASSIGNMENT_LIMIT_REACHED,
+                 ASSIGNMENT_USAGE_UNMEASURED]
         field: { type: string }
         message: { type: string, minLength: 1 }
         correction: { type: string, minLength: 1 }

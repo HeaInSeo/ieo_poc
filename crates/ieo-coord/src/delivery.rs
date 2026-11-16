@@ -196,6 +196,15 @@ fn load(tx: &mut Transaction, id: &str) -> Result<Value, Resp> {
 /// Transaction 1: the replay of a stored request (200, `{"replay": id}`), or the new request
 /// checked against the current assignment and recorded (201, the stored delivery). The
 /// coordinator record and the target SHA come from the database and the role configuration.
+/// What a new request is checked with: the role's configuration, and what the budget ledger
+/// says before the delivery (02-05 step 5) — its identity and its records when no call is
+/// running (`None`: busy, or no budget plan).
+struct LedgerView<'a> {
+    target: &'a Value,
+    id: Option<&'a str>,
+    idle: Option<&'a [Value]>,
+}
+
 fn record_request(
     tx: &mut Transaction,
     who: &Caller,
@@ -203,8 +212,9 @@ fn record_request(
     role: &str,
     key: &str,
     body: &Value,
-    t: &Value,
+    ledger: &LedgerView,
 ) -> R {
+    let t = ledger.target;
     lock(tx, &format!("delivery:{repo}:{role}"))?;
     if let Some(row) = tx.query_opt(
         "SELECT delivery_id, body FROM role_deliveries
@@ -267,14 +277,33 @@ fn record_request(
             "use a new attempt_id",
         ));
     }
-    let spec: Value = h.get(7);
+    // an attempt id the budget ledger already holds (another caller of the budget, e.g. the
+    // 02-04 host caller) is never a delivery's: its record would be taken for this delivery's
+    // (review 97ff0bc I-2)
+    if ledger
+        .idle
+        .is_some_and(|recs| recs.iter().any(|r| r["attempt_id"] == attempt))
+    {
+        return Err(one(
+            409,
+            "ATTEMPT_ID_CONFLICT",
+            "attempt_id",
+            "the budget ledger already has a call with this attempt_id",
+            "use a new attempt_id",
+        ));
+    }
+    // 02-05 step 5: the assignment's limits (its finished runs were settled just before); a
+    // refusal rolls this transaction back (nothing recorded)
+    let st = crate::limits::state(tx, &aid, generation, ledger.id)?;
+    crate::limits::room(&st)?;
     let record = json!({"generation": generation, "assignment_id": aid,
         "sprint_id": h.get::<_, String>(4), "sprint_revision": h.get::<_, i64>(5),
         "spec_digest": h.get::<_, String>(6), "image_digest": t["image_digest"],
         "profile_id": t["profile_id"], "profile_revision": t["profile_revision"],
         "task_id": h.get::<_, String>(2),
-        "limits": {"elapsed_seconds": spec["limits"]["elapsed_seconds"],
-                   "total_tokens": spec["limits"]["total_tokens"]}});
+        // the assignment's own limits (review 97ff0bc I-1)
+        "limits": {"elapsed_seconds": st["limits"]["elapsed_seconds"],
+                   "total_tokens": st["limits"]["total_tokens"]}});
     let id = delivery_id(repo, role, key);
     let logical = body["logical_name"]
         .as_str()
@@ -391,9 +420,64 @@ pub fn deliver(
         Ok(x) => x,
         Err(r) => return Ok(r),
     };
+    // the in-flight window of this delivery starts here (review 97ff0bc L-2)
+    let begun = std::time::Instant::now();
+    // the budget ledger's identity and its records when no call is running (step 5)
+    let ledger_id = crate::limits::ledger_id(&ctx.roles[repo]["budget_plan"]);
+    let idle = budget_plan(ctx, repo)
+        .ok()
+        .and_then(|p| caller::records_when_idle(&p).ok().flatten());
+    // the finished runs of the named assignment are settled first, in their own transaction:
+    // measured facts, kept whatever the delivery's answer (the refusal itself records nothing
+    // but its limit event). A replay of a stored request settles nothing.
+    if let (Some(recs), Some(aid), Some(lid)) = (
+        idle.as_deref(),
+        body["assignment_id"].as_str(),
+        ledger_id.as_deref(),
+    ) {
+        let settled = run_tx(db, guard, &|tx| {
+            let replay = tx
+                .query_opt(
+                    "SELECT 1 FROM role_deliveries WHERE repo_id = $1 AND role = $2
+                       AND request_id = $3",
+                    &[&repo, &role, &key],
+                )?
+                .is_some();
+            if !replay {
+                crate::limits::settle(tx, repo, role, aid, recs, lid, bounds().0)?;
+            }
+            ok(200, json!({}))
+        })?;
+        if settled.status != 200 {
+            return Ok(settled);
+        }
+    }
+    let view = LedgerView {
+        target: t,
+        id: ledger_id.as_deref(),
+        idle: idle.as_deref(),
+    };
     let first = run_tx(db, guard, &|tx| {
-        record_request(tx, who, repo, role, key, &body, t)
+        record_request(tx, who, repo, role, key, &body, &view)
     })?;
+    let limit_refusal = first.status == 409
+        && matches!(
+            first.body["rejections"][0]["code"].as_str(),
+            Some("ASSIGNMENT_LIMIT_REACHED" | "ASSIGNMENT_USAGE_UNMEASURED")
+        );
+    if limit_refusal {
+        // the refusal stays visible as one limit event; nothing else is recorded
+        let generation = body["generation"].as_u64().map_or(0, crate::api::i64_of);
+        let aid = body["assignment_id"].as_str().unwrap_or_default();
+        let ev = run_tx(db, guard, &|tx| {
+            crate::limits::record_event(tx, aid, generation, &first, &who.name)?;
+            ok(200, json!({}))
+        })?;
+        if ev.status != 200 {
+            return Ok(ev);
+        }
+        return Ok(first);
+    }
     match first.status {
         201 => {}
         200 => {
@@ -503,13 +587,49 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     }
-    // the revision's limits bound one run too (the remaining amounts are step 5)
-    if let Err(why) = adm.lower(
-        rec["limits"]["elapsed_seconds"].as_u64(),
-        rec["limits"]["total_tokens"].as_u64(),
-    ) {
+    // the assignment's remaining amounts bound the run (02-05 step 5): settled again from the
+    // records the budget check read under its lock, all generations
+    let aid = d["assignment_id"].as_str().unwrap_or_default().to_string();
+    let generation = d["generation"].as_i64().unwrap_or_default();
+    let lid = ledger_id.clone().unwrap_or_default();
+    let st = run_tx(db, guard, &|tx| {
+        crate::limits::settle(tx, repo, role, &aid, adm.records(), &lid, bounds().0)?;
+        ok(200, crate::limits::state(tx, &aid, generation, Some(&lid))?)
+    })?;
+    if st.status != 200 {
         drop(adm);
-        let o = budget_refused(format!("the sprint revision's limits: {why}"));
+        return Ok(st);
+    }
+    let room = crate::limits::room(&st.body).map_err(|r| {
+        r.body["rejections"][0]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string()
+    });
+    let lowered = room.and_then(|(secs, tokens)| {
+        adm.lower(secs, tokens)
+            .map_err(|why| format!("the assignment's remaining limits: {why}"))
+    });
+    if let Err(why) = lowered {
+        drop(adm);
+        let o = budget_refused(format!("assignment limits: {why}"));
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
+    }
+    // the start is sent only while the call (bounded by the adapter's 30 s) still ends inside
+    // the in-flight window a replay waits for (review 97ff0bc L-2): later, nothing is called
+    let (in_flight, deadline) = bounds();
+    if begun.elapsed() > Duration::from_secs(deadline) {
+        drop(adm);
+        let mut o = base("not_called");
+        o.reasons = json!([format!(
+            "the delivery took {} s before its call: past the {} s start deadline (the call must \
+             end inside the {in_flight} s a replay waits)",
+            begun.elapsed().as_secs(),
+            deadline
+        )]);
+        o.op = None;
         return run_tx(db, guard, &|tx| {
             record_result(tx, repo, role, &id, &o, 201, None)
         });
@@ -578,8 +698,53 @@ fn choose_op(decision: &str, new_session: bool, judged: &Value) -> Option<&'stat
 }
 
 /// A delivery without a result younger than this is still in flight: a replay answers 409
-/// `DELIVERY_IN_PROGRESS` instead of re-querying (the call itself is bounded well below it).
-const IN_FLIGHT: &str = "120 seconds";
+/// `DELIVERY_IN_PROGRESS` instead of re-querying, and the assignment's settlement leaves it for
+/// later (02-05 step 5).
+pub(crate) const IN_FLIGHT_DEFAULT: u64 = 120;
+
+/// The start or reconnect is sent only this long after the delivery began (review 97ff0bc L-2,
+/// 1548061 I-3): the call is bounded by the adapter's 30 s timeout and the result is then
+/// recorded in one short transaction (each statement ≤ 10 s on HTTP), with 5 s to spare, so the
+/// result exists before a replay re-queries: 75 + 30 + 10 + 5 = 120. Everything before the call
+/// (the request, the judgments, the budget check with its status reads, the settlements) has
+/// to fit in these 75 s; a delivery that does not is recorded as `not_called`.
+pub(crate) const START_DEADLINE_DEFAULT: u64 = 75;
+
+/// The call and the result's transaction after the start deadline: 30 s + 10 s + 5 s.
+const AFTER_START: u64 = 45;
+
+/// The two bounds in seconds: (in flight, start deadline). The defaults, unless the coordinator
+/// process sets `IEO_COORD_DELIVERY_IN_FLIGHT_SECS` and `IEO_COORD_DELIVERY_START_DEADLINE_SECS`
+/// (meant for tests, to reach these paths without waiting minutes) to values that keep
+/// deadline + 45 ≤ in flight; any other setting is ignored with a message.
+pub(crate) fn bounds() -> (u64, u64) {
+    static B: std::sync::OnceLock<(u64, u64)> = std::sync::OnceLock::new();
+    *B.get_or_init(|| {
+        let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<u64>().ok());
+        let (f, d) = (
+            env("IEO_COORD_DELIVERY_IN_FLIGHT_SECS"),
+            env("IEO_COORD_DELIVERY_START_DEADLINE_SECS"),
+        );
+        let b = checked_bounds(f, d);
+        if (f, d) != (None, None) && b == (IN_FLIGHT_DEFAULT, START_DEADLINE_DEFAULT) {
+            eprintln!(
+                "ieo-coord: delivery bounds {f:?}/{d:?} ignored (both are needed, deadline + \
+                 {AFTER_START} <= in flight): using {IN_FLIGHT_DEFAULT} s / \
+                 {START_DEADLINE_DEFAULT} s"
+            );
+        }
+        b
+    })
+}
+
+/// The bounds a setting gives: both values with deadline ≥ 1 and deadline + 45 ≤ in flight,
+/// else the defaults.
+fn checked_bounds(in_flight: Option<u64>, deadline: Option<u64>) -> (u64, u64) {
+    match (in_flight, deadline) {
+        (Some(f), Some(d)) if d >= 1 && d.saturating_add(AFTER_START) <= f => (f, d),
+        _ => (IN_FLIGHT_DEFAULT, START_DEADLINE_DEFAULT),
+    }
+}
 
 /// The same request again: the stored delivery, or — when its result is `unknown` or was never
 /// written — the supervisor's stored answer for the attempt, recorded as the next result.
@@ -595,11 +760,9 @@ fn replay(
         let mut d = load(tx, id)?;
         let young: bool = tx
             .query_one(
-                &format!(
-                    "SELECT now() - requested_at < interval '{IN_FLIGHT}' FROM role_deliveries
-                     WHERE delivery_id = $1"
-                ),
-                &[&id],
+                "SELECT now() - requested_at < make_interval(secs => $2) FROM role_deliveries
+                 WHERE delivery_id = $1",
+                &[&id, &(bounds().0 as f64)],
             )?
             .get(0);
         d["_young"] = json!(young);
@@ -679,4 +842,25 @@ fn replay(
     run_tx(db, guard, &|tx| {
         record_result(tx, repo, role, id, &o, 200, expect_n)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delivery_bounds_keep_the_call_inside_the_in_flight_window() {
+        // the defaults: 75 + 45 = 120
+        assert_eq!(START_DEADLINE_DEFAULT + AFTER_START, IN_FLIGHT_DEFAULT);
+        assert_eq!(checked_bounds(None, None), (120, 75));
+        assert_eq!(checked_bounds(Some(47), Some(2)), (47, 2));
+        for (f, d) in [
+            (Some(46), Some(2)),
+            (Some(47), Some(0)),
+            (Some(47), None),
+            (None, Some(2)),
+        ] {
+            assert_eq!(checked_bounds(f, d), (120, 75), "{f:?} {d:?}");
+        }
+    }
 }

@@ -49,6 +49,11 @@ impl From<postgres::Error> for Resp {
     fn from(e: postgres::Error) -> Self {
         if e.code() == Some(&postgres::error::SqlState::QUERY_CANCELED) {
             QUERY_CANCELED.with(|c| c.set(true));
+            return Resp {
+                status: 500,
+                body: json!({"code": "INTERNAL",
+                             "message": "database error: statement timeout or cancellation (SQLSTATE 57014); this step's transaction was rolled back"}),
+            };
         }
         // The database message never contains credentials (the URL is not part of it).
         Resp {
@@ -538,11 +543,29 @@ pub(crate) fn run_tx(
     }
 }
 
-/// HTTP entry: route the path, then [`dispatch`] with no deadline.
+/// Upper bound of one statement on the HTTP path, advisory-lock waits included (PR #74 review
+/// fe924b7 I-5). A statement past it fails with SQLSTATE 57014 and the operation answers 500
+/// with its transaction rolled back (a multi-statement transaction can take a multiple of it).
+/// deliverAssignment does not rely on this sum for its 120 s in-flight window: it sends its call
+/// only before its start deadline (75 s, `delivery::bounds`) and records the result right after it (review
+/// 97ff0bc L-2).
+pub const HTTP_STATEMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The HTTP path's guard: no deadline and no cancellation, but every statement is bounded by
+/// [`HTTP_STATEMENT_TIMEOUT`].
+pub struct HttpGuard;
+
+impl TxGuard for HttpGuard {
+    fn statement_timeout(&self) -> Option<std::time::Duration> {
+        Some(HTTP_STATEMENT_TIMEOUT)
+    }
+}
+
+/// HTTP entry: route the path, then [`dispatch`] with no deadline and bounded statements.
 pub fn handle(db: &mut Client, ctx: &Ctx, who: Option<&Caller>, req: &Req) -> Resp {
-    match dispatch(db, ctx, who, route(req.method, req.path), req, &NoGuard) {
+    match dispatch(db, ctx, who, route(req.method, req.path), req, &HttpGuard) {
         Ok(r) => r,
-        // NoGuard never aborts
+        // HttpGuard never aborts (a statement timeout is the 500 of the failed statement)
         Err(_) => problem(500, "INTERNAL", "transaction abandoned"),
     }
 }
@@ -654,7 +677,7 @@ pub fn dispatch(
             assignment_id,
             generation,
         } => run(db, &|tx| {
-            crate::chain::assignment_chain(tx, who, assignment_id, generation)
+            crate::chain::assignment_chain(tx, who, &ctx.roles, assignment_id, generation)
         }),
         Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
@@ -2513,6 +2536,61 @@ fn find_task<'a>(spec: &'a Value, task_id: &str) -> Option<&'a Value> {
         .find(|t| t["task_id"] == task_id)
 }
 
+/// The assignment-level limit keys (02-05 step 5, PLAN §3.2 step 5).
+const LIMIT_KEYS: [&str; 2] = ["elapsed_seconds", "total_tokens"];
+
+/// The optional `limits` of an assignment request: absent or null, or an object with
+/// `elapsed_seconds` and/or `total_tokens` (each null or an integer ≥ 1).
+fn assignment_limits_field(v: &Value) -> Result<Value, Resp> {
+    if v.is_null() {
+        return Ok(json!({}));
+    }
+    let bad = || {
+        one(
+            400,
+            "SCHEMA_VIOLATION",
+            "limits",
+            "limits is null or {elapsed_seconds, total_tokens}, each null or an integer ≥ 1",
+            "fix limits",
+        )
+    };
+    let m = v.as_object().ok_or_else(bad)?;
+    if m.keys().any(|k| !LIMIT_KEYS.contains(&k.as_str()))
+        || m.values()
+            .any(|x| !(x.is_null() || x.as_u64().is_some_and(|n| n >= 1)))
+    {
+        return Err(bad());
+    }
+    Ok(v.clone())
+}
+
+/// The assignment's limits: each asked value, else the revision's. An asked value above the
+/// revision's, or where the revision has none, is 422 `LIMITS_ABOVE_SPEC` (the PoC sets no
+/// numbers of its own: policy `numeric_values`).
+fn effective_limits(spec: &Value, asked: &Value) -> Result<Value, Resp> {
+    let mut out = json!({});
+    for k in LIMIT_KEYS {
+        let from_spec = spec["limits"][k].as_u64();
+        out[k] = match (asked[k].as_u64(), from_spec) {
+            (None, s) => json!(s),
+            (Some(a), Some(s)) if a <= s => json!(a),
+            (Some(a), s) => {
+                return Err(one(
+                    422,
+                    "LIMITS_ABOVE_SPEC",
+                    &format!("limits.{k}"),
+                    &format!(
+                        "{k} {a} is above the revision's {}",
+                        s.map_or("unset value".to_string(), |s| s.to_string())
+                    ),
+                    "ask for at most the revision's limit",
+                ));
+            }
+        };
+    }
+    Ok(out)
+}
+
 fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     need_client_scope(who, "coordinator:assign", false)?;
     let body = parse_body(req.body)?;
@@ -2536,8 +2614,10 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "task_id",
             "target_sha",
             "expected_current",
+            "limits",
         ],
     )?;
+    let asked_limits = assignment_limits_field(&body["limits"])?;
     let role = str_field(&body, "role", 16)?.to_string();
     if role != "development" && role != "guardrail" {
         return Err(one(
@@ -2695,6 +2775,8 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "fix task_id",
         ));
     };
+    // 02-05 step 5: the assignment's limits, never above the revision's (no new numbers)
+    let limits = effective_limits(&spec, &asked_limits)?;
     // ownership: compare-and-swap on the (repo, role) head
     let book = load_book(tx, &repo, &role)?;
     if book.current != expected {
@@ -2863,10 +2945,10 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     }
     tx.execute(
         "INSERT INTO assignments (assignment_id, generation, repo_id, role, sprint_id, sprint_revision,
-            task_id, target_sha, issued_by, policy_digest, request)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+            task_id, target_sha, issued_by, policy_digest, request, limits)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
         &[&aid, &i64_of(generation), &repo, &role, &sprint_id, &sprint_rev, &task_id, &sha,
-          &who.name, &ctx.policy.digest, &body],
+          &who.name, &ctx.policy.digest, &body, &limits],
     )?;
     tx.execute(
         "INSERT INTO assignment_heads (repo_id, role, assignment_id, generation) VALUES ($1,$2,$3,$4)
@@ -4501,6 +4583,9 @@ fn own_assignment(tx: &mut Transaction, who: &Caller, repo: &str, role: &str) ->
         })
         .collect();
     let limit = |k: &str| spec["limits"][k].as_u64().map_or(Value::Null, |n| json!(n));
+    // the assignment's own limits (02-05 step 5), else the revision's
+    let eff = crate::limits::state(tx, &r.get::<_, String>(0), r.get::<_, i64>(1), None)?["limits"]
+        .clone();
     // the newest delivery of this head (02-05 step 3) and the image and profile it expects
     let delivery = tx.query_opt(
         "SELECT delivery_id, coordinator_record FROM role_deliveries
@@ -4526,8 +4611,8 @@ fn own_assignment(tx: &mut Transaction, who: &Caller, repo: &str, role: &str) ->
                "target_sha": r.get::<_, String>(3), "sprint_id": r.get::<_, String>(4),
                "sprint_revision": r.get::<_, i64>(5), "spec_digest": r.get::<_, String>(6),
                "sources": sources,
-               "limits": {"elapsed_seconds": limit("elapsed_seconds"),
-                          "total_tokens": limit("total_tokens"),
+               "limits": {"elapsed_seconds": eff["elapsed_seconds"],
+                          "total_tokens": eff["total_tokens"],
                           "correction_attempts": limit("correction_attempts")},
                "attempts_issued": r.get::<_, i64>(10),
                "policy_digest": r.get::<_, String>(8), "issued_at": r.get::<_, String>(9),

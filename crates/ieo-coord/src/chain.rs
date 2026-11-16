@@ -42,7 +42,13 @@ fn need_reader(who: &Caller) -> Result<(), crate::api::Resp> {
 }
 
 /// `getAssignmentChain`.
-pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, gen_s: &str) -> R {
+pub(crate) fn assignment_chain(
+    tx: &mut Transaction,
+    who: &Caller,
+    roles: &Value,
+    aid: &str,
+    gen_s: &str,
+) -> R {
     need_reader(who)?;
     let Some(generation) = gen_s
         .parse::<u64>()
@@ -90,10 +96,16 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
     let limit = |k: &str| spec["limits"][k].as_u64().map_or(Value::Null, |n| json!(n));
     let sprint = json!({"evidence_level": "verified", "sprint_id": a.get::<_, String>(2),
         "revision": a.get::<_, i64>(3), "digest": a.get::<_, String>(9), "sources": sources});
+    // the assignment's limits and what its runs used, all generations (02-05 step 5)
+    // read against the configured ledger: rows of another one show the delivery's refusal
+    // (review 1548061 I-2)
+    let ledger = crate::limits::ledger_id(&roles[&repo]["budget_plan"]);
+    let usage = crate::limits::state(tx, aid, g, ledger.as_deref())?;
+    let lim = |k: &str| usage["limits"][k].clone();
     let assignment = json!({"evidence_level": "verified", "assignment_id": aid,
         "generation": generation, "repo_id": repo, "role": role,
         "task_id": a.get::<_, String>(4), "target_sha": a.get::<_, String>(5),
-        "limits": {"elapsed_seconds": limit("elapsed_seconds"), "total_tokens": limit("total_tokens"),
+        "limits": {"elapsed_seconds": lim("elapsed_seconds"), "total_tokens": lim("total_tokens"),
                    "correction_attempts": limit("correction_attempts")},
         "issued_by": a.get::<_, String>(6), "policy_digest": a.get::<_, String>(7),
         "issued_at": a.get::<_, String>(8), "current": a.get::<_, bool>(11)});
@@ -263,6 +275,49 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
                 "reported_by": r.get::<_, String>(6)})
         });
 
+    // the settled runs of the assignment (newest row per delivery) and its limit refusals
+    let usage_runs: Vec<Value> = tx
+        .query(
+            "SELECT DISTINCT ON (delivery_id) delivery_id, generation, attempt_id, state, seconds,
+                    input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, reason,
+                    record_sha256, iso(settled_at)
+             FROM assignment_run_usage WHERE assignment_id = $1
+             ORDER BY delivery_id, settled_at DESC",
+            &[&aid],
+        )?
+        .iter()
+        .map(|r| {
+            json!({"evidence_level": "verified", "delivery_id": r.get::<_, String>(0),
+                "generation": r.get::<_, i64>(1), "attempt_id": r.get::<_, String>(2),
+                "state": r.get::<_, String>(3), "seconds": r.get::<_, Option<i64>>(4),
+                "tokens": {"input": r.get::<_, Option<i64>>(5),
+                           "output": r.get::<_, Option<i64>>(6),
+                           "cache_creation": r.get::<_, Option<i64>>(7),
+                           "cache_read": r.get::<_, Option<i64>>(8)},
+                "reason": r.get::<_, Option<String>>(9),
+                "record_sha256": r.get::<_, String>(10), "settled_at": r.get::<_, String>(11)})
+        })
+        .collect();
+    let limit_events: Vec<Value> = tx
+        .query(
+            "SELECT generation, code, settled_runs, reason, requested_by, iso(recorded_at)
+             FROM assignment_limit_events WHERE assignment_id = $1
+             ORDER BY recorded_at, generation, code",
+            &[&aid],
+        )?
+        .iter()
+        .map(|r| {
+            json!({"generation": r.get::<_, i64>(0), "code": r.get::<_, String>(1),
+                "settled_runs": r.get::<_, i64>(2), "reason": r.get::<_, String>(3),
+                "requested_by": r.get::<_, String>(4), "recorded_at": r.get::<_, String>(5)})
+        })
+        .collect();
+    let mut usage = usage;
+    usage["operational_state"] = json!(match crate::limits::room(&usage) {
+        Ok(_) => "open",
+        Err(_) => "awaiting_human_decision",
+    });
+
     // one link per delivery: what was sent, whether it was taken over, and the run's first
     // action (recorded, `none` as its after_run says, or null: not known)
     let links: Vec<Value> = deliveries
@@ -310,12 +365,14 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
         200,
         json!({"assignment_id": aid, "generation": generation, "repo_id": repo, "role": role,
             "evidence_levels": {
-                "verified": ["sprint", "assignment", "deliveries"],
+                "verified": ["sprint", "assignment", "deliveries", "usage", "usage_runs",
+                         "limit_events"],
                 "claim": ["takeovers", "first_actions", "checkpoints", "tamper_events",
                           "agent_reports", "session_status"]},
             "sprint": sprint, "assignment": assignment, "deliveries": deliveries,
             "takeovers": takeovers, "first_actions": first_actions, "checkpoints": checkpoints,
             "tamper_events": tamper_events, "agent_reports": agent_reports,
-            "session_status": session_status, "links": links}),
+            "session_status": session_status, "links": links,
+            "usage": usage, "usage_runs": usage_runs, "limit_events": limit_events}),
     )
 }
