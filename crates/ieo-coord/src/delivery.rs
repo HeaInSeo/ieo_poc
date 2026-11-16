@@ -39,7 +39,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
-const BODY_KEYS: [&str; 7] = [
+const BODY_KEYS: [&str; 8] = [
     "assignment_id",
     "generation",
     "attempt_id",
@@ -47,6 +47,7 @@ const BODY_KEYS: [&str; 7] = [
     "prompt",
     "logical_name",
     "new_session",
+    "recovery_id",
 ];
 
 /// An id the supervisor accepts as a file name and CLI argument (its `safe_id`).
@@ -95,6 +96,16 @@ fn check_body(req: &Req) -> Result<Value, Resp> {
     }
     if !(body["new_session"].is_null() || body["new_session"].is_boolean()) {
         return Err(bad("new_session", "`new_session` must be a boolean"));
+    }
+    // 02-05 step 7b: the approval this delivery uses (a new session over an unfinished
+    // checkpoint); the supervisor carries it as a file-safe id
+    if !body["recovery_id"].is_null()
+        && !str_field(&body, "recovery_id", 64).is_ok_and(|r| r.starts_with("R-") && safe_id(r))
+    {
+        return Err(bad(
+            "recovery_id",
+            "`recovery_id` is an approved recovery's id (R-…)",
+        ));
     }
     Ok(body)
 }
@@ -190,7 +201,9 @@ fn load(tx: &mut Transaction, id: &str) -> Result<Value, Resp> {
         "logical_name": d.get::<_, String>(8), "coordinator_record": d.get::<_, Value>(9),
         "target_sha": d.get::<_, String>(10), "cause": d.get::<_, String>(11),
         "requested_by": d.get::<_, String>(12), "requested_at": d.get::<_, String>(13),
-        "evidence_level": d.get::<_, String>(14), "result": result}),
+        "evidence_level": d.get::<_, String>(14), "result": result,
+        // the approval this delivery used (02-05 step 7b), or null
+        "recovery": crate::recovery::of_delivery(tx, id)?}),
     )
 }
 
@@ -499,9 +512,45 @@ pub fn deliver(
     let id = d["delivery_id"].as_str().unwrap_or_default().to_string();
     // the resume judgment: the supervisor's status outside any transaction, then the central
     // record and the head under the checkpoint lock
-    let judge = |db: &mut Client| {
+    // 02-05 step 7b: a delivery naming an approved recovery starts a new session over the
+    // unfinished checkpoint, and nothing else; the approval is checked again at each judgment
+    let recovery = body["recovery_id"].as_str().map(str::to_string);
+    let judge = |db: &mut Client| -> Result<Resp, Abort> {
         let local = role_status(ctx, repo, role);
-        run_tx(db, guard, &|tx| compare_checkpoint(tx, repo, role, &local))
+        let j = run_tx(db, guard, &|tx| compare_checkpoint(tx, repo, role, &local))?;
+        let Some(rid) = recovery.as_deref().filter(|_| j.status == 200) else {
+            return Ok(j);
+        };
+        let u = run_tx(db, guard, &|tx| {
+            let r = crate::recovery::usable(tx, repo, role, rid, &local, &id)?;
+            ok(
+                200,
+                match r {
+                    Ok(g) => json!({"ok": true, "github": g}),
+                    Err(why) => json!({"ok": false, "why": why}),
+                },
+            )
+        })?;
+        if u.status != 200 {
+            return Ok(u);
+        }
+        let mut b = j.body;
+        if u.body["ok"] == true {
+            b["decision"] = json!("recovery_allowed");
+            b["reasons"] = json!([format!(
+                "recovery {rid}: a new session over the unfinished checkpoint, approved by a person"
+            )]);
+            b["github"] = u.body["github"].clone();
+        } else {
+            let mut why = vec![u.body["why"].clone()];
+            why.extend(b["reasons"].as_array().cloned().unwrap_or_default());
+            b["reasons"] = json!(why);
+            b["recovery_refused"] = json!(true);
+        }
+        Ok(Resp {
+            status: 200,
+            body: b,
+        })
     };
     let judged = judge(db)?;
     if judged.status != 200 {
@@ -662,6 +711,28 @@ pub fn deliver(
     for (k, v) in extra.as_object().into_iter().flatten() {
         sent[k] = v.clone();
     }
+    // the approval's one use, committed before the start is sent (02-05 step 7b): a second
+    // delivery, a replay or a restart can never start a second run with it
+    if let Some(rid) = &recovery {
+        let g = github.clone().unwrap_or(Value::Null);
+        let used = run_tx(db, guard, &|tx| {
+            crate::recovery::record_use(tx, repo, role, rid, &id, &g)
+        })?;
+        if used.status != 200 {
+            drop(adm);
+            let mut o = base("not_called");
+            o.op = None;
+            o.reasons = json!([format!(
+                "recovery {rid}: {}",
+                used.body["message"].as_str().unwrap_or("not usable")
+            )]);
+            return run_tx(db, guard, &|tx| {
+                record_result(tx, repo, role, &id, &o, 201, None)
+            });
+        }
+        extra["recovery_id"] = json!(rid);
+        sent["recovery_id"] = json!(rid);
+    }
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
@@ -711,7 +782,12 @@ pub fn deliver(
 /// refuses (review c11e734 M-1: `judge_resume` already reports an unfinished older run as
 /// reconciliation; the phase is checked here again so a start never covers one).
 fn choose_op(decision: &str, new_session: bool, judged: &Value) -> Option<&'static str> {
+    // a delivery naming a recovery does that or nothing (02-05 step 7b)
+    if judged["recovery_refused"] == true {
+        return None;
+    }
     match (decision, new_session) {
+        ("recovery_allowed", _) => Some("start"),
         ("no_checkpoint", _) => Some("start"),
         ("resume_allowed", false) => Some("reconnect"),
         ("resume_allowed", true) => Some("start"),

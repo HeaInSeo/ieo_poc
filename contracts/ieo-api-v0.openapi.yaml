@@ -1,12 +1,26 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.15.0
+  version: 0.16.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.16.0 (02-05 step 7b; user decision 2026-11-16 (나), runtime contract revision 15 §18): the official recovery
+    after a crash. approveRecovery (`POST /v0/repos/{repo_id}/roles/{role}/recoveries`, `Idempotency-Key`, HTTP
+    only): a person (a `user` credential with `roles:control` for the repo; services 403 `HUMAN_APPROVAL_REQUIRED`,
+    agents 403) approves one new session over the latest, unfinished (`takeover`/`error`) checkpoint of the
+    current assignment generation, with a reason. Refused with nothing recorded (409 `RECOVERY_RUNNING`,
+    `RECOVERY_TARGET_MISMATCH`), or recorded as `approved` or as a `needs_confirmation` hold (the run's end, an
+    external request, a delivery's outcome or the GitHub head not confirmed; the GitHub head check is step 7's on
+    evidence-service input, not a live GitHub read). getRecovery reads one with its use. deliverAssignment takes
+    an optional `recovery_id`: the approval is checked again; then the decision is `recovery_allowed` and the call
+    a `start` of the delivery's new session (never a resume) carrying `recovery_id`; otherwise nothing is called.
+    One approval starts at most one run (the use is committed before the call). The delivery shows `recovery`;
+    getAssignmentChain has `recoveries` and each delivery's `recovery`. **Behaviour change (accepted 02-04
+    supervisor start):** a start over an unfinished checkpoint without `recovery_id` is refused (409
+    `EXTERNAL_RECONCILIATION_REQUIRED`), with `local_only` too. Additive otherwise.
     0.15.0 (02-05 step 7, C10; runtime contract revision 14 §17): the GitHub record as the final basis of a resume.
     New evidence kind `branch_head` {sha, ref (`refs/heads/<name>`), source_ref} — trusted evidence-service input, not
     a live GitHub read. issueAssignment takes an optional `branch_ref`; the delivery's `coordinator_record` carries
@@ -952,6 +966,14 @@ paths:
                 prompt: { type: string, minLength: 1, maxLength: 65536 }
                 logical_name: { type: string, minLength: 1, maxLength: 128 }
                 new_session: { type: boolean, default: false }
+                recovery_id:
+                  description: |
+                    0.16.0 (02-05 step 7b): an approved recovery (approveRecovery). Checked again at use (the
+                    checkpoint, generation and GitHub head may have changed); usable → decision `recovery_allowed`,
+                    a `start` of `session_id` over the unfinished checkpoint, never a resume; otherwise nothing is
+                    called (`not_called`, the first reason says why). At most one run per approval.
+                  type: string
+                  pattern: '^R-[A-Za-z0-9_-]{1,62}$'
       responses:
         '201':
           description: The delivery recorded with its first result
@@ -981,6 +1003,91 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RejectionList' }
         '500': { $ref: '#/components/responses/Internal' }
+  /v0/repos/{repo_id}/roles/{role}/recoveries:
+    post:
+      tags: [coordinator]
+      operationId: approveRecovery
+      summary: A person approves one new session over an unfinished checkpoint (02-05 step 7b)
+      description: |
+        User decision 2026-11-16 (나) (docs/poc/User_Decisions_2026-11-16_recovery.md §2). HTTP only. Credential: a
+        `user` principal with `roles:control` for the repo (a person); a service credential → 403
+        `HUMAN_APPROVAL_REQUIRED`, an agent credential (the role's own included) → 403 `SCOPE_DENIED`.
+        `Idempotency-Key` (8–128 bytes) is the approval's request id within (repo, role): the same body → 200 the
+        stored approval; another body → 409 `IDEMPOTENCY_KEY_CONFLICT`.
+        The supervisor's status is read first, outside the transaction. Refused, nothing recorded: the role is running
+        (409 `RECOVERY_RUNNING`); the assignment generation is not the current head, the named checkpoint is not the
+        latest central one, its run finished, or (guardrail) the review target is not the current development target
+        (409 `RECOVERY_TARGET_MISMATCH`). Recorded `needs_confirmation` (a hold: never usable) when the supervisor
+        was not observed, its local checkpoint is not the central one, its pending external requests are not an
+        empty list, a delivery to the role has no known outcome, or (development) step 7's GitHub head check
+        (`github`; evidence-service input, not a live GitHub read) is not `match` — a crashed run that pushed is
+        such a hold until a person reconciles the branch. Otherwise `approved`. Children stay untracked (04-05),
+        recorded in `facts.limits`. An approval changes no usage and approves no call: deliverAssignment's limits and
+        budget check still apply.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 128 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [assignment_id, generation, checkpoint_seq, checkpoint_sha256, reason]
+              properties:
+                assignment_id: { type: string, minLength: 1, maxLength: 128 }
+                generation: { type: integer, minimum: 0 }
+                checkpoint_seq: { type: integer, minimum: 0 }
+                checkpoint_sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201':
+          description: Recorded (`approved` or `needs_confirmation`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recovery' }
+        '200':
+          description: The stored approval (same key and body)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recovery' }
+        '400':
+          description: Missing Idempotency-Key or a body that is not the schema
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectionList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Unknown role
+        '409':
+          description: '`RECOVERY_RUNNING`, `RECOVERY_TARGET_MISMATCH` or `IDEMPOTENCY_KEY_CONFLICT`; nothing recorded'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectionList' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /v0/repos/{repo_id}/roles/{role}/recoveries/{recovery_id}:
+    get:
+      tags: [coordinator]
+      operationId: getRecovery
+      summary: One recovery approval with its use (02-05 step 7b)
+      description: Scope `roles:control` for the repo (user or service). HTTP only. Unknown → 404 `NOT_FOUND`.
+      parameters:
+        - { name: repo_id, in: path, required: true, schema: { type: string } }
+        - { name: role, in: path, required: true, schema: { type: string, enum: [development, guardrail] } }
+        - { name: recovery_id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The approval
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recovery' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such recovery
   /v0/repos/{repo_id}/roles/{role}/first-actions:
     post:
       tags: [agent]
@@ -1278,7 +1385,9 @@ paths:
         `sprint` (sprint_id, revision, digest, `sources[]`) and `assignment` (generation, task, target SHA, the
         revision's limits, issuer, issued_at, policy digest, whether it is the current head) — `verified`;
         `deliveries` (request, cause, every result: judgment, operation, budget outcome, what was sent and the
-        supervisor's answer; `requested_at`, `responded_at`) — `verified`: what the coordinator itself did;
+        supervisor's answer; `requested_at`, `responded_at`; 0.16.0 `recovery`: the approval it used) and
+        `recoveries` (0.16.0: the generation's recovery approvals with their use) — `verified`: what the
+        coordinator itself did;
         `takeovers` (delivery, checkpoint sequence and digest, session, applied revision and digest,
         received_at), `first_actions` (attempt, offset, supervisor-clock time, kind, `source`), `checkpoints` of
         the generation (with their `delivery_id` and `first_action`), `tamper_events`, `agent_reports` of the
@@ -1554,6 +1663,9 @@ components:
         request_id: { type: string }
         repo_id: { type: string }
         role: { type: string, enum: [development, guardrail] }
+        recovery:
+          description: 0.16.0 (02-05 step 7b) the approved recovery this delivery used, or null
+          type: [object, 'null']
         assignment_id: { type: string }
         generation: { type: integer, minimum: 0 }
         attempt_id: { type: string }
@@ -1574,7 +1686,7 @@ components:
           required: [n, decision, reasons, op, outcome, limits, sent_sha256, supervisor, requeried, recorded_at]
           properties:
             n: { type: integer, minimum: 1 }
-            decision: { type: [string, 'null'], enum: [resume_allowed, no_checkpoint, already_running, stale_generation, external_reconciliation_required, not_observed, stale_target, null] }
+            decision: { type: [string, 'null'], enum: [resume_allowed, no_checkpoint, already_running, stale_generation, external_reconciliation_required, not_observed, stale_target, recovery_allowed, null] }
             reasons: { type: array }
             op: { type: [string, 'null'], enum: [start, reconnect, null] }
             outcome: { type: string, enum: [not_called, budget_refused, accepted, refused, unknown, not_accepted] }
@@ -1592,6 +1704,36 @@ components:
               oneOf:
                 - type: 'null'
                 - $ref: '#/components/schemas/GithubComparison'
+    Recovery:
+      description: 0.16.0 (02-05 step 7b) a person's approval of one new session over an unfinished checkpoint (verified)
+      type: object
+      required: [recovery_id, repo_id, role, assignment_id, generation, checkpoint, state, reasons, facts,
+                 approved_by, approver_kind, reason, approved_at, used]
+      properties:
+        recovery_id: { type: string }
+        repo_id: { type: string }
+        role: { type: string, enum: [development, guardrail] }
+        request_id: { type: string }
+        assignment_id: { type: string }
+        generation: { type: integer }
+        checkpoint:
+          type: object
+          properties:
+            seq: { type: integer }
+            checkpoint_sha256: { type: string }
+            phase: { type: string, enum: [takeover, error] }
+        state: { type: string, enum: [approved, needs_confirmation] }
+        reasons: { type: array, items: { type: string }, description: why it is held (empty when approved) }
+        facts: { type: object, description: the supervisor's status, the central checkpoint, pending deliveries and known limits read }
+        github: { description: step 7's GitHub head check (development), or null }
+        approved_by: { type: string }
+        approver_kind: { type: string, const: user }
+        reason: { type: string }
+        approved_at: { type: string, format: date-time }
+        evidence_level: { type: string, const: verified }
+        used:
+          type: [object, 'null']
+          description: the one delivery that used it (delivery_id, used_at, the GitHub check at use)
     GithubComparison:
       description: |
         0.15.0 (02-05 step 7): what a development judgment of `resume_allowed` compared (it accompanies the reconnect

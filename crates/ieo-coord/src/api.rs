@@ -115,7 +115,7 @@ fn sha256_hex(s: &str) -> String {
     hex::encode(Sha256::digest(s.as_bytes()))
 }
 
-fn is_sha(s: &str) -> bool {
+pub(crate) fn is_sha(s: &str) -> bool {
     (40..=64).contains(&s.len())
         && s.bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
@@ -329,6 +329,16 @@ pub enum Operation<'a> {
         repo: &'a str,
         role: &'a str,
     },
+    /// 02-05 step 7b: a person approves a recovery; read one (HTTP only).
+    ApproveRecovery {
+        repo: &'a str,
+        role: &'a str,
+    },
+    GetRecovery {
+        repo: &'a str,
+        role: &'a str,
+        id: &'a str,
+    },
     /// 02-05 step 4: the connection of one assignment generation (HTTP only, read only).
     AssignmentChain {
         assignment_id: &'a str,
@@ -368,6 +378,8 @@ impl Operation<'_> {
             Operation::RoleStop { .. } => Shape::CallThenTransaction,
             Operation::CompareCheckpoint { .. } => Shape::CallThenTransaction,
             Operation::DeliverAssignment { .. } => Shape::Delivery,
+            // the supervisor's status first, then one transaction (02-05 step 7b)
+            Operation::ApproveRecovery { .. } => Shape::CallThenTransaction,
             _ => Shape::Transaction,
         }
     }
@@ -417,6 +429,13 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         // the coordinator's delivery of the current assignment (02-05 step 3)
         ("POST", ["v0", "repos", repo, "roles", role, "deliveries"]) => {
             Operation::DeliverAssignment { repo, role }
+        }
+        // the official recovery after a crash (02-05 step 7b)
+        ("POST", ["v0", "repos", repo, "roles", role, "recoveries"]) => {
+            Operation::ApproveRecovery { repo, role }
+        }
+        ("GET", ["v0", "repos", repo, "roles", role, "recoveries", id]) => {
+            Operation::GetRecovery { repo, role, id }
         }
         // the connection of one assignment generation (02-05 step 4)
         (
@@ -716,6 +735,12 @@ pub fn dispatch(
         Operation::DeliverAssignment { repo, role } => {
             crate::delivery::deliver(db, ctx, who, repo, role, req, guard)
         }
+        Operation::ApproveRecovery { repo, role } => {
+            crate::recovery::approve(db, ctx, who, repo, role, req, guard)
+        }
+        Operation::GetRecovery { repo, role, id } => {
+            run(db, &|tx| crate::recovery::get(tx, who, repo, role, id))
+        }
         Operation::AssignmentChain {
             assignment_id,
             generation,
@@ -731,7 +756,7 @@ pub fn dispatch(
 
 /// The deliveries of a repo whose call's outcome is not known (02-05 step 6): no result recorded
 /// yet (in flight, or its result transaction was lost), or the newest result `unknown`.
-fn pending_deliveries(tx: &mut Transaction, repo: &str) -> Result<Vec<Value>, Resp> {
+pub(crate) fn pending_deliveries(tx: &mut Transaction, repo: &str) -> Result<Vec<Value>, Resp> {
     Ok(tx
         .query(
             "SELECT d.delivery_id, d.role, d.attempt_id, iso(d.requested_at),
@@ -758,7 +783,7 @@ fn pending_deliveries(tx: &mut Transaction, repo: &str) -> Result<Vec<Value>, Re
         .collect())
 }
 
-fn need_client_scope(who: &Caller, scope: &str, sprints_path: bool) -> Result<(), Resp> {
+pub(crate) fn need_client_scope(who: &Caller, scope: &str, sprints_path: bool) -> Result<(), Resp> {
     if who.kind == Kind::Agent {
         return Err(if sprints_path {
             problem(
@@ -3838,7 +3863,7 @@ fn need_reporter(who: &Caller, repo: &str, role: &str) -> Result<(), Resp> {
     Ok(())
 }
 
-fn need_role(role: &str) -> Result<(), Resp> {
+pub(crate) fn need_role(role: &str) -> Result<(), Resp> {
     if role == "development" || role == "guardrail" {
         Ok(())
     } else {
@@ -3850,7 +3875,11 @@ fn need_role(role: &str) -> Result<(), Resp> {
     }
 }
 
-fn latest_row(tx: &mut Transaction, repo: &str, role: &str) -> Result<Option<Value>, Resp> {
+pub(crate) fn latest_row(
+    tx: &mut Transaction,
+    repo: &str,
+    role: &str,
+) -> Result<Option<Value>, Resp> {
     let row = tx.query_opt(
         "SELECT seq, checkpoint_sha256, phase, session_id, assignment_id, generation, sprint_id,
                 sprint_revision, spec_digest, target_sha, settings_digest, reported_by, iso(received_at),

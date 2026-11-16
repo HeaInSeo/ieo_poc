@@ -809,12 +809,35 @@ fn a_run_error_leaves_an_error_checkpoint_and_stops_further_starts() {
         serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
             .expect("j");
     assert_eq!(cp["phase"], "error");
-    // usage of a failed attempt is unknown: the backstop refuses until a person reconciles
+    // 02-05 step 7b: a start over the error checkpoint needs an approved recovery
     let (st, b) = call(
         &svc,
         "POST",
         "/v0/role/start",
         &req("a2", "hi", json!({"session_id": "s2"})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+    assert!(
+        b["reason"]
+            .as_str()
+            .is_some_and(|r| r.contains("recovery_id")),
+        "{b}"
+    );
+    // usage of a failed attempt is unknown: with a recovery, the backstop still refuses until a
+    // person reconciles (a recovery is no budget reset)
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req(
+            "a2",
+            "hi",
+            json!({"session_id": "s2", "recovery_id": "R-a2"}),
+        ),
     );
     assert_eq!(
         (st, b["code"].as_str()),
@@ -1694,12 +1717,17 @@ fn a_lost_takeover_answer_is_adopted_and_its_tamper_is_reported_once(transport: 
         (cp["seq"].as_u64(), cp["session_id"].as_str()),
         (Some(3), Some("s2"))
     );
-    // a new session starts without carrying the tamper again
+    // a new session starts without carrying the tamper again; the adopted takeover is an
+    // unfinished run, so the start carries an approved recovery (02-05 step 7b)
     let (st, b) = call(
         &svc,
         "POST",
         "/v0/role/start",
-        &req("l4", "hi", json!({"session_id": "s4"})),
+        &req(
+            "l4",
+            "hi",
+            json!({"session_id": "s4", "recovery_id": "R-l4"}),
+        ),
     );
     assert_eq!(st, 202, "{b}");
     assert!(b["accepted"]["tamper"].is_null(), "{b}");
@@ -1746,11 +1774,17 @@ fn a_takeover_accepted_but_not_written_locally_is_adopted_next_time(transport: &
         "{ledger}"
     );
     std::fs::remove_dir(state.join("checkpoint.json")).expect("rmdir");
+    // the adopted takeover is an unfinished run: a new session over it carries an approved
+    // recovery (02-05 step 7b)
     let (st, b) = call(
         &svc,
         "POST",
         "/v0/role/start",
-        &req("w2", "hi", json!({"session_id": "s2"})),
+        &req(
+            "w2",
+            "hi",
+            json!({"session_id": "s2", "recovery_id": "R-w2"}),
+        ),
     );
     assert_eq!(st, 202, "{b}");
     wait(&svc, "w2");
@@ -2557,11 +2591,17 @@ fn pending_external_requests_are_tracked_requeried_and_stop_a_reconnect(transpor
         (Some(1), Some("checkpoint_report")),
         "{l}"
     );
+    // the adopted takeover is an unfinished run (02-05 step 7b: a start over it carries an
+    // approved recovery)
     let (st, b) = call(
         &svc,
         "POST",
         "/v0/role/start",
-        &req("p5", "hi", json!({"session_id": "s5"})),
+        &req(
+            "p5",
+            "hi",
+            json!({"session_id": "s5", "recovery_id": "R-p5"}),
+        ),
     );
     assert_eq!(st, 202, "{b}");
     wait(&svc, "p5");
@@ -2942,4 +2982,89 @@ fn a_run_records_its_worktree_head_and_the_pushed_sha() {
             "{b}"
         );
     }
+}
+
+// 02-05 step 7b (review fe924b7 I-4, user decision 2026-11-16 (나)): a start over a run that did
+// not finish needs an approved recovery; with `local_only` the id is the adapter caller's claim
+#[test]
+fn a_start_over_an_unfinished_run_needs_a_recovery() {
+    let (t, svc) = setup("recovery");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("r1", "hi", json!({"session_id": "s1"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "r1");
+    let p = t.0.join("state/checkpoint.json");
+    for phase in ["takeover", "error"] {
+        let mut cp: Value = serde_json::from_slice(&std::fs::read(&p).expect("cp")).expect("j");
+        cp["phase"] = json!(phase);
+        std::fs::write(&p, serde_json::to_vec_pretty(&cp).expect("j")).expect("w");
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req("r2", "hi", json!({"session_id": "s2"})),
+        );
+        assert_eq!(
+            (st, b["code"].as_str()),
+            (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+            "{phase} {b}"
+        );
+        assert!(!t.0.join("state/runs/r2").exists());
+    }
+    for bad in [json!("../x"), json!(""), json!(7)] {
+        let (st, b) = call(
+            &svc,
+            "POST",
+            "/v0/role/start",
+            &req("r2", "hi", json!({"session_id": "s2", "recovery_id": bad})),
+        );
+        assert_eq!(
+            (st, b["code"].as_str()),
+            (400, Some("SCHEMA_VIOLATION")),
+            "{b}"
+        );
+    }
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req(
+            "r2",
+            "hi",
+            json!({"session_id": "s2", "recovery_id": "R-local-1"}),
+        ),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(
+        b["accepted"]["mode"], "new",
+        "a recovery never resumes: {b}"
+    );
+    wait(&svc, "r2");
+    let cp: Value = serde_json::from_slice(&std::fs::read(&p).expect("cp")).expect("j");
+    assert_eq!(
+        (
+            cp["phase"].as_str(),
+            cp["session_id"].as_str(),
+            cp["recovery_id"].as_str()
+        ),
+        (Some("after_run"), Some("s2"), Some("R-local-1")),
+        "{cp}"
+    );
+    // a finished run needs none
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("r3", "hi", json!({"session_id": "s3"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "r3");
+    assert!(
+        serde_json::from_slice::<Value>(&std::fs::read(&p).expect("cp")).expect("j")["recovery_id"]
+            .is_null()
+    );
 }

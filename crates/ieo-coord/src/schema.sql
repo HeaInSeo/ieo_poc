@@ -548,4 +548,50 @@ END $$;
 -- returned it; NULL when the judgment made none (02-05 step 7)
 ALTER TABLE role_delivery_results ADD COLUMN IF NOT EXISTS github jsonb;
 
+-- 02-05 step 7b (user decision 2026-11-16 (나)): the official recovery after a crash. A person's
+-- approval to start a new session over one unfinished checkpoint (takeover/error), with the
+-- facts it was judged on; `needs_confirmation` is a recorded hold (nothing may use it). Append-only:
+-- earlier checkpoints, deliveries and evidence are never changed.
+CREATE TABLE IF NOT EXISTS role_recoveries (
+    recovery_id       text        PRIMARY KEY,
+    repo_id           text        NOT NULL,
+    role              text        NOT NULL CHECK (role IN ('development', 'guardrail')),
+    request_id        text        NOT NULL,
+    body              jsonb       NOT NULL,
+    assignment_id     text        NOT NULL,
+    generation        bigint      NOT NULL,
+    checkpoint_seq    bigint      NOT NULL,
+    checkpoint_sha256 text        NOT NULL,
+    checkpoint_phase  text        NOT NULL CHECK (checkpoint_phase IN ('takeover', 'error')),
+    state             text        NOT NULL CHECK (state IN ('approved', 'needs_confirmation')),
+    reasons           jsonb       NOT NULL,
+    facts             jsonb       NOT NULL,
+    github            jsonb,
+    approved_by       text        NOT NULL,
+    approver_kind     text        NOT NULL CHECK (approver_kind = 'user'),
+    reason            text        NOT NULL,
+    approved_at       timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (repo_id, role, request_id),
+    FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation)
+);
+
+-- The one execution of an approval: written (and committed) right before the supervisor's start
+-- is sent. One row per approval and one per unfinished checkpoint, so an approval never starts
+-- two runs and two approvals of one checkpoint never start two either.
+CREATE TABLE IF NOT EXISTS role_recovery_uses (
+    recovery_id       text        PRIMARY KEY REFERENCES role_recoveries (recovery_id),
+    delivery_id       text        NOT NULL UNIQUE REFERENCES role_deliveries (delivery_id),
+    repo_id           text        NOT NULL,
+    role              text        NOT NULL,
+    checkpoint_seq    bigint      NOT NULL,
+    github            jsonb,
+    used_at           timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (repo_id, role, checkpoint_seq)
+);
+
+CREATE OR REPLACE TRIGGER role_recoveries_append_only BEFORE UPDATE OR DELETE ON role_recoveries
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+CREATE OR REPLACE TRIGGER role_recovery_uses_append_only BEFORE UPDATE OR DELETE ON role_recovery_uses
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;

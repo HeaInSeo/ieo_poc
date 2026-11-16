@@ -4960,8 +4960,8 @@ fn claims_are_kept_apart_from_the_completion_judgment() {
     assert_eq!(st, 200, "{c2}");
     assert_eq!(
         c2["evidence_levels"],
-        json!({"verified": ["sprint", "assignment", "deliveries", "usage", "usage_runs",
-                            "limit_events"],
+        json!({"verified": ["sprint", "assignment", "deliveries", "recoveries", "usage",
+                            "usage_runs", "limit_events"],
                "claim": ["takeovers", "first_actions", "checkpoints", "tamper_events",
                          "agent_reports", "session_status"]})
     );

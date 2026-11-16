@@ -115,6 +115,25 @@ fn routes_resolve_to_their_operations_and_shapes() {
             }),
         ),
         ("GET", "/v0/repos/r/roles/development/deliveries", None),
+        // approveRecovery and its read (02-05 step 7b)
+        (
+            "POST",
+            "/v0/repos/r/roles/development/recoveries",
+            Some(Operation::ApproveRecovery {
+                repo: "r",
+                role: "development",
+            }),
+        ),
+        (
+            "GET",
+            "/v0/repos/r/roles/development/recoveries/R-1",
+            Some(Operation::GetRecovery {
+                repo: "r",
+                role: "development",
+                id: "R-1",
+            }),
+        ),
+        ("GET", "/v0/repos/r/roles/development/recoveries", None),
         // getAssignmentChain (02-05 step 4)
         (
             "GET",
@@ -155,6 +174,15 @@ fn routes_resolve_to_their_operations_and_shapes() {
     );
     assert_eq!(
         shape("GET", "/v0/coordinator/assignments/A1/generations/0/chain"),
+        Some(Shape::Transaction)
+    );
+    // approveRecovery (02-05 step 7b): the supervisor's status, then one transaction
+    assert_eq!(
+        shape("POST", "/v0/repos/r/roles/development/recoveries"),
+        Some(Shape::CallThenTransaction)
+    );
+    assert_eq!(
+        shape("GET", "/v0/repos/r/roles/development/recoveries/R-1"),
         Some(Shape::Transaction)
     );
     // the five operations of the gRPC surface are one transaction each (contract §9)
