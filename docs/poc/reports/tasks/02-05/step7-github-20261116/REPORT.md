@@ -5,7 +5,7 @@
 | 작업 | 02-05 구현 단계 7([계획](../plan-20261115/PLAN.md) §3.2 단계 7). 이월 C10(GitHub SHA·CI 대조를 재개의 최종 근거로)을 닫는다. C14의 `worktree_head`도 여기서 채운다 |
 | 착수 근거 | 단계 6 병합(PR #78, main 9b66300, 검토 6e0ad85 승인) |
 | 검토 반영 | PR #78 검토 6e0ad85 L-a·I-a·I-b·I-c와 실행되지 않은 회차의 원장 기록, PR #74 검토 fe924b7 I-4 잔여(§9) |
-| 기준 커밋 | main 9b66300. 구현 c9be60f, 증거 6a2d615(evidence/test.log 첫 줄이 c9be60f, 작업 트리 깨끗) |
+| 기준 커밋 | main 9b66300. 구현 c9be60f, 재사용 검사로 정리 f7cfb93(사용자 결정 2026-11-16 (나)의 단계 7b 준비), 증거 cb9366b(evidence/test.log 첫 줄이 f7cfb93, 작업 트리 깨끗). 6a2d615는 c9be60f의 증거였고 cb9366b가 대신한다 |
 | 모델 호출 | 0회. 실제 `claude`·컨테이너·실제 회차 없음. 실제 GitHub도 읽지 않았다. 영속 PoC DB(55433)·58090 코디네이터는 쓰지 않았다(일회성 시험 DB 55432만) |
 | 상태 | 구현과 시험 완료, **독립 검토 전**. fe924b7 I-4 잔여는 사용자 결정 2026-11-16 (나)에 따라 02-05 단계 7b 별도 PR로 넘김(§9). 원장(`state.json`)은 고치지 않았다(원장 담당이 기록) |
 
@@ -47,6 +47,7 @@
 - **CI 주장**: 현재 개발 배정의 최신 `development_progress` 보고(처분 `current`) 가운데 `target_sha`가 그 head인 것의 `internal_checks`(FAIL 하나 → 실패, 모두 PASS → 성공, 그 밖은 주장 아님). GitHub 결과와 다르면 `ci_claim.matches_github: false`로 기록하고 GitHub 결과를 쓴다.
 - 답의 새 필드 `github`: `source`(증거 입력이라는 표시), `branch_ref`, `worktree_head`·`pushed_sha`(체크포인트의 주장), `expected_sha`·`expected_from`(`pushed_sha`/`target_sha`), `head`(증거 id·SHA·source_ref), `matches`, `ci` {sha, result, evidence}, `ci_claim`. 개발 역할의 `resume_allowed` 판단이 아니면 null.
 - **Guardrail**: Guardrail 배정의 `target_sha`가 현재 개발 배정의 `target_sha`가 아니면(개발 배정이 없을 때 포함), 판단이 `resume_allowed`·`no_checkpoint`·`stale_generation`이었어도 새 값 `stale_target`이다. 사유: 새 검토 배정이 필요하다. 계획은 “재개하지 않는다”만 적었다. 낡은 대상을 새 세션으로 검토하는 것도 쓸모없어서 실행할 수 있는 세 판단을 모두 막았다(§7).
+- **재사용 검사(f7cfb93).** 이 대조는 함수 하나 `github_head_check`(배정·세대와 체크포인트 → 판단, 거절 사유, 대조 기록)다. 대조 기록의 `result`는 `match`/`mismatch`/`not_observed`이고 `source`는 입력이 증거 입력 기록(실제 GitHub 읽기가 아님)임을 밝힌다. `assignment_id`·`generation`, head의 증거 id, 그 head의 CI와 다른 CI 주장도 담는다. compare가 이 함수를 쓰고, 단계 7b의 공식 복구 점검(사용자 결정 조건 §2.2 “단계 7의 GitHub head 대조를 재사용”)이 같은 함수를 쓴다.
 - **전달(deliverAssignment)**: 판단의 `github`를 결과 행(`role_delivery_results.github`, 새 열)에 기록하고 결과에 싣는다. start·reconnect 본문에 `branch_ref`를 싣고, 재개이면 `github` {branch_ref, head_sha, ci}도 싣는다(보낸 본문 digest에 포함). `stale_target`은 아무것도 부르지 않는다(`not_called`).
 
 ### 2.3 단계 6 잔여(검토 6e0ad85)
@@ -94,7 +95,7 @@
 | 위치 | 확인 |
 | --- | --- |
 | 단계 2 | `coordinator_record.branch_ref`(배정의 브랜치) |
-| 단계 4 전 | **GitHub 기록 없음 → `not_observed`**(사유에 브랜치, `expected_from: target_sha`). 증거 서비스가 브랜치를 target SHA로 기록 → `resume_allowed`, head 일치, CI `none` |
+| 단계 4 전 | **GitHub 기록 없음 → `not_observed`**(사유에 브랜치, `expected_from: target_sha`, 검사 `result: not_observed`, `source`가 증거 입력임을 밝힘). 증거 서비스가 브랜치를 target SHA로 기록 → `resume_allowed`, head 일치, CI `none` |
 | 단계 4 | **head 일치 → 재개**(reconnect 수락). 결과의 `github.head.sha`, supervisor가 받은 본문의 `github` {branch_ref, head_sha, ci: none}과 `branch_ref` |
 | 단계 4 뒤 | **다른 SHA의 CI 무시**: 다른 SHA의 실패 기록 뒤에도 CI `none`. head SHA의 성공 기록 → 단계 6의 재개 전달 결과 `ci` {result: success, evidence: [ci-head]}, 받은 본문 `ci: success` |
 | 단계 12 | **CI 주장 불일치 기록**: 개발 에이전트가 같은 head에 FAIL을 주장 → 판단은 `resume_allowed`, CI는 GitHub의 `success`, `ci_claim` {claimed: failure, matches_github: false} |
@@ -103,7 +104,7 @@
 | 단계 12 | **로컬 ref만 옮긴 push 주장 → 외부 대조**: 다른 브랜치의 head가 그 SHA여도 쓰지 않음 |
 | 단계 12 | **Guardrail 대상 낡음 → 재개 안 함**: 대상이 개발 target과 같으면 `no_checkpoint`, 다른 SHA로 새 배정 → `stale_target`(사유 “새 검토 배정”), 그 전달 `not_called`·supervisor 호출 없음, 다시 맞춘 배정 → `no_checkpoint` |
 
-결과([evidence/test.log](evidence/test.log), 커밋 c9be60f):
+결과([evidence/test.log](evidence/test.log), 커밋 f7cfb93):
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`: 통과.
 - `openapi-spec-validator`: OK. proto 변경 없음.
 - `cargo test --workspace --locked`(시험 DB, `RUST_TEST_THREADS=4`): **392 통과, 0 실패, 0 무시**. 기준(9b66300) 388에 새 시험 4개.
@@ -111,7 +112,7 @@
 
 ## 5. 변이 시험
 
-각 변이를 하나씩 c9be60f 코드에 넣고 대상 시험을 돌린 뒤 파일을 되돌렸다(매번 `git status` 깨끗, [evidence/mutants.txt](evidence/mutants.txt)). **23개 모두 잡혔다.**
+각 변이를 하나씩 f7cfb93 코드에 넣고(c9be60f에서도 같은 23개가 모두 잡혔고, 재사용 검사로 옮긴 뒤 다시 돌렸다) 대상 시험을 돌린 뒤 파일을 되돌렸다(매번 `git status` 깨끗, [evidence/mutants.txt](evidence/mutants.txt)). **23개 모두 잡혔다.**
 
 | id | 변이 | 잡은 시험 |
 | --- | --- | --- |
@@ -169,7 +170,7 @@
 
 | 항목 | 처분 |
 | --- | --- |
-| PR #74 검토 fe924b7 I-4 잔여(전달 없는 직접 start가 끝나지 않은 체크포인트 위에서 새 세션을 시작) | **사용자 결정 2026-11-16 (나): 공식 복구 작업을 02-05 단계 7b 별도 PR로 추가**([결정 기록](../../../../User_Decisions_2026-11-16_recovery.md), 조건은 그 문서 §2). 이 단계는 그 복구 점검이 재사용할 GitHub head 대조를 제공한다. 결정 전 확인한 사실: 중앙 기록이 코디네이터이면 직접 start는 takeover가 `DELIVERY_REQUIRED`로 거부되어 실행되지 않고(chain_e2e), 전달 경로의 start는 외부 대조로 막힌다. 즉 코디네이터 모드의 구멍은 이미 닫혀 있다. 대신 그 모드에는 충돌 뒤 **복구 경로가 없다**(새 세대도 외부 대조). `local_only`(시험·02-04 호스트 호출자)의 직접 start는 02-04가 설계한 복구다. 선택지: (가) 기록만(코디네이터 모드 닫힘, `local_only`는 설계된 복구, 코디네이터 모드 복구 부재를 단계 9의 한계로), (나) 운영자만 쓰는 기록되는 복구 작업(GitHub head 대조를 조건으로, 그 뒤 새 세션만 허용, supervisor 직접 start도 그 복구 id 없이는 거부), (다) supervisor가 늘 거부하고 사람이 볼륨에서 체크포인트를 치움. 작성자 권고는 (가)였고 사용자는 (나)를 골랐다. 이 단계는 이 항목의 코드를 바꾸지 않았다 |
+| PR #74 검토 fe924b7 I-4 잔여(전달 없는 직접 start가 끝나지 않은 체크포인트 위에서 새 세션을 시작) | **사용자 결정 2026-11-16 (나): 공식 복구 작업을 02-05 단계 7b 별도 PR로 추가**([결정 기록](../../../../User_Decisions_2026-11-16_recovery.md), 조건은 그 문서 §2). 이 단계는 그 복구 점검이 재사용할 GitHub head 대조를 함수 하나(`github_head_check`: 배정·세대·체크포인트 → `match`/`mismatch`/`not_observed`와 증거, f7cfb93, §2.2)로 제공한다. 결정 전 확인한 사실: 중앙 기록이 코디네이터이면 직접 start는 takeover가 `DELIVERY_REQUIRED`로 거부되어 실행되지 않고(chain_e2e), 전달 경로의 start는 외부 대조로 막힌다. 즉 코디네이터 모드의 구멍은 이미 닫혀 있다. 대신 그 모드에는 충돌 뒤 **복구 경로가 없다**(새 세대도 외부 대조). `local_only`(시험·02-04 호스트 호출자)의 직접 start는 02-04가 설계한 복구다. 선택지: (가) 기록만(코디네이터 모드 닫힘, `local_only`는 설계된 복구, 코디네이터 모드 복구 부재를 단계 9의 한계로), (나) 운영자만 쓰는 기록되는 복구 작업(GitHub head 대조를 조건으로, 그 뒤 새 세션만 허용, supervisor 직접 start도 그 복구 id 없이는 거부), (다) supervisor가 늘 거부하고 사람이 볼륨에서 체크포인트를 치움. 작성자 권고는 (가)였고 사용자는 (나)를 골랐다. 이 단계는 이 항목의 코드를 바꾸지 않았다 |
 | PR #78 검토 6e0ad85 L-a(파일 이름, 202 뒤 실패) | 교정. 사유·답·상태에 파일 경로, 받기 전 읽기·쓰기 확인으로 바로 409(§2.3). 시험 단계 7·8, 변이 S7-G17 |
 | 6e0ad85 I-a(고정 200 ms) | 교정. 잠금을 잡았다는 신호를 기다린다 |
 | 6e0ad85 I-b(N3 생존) | 교정. `ok`·`not_sent`·`file` 확인. 변이 S7-N3 잡힘 |
@@ -179,5 +180,5 @@
 
 ## 10. 검증 명령과 정리
 
-- 로그: [evidence/test.log](evidence/test.log)(fmt·clippy·openapi·전체 시험, 커밋 c9be60f), [evidence/mutants.txt](evidence/mutants.txt)(23개).
-- 시험 DB(55432) 정리: 처음 실패한 `chain_e2e` 실행과 변이 실행이 남긴 `ieo_t_chain_*`·`ieo_t_dlv_*` 22개(모두 이 작업의 끝난 프로세스)를 이름으로 지웠다. 이 종단 시험들은 실패하면 자기 DB를 지우지 않는다(기존 동작). 끝난 뒤 `ieo_t_*`는 0개다. 55433·58090은 건드리지 않았다.
+- 로그: [evidence/test.log](evidence/test.log)(fmt·clippy·openapi·전체 시험, 커밋 f7cfb93), [evidence/mutants.txt](evidence/mutants.txt)(23개).
+- 시험 DB(55432) 정리: 처음 실패한 `chain_e2e` 실행과 두 차례 변이 실행이 남긴 `ieo_t_chain_*`·`ieo_t_dlv_*` 42개(22개, 그 뒤 20개, 모두 이 작업의 끝난 프로세스)를 이름으로 지웠다. 이 종단 시험들은 실패하면 자기 DB를 지우지 않는다(기존 동작). 끝난 뒤 `ieo_t_*`는 0개다. 55433·58090은 건드리지 않았다.
