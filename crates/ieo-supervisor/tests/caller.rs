@@ -2511,3 +2511,47 @@ fn the_0205_spare_may_redo_the_first_planned_run() {
     let why = not_started(call("d3", "hi", json!({})));
     assert!(why.contains("planned runs are used"), "{why}");
 }
+
+/// The spare gate fails closed on an ambiguous ledger: two records of the replaced attempt, or
+/// a replaced record of another budget, refuse (user decision 2026-11-17 (나)).
+#[test]
+fn the_spare_gate_refuses_ambiguous_records() {
+    let t = Tmp::new("spare-gate");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let run = |attempt: &str, budget: &str, failed: bool| {
+        json!({"format": "ieo-role-run/v0", "attempt_id": attempt, "role": "development",
+               "budget": budget, "model_request": true, "stop_required": failed,
+               "outcome": {"result": {"subtype": "success", "is_error": failed}}})
+    };
+    let recs = vec![run("d1", "02-05", false), run("d2", "02-05", true)];
+    let marker = json!({"spare": {"reason": "env", "replaces": "d2"}});
+    assert_eq!(
+        caller::spare_gate(&p, "development", &recs, &recs, &marker),
+        Ok(Some(json!({"reason": "env", "replaces": "d2"})))
+    );
+    // two records of the replaced attempt
+    let raw = vec![
+        run("d1", "02-05", false),
+        run("d2", "02-05", true),
+        run("d2", "02-05", true),
+    ];
+    let e = caller::spare_gate(&p, "development", &recs, &raw, &marker).expect_err("ambiguous");
+    assert!(e.contains("2 found"), "{e}");
+    // a replaced run of another budget
+    let raw = vec![run("d1", "02-05", false), run("d2", "02-04", true)];
+    let e = caller::spare_gate(&p, "development", &recs, &raw, &marker).expect_err("budget");
+    assert!(e.contains("of the 02-05 budget"), "{e}");
+    // a failure is a non-success result even without stop_required
+    let mut soft = run("d2", "02-05", false);
+    soft["outcome"]["result"]["subtype"] = json!("error_max_turns");
+    let raw = vec![run("d1", "02-05", false), soft];
+    assert!(caller::spare_gate(&p, "development", &recs, &raw, &marker).is_ok());
+    // a missing result is no clean success either
+    let mut none = run("d2", "02-05", false);
+    none["outcome"]["result"] = Value::Null;
+    let raw = vec![run("d1", "02-05", false), none];
+    assert!(caller::spare_gate(&p, "development", &recs, &raw, &marker).is_ok());
+}
