@@ -1,4 +1,4 @@
-# 02-05 budget PR mutants: each applied alone to the code of 8a4d619 (8d999bd adds one test; A3 was re-run on it after it first survived), then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). N: the approved numbers (user decision 2026-11-15 (나) §2.1); R: the share and ledger rules; A: review d336849 L-a/L-b. Columns: id | mutation | result | target: failing tests
+# 02-05 budget PR mutants: each applied alone to the code of e77ed76 (the spare gate of user decision 2026-11-17 (나) included), then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). N: the approved numbers (decision 2026-11-15 (나) §2.1); R: the share and ledger rules; S: the spare rules (decision 2026-11-17 (나)); A: review d336849 L-a/L-b. Columns: id | mutation | result | target: failing tests
 N1 | 4 runs → 5 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
 N2 | 600 s per run → 601 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
 N3 | 2,400 s → 2,401 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1; the_0205_budget_caps_each_number
@@ -8,12 +8,24 @@ N6 | development share 3 runs → 4 (the spare twice) | KILLED | ieo-supervisor 
 N7 | guardrail share 1 run → 2 (a retry) | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
 N8 | development share 150,000 → 150,001 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
 N9 | guardrail share 600 s → 601 | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
-R1 | the plan ignores the approved shares | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail
+R1 | the plan ignores the approved shares | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail; the_0205_spare_may_redo_the_first_planned_run; the_0205_spare_run_needs_a_marker_and_a_failed_development_run
 R2 | the plan accepts a share other than the approved one | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail
-R3 | the role service ignores the approved share | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail
+R3 | the role service ignores the approved share | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail; the_0205_spare_may_redo_the_first_planned_run; the_0205_spare_run_needs_a_marker_and_a_failed_development_run
 R5 | a ledger may hold another budget's records | KILLED | ieo-supervisor --test caller: a_ledger_belongs_to_one_budget
 R6 | "02-05" is not a budget name | KILLED | ieo-supervisor --test supervisor: budget_constants_match_decision_1
+S1 | no marker: development runs past its 2 planned runs | KILLED | ieo-supervisor --test caller: the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail; the_0205_spare_run_needs_a_marker_and_a_failed_development_run; the_0205_spare_may_redo_the_first_planned_run
+S2 | the replaced attempt need not have failed | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
+S3 | the replaced attempt may be another role or budget | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
+S4 | a second spare is allowed | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
+S5 | the spare rule applies to every role (the guardrail too) | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
+S6 | the marker is not written to the record | KILLED | ieo-supervisor --test caller: the_0205_spare_may_redo_the_first_planned_run; the_0205_spare_run_needs_a_marker_and_a_failed_development_run
+S7 | the spare does not answer the failed run it replaces | KILLED | ieo-supervisor --test caller: the_0205_spare_may_redo_the_first_planned_run; the_0205_spare_run_needs_a_marker_and_a_failed_development_run
+S8 | a recorded spare does not answer its run for later calls | KILLED | ieo-supervisor --test caller: the_0205_spare_may_redo_the_first_planned_run
+S9 | an ambiguous replaced attempt takes the first record | KILLED | ieo-supervisor --test caller: the_spare_gate_refuses_ambiguous_records
+S10 | the delivery body's spare is not checked | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S11 | the delivery does not pass its spare to the budget check | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+S12 | ieo-role-call drops the spare flags | KILLED | ieo-supervisor --test caller: the_caller_talks_to_the_service_over_http
 A1 | the recovery use is not bound to the checkpoint taken over (d336849 L-a) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
 A2 | only a takeover phase needs a recovery (d336849 L-b, H3) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
 A3 | the approval assignment/generation is not checked (d336849 L-a) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint; a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
-# 17 of 17 killed
+# 29 of 29 killed
