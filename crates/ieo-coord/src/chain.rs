@@ -91,7 +91,7 @@ pub(crate) fn assignment_chain(tx: &mut Transaction, who: &Caller, aid: &str, ge
     let sprint = json!({"evidence_level": "verified", "sprint_id": a.get::<_, String>(2),
         "revision": a.get::<_, i64>(3), "digest": a.get::<_, String>(9), "sources": sources});
     // the assignment's limits and what its runs used, all generations (02-05 step 5)
-    let usage = crate::limits::state(tx, aid, g)?;
+    let usage = crate::limits::state(tx, aid, g, None)?;
     let lim = |k: &str| usage["limits"][k].clone();
     let assignment = json!({"evidence_level": "verified", "assignment_id": aid,
         "generation": generation, "repo_id": repo, "role": role,

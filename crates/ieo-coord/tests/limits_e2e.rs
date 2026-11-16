@@ -325,8 +325,7 @@ fn e2e(transport: &str) {
     let ledger = dir.join("ledger");
     // the development role's share: 8 runs, 120 billable tokens (a test fixture value, PLAN §3.2
     // step 5: no approved 02-05 budget is wired here); the plan's window is 120 s
-    std::fs::write(
-        dir.join("roles.json"),
+    let roles_json = |ledger: &Path| {
         json!({"repo-a": {
             "development": {"url": format!("http://127.0.0.1:{}", role.port),
                             "adapter_token_file": dir.join("adapter_token"),
@@ -345,9 +344,9 @@ fn e2e(transport: &str) {
                 "guardrail": {"max_window_seconds": 120,
                     "share": {"max_runs": 2, "total_seconds": 4_800,
                               "billable_tokens": 500_000, "cache_read_tokens": 5_000_000}}}}}})
-        .to_string(),
-    )
-    .expect("roles");
+        .to_string()
+    };
+    std::fs::write(dir.join("roles.json"), roles_json(&ledger)).expect("roles");
     let rootdir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
     let mut coord = Coord {
         child: None,
@@ -592,6 +591,104 @@ fn e2e(transport: &str) {
         Some(1)
     );
 
+    // 4b. review 97ff0bc M-1: a missing ledger record never lowers consumption
+    let rec_path = ledger.join("records.jsonl");
+    let full = std::fs::read_to_string(&rec_path).expect("ledger");
+    let probe = |key: &str, want: &str| {
+        let b = refused(
+            key,
+            &dbody("A1", 1, "a3", "s2", json!({"new_session": true})),
+            want,
+        );
+        let ch = chain("A1", 1);
+        (b, ch)
+    };
+    // (a) the file is gone (moved, truncated, not mounted): it says nothing; usage stays
+    std::fs::rename(&rec_path, ledger.join("records.away")).expect("mv");
+    let (_, ch) = probe("lim-key-0003", "ASSIGNMENT_LIMIT_REACHED");
+    assert_eq!(
+        (
+            ch["usage"]["total_tokens"].as_u64(),
+            ch["usage"]["runs"].as_u64()
+        ),
+        (Some(40), Some(2)),
+        "{ch}"
+    );
+    std::fs::rename(ledger.join("records.away"), &rec_path).expect("mv back");
+    // (b) one record of a sent call is gone: the run is missing, stops the assignment and
+    //     keeps its last known counts
+    let only_a1: String = full
+        .lines()
+        .filter(|l| !l.contains("\"attempt_id\":\"a2\""))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    assert!(only_a1.len() < full.len());
+    std::fs::write(&rec_path, &only_a1).expect("partial");
+    let (b, ch) = probe("lim-key-0003", "ASSIGNMENT_USAGE_UNMEASURED");
+    assert!(
+        b["rejections"][0]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("record is missing")),
+        "{b}"
+    );
+    assert_eq!(ch["usage"]["total_tokens"], 40, "never lowered: {ch}");
+    assert!(
+        ch["usage_runs"]
+            .as_array()
+            .expect("runs")
+            .iter()
+            .any(|u| u["attempt_id"] == "a2" && u["state"] == "missing"),
+        "{ch}"
+    );
+    // (c) the record comes back: a newer row counts it again (the probe's case: never 0)
+    std::fs::write(&rec_path, &full).expect("restore");
+    let (_, ch) = probe("lim-key-0003", "ASSIGNMENT_LIMIT_REACHED");
+    assert_eq!(
+        (
+            ch["usage"]["total_tokens"].as_u64(),
+            ch["usage"]["unmeasured_runs"].as_u64()
+        ),
+        (Some(40), Some(0)),
+        "{ch}"
+    );
+    // (d) another ledger (e.g. a new budget's directory): the rows are never continued from it;
+    //     the delivery is refused until the configured ledger is the one they came from
+    std::fs::write(
+        dir.join("roles.json"),
+        roles_json(&dir.join("ledger-other")),
+    )
+    .expect("roles");
+    coord.stop();
+    coord.start();
+    let (b, ch2) = probe("lim-key-0003", "ASSIGNMENT_USAGE_UNMEASURED");
+    assert!(
+        b["rejections"][0]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("settled from the ledger")),
+        "{b}"
+    );
+    assert_eq!(ch2["usage"]["total_tokens"], 40);
+    std::fs::write(dir.join("roles.json"), roles_json(&ledger)).expect("roles");
+    coord.stop();
+    coord.start();
+    probe("lim-key-0003", "ASSIGNMENT_LIMIT_REACHED");
+    // review 97ff0bc I-2: an attempt id the budget ledger already holds is refused
+    std::fs::write(
+        &rec_path,
+        format!(
+            "{full}{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "x-host", "role": "development",
+                   "model_request": false, "reason": "another caller of the budget"})
+        ),
+    )
+    .expect("entry");
+    let (st, b) = deliver("lim-key-0099", &dbody("A1", 1, "x-host", "s2", json!({})));
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("ATTEMPT_ID_CONFLICT")),
+        "{b}"
+    );
+
     // 5. a later generation with a larger limit (still within the revision's): 20 left
     assert_eq!(
         assign(
@@ -613,8 +710,40 @@ fn e2e(transport: &str) {
         "{d5}"
     );
     assert_eq!(d5["result"]["limits"]["billable_room"], 20, "60 - 40: {d5}");
+    // review 97ff0bc I-1: the verified delivery record carries the assignment's own limits
+    assert_eq!(
+        d5["coordinator_record"]["limits"]["total_tokens"], 60,
+        "{d5}"
+    );
     role.wait("a5");
     settled("a5");
+    // review 97ff0bc L-1: the ledger is busy when the delivery arrives (the pre-settle is
+    // skipped, the request's check sees 40 of 60); the budget check waits for the lock and the
+    // settle under it finds 60 of 60: refused before any call
+    let lock_path = ledger.join("caller.lock");
+    let holder = std::thread::spawn(move || {
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&lock_path)
+            .expect("lock file");
+        f.lock().expect("lock");
+        std::thread::sleep(Duration::from_millis(1_000));
+        drop(f);
+    });
+    std::thread::sleep(Duration::from_millis(200));
+    let (st, busy) = deliver("lim-key-0015", &dbody("A1", 2, "a15", "s3", json!({})));
+    holder.join().expect("holder");
+    assert_eq!(
+        (st, busy["result"]["outcome"].as_str()),
+        (201, Some("budget_refused")),
+        "{busy}"
+    );
+    assert!(
+        busy["result"]["reasons"][0]
+            .as_str()
+            .is_some_and(|r| r.contains("assignment limits")),
+        "{busy}"
+    );
     refused(
         "lim-key-0006",
         &dbody("A1", 2, "a6", "s3", json!({})),
@@ -754,11 +883,12 @@ fn e2e(transport: &str) {
     );
     assert_eq!(ch["usage"]["operational_state"], "awaiting_human_decision");
 
-    // totals: six runs, each settled once; refusals recorded no delivery
+    // totals: six runs and the busy-ledger delivery (budget_refused); a2 has three rows
+    // (measured, missing, measured again); refusals recorded no delivery
     let n = counts();
-    assert_eq!((n[1], n[3]), (6, 6), "{n:?}");
-    // A1/1 and A1/2 (tokens), A1/4 (time), A1/5 (unmeasured)
-    assert_eq!(n[4], 4, "{n:?}");
+    assert_eq!((n[1], n[3]), (7, 8), "{n:?}");
+    // A1/1 (tokens, then missing/other ledger), A1/2 (tokens), A1/4 (time), A1/5 (unmeasured)
+    assert_eq!(n[4], 5, "{n:?}");
     coord.stop();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = admin.batch_execute(&format!("DROP DATABASE IF EXISTS {dbname} WITH (FORCE)"));

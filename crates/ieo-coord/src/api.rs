@@ -52,7 +52,7 @@ impl From<postgres::Error> for Resp {
             return Resp {
                 status: 500,
                 body: json!({"code": "INTERNAL",
-                             "message": "database error: statement timeout or cancellation (SQLSTATE 57014); nothing was stored"}),
+                             "message": "database error: statement timeout or cancellation (SQLSTATE 57014); this step's transaction was rolled back"}),
             };
         }
         // The database message never contains credentials (the URL is not part of it).
@@ -545,11 +545,10 @@ pub(crate) fn run_tx(
 
 /// Upper bound of one statement on the HTTP path, advisory-lock waits included (PR #74 review
 /// fe924b7 I-5). A statement past it fails with SQLSTATE 57014 and the operation answers 500
-/// with its transaction rolled back. deliverAssignment runs at most four short transactions
-/// before its result is recorded (the request, two judgments, the result), so its database
-/// part stays within 40 s and the whole call (two status reads of 10 s each, the 3 s ledger
-/// lock wait, the 30 s start call) within about 95 s: below the 120 s after which a replay
-/// re-queries (`delivery::IN_FLIGHT`).
+/// with its transaction rolled back (a multi-statement transaction can take a multiple of it).
+/// deliverAssignment does not rely on this sum for its 120 s in-flight window: it sends its call
+/// only before `delivery::START_DEADLINE` (80 s) and records the result right after it (review
+/// 97ff0bc L-2).
 pub const HTTP_STATEMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The HTTP path's guard: no deadline and no cancellation, but every statement is bounded by
@@ -4585,8 +4584,8 @@ fn own_assignment(tx: &mut Transaction, who: &Caller, repo: &str, role: &str) ->
         .collect();
     let limit = |k: &str| spec["limits"][k].as_u64().map_or(Value::Null, |n| json!(n));
     // the assignment's own limits (02-05 step 5), else the revision's
-    let eff =
-        crate::limits::state(tx, &r.get::<_, String>(0), r.get::<_, i64>(1))?["limits"].clone();
+    let eff = crate::limits::state(tx, &r.get::<_, String>(0), r.get::<_, i64>(1), None)?["limits"]
+        .clone();
     // the newest delivery of this head (02-05 step 3) and the image and profile it expects
     let delivery = tx.query_opt(
         "SELECT delivery_id, coordinator_record FROM role_deliveries

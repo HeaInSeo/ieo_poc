@@ -12,8 +12,9 @@
 //!   `total_tokens` = input + output + cache_creation (cache_read is recorded, not counted),
 //!   `elapsed_seconds` = the sum of the runs' durations (each rounded up to a second; not wall
 //!   clock). All four token counts are kept per run.
-//! * **Unmeasured.** A run whose ledger record is unmeasured (a guard stop, a lost answer, a
-//!   failed measurement) is never counted as 0: the assignment's next delivery is refused (409
+//! * **Unmeasured or missing.** A run whose ledger record is unmeasured (a guard stop, a lost
+//!   answer, a failed measurement), or whose record is missing although its call was sent (or
+//!   was settled before), is never counted as 0 and never lowered (review 97ff0bc M-1): the assignment's next delivery is refused (409
 //!   `ASSIGNMENT_USAGE_UNMEASURED`) until a person corrects the ledger.
 //! * **Enforcement.** A delivery is refused (409 `ASSIGNMENT_LIMIT_REACHED`, nothing recorded
 //!   apart from one limit event) when no token room is left or the time left is not more than
@@ -27,57 +28,119 @@ use postgres::Transaction;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-/// Copy the ledger records of the assignment's delivered attempts (all generations) that are
-/// not copied yet, or whose record changed (a person's correction gives a newer row). `recs` are
-/// the ledger's effective records read while no call was running. The ledger is the authority:
-/// the shared budget library writes a record for every call it sent (measured, unmeasured, or
-/// a lost answer that asks for a person) before it releases the ledger, so an attempt the idle
-/// ledger has no record of was never sent, or a person removed it when reconciling.
+/// The ledger a budget plan reads: `<budget>@<ledger_dir>` (rows are bound to it).
+pub(crate) fn ledger_id(plan_json: &Value) -> Option<String> {
+    Some(format!(
+        "{}@{}",
+        plan_json["budget"].as_str()?,
+        plan_json["ledger_dir"].as_str()?
+    ))
+}
+
+/// Copy what the ledger says about the assignment's delivered attempts (all generations) into
+/// `assignment_run_usage`, adding a row whenever a delivery's settled state changes (the newest
+/// row by `seq` counts). `recs` are the ledger's effective records read while no call was running
+/// (`caller::records_when_idle` or the budget check's own read under the ledger lock); `ledger` is
+/// that ledger's identity.
+///
+/// * Only a delivery that sent a call (a result with a sent digest) is matched, and only with a
+///   record of the same attempt and role: a refused admission never takes another caller's record
+///   (review 97ff0bc I-2).
+/// * A record with `model_request: false` naming the attempt is an explicit entry by a person:
+///   the run counts nothing (`withdrawn`).
+/// * No record while a call was (or may have been) started (newest result `accepted`/`unknown`),
+///   or a record settled before that is gone now: `missing` — it stops the assignment and keeps
+///   the last known counts. A missing record never lowers consumption (review 97ff0bc M-1).
+/// * An empty ledger (no records at all) when rows were settled before says nothing: no row is
+///   added (a truncated or moved file, a ledger not mounted).
+/// * Rows of another ledger are never continued from this one: nothing is settled and
+///   [`state`] reports the mismatch.
 pub(crate) fn settle(
     tx: &mut Transaction,
     repo: &str,
     role: &str,
     aid: &str,
     recs: &[Value],
+    ledger: &str,
 ) -> Result<(), Resp> {
+    let other: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM assignment_run_usage
+                            WHERE assignment_id = $1 AND ledger <> $2)",
+            &[&aid, &ledger],
+        )?
+        .get(0);
+    let any: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM assignment_run_usage WHERE assignment_id = $1)",
+            &[&aid],
+        )?
+        .get(0);
+    if other || (any && recs.is_empty()) {
+        return Ok(());
+    }
     let rows = tx.query(
         "SELECT d.delivery_id, d.generation, d.attempt_id,
-                (SELECT u.record_sha256 FROM assignment_run_usage u
-                 WHERE u.delivery_id = d.delivery_id ORDER BY u.settled_at DESC LIMIT 1)
+                EXISTS (SELECT 1 FROM role_delivery_results r WHERE r.delivery_id = d.delivery_id
+                          AND r.sent_sha256 IS NOT NULL),
+                (SELECT outcome FROM role_delivery_results r WHERE r.delivery_id = d.delivery_id
+                 ORDER BY n DESC LIMIT 1),
+                u.record_sha256, u.seconds, u.input_tokens, u.output_tokens,
+                u.cache_creation_tokens, u.cache_read_tokens, u.state
          FROM role_deliveries d
+         LEFT JOIN LATERAL (SELECT * FROM assignment_run_usage x WHERE x.delivery_id = d.delivery_id
+                            ORDER BY x.seq DESC LIMIT 1) u ON true
          WHERE d.assignment_id = $1 AND d.repo_id = $2 AND d.role = $3 ORDER BY d.seq",
         &[&aid, &repo, &role],
     )?;
     for r in rows {
         let (id, generation, attempt): (String, i64, String) = (r.get(0), r.get(1), r.get(2));
-        let stored: Option<String> = r.get(3);
-        let row = match recs.iter().find(|x| x["attempt_id"] == attempt.as_str()) {
+        let sent: bool = r.get(3);
+        let outcome: Option<String> = r.get(4);
+        let stored: Option<String> = r.get(5);
+        if !sent {
+            continue;
+        }
+        let rec = recs
+            .iter()
+            .find(|x| x["attempt_id"] == attempt.as_str() && x["role"] == role);
+        let started = matches!(outcome.as_deref(), Some("accepted" | "unknown"));
+        let row = match rec {
             Some(rec) => usage_of(rec),
-            None => match &stored {
-                // copied before, gone from the ledger now (a person removed it when
-                // reconciling): the ledger is the authority, the run no longer counts
-                Some(prev) if !prev.starts_with("withdrawn:") => Usage {
-                    sha: format!("withdrawn:{prev}"),
-                    state: "withdrawn",
-                    seconds: None,
-                    tokens: None,
-                    reason: Some("the budget ledger no longer has a record of this attempt".into()),
-                },
-                _ => continue,
-            },
+            None if stored.is_some() || started => {
+                // keep the last known counts: a missing record never lowers consumption
+                let n = |i: usize| r.get::<_, Option<i64>>(i).map(|x| x.max(0) as u64);
+                let prev = (n(7), n(8), n(9), n(10));
+                let tokens = match prev {
+                    (Some(a), Some(b), Some(c), Some(d)) => Some([a, b, c, d]),
+                    _ => None,
+                };
+                Usage {
+                    sha: "missing".into(),
+                    state: "missing",
+                    seconds: n(6),
+                    tokens,
+                    reason: Some(
+                        "the budget ledger has no record of this attempt: a person reconciles                          the ledger (the record back, or an entry naming the attempt)"
+                            .into(),
+                    ),
+                }
+            }
+            None => continue,
         };
         if stored.as_deref() == Some(row.sha.as_str()) {
             continue;
         }
         let t = |i: usize| row.tokens.map(|t| i64_of(t[i]));
         tx.execute(
-            "INSERT INTO assignment_run_usage (delivery_id, record_sha256, assignment_id, generation,
-                 attempt_id, state, seconds, input_tokens, output_tokens, cache_creation_tokens,
-                 cache_read_tokens, reason)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING",
+            "INSERT INTO assignment_run_usage (delivery_id, record_sha256, ledger, assignment_id,
+                 generation, attempt_id, state, seconds, input_tokens, output_tokens,
+                 cache_creation_tokens, cache_read_tokens, reason)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
             &[
                 &id,
                 &row.sha,
+                &ledger,
                 &aid,
                 &generation,
                 &attempt,
@@ -96,7 +159,7 @@ pub(crate) fn settle(
 
 struct Usage {
     sha: String,
-    /// measured, unmeasured, or withdrawn (no longer in the ledger)
+    /// measured, unmeasured, missing or withdrawn
     state: &'static str,
     seconds: Option<u64>,
     /// input, output, cache_creation, cache_read
@@ -107,6 +170,20 @@ struct Usage {
 /// What one ledger record says the run used (the charge `budget::spent` reads).
 fn usage_of(rec: &Value) -> Usage {
     let sha = hex::encode(Sha256::digest(serde_json::to_vec(rec).unwrap_or_default()));
+    if rec["model_request"] == false {
+        return Usage {
+            sha,
+            state: "withdrawn",
+            seconds: None,
+            tokens: None,
+            reason: Some(
+                rec["reason"]
+                    .as_str()
+                    .unwrap_or("a ledger entry says no model request ran")
+                    .to_string(),
+            ),
+        };
+    }
     let seconds = rec["duration_ms"].as_u64().map(|ms| ms.div_ceil(1000));
     let run = &rec["usage"]["run"];
     let t = &run["tokens"];
@@ -141,7 +218,12 @@ fn usage_of(rec: &Value) -> Usage {
 /// The assignment's limits, consumption and what is left (all generations; the newest usage row
 /// of each delivery). `limits` are the current head generation's when the assignment is the
 /// head, else the named generation's.
-pub(crate) fn state(tx: &mut Transaction, aid: &str, generation: i64) -> Result<Value, Resp> {
+pub(crate) fn state(
+    tx: &mut Transaction,
+    aid: &str,
+    generation: i64,
+    ledger: Option<&str>,
+) -> Result<Value, Resp> {
     let lim = tx.query_one(
         "SELECT coalesce(a.limits, jsonb_build_object(
                     'elapsed_seconds', s.spec->'limits'->'elapsed_seconds',
@@ -155,9 +237,9 @@ pub(crate) fn state(tx: &mut Transaction, aid: &str, generation: i64) -> Result<
     let u = tx.query_one(
         "WITH newest AS (
              SELECT DISTINCT ON (delivery_id) * FROM assignment_run_usage
-             WHERE assignment_id = $1 ORDER BY delivery_id, settled_at DESC)
+             WHERE assignment_id = $1 ORDER BY delivery_id, seq DESC)
          SELECT count(*) FILTER (WHERE state <> 'withdrawn'),
-                count(*) FILTER (WHERE state = 'unmeasured'),
+                count(*) FILTER (WHERE state IN ('unmeasured', 'missing')),
                 coalesce(sum(seconds), 0)::bigint,
                 coalesce(sum(input_tokens), 0)::bigint, coalesce(sum(output_tokens), 0)::bigint,
                 coalesce(sum(cache_creation_tokens), 0)::bigint,
@@ -174,7 +256,18 @@ pub(crate) fn state(tx: &mut Transaction, aid: &str, generation: i64) -> Result<
             .as_u64()
             .map_or(Value::Null, |l| json!(l.saturating_sub(used)))
     };
+    // rows settled from another ledger than the one this delivery would use
+    let ledgers: Vec<String> = tx
+        .query(
+            "SELECT DISTINCT ledger FROM assignment_run_usage WHERE assignment_id = $1 ORDER BY 1",
+            &[&aid],
+        )?
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    let mismatch = ledger.is_some_and(|l| ledgers.iter().any(|x| x != l));
     Ok(json!({"evidence_level": "verified", "limits": limits,
+        "ledgers": ledgers, "ledger_mismatch": mismatch,
         "runs": runs, "unmeasured_runs": unmeasured,
         "elapsed_seconds": seconds,
         "total_tokens": total,
@@ -199,11 +292,21 @@ pub(crate) fn room(st: &Value) -> Result<(Option<u64>, Option<u64>), Resp> {
         r.body["operational_state"] = json!("awaiting_human_decision");
         r
     };
+    if st["ledger_mismatch"] == true {
+        return Err(refuse(
+            "ASSIGNMENT_USAGE_UNMEASURED",
+            format!(
+                "this assignment's runs were settled from the ledger {}, not the configured one: \
+                 its usage cannot be read here",
+                st["ledgers"]
+            ),
+        ));
+    }
     if st["unmeasured_runs"].as_u64().unwrap_or(0) > 0 {
         return Err(refuse(
             "ASSIGNMENT_USAGE_UNMEASURED",
             format!(
-                "{} run(s) of this assignment are not measured: never counted as 0",
+                "{} run(s) of this assignment are not measured or their ledger record is missing: never counted as 0",
                 st["unmeasured_runs"]
             ),
         ));

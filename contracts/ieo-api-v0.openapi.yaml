@@ -12,13 +12,15 @@ info:
     generations of the assignment). issueAssignment takes an optional `limits {elapsed_seconds, total_tokens}`
     (absent → the revision's; above it, or where the revision has none → 422 `LIMITS_ABOVE_SPEC`). deliverAssignment
     refuses with 409 `ASSIGNMENT_LIMIT_REACHED` (no token room, or time left not above the run guard's 6 s stop
-    grace) or 409 `ASSIGNMENT_USAGE_UNMEASURED` (a run of the assignment is unmeasured: never counted as 0); nothing
-    is recorded except one limit event; otherwise the run's limits are the smallest of the assignment's remaining
+    grace) or 409 `ASSIGNMENT_USAGE_UNMEASURED` (a run unmeasured, a sent call's ledger record missing, or runs settled
+    from another ledger: never counted as 0, never lowered); nothing is recorded except one limit event; otherwise the run's limits are the smallest of the assignment's remaining
     amounts, the budget's and the role share's. getAssignmentChain adds `usage`, `usage_runs` and `limit_events`
     (verified); getOwnAssignment's `limits` are the assignment's own. **Behaviour changes:** the HTTP path bounds
-    every statement at 10 s (500 after it, nothing stored; review fe924b7 I-5); deliverAssignment of an
-    assignment with an unmeasured run now answers 409 before recording the request (it was recorded with
-    `budget_refused`).
+    every statement at 10 s (500 after it, that step's transaction rolled back; review fe924b7 I-5);
+    deliverAssignment of an assignment with an unmeasured run now answers 409 before recording the request (it was
+    recorded with `budget_refused`); an `attempt_id` the budget ledger already holds is 409 `ATTEMPT_ID_CONFLICT`; a
+    delivery that reaches its call more than 80 s after it began calls nothing (`not_called`), so its call ends inside
+    the 120 s a replay waits; `coordinator_record.limits` are the assignment's own limits.
     0.12.0 (02-05 step 4, additive): getAssignmentChain (`GET /v0/coordinator/assignments/{assignment_id}/generations/{generation}/chain`,
     `coordinator:assign` or `roles:control`, HTTP only): sprint revision → assignment → deliveries (verified) → takeovers
     → first actions → checkpoints and tamper events → agent reports and the latest session status (claims). Every
@@ -820,7 +822,8 @@ paths:
         §1.2). `Idempotency-Key` (8–128 bytes) is the delivery's request id within (repo, role).
         Shape: (1) the request is recorded (`verified`, transaction 1) when `assignment_id`/`generation` are the
         current head (else 409 `STALE_ASSIGNMENT`; no head → 404 `NO_CURRENT_ASSIGNMENT`; an `attempt_id` used
-        by another delivery → 409 `ATTEMPT_ID_CONFLICT`); (2) the resume judgment of compareCheckpoint:
+        by another delivery, or one the budget ledger already holds → 409 `ATTEMPT_ID_CONFLICT`); (2) the resume
+        judgment of compareCheckpoint:
         `no_checkpoint` → `start`, `resume_allowed` → `reconnect` (`new_session: true` asks for `start` on
         `resume_allowed`, and on `stale_generation` only when that older generation's last run finished
         (`after_run`); an older generation whose last run did not finish is judged
@@ -841,8 +844,11 @@ paths:
         `unknown` when the answer was lost (the budget ledger then asks for a person, as for the host caller).
         An accepted run is finished, measured and charged in the background by the same library.
         02-05 step 5, before the request is recorded: the assignment's runs (all generations) are settled from
-        the budget ledger when no call is running, and the delivery is refused with 409 `ASSIGNMENT_USAGE_UNMEASURED`
-        (a run unmeasured, or started with no record) or `ASSIGNMENT_LIMIT_REACHED` (no `total_tokens` room, or the
+        the budget ledger when no call is running (only deliveries that sent a call, matched by attempt and role;
+        a replay settles nothing), and the delivery is refused with 409 `ASSIGNMENT_USAGE_UNMEASURED` (a run
+        unmeasured; the ledger record of a sent call missing — it keeps its last known counts until a person
+        reconciles the ledger, by the record coming back or an entry naming the attempt with `model_request: false`;
+        or the runs were settled from another ledger than the configured one) or `ASSIGNMENT_LIMIT_REACHED` (no `total_tokens` room, or the
         `elapsed_seconds` left is not more than the run guard's 6 s stop grace). The refusal records nothing but one
         limit event per (generation, code, settled runs); the answer carries `usage` and `operational_state:
         awaiting_human_decision` (no decision request is created). After the budget check the runs are settled

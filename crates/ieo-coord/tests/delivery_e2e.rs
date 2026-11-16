@@ -1095,6 +1095,24 @@ fn e2e(transport: &str) {
         "{r41}"
     );
     std::fs::write(ledger.join("records.jsonl"), &kept).expect("reconciled");
+    // the person's reconciliation also names the attempt the supervisor never ran: an entry
+    // with `model_request: false` (02-05 step 5: a ledger record of a sent call that is gone
+    // would otherwise stop the assignment; review 97ff0bc M-1)
+    {
+        use std::io::Write as _;
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(ledger.join("records.jsonl"))
+            .expect("ledger");
+        writeln!(
+            f,
+            "{}",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "a41", "role": "development",
+                   "model_request": false,
+                   "reason": "reconciled: the supervisor held another request under a41"})
+        )
+        .expect("entry");
+    }
     std::fs::write(&cred, "fake-oauth-token\n").expect("cred");
     assert_eq!(runs(), 4);
 

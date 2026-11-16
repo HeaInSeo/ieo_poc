@@ -477,18 +477,27 @@ ALTER TABLE role_first_actions ADD COLUMN IF NOT EXISTS source text NOT NULL DEF
 
 -- 02-05 step 5: what each delivered run used, as the shared budget library measured and charged
 -- it (02-01 meter; resume = cumulative difference; children by transcript) — copied from the
--- budget ledger's record of the attempt. One row per (delivery, record): a ledger correction by a
--- person gives the delivery a newer row; the newest row counts. `measured` rows carry the four
--- token counts; an `unmeasured` run is never counted as 0 (it stops the assignment); a record a
--- person removed from the ledger gives a `withdrawn` row (the ledger is the authority). The
--- coordinator's own measurement: verified.
+-- budget ledger's record of the attempt. A new row whenever the delivery's settled state
+-- changes; the newest row (by `seq`) counts. States:
+--   measured   — the four token counts and the time;
+--   unmeasured — never counted as 0: it stops the assignment;
+--   missing    — the ledger had (or should have) a record and has none now: it stops the
+--                assignment like an unmeasured run and keeps the last known counts (a missing
+--                record never lowers consumption; review 97ff0bc M-1);
+--   withdrawn  — an explicit ledger entry naming the attempt says no model request ran
+--                (`model_request: false`): counts nothing.
+-- `ledger` is the ledger the row was settled from (budget name @ ledger_dir); rows are never
+-- settled from another one. The coordinator's own measurement: verified.
 CREATE TABLE IF NOT EXISTS assignment_run_usage (
+    seq               bigserial   PRIMARY KEY,
     delivery_id       text        NOT NULL REFERENCES role_deliveries (delivery_id),
     record_sha256     text        NOT NULL,
+    ledger            text        NOT NULL,
     assignment_id     text        NOT NULL,
     generation        bigint      NOT NULL,
     attempt_id        text        NOT NULL,
-    state             text        NOT NULL CHECK (state IN ('measured', 'unmeasured', 'withdrawn')),
+    state             text        NOT NULL CHECK (state IN ('measured', 'unmeasured', 'missing',
+                                                            'withdrawn')),
     -- duration_ms rounded up to seconds; NULL when the record has none
     seconds           bigint      CHECK (seconds >= 0),
     input_tokens      bigint      CHECK (input_tokens >= 0),
@@ -497,7 +506,6 @@ CREATE TABLE IF NOT EXISTS assignment_run_usage (
     cache_read_tokens bigint      CHECK (cache_read_tokens >= 0),
     reason            text,
     settled_at        timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (delivery_id, record_sha256),
     FOREIGN KEY (assignment_id, generation) REFERENCES assignments (assignment_id, generation),
     CHECK (state <> 'measured' OR (input_tokens IS NOT NULL AND output_tokens IS NOT NULL
            AND cache_creation_tokens IS NOT NULL AND cache_read_tokens IS NOT NULL
