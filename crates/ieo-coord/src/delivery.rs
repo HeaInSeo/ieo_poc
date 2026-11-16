@@ -716,8 +716,11 @@ const AFTER_START: u64 = 45;
 /// The two bounds in seconds: (in flight, start deadline). The defaults, unless the coordinator
 /// process sets `IEO_COORD_DELIVERY_IN_FLIGHT_SECS` and `IEO_COORD_DELIVERY_START_DEADLINE_SECS`
 /// (meant for tests, to reach these paths without waiting minutes) to values that keep
-/// deadline + 45 ≤ in flight; any other setting is ignored with a message.
-pub(crate) fn bounds() -> (u64, u64) {
+/// deadline + 45 ≤ in flight and are no longer than the defaults (only shorter bounds, which
+/// fail closed; review af68c93 C-1); any other setting is ignored with a message. The
+/// coordinator calls this at start-up and logs the effective bounds when they are not the
+/// defaults.
+pub fn bounds() -> (u64, u64) {
     static B: std::sync::OnceLock<(u64, u64)> = std::sync::OnceLock::new();
     *B.get_or_init(|| {
         let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<u64>().ok());
@@ -726,22 +729,35 @@ pub(crate) fn bounds() -> (u64, u64) {
             env("IEO_COORD_DELIVERY_START_DEADLINE_SECS"),
         );
         let b = checked_bounds(f, d);
-        if (f, d) != (None, None) && b == (IN_FLIGHT_DEFAULT, START_DEADLINE_DEFAULT) {
+        if b != (IN_FLIGHT_DEFAULT, START_DEADLINE_DEFAULT) {
             eprintln!(
-                "ieo-coord: delivery bounds {f:?}/{d:?} ignored (both are needed, deadline + \
-                 {AFTER_START} <= in flight): using {IN_FLIGHT_DEFAULT} s / \
-                 {START_DEADLINE_DEFAULT} s"
+                "ieo-coord: delivery bounds in effect: in flight {} s, start deadline {} s \
+                 (defaults {IN_FLIGHT_DEFAULT} s / {START_DEADLINE_DEFAULT} s)",
+                b.0, b.1
+            );
+        } else if (f, d) != (None, None) {
+            eprintln!(
+                "ieo-coord: delivery bounds {f:?}/{d:?} ignored (both are needed, at most \
+                 {IN_FLIGHT_DEFAULT} s / {START_DEADLINE_DEFAULT} s, deadline + {AFTER_START} \
+                 <= in flight): using the defaults"
             );
         }
         b
     })
 }
 
-/// The bounds a setting gives: both values with deadline ≥ 1 and deadline + 45 ≤ in flight,
-/// else the defaults.
+/// The bounds a setting gives: both values, each at most its default, with deadline ≥ 1 and
+/// deadline + 45 ≤ in flight; else the defaults.
 fn checked_bounds(in_flight: Option<u64>, deadline: Option<u64>) -> (u64, u64) {
     match (in_flight, deadline) {
-        (Some(f), Some(d)) if d >= 1 && d.saturating_add(AFTER_START) <= f => (f, d),
+        (Some(f), Some(d))
+            if d >= 1
+                && f <= IN_FLIGHT_DEFAULT
+                && d <= START_DEADLINE_DEFAULT
+                && d.saturating_add(AFTER_START) <= f =>
+        {
+            (f, d)
+        }
         _ => (IN_FLIGHT_DEFAULT, START_DEADLINE_DEFAULT),
     }
 }
@@ -859,6 +875,10 @@ mod tests {
             (Some(47), Some(0)),
             (Some(47), None),
             (None, Some(2)),
+            // never longer than the defaults (review af68c93 C-1)
+            (Some(86_400), Some(86_355)),
+            (Some(121), Some(75)),
+            (Some(120), Some(76)),
         ] {
             assert_eq!(checked_bounds(f, d), (120, 75), "{f:?} {d:?}");
         }

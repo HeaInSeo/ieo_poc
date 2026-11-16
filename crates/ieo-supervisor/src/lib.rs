@@ -24,6 +24,7 @@ pub mod configdir;
 pub mod env;
 pub mod first_action;
 pub mod lock;
+pub mod pending;
 pub mod provider;
 pub mod run;
 pub mod serve;

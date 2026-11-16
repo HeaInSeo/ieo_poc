@@ -1005,14 +1005,16 @@ fn status_reports_the_section_7_fields_and_an_honest_safe_shutdown() {
     assert!(s["last_actual_action_at"].is_null());
     assert_eq!(s["restored_checkpoint_ref"]["found"], false);
     assert_eq!(s["safe_shutdown"]["active_children"], "not_tracked");
+    // 02-05 step 6: a tracked (here empty) list; the model's own requests are not observable
+    assert_eq!(s["safe_shutdown"]["pending_external_requests"], json!([]));
     assert_eq!(
-        s["safe_shutdown"]["pending_external_requests"],
-        "not_tracked"
+        s["safe_shutdown"]["direct_network_requests"],
+        "not_observable"
     );
     assert!(
-        s["capability_gaps"]
-            .as_array()
-            .is_some_and(|g| g.len() == 4),
+        s["capability_gaps"].as_array().is_some_and(|g| g.len() == 4
+            && g.iter()
+                .any(|x| x == "direct network requests of the model not observable")),
         "{s}"
     );
     call(
@@ -1292,6 +1294,12 @@ struct FakeCentral {
     reject: Arc<std::sync::atomic::AtomicBool>,
     dup: Arc<std::sync::atomic::AtomicBool>,
     own: Own,
+    /// While set, first-action reports get no usable answer (02-05 step 6).
+    fa_down: Arc<std::sync::atomic::AtomicBool>,
+    /// While set, first-action reports are refused with 409 `EVENT_CONTENT_CONFLICT`.
+    fa_conflict: Arc<std::sync::atomic::AtomicBool>,
+    /// First-action reports the fake recorded.
+    fas: Arc<std::sync::Mutex<Vec<Value>>>,
 }
 
 /// The fake's current assignment (getOwnAssignment, 02-05 step 3): `coord(0)` unless a test
@@ -1318,9 +1326,36 @@ struct Fake {
     reject: Arc<std::sync::atomic::AtomicBool>,
     dup: Arc<std::sync::atomic::AtomicBool>,
     own: Own,
+    fa_down: Arc<std::sync::atomic::AtomicBool>,
+    fa_conflict: Arc<std::sync::atomic::AtomicBool>,
+    fas: Arc<std::sync::Mutex<Vec<Value>>>,
 }
 
 impl Fake {
+    /// A first-action report (02-05 step 6): 201 and recorded; 503 (no usable answer) while
+    /// `fa_down` is set; 409 `EVENT_CONTENT_CONFLICT` while `fa_conflict` is set. Every report
+    /// that reaches the fake is in `fas`.
+    fn first_action(&self, body: Value) -> (u16, Value) {
+        use std::sync::atomic::Ordering;
+        if self.fa_down.load(Ordering::SeqCst) {
+            return (503, json!({"code": "UNAVAILABLE"}));
+        }
+        self.fas.lock().expect("fas").push(body.clone());
+        if self.fa_conflict.load(Ordering::SeqCst) {
+            return (
+                409,
+                json!({"rejections": [{"code": "EVENT_CONTENT_CONFLICT"}]}),
+            );
+        }
+        (
+            201,
+            json!({"assignment_id": body["assignment_id"], "generation": body["generation"],
+                    "attempt_id": body["attempt_id"], "session_id": body["session_id"],
+                    "evidence_level": "claim", "current_assignment": true,
+                    "received_at": "2026-11-16T00:00:00Z"}),
+        )
+    }
+
     fn recorded_by(&self, seq: u64) -> bool {
         self.events
             .lock()
@@ -1437,12 +1472,26 @@ impl ieo_proto::v0::supervisor_service_server::SupervisorService for Fake {
             &v,
         )))
     }
-    // 02-05 step 2 RPCs the supervisor does not call yet (step 4)
     async fn record_first_action(
         &self,
-        _: tonic::Request<ieo_proto::v0::RecordFirstActionRequest>,
+        r: tonic::Request<ieo_proto::v0::RecordFirstActionRequest>,
     ) -> Result<tonic::Response<ieo_proto::v0::RecordFirstActionResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("fake"))
+        let body = ieo_proto::first_action_request_json(r.get_ref());
+        match self.first_action(body) {
+            (201, v) => Ok(tonic::Response::new(
+                ieo_proto::v0::RecordFirstActionResponse {
+                    outcome: ieo_proto::outcome_of(201) as i32,
+                    receipt: Some(ieo_proto::first_action_receipt_from_json(&v)),
+                },
+            )),
+            // a status without the error trailer: no usable answer
+            (503, _) => Err(tonic::Status::unavailable("fake down")),
+            (st, v) => Err(ieo_proto::status_with_error(
+                ieo_proto::grpc_code(st, &v),
+                st,
+                &v,
+            )),
+        }
     }
     async fn report_session_status(
         &self,
@@ -1474,6 +1523,9 @@ fn fake_central(transport: &'static str) -> FakeCentral {
         reject: Arc::new(AtomicBool::new(false)),
         dup: Arc::new(AtomicBool::new(false)),
         own: Arc::new(std::sync::Mutex::new(own_of(0))),
+        fa_down: Arc::new(AtomicBool::new(false)),
+        fa_conflict: Arc::new(AtomicBool::new(false)),
+        fas: Arc::new(std::sync::Mutex::new(Vec::new())),
     };
     let url = if transport == "grpc" {
         let (tx, rx) = std::sync::mpsc::channel();
@@ -1509,6 +1561,8 @@ fn fake_central(transport: &'static str) -> FakeCentral {
                 let _ = std::io::Read::read_to_end(req.as_reader(), &mut body);
                 let (code, out) = if req.url().ends_with("/assignment") {
                     (200, f.own.lock().expect("own").clone())
+                } else if req.url().ends_with("/first-actions") {
+                    f.first_action(serde_json::from_slice(&body).unwrap_or(Value::Null))
                 } else {
                     f.answer(req.method().as_str(), &body)
                 };
@@ -1528,6 +1582,9 @@ fn fake_central(transport: &'static str) -> FakeCentral {
         reject: fake.reject,
         dup: fake.dup,
         own: fake.own,
+        fa_down: fake.fa_down,
+        fa_conflict: fake.fa_conflict,
+        fas: fake.fas,
     }
 }
 
@@ -1557,6 +1614,8 @@ over_both_transports!(
     a_tamper_the_coordinator_did_not_record_stays_pending,
     an_unrecorded_tamper_stays_pending_after_a_duplicate_or_an_adopted_takeover,
     an_unreadable_pending_file_stops_until_a_person_reconciles_it,
+    pending_external_requests_are_tracked_requeried_and_stop_a_reconnect,
+    a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent,
 );
 
 fn svc_central(t: &Tmp, c: &FakeCentral) -> Arc<Service> {
@@ -2363,4 +2422,355 @@ fn checkpoints_carry_the_delivery_and_the_first_action() {
         serde_json::from_slice(&std::fs::read(t.0.join("state/checkpoint.json")).expect("cp"))
             .expect("j");
     assert!(cp["delivery_id"].is_null(), "{cp}");
+}
+
+// --- 02-05 step 6: pending external requests ---
+
+fn pending_external_requests_are_tracked_requeried_and_stop_a_reconnect(transport: &'static str) {
+    use std::sync::atomic::Ordering;
+    let (t, _) = setup("pending");
+    // a run that shows a first action (a tool use after init)
+    scripted_claude(
+        &t,
+        "fake-claude",
+        &[
+            r#"{"type":"system","subtype":"init","session_id":"s1"}"#,
+            r#"{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{}}],"usage":{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}"#,
+            RL_ALLOWED,
+            r#"{"type":"result","subtype":"success","is_error":false,"session_id":"s1","usage":{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20},"modelUsage":{"m":{"inputTokens":3,"outputTokens":7,"cacheReadInputTokens":20,"cacheCreationInputTokens":10}},"total_cost_usd":0.01}"#,
+        ],
+        0,
+    );
+    let c = fake_central(transport);
+    let svc = svc_central(&t, &c);
+    let state = t.0.join("state");
+    let pending_of = |s: &Value| s["safe_shutdown"]["pending_external_requests"].clone();
+    let s = svc.status();
+    assert_eq!(pending_of(&s), json!([]), "{s}");
+    assert_eq!(
+        s["safe_shutdown"]["direct_network_requests"],
+        "not_observable"
+    );
+    assert_eq!(s["safe_shutdown"]["active_children"], "not_tracked");
+    // 1. the first-action report gets no answer: it stays on the list (the run goes on)
+    c.fa_down.store(true, Ordering::SeqCst);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p1", "hi", json!({"session_id": "s1"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "p1");
+    let t0 = Instant::now();
+    let s = loop {
+        let s = svc.status();
+        if s["first_action_report"]["pending"] == false {
+            break s;
+        }
+        assert!(t0.elapsed() < Duration::from_secs(20), "{s}");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let l = pending_of(&s);
+    assert_eq!(l.as_array().map(Vec::len), Some(1), "{s}");
+    assert_eq!(
+        (
+            l[0]["kind"].as_str(),
+            l[0]["request_id"].as_str(),
+            l[0]["target"].as_str()
+        ),
+        (
+            Some("first_action_report"),
+            Some("first-action:p1"),
+            Some("coordinator recordFirstAction")
+        ),
+        "{s}"
+    );
+    assert!(l[0]["sent_at"].is_string(), "{s}");
+    let cp: Value =
+        serde_json::from_slice(&std::fs::read(state.join("checkpoint.json")).expect("cp"))
+            .expect("j");
+    assert_eq!(cp["tracked"]["pending_external_requests"], true, "{cp}");
+    assert_eq!(cp["direct_network_requests"], "not_observable", "{cp}");
+    assert!(cp["pending_external_requests"].is_array(), "{cp}");
+    // a restarted service reads the same list
+    assert_eq!(pending_of(&svc_central(&t, &c).status()), l);
+    // 2. a reconnect re-queries it first; still no answer: refused for external
+    //    reconciliation, nothing runs
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("p2", "hi", json!({})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+    assert_eq!(
+        b["pending_external_requests"][0]["request_id"],
+        "first-action:p1"
+    );
+    assert!(!state.join("runs/p2").exists());
+    // 3. answered on the re-query: cleared, and the reconnect resumes
+    c.fa_down.store(false, Ordering::SeqCst);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("p3", "hi", json!({})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["mode"], "resume", "{b}");
+    assert!(
+        c.fas
+            .lock()
+            .expect("fas")
+            .iter()
+            .any(|f| f["attempt_id"] == "p1"),
+        "the re-query sent the same report"
+    );
+    wait(&svc, "p3");
+    let t0 = Instant::now();
+    while svc.status()["first_action_report"]["pending"] != false {
+        assert!(t0.elapsed() < Duration::from_secs(20));
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(pending_of(&svc.status()), json!([]));
+    // 4. a takeover report whose answer is lost stays on the list; the next start's central
+    //    comparison settles it (the coordinator holds it: adopted) and clears it
+    c.lose.store(true, Ordering::SeqCst);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p4", "hi", json!({"session_id": "s4"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(wait(&svc, "p4")["stop"], "CentralRefused");
+    let l = pending_of(&svc.status());
+    assert_eq!(
+        (l.as_array().map(Vec::len), l[0]["kind"].as_str()),
+        (Some(1), Some("checkpoint_report")),
+        "{l}"
+    );
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p5", "hi", json!({"session_id": "s5"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "p5");
+    let t0 = Instant::now();
+    while svc.status()["first_action_report"]["pending"] != false {
+        assert!(t0.elapsed() < Duration::from_secs(20));
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(pending_of(&svc.status()), json!([]));
+    // 5. a list that cannot be read: reported as such, and a reconnect stops (fail closed)
+    std::fs::write(state.join("pending-requests.json"), "{").expect("break");
+    assert_eq!(pending_of(&svc.status()), json!("unreadable"));
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("p6", "hi", json!({})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+    assert!(!state.join("runs/p6").exists());
+    std::fs::remove_file(state.join("pending-requests.json")).expect("rm");
+}
+
+/// Review 1b362ec L-3 (R2) and L-1: a 4xx answer settles a first-action report, and a request
+/// that cannot be put on the list is not sent.
+fn a_refused_first_action_is_settled_and_an_untracked_request_is_not_sent(transport: &'static str) {
+    use std::sync::atomic::Ordering;
+    let (t, _) = setup("pending-fa");
+    scripted_claude(
+        &t,
+        "fake-claude",
+        &[
+            r#"{"type":"system","subtype":"init","session_id":"s1"}"#,
+            r#"{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{}}],"usage":{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}"#,
+            RL_ALLOWED,
+            r#"{"type":"result","subtype":"success","is_error":false,"session_id":"s1","usage":{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20},"modelUsage":{"m":{"inputTokens":3,"outputTokens":7,"cacheReadInputTokens":20,"cacheCreationInputTokens":10}},"total_cost_usd":0.01}"#,
+        ],
+        0,
+    );
+    let c = fake_central(transport);
+    let svc = svc_central(&t, &c);
+    let state = t.0.join("state");
+    let pending_of = |s: &Value| s["safe_shutdown"]["pending_external_requests"].clone();
+    let settled = |svc: &Service| {
+        let t0 = Instant::now();
+        while svc.status()["first_action_report"]["pending"] != false {
+            assert!(t0.elapsed() < Duration::from_secs(20));
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    };
+    let sent = |attempt: &str| {
+        c.fas
+            .lock()
+            .expect("fas")
+            .iter()
+            .filter(|f| f["attempt_id"] == attempt)
+            .count()
+    };
+    // 6. a first-action report the coordinator refuses with a 4xx has a known outcome: the
+    //    re-query clears it and the reconnect resumes (review 1b362ec L-3, R2)
+    c.fa_down.store(true, Ordering::SeqCst);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p7", "hi", json!({"session_id": "s7"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "p7");
+    settled(&svc);
+    assert_eq!(
+        pending_of(&svc.status())[0]["request_id"],
+        "first-action:p7"
+    );
+    c.fa_down.store(false, Ordering::SeqCst);
+    c.fa_conflict.store(true, Ordering::SeqCst);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("p8", "hi", json!({})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["mode"], "resume", "{b}");
+    assert_eq!(sent("p7"), 1, "the re-query reached the coordinator");
+    wait(&svc, "p8");
+    settled(&svc);
+    let s = svc.status();
+    assert_eq!(s["first_action_report"]["result"]["status"], 409, "{s}");
+    assert_eq!(pending_of(&s), json!([]), "{s}");
+    c.fa_conflict.store(false, Ordering::SeqCst);
+    // 7. a request that cannot be put on the list is not sent (review 1b362ec L-1): a
+    //    first-action report on the list is not re-sent while the list cannot be written, so it
+    //    stays and the reconnect stops; once the list can be written, it is sent and cleared
+    c.fa_down.store(true, Ordering::SeqCst);
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p9", "hi", json!({"session_id": "s9"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "p9");
+    settled(&svc);
+    assert_eq!(
+        pending_of(&svc.status())[0]["request_id"],
+        "first-action:p9"
+    );
+    c.fa_down.store(false, Ordering::SeqCst);
+    let blocker = state.join("pending-requests.tmp");
+    std::fs::create_dir_all(blocker.join("x")).expect("blocker");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("p10", "hi", json!({})),
+    );
+    assert_eq!(
+        (st, b["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{b}"
+    );
+    assert_eq!(sent("p9"), 0, "an untracked request must not be sent");
+    assert!(!state.join("runs/p10").exists());
+    // a start over a list that cannot be written: its takeover report is not sent, so the
+    // run stops before the model (the coordinator never sees an untracked report)
+    let reports = c.store.lock().expect("store").len();
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p11", "hi", json!({"session_id": "s11"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(wait(&svc, "p11")["stop"], "CentralRefused");
+    let s = svc.status();
+    assert_eq!(
+        s["central_checkpoint"]["last_report"]["refusal"]["code"], "EXTERNAL_REQUEST_NOT_TRACKED",
+        "{s}"
+    );
+    assert_eq!(c.store.lock().expect("store").len(), reports);
+    assert_eq!(sent("p11"), 0);
+    std::fs::remove_dir_all(&blocker).expect("unblock");
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("p12", "hi", json!({"session_id": "s12"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "p12");
+    settled(&svc);
+    assert_eq!(
+        sent("p9"),
+        1,
+        "the re-query sent it once the list could be written"
+    );
+    assert_eq!(pending_of(&svc.status()), json!([]));
+}
+
+// 02-05 step 6, review 1b362ec L-3 (R6): without a coordinator nothing is sent, so a first
+// action leaves no pending request and a reconnect resumes
+#[test]
+fn a_local_only_role_has_no_pending_external_requests() {
+    let (t, svc) = setup("pending-local");
+    scripted_claude(
+        &t,
+        "fake-claude",
+        &[
+            r#"{"type":"system","subtype":"init","session_id":"s1"}"#,
+            r#"{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{}}],"usage":{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}"#,
+            RL_ALLOWED,
+            r#"{"type":"result","subtype":"success","is_error":false,"session_id":"s1","usage":{"input_tokens":3,"output_tokens":7,"cache_creation_input_tokens":10,"cache_read_input_tokens":20},"modelUsage":{"m":{"inputTokens":3,"outputTokens":7,"cacheReadInputTokens":20,"cacheCreationInputTokens":10}},"total_cost_usd":0.01}"#,
+        ],
+        0,
+    );
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("l1", "hi", json!({"session_id": "s1"})),
+    );
+    assert_eq!(st, 202, "{b}");
+    wait(&svc, "l1");
+    let t0 = Instant::now();
+    let s = loop {
+        let s = svc.status();
+        if s["first_action_report"]["pending"] == false {
+            break s;
+        }
+        assert!(t0.elapsed() < Duration::from_secs(20), "{s}");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(s["first_action_report"]["result"]["ok"], false, "{s}");
+    assert_eq!(
+        s["safe_shutdown"]["pending_external_requests"],
+        json!([]),
+        "{s}"
+    );
+    assert!(!t.0.join("state/pending-requests.json").exists());
+    let (st, b) = call(
+        &svc,
+        "POST",
+        "/v0/role/reconnect",
+        &req("l2", "hi", json!({})),
+    );
+    assert_eq!(st, 202, "{b}");
+    assert_eq!(b["accepted"]["mode"], "resume", "{b}");
+    wait(&svc, "l2");
 }

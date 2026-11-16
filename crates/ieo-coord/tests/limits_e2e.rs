@@ -115,10 +115,13 @@ impl Drop for Coord {
 
 /// The role service behind an HTTP port.
 struct Role {
-    _svc: Arc<Mutex<Arc<Service>>>,
+    svc: Arc<Mutex<Arc<Service>>>,
     port: u16,
-    /// While set, a start or reconnect is handled at once but answered 3 s later.
+    /// While set, a start or reconnect is handled at once, `handled` is set, and the answer
+    /// waits until `release` is set (at most 30 s). Conditions, not times (review 1b362ec I-4).
     slow_start: Arc<std::sync::atomic::AtomicBool>,
+    handled: Arc<std::sync::atomic::AtomicBool>,
+    release: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Role {
@@ -129,6 +132,9 @@ impl Role {
         let h = Arc::clone(&svc);
         let slow_start = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let slow = Arc::clone(&slow_start);
+        let handled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (handled2, release2) = (Arc::clone(&handled), Arc::clone(&release));
         std::thread::spawn(move || {
             for mut req in server.incoming_requests() {
                 let bearer = req
@@ -143,7 +149,13 @@ impl Role {
                 let launch = req.method().as_str() == "POST"
                     && (req.url().ends_with("/start") || req.url().ends_with("/reconnect"));
                 if launch && slow.load(std::sync::atomic::Ordering::SeqCst) {
-                    std::thread::sleep(Duration::from_secs(3));
+                    handled2.store(true, std::sync::atomic::Ordering::SeqCst);
+                    let t0 = Instant::now();
+                    while !release2.load(std::sync::atomic::Ordering::SeqCst)
+                        && t0.elapsed() < Duration::from_secs(30)
+                    {
+                        std::thread::sleep(Duration::from_millis(20));
+                    }
                 }
                 let _ = req.respond(
                     tiny_http::Response::from_data(serde_json::to_vec(&r.body).unwrap_or_default())
@@ -152,9 +164,11 @@ impl Role {
             }
         });
         Role {
-            _svc: svc,
+            svc,
             port,
             slow_start,
+            handled,
+            release,
         }
     }
     fn status(&self) -> Value {
@@ -915,13 +929,36 @@ fn e2e(transport: &str) {
         "{dl}"
     );
     assert!(records().iter().all(|r| r["attempt_id"] != "ad"));
-    // the delivery lock is held from 1.5 s to 16.5 s: the call (answered after 3 s) is made,
-    // and the result's transaction waits past the 10 s statement bound and is rolled back
-    let hold_delivery_lock = || {
+    // the call is made and handled; once the supervisor is done with it (for an accepted run:
+    // the run, whose takeover report itself takes the delivery lock, has ended), the delivery
+    // lock is taken and held 15 s, and only then is the call answered: the result's transaction
+    // waits past the 10 s statement bound and is rolled back. Review 1b362ec I-4: the lock was
+    // taken 1.5 s after the delivery began; under load the takeover report came later, waited
+    // for the lock, was refused, and aL ran nothing (unmeasured). Conditions, not times, now.
+    let hold_delivery_lock = |attempt: &'static str, ran: bool| {
+        use std::sync::atomic::Ordering;
         let mut c2 = cfg.clone();
         c2.dbname(&dbname);
+        let svc = Arc::clone(&role.svc);
+        let (handled, release) = (Arc::clone(&role.handled), Arc::clone(&role.release));
+        handled.store(false, Ordering::SeqCst);
+        release.store(false, Ordering::SeqCst);
         std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(1_500));
+            let t0 = Instant::now();
+            loop {
+                let done = handled.load(Ordering::SeqCst) && {
+                    let s = svc.lock().expect("svc").status();
+                    !ran || (s["running"].is_null() && s["last"]["attempt_id"] == attempt)
+                };
+                if done {
+                    break;
+                }
+                assert!(
+                    t0.elapsed() < Duration::from_secs(30),
+                    "{attempt} not handled"
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            }
             let mut holder = c2.connect(NoTls).expect("db");
             let mut tx = holder.transaction().expect("tx");
             tx.execute(
@@ -929,6 +966,7 @@ fn e2e(transport: &str) {
                 &[],
             )
             .expect("hold");
+            release.store(true, Ordering::SeqCst);
             std::thread::sleep(Duration::from_secs(15));
             tx.rollback().expect("release");
         })
@@ -937,7 +975,7 @@ fn e2e(transport: &str) {
     let bl = dbody("A1", 5, "aL", "s21", json!({"new_session": true}));
     role.slow_start
         .store(true, std::sync::atomic::Ordering::SeqCst);
-    let h = hold_delivery_lock();
+    let h = hold_delivery_lock("aL", true);
     let (st, b) = deliver("lim-key-0021", &bl);
     role.slow_start
         .store(false, std::sync::atomic::Ordering::SeqCst);
@@ -951,7 +989,7 @@ fn e2e(transport: &str) {
     let br = dbody("A1", 5, "aR", "s21", json!({}));
     role.slow_start
         .store(true, std::sync::atomic::Ordering::SeqCst);
-    let h = hold_delivery_lock();
+    let h = hold_delivery_lock("aR", false);
     let (st, b) = deliver("lim-key-0022", &br);
     role.slow_start
         .store(false, std::sync::atomic::Ordering::SeqCst);
@@ -959,6 +997,33 @@ fn e2e(transport: &str) {
     h.join().expect("released");
     std::fs::rename(root.join("cred/oauth.away"), root.join("cred/oauth_token")).expect("mv");
     assert!(records().iter().all(|r| r["attempt_id"] != "aR"));
+    // 02-05 step 6: the repo stop reports the coordinator's two deliveries whose outcome is not
+    // known as pending external requests; the roles' own lists are empty, and the untracked
+    // children keep the stop unconfirmed (user decision 2026-11-15 item 3)
+    let (st, stop) = c(
+        "operator",
+        "POST",
+        "/v0/repos/repo-a/stop",
+        Some(&json!({})),
+    );
+    assert_eq!(st, 200, "{stop}");
+    assert_eq!(stop["safe_shutdown_confirmed"], false, "{stop}");
+    let pend: Vec<String> = stop["coordinator_pending_external_requests"]
+        .as_array()
+        .expect("pending")
+        .iter()
+        .map(|p| p["attempt_id"].as_str().unwrap_or_default().to_string())
+        .collect();
+    // exactly those two: every other delivery has a known outcome
+    assert_eq!(pend, ["aL", "aR"], "{stop}");
+    let reasons = stop["unconfirmed"].to_string();
+    assert!(reasons.contains("coordinator: delivery"), "{stop}");
+    assert!(reasons.contains("development: active_children"), "{stop}");
+    assert_eq!(
+        stop["roles"]["development"]["safe_shutdown"]["pending_external_requests"],
+        json!([]),
+        "{stop}"
+    );
     // while the two are younger than the in-flight bound, nothing is settled for them; past
     // it, they may have run
     std::thread::sleep(Duration::from_secs(48));
@@ -972,6 +1037,40 @@ fn e2e(transport: &str) {
         ),
         (200, Some("unknown"), Value::Null),
         "{r}"
+    );
+    // review 1b362ec L-3 (R3): a delivery whose newest result is `unknown` is still a pending
+    // external request of the coordinator, reported as "result unknown"
+    let (st, stop) = c(
+        "operator",
+        "POST",
+        "/v0/repos/repo-a/stop",
+        Some(&json!({})),
+    );
+    assert_eq!(st, 200, "{stop}");
+    let pend: Vec<(String, String)> = stop["coordinator_pending_external_requests"]
+        .as_array()
+        .expect("pending")
+        .iter()
+        .map(|p| {
+            (
+                p["attempt_id"].as_str().unwrap_or_default().to_string(),
+                p["state"].as_str().unwrap_or_default().to_string(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        pend,
+        [
+            ("aL".to_string(), "result unknown".to_string()),
+            ("aR".to_string(), "no result recorded".to_string())
+        ],
+        "{stop}"
+    );
+    assert!(
+        stop["unconfirmed"]
+            .to_string()
+            .contains("has no known outcome (result unknown)"),
+        "{stop}"
     );
     // without aL's ledger record, the `unknown` run is missing: the assignment stops
     let with_al = std::fs::read_to_string(&rec_path).expect("ledger");

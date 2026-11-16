@@ -1053,10 +1053,54 @@ fn e2e(transport: &str) {
     assert_eq!(r10["result"]["n"], 2);
     let (st, again) = deliver("operator", "dlv-key-0010", "development", &b10);
     assert_eq!((st, &again), (200, &r10));
+    // review af68c93 C-2: a10's call was sent (its result carries the sent digest) and the
+    // budget ledger still holds its lost-answer record after the `not_accepted` replay: the
+    // record counts — unmeasured, so the assignment's next delivery stops (02-05 step 5)
+    let a10_state = || -> String {
+        let mut c2 = cfg.clone();
+        c2.dbname(&dbname);
+        c2.connect(NoTls)
+            .expect("db")
+            .query_one(
+                "SELECT state FROM assignment_run_usage WHERE attempt_id = 'a10'
+                 ORDER BY seq DESC LIMIT 1",
+                &[],
+            )
+            .expect("a10 row")
+            .get(0)
+    };
+    let (st, b) = deliver(
+        "operator",
+        "dlv-key-0060",
+        "development",
+        &dbody("a60", 1, "s2", json!({})),
+    );
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("ASSIGNMENT_USAGE_UNMEASURED")),
+        "{b}"
+    );
+    assert_eq!(a10_state(), "unmeasured");
     std::fs::write(ledger.join("records.jsonl"), &kept).expect("reconciled");
+    // the person's reconciliation removed the record: a record settled before and gone now is
+    // `missing` (never lowered) …
+    let (st, b) = deliver(
+        "operator",
+        "dlv-key-0061",
+        "development",
+        &dbody("a61", 1, "s2", json!({})),
+    );
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("ASSIGNMENT_USAGE_UNMEASURED")),
+        "{b}"
+    );
+    assert_eq!(a10_state(), "missing");
+    // … and its result says nothing ran (`not_accepted`): the next settlement closes it
     // review c11e734 L-1: the supervisor holds another request under the delivery's attempt id
     // (accepted before, other content): the delivery is refused and its answer lost, and the
-    // re-query does not take the other request's answer for this delivery's
+    // re-query does not take the other request's answer for this delivery's. (Its own
+    // settlement first closes a10: `withdrawn`, the delivery sent nothing.)
     std::fs::create_dir_all(state.join("attempts")).expect("dir");
     std::fs::write(
         state.join("attempts/a41.json"),
@@ -1074,6 +1118,7 @@ fn e2e(transport: &str) {
         o("resume_allowed", Some("reconnect"), "unknown"),
         "{st} {d41}"
     );
+    assert_eq!(a10_state(), "withdrawn");
     let (st, r41) = deliver("operator", "dlv-key-0041", "development", &b41);
     assert_eq!(st, 200, "{r41}");
     assert_eq!(
@@ -1174,6 +1219,8 @@ fn e2e(transport: &str) {
     );
     assert_eq!(d["operational_state"], "awaiting_human_decision");
     assert_eq!(count("role_deliveries"), deliveries);
+    // one event for a10's two refusals and this one: the same generation, code and number of
+    // settled runs (a10 withdrawn, a11 unmeasured)
     assert_eq!(count("assignment_limit_events"), 1);
 
     // every run went through a delivery; the database holds every request and result

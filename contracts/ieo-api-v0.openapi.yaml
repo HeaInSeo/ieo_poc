@@ -1,12 +1,21 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.13.0
+  version: 0.14.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.14.0 (02-05 step 6, additive): external-request tracking (C9, 02-04 item 3; runtime contract revision 13 §16).
+    The role supervisors report `pending_external_requests` as a list (request id, kind, sent time, target) of the
+    requests they sent to the coordinator whose answer is not known, and `direct_network_requests: not_observable`.
+    stopRepo also reads the coordinator's own deliveries whose outcome is not known (no result, or `unknown`) and
+    lists them in `coordinator_pending_external_requests` and as reasons; children stay `not_tracked`, so the stop
+    stays unconfirmed. **Behaviour change:** stopRepo now runs one read transaction after the stops (execution shape
+    CallThenTransaction instead of NoDatabase). If that read fails, the stops have still been sent: the answer is the
+    same stop report (200) with `coordinator_pending_external_requests: "unreadable"`, a reason carrying the database
+    error, and `safe_shutdown_confirmed: false` — never a bare error (review 1b362ec M-1).
     0.13.0 (02-05 step 5): assignment-level time and token limits (C7, 02-04 item 1a; user decision 2026-11-16:
     `total_tokens` = input + output + cache_creation, `elapsed_seconds` = the sum of run durations, both over all
     generations of the assignment). issueAssignment takes an optional `limits {elapsed_seconds, total_tokens}`
@@ -568,9 +577,15 @@ paths:
         every role answered, runs nothing, has its checkpoint saved and reported to the
         coordinator (`checkpoint_reported: true`; false, missing or `local_only` is not
         reported), and reports no active children and no pending external requests; otherwise
-        `unconfirmed` lists the reasons
-        (the supervisors report children and external requests as `not_tracked`, so it is
-        unconfirmed until they track them).
+        `unconfirmed` lists the reasons. 02-05 step 6: each role reports its pending external
+        requests as a list (an empty list is not a reason); the model's own network requests are
+        `not_observable` (reported apart, not a reason). The supervisors still report children as
+        `not_tracked` (until 04-05), so the stop stays unconfirmed. After the stops the
+        coordinator reads, in one transaction, the repo's deliveries whose call has no known
+        outcome (no result yet, or `unknown`): `coordinator_pending_external_requests` (request id
+        = delivery id, kind `delivery`, sent time, target, attempt id, state), each also a reason.
+        If that read fails, the stops were still sent and the same report is returned: the list
+        is `"unreadable"`, a reason carries the database error, and the stop is unconfirmed.
       parameters:
         - { name: repo_id, in: path, required: true, schema: { type: string } }
       responses:
@@ -586,6 +601,21 @@ paths:
                   roles: { type: object }
                   safe_shutdown_confirmed: { type: boolean }
                   unconfirmed: { type: array, items: { type: string } }
+                  coordinator_pending_external_requests:
+                    oneOf:
+                      - type: array
+                        items:
+                          type: object
+                          required: [request_id, kind, sent_at, target, attempt_id, state]
+                          properties:
+                            request_id: { type: string }
+                            kind: { type: string, const: delivery }
+                            sent_at: { type: string, format: date-time }
+                            target: { type: string }
+                            attempt_id: { type: string }
+                            state: { type: string, enum: [no result recorded, result unknown] }
+                      - type: string
+                        const: unreadable
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':

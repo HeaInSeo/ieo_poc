@@ -363,7 +363,9 @@ impl Operation<'_> {
     pub fn shape(&self) -> Shape {
         match self {
             Operation::Health => Shape::Unauthenticated,
-            Operation::RoleStatus { .. } | Operation::RoleStop { .. } => Shape::NoDatabase,
+            Operation::RoleStatus { .. } => Shape::NoDatabase,
+            // the stops first, then one read transaction (02-05 step 6)
+            Operation::RoleStop { .. } => Shape::CallThenTransaction,
             Operation::CompareCheckpoint { .. } => Shape::CallThenTransaction,
             Operation::DeliverAssignment { .. } => Shape::Delivery,
             _ => Shape::Transaction,
@@ -605,8 +607,9 @@ pub fn dispatch(
     };
     let run = |db: &mut Client, f: &dyn Fn(&mut Transaction) -> R| run_tx(db, guard, f);
     match op {
-        // repo-scope role control (§7): no database; service and user credentials with
-        // `roles:control`
+        // repo-scope role control (§7), service and user credentials with `roles:control`:
+        // RoleStatus uses no database; RoleStop sends the stops, then reads the repo's
+        // deliveries of unknown outcome in one transaction (02-05 step 6)
         Operation::RoleStatus { repo } | Operation::RoleStop { repo } => {
             if let Err(r) = need_client_scope(who, "roles:control", false) {
                 return Ok(r);
@@ -619,16 +622,56 @@ pub fn dispatch(
                     "repo outside the credential's repos",
                 ));
             }
-            let (status, body) = if matches!(op, Operation::RoleStatus { .. }) {
-                crate::roles::status(&ctx.roles, repo)
-            } else {
-                crate::roles::stop(
-                    &ctx.roles,
-                    repo,
-                    std::time::Duration::from_secs(30),
-                    std::time::Duration::from_millis(250),
-                )
-            };
+            if matches!(op, Operation::RoleStatus { .. }) {
+                let (status, body) = crate::roles::status(&ctx.roles, repo);
+                return Ok(Resp { status, body });
+            }
+            let (status, mut body) = crate::roles::stop(
+                &ctx.roles,
+                repo,
+                std::time::Duration::from_secs(30),
+                std::time::Duration::from_millis(250),
+            );
+            // the coordinator's own external requests of the repo (02-05 step 6): deliveries
+            // whose call's outcome is not known (no result yet, or `unknown`). The stops are
+            // already sent: a failed read never replaces the stop report (review 1b362ec M-1);
+            // the list is then "unreadable", a reason says why, and the stop stays unconfirmed.
+            let pending = run(db, &|tx| ok(200, json!(pending_deliveries(tx, repo)?)));
+            if status == 200 {
+                let mut why = Vec::new();
+                match &pending {
+                    Ok(p) if p.status == 200 => {
+                        for d in p.body.as_array().into_iter().flatten() {
+                            why.push(format!(
+                                "coordinator: delivery {} to {} has no known outcome ({})",
+                                d["request_id"].as_str().unwrap_or_default(),
+                                d["target"].as_str().unwrap_or_default(),
+                                d["state"].as_str().unwrap_or_default()
+                            ));
+                        }
+                        body["coordinator_pending_external_requests"] = p.body.clone();
+                    }
+                    failed => {
+                        let cause = match failed {
+                            Ok(p) => format!(
+                                "{} {}",
+                                p.status,
+                                p.body["message"].as_str().unwrap_or_default()
+                            ),
+                            Err(a) => format!("{a:?}"),
+                        };
+                        why.push(format!(
+                            "coordinator: pending deliveries could not be read ({cause})"
+                        ));
+                        body["coordinator_pending_external_requests"] = json!("unreadable");
+                    }
+                }
+                if let Some(u) = body["unconfirmed"].as_array_mut() {
+                    u.extend(why.into_iter().map(Value::from));
+                }
+                body["safe_shutdown_confirmed"] =
+                    json!(body["unconfirmed"].as_array().is_some_and(Vec::is_empty));
+            }
             Ok(Resp { status, body })
         }
         Operation::Health => Ok(health(db, ctx)),
@@ -684,6 +727,35 @@ pub fn dispatch(
         Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
         Operation::Deliver { id } => run(db, &|tx| deliver(tx, who, id, req)),
     }
+}
+
+/// The deliveries of a repo whose call's outcome is not known (02-05 step 6): no result recorded
+/// yet (in flight, or its result transaction was lost), or the newest result `unknown`.
+fn pending_deliveries(tx: &mut Transaction, repo: &str) -> Result<Vec<Value>, Resp> {
+    Ok(tx
+        .query(
+            "SELECT d.delivery_id, d.role, d.attempt_id, iso(d.requested_at),
+                    (SELECT outcome FROM role_delivery_results r WHERE r.delivery_id = d.delivery_id
+                     ORDER BY n DESC LIMIT 1)
+             FROM role_deliveries d WHERE d.repo_id = $1 ORDER BY d.seq",
+            &[&repo],
+        )?
+        .iter()
+        .filter_map(|r| {
+            let outcome: Option<String> = r.get(4);
+            let state = match outcome.as_deref() {
+                None => "no result recorded",
+                Some("unknown") => "result unknown",
+                _ => return None,
+            };
+            Some(
+                json!({"request_id": r.get::<_, String>(0), "kind": "delivery",
+                "sent_at": r.get::<_, String>(3),
+                "target": format!("{} supervisor start/reconnect", r.get::<_, String>(1)),
+                "attempt_id": r.get::<_, String>(2), "state": state}),
+            )
+        })
+        .collect())
 }
 
 fn need_client_scope(who: &Caller, scope: &str, sprints_path: bool) -> Result<(), Resp> {
