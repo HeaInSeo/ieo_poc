@@ -976,10 +976,8 @@ fn e2e(transport: &str) {
         .iter()
         .map(|p| p["attempt_id"].as_str().unwrap_or_default().to_string())
         .collect();
-    assert!(
-        pend.contains(&"aL".to_string()) && pend.contains(&"aR".to_string()),
-        "{stop}"
-    );
+    // exactly those two: every other delivery has a known outcome
+    assert_eq!(pend, ["aL", "aR"], "{stop}");
     let reasons = stop["unconfirmed"].to_string();
     assert!(reasons.contains("coordinator: delivery"), "{stop}");
     assert!(reasons.contains("development: active_children"), "{stop}");
