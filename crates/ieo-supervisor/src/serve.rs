@@ -709,6 +709,18 @@ impl Service {
                 );
             }
         };
+        // 02-05 step 7b: the approved recovery a start over an unfinished checkpoint carries
+        let recovery_id = match &req["recovery_id"] {
+            Value::Null => None,
+            Value::String(r) if safe_id(r) => Some(r.clone()),
+            _ => {
+                return err(
+                    400,
+                    "SCHEMA_VIOLATION",
+                    "recovery_id (1-64 of [A-Za-z0-9_-]) when present",
+                );
+            }
+        };
         if self.cfg.runs().join(&attempt).exists() {
             return err(409, "ID_CONTENT_CONFLICT", "attempt_id already used");
         }
@@ -815,6 +827,23 @@ impl Service {
             let Some(sid) = s("session_id").filter(|x| safe_id(x)) else {
                 return err(400, "SCHEMA_VIOLATION", "session_id required");
             };
+            // a start over a run that did not finish needs a person's approved recovery
+            // (02-05 step 7b, review fe924b7 I-4). The supervisor does not check the id itself:
+            // with a coordinator, the takeover report is refused unless the id is the approval
+            // its delivery used (review 185d12b L-1); with `local_only` the id is the adapter
+            // caller's recorded claim (no coordinator to check it)
+            if let Some(phase @ ("takeover" | "error")) =
+                cp.as_ref().and_then(|c| c["phase"].as_str())
+                && recovery_id.is_none()
+            {
+                return resp(
+                    409,
+                    json!({"code": "EXTERNAL_RECONCILIATION_REQUIRED",
+                           "reason": format!("the previous run did not finish (checkpoint phase \
+                                              {phase}): a new session over it needs an approved \
+                                              recovery (recovery_id)")}),
+                );
+            }
             (sid, false, None)
         } else {
             // a reconnect without a usable checkpoint is never silently replaced by a new session
@@ -1056,7 +1085,8 @@ impl Service {
                 "spec_digest": spec_digest, "image_digest": image_digest,
                 "profile_id": profile_id, "profile_revision": profile_revision,
                 "target_sha": req["target_sha"].as_str().unwrap_or("unknown"),
-                "delivery_id": delivery_id, "branch_ref": branch_ref}),
+                "delivery_id": delivery_id, "branch_ref": branch_ref,
+                "recovery_id": recovery_id}),
             tamper,
             stop,
             probe,
@@ -1299,6 +1329,8 @@ impl Service {
         // pushed to it as the work tree records it (null: nothing pushed, or not observed). A
         // claim of the role volume; the coordinator compares it with the GitHub record.
         cp["branch_ref"] = c["branch_ref"].clone();
+        // 02-05 step 7b: the approved recovery this run's new session was started under
+        cp["recovery_id"] = c["recovery_id"].clone();
         cp["pushed_sha"] = c["branch_ref"]
             .as_str()
             .and_then(|b| crate::gitref::pushed(&cfg.cwd(), b))

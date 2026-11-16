@@ -12,4 +12,5 @@ pub mod grpc;
 pub mod http;
 pub mod limits;
 pub mod policy;
+pub mod recovery;
 pub mod roles;

@@ -1442,11 +1442,11 @@ fn e2e(transport: &str) {
     );
     // a push: the after_run checkpoint names the pushed SHA (crafted here as the supervisor
     // reports it; its own recording from the work tree is tested in ieo-supervisor)
-    let push_report_on = |branch: &str, seq: u64, pushed: Value, report_it: bool| {
+    let push_report_on = |branch: Value, seq: u64, pushed: Value, report_it: bool| {
         let mut cp: Value =
             serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("cp");
         cp["seq"] = json!(seq);
-        cp["branch_ref"] = json!(branch);
+        cp["branch_ref"] = branch;
         cp["pushed_sha"] = pushed;
         let raw = serde_json::to_string_pretty(&cp).expect("j");
         if report_it {
@@ -1465,8 +1465,9 @@ fn e2e(transport: &str) {
         }
         std::fs::write(&cp_path, &raw).expect("local");
     };
-    let push_report =
-        |seq: u64, pushed: Value, report_it: bool| push_report_on(BRANCH, seq, pushed, report_it);
+    let push_report = |seq: u64, pushed: Value, report_it: bool| {
+        push_report_on(json!(BRANCH), seq, pushed, report_it)
+    };
     let seq =
         serde_json::from_slice::<Value>(&std::fs::read(&cp_path).expect("cp")).expect("cp")["seq"]
             .as_u64()
@@ -1547,7 +1548,7 @@ fn e2e(transport: &str) {
     );
     // review f0e0ca9 L-2: a checkpoint written for another branch: its pushed SHA is not this
     // branch's, even when it equals this branch's GitHub head
-    push_report_on("refs/heads/other", seq + 3, json!(SHA_P), true);
+    push_report_on(json!("refs/heads/other"), seq + 3, json!(SHA_P), true);
     let cmp = compare("development");
     assert_eq!(
         (
@@ -1566,6 +1567,23 @@ fn e2e(transport: &str) {
         cmp["reasons"][0]
             .as_str()
             .is_some_and(|r| r.contains("refs/heads/other is not the assignment's")),
+        "{cmp}"
+    );
+    // review 47e4e3f L-4: a checkpoint that names no branch observed no push: its pushed_sha is
+    // not read, the target SHA is expected (and differs from the head here)
+    push_report_on(Value::Null, seq + 4, json!(SHA_P), true);
+    let cmp = compare("development");
+    assert_eq!(
+        (
+            cmp["github"]["result"].as_str(),
+            cmp["github"]["expected_from"].as_str(),
+            cmp["github"]["push_provenance"].as_str()
+        ),
+        (
+            Some("mismatch"),
+            Some("target_sha"),
+            Some("the checkpoint names no branch: no push observed (target SHA expected)")
+        ),
         "{cmp}"
     );
     // a guardrail whose review target is not the development assignment's target SHA runs

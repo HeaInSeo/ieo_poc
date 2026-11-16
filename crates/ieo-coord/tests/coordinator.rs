@@ -3507,8 +3507,10 @@ fn central_checkpoints_keep_sequence_identity_and_tamper_reports() {
         ensure_delivery(&e, raw.as_bytes());
         e.post(who, CP, &json!({"seq": seq, "checkpoint_json": raw}))
     };
-    // no assignment yet
-    let c1 = checkpoint(1, 0, &digest, json!({"phase": "takeover"}));
+    // no assignment yet. The first run finished (after_run): the seq-2 takeover below is a new
+    // session over a finished run, not a recovery (02-05 step 7b: a takeover over an unfinished
+    // run names its approved recovery, review 185d12b L-1)
+    let c1 = checkpoint(1, 0, &digest, json!({"phase": "after_run"}));
     let (st, b) = report("sup-dev-a", 1, &c1);
     assert_eq!((st, code(&b)), (409, "NO_CURRENT_ASSIGNMENT".into()), "{b}");
     assert_eq!(
@@ -4960,8 +4962,8 @@ fn claims_are_kept_apart_from_the_completion_judgment() {
     assert_eq!(st, 200, "{c2}");
     assert_eq!(
         c2["evidence_levels"],
-        json!({"verified": ["sprint", "assignment", "deliveries", "usage", "usage_runs",
-                            "limit_events"],
+        json!({"verified": ["sprint", "assignment", "deliveries", "recoveries", "usage",
+                            "usage_runs", "limit_events"],
                "claim": ["takeovers", "first_actions", "checkpoints", "tamper_events",
                          "agent_reports", "session_status"]})
     );

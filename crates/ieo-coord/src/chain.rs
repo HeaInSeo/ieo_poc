@@ -154,7 +154,22 @@ pub(crate) fn assignment_chain(
             "coordinator_record": d.get::<_, Value>(5), "target_sha": d.get::<_, String>(6),
             "cause": d.get::<_, String>(7), "requested_by": d.get::<_, String>(8),
             "requested_at": d.get::<_, String>(9), "responded_at": responded_at,
-            "outcome": outcome, "results": results}));
+            "outcome": outcome, "results": results,
+            // the approved recovery this delivery used (02-05 step 7b), or null
+            "recovery": crate::recovery::of_delivery(tx, &id)?}));
+    }
+
+    // recoveries: a person's approvals of a new session over an unfinished checkpoint, with
+    // their one use (verified; 02-05 step 7b)
+    let mut recoveries = Vec::new();
+    for r in tx.query(
+        "SELECT recovery_id FROM role_recoveries WHERE assignment_id = $1 AND generation = $2
+         ORDER BY approved_at, recovery_id",
+        &[&aid, &g],
+    )? {
+        if let Some(v) = crate::recovery::load(tx, &r.get::<_, String>(0))? {
+            recoveries.push(v);
+        }
     }
 
     // takeovers: stored with their checkpoint, linked to a delivery (claim)
@@ -365,11 +380,12 @@ pub(crate) fn assignment_chain(
         200,
         json!({"assignment_id": aid, "generation": generation, "repo_id": repo, "role": role,
             "evidence_levels": {
-                "verified": ["sprint", "assignment", "deliveries", "usage", "usage_runs",
-                         "limit_events"],
+                "verified": ["sprint", "assignment", "deliveries", "recoveries", "usage",
+                         "usage_runs", "limit_events"],
                 "claim": ["takeovers", "first_actions", "checkpoints", "tamper_events",
                           "agent_reports", "session_status"]},
             "sprint": sprint, "assignment": assignment, "deliveries": deliveries,
+            "recoveries": recoveries,
             "takeovers": takeovers, "first_actions": first_actions, "checkpoints": checkpoints,
             "tamper_events": tamper_events, "agent_reports": agent_reports,
             "session_status": session_status, "links": links,

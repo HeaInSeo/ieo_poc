@@ -1,7 +1,9 @@
 //! `ieo-role-call --plan <plan.json> --task <id> --role <role> --op start|reconnect
-//!  --attempt <id> --session <id> --prompt-file <f> --coordinator-file <f>`
+//!  --attempt <id> --session <id> --prompt-file <f> --coordinator-file <f> [--recovery-id <id>]`
 //!
-//! One budgeted call to a role service (see `ieo_supervisor::caller`). Prints a summary
+//! One budgeted call to a role service (see `ieo_supervisor::caller`). `--recovery-id`: a start
+//! over a run that did not finish carries a person's recovery id (02-05 step 7b; the service
+//! refuses such a start without one). Prints a summary
 //! without secrets. Exit 0: recorded, nothing to look at; 2: nothing started (refused or held);
 //! 3: recorded with `stop_required`; 1: an error (bad arguments, or a failure the caller could
 //! not record — its in-flight marker then blocks every further call). **Anything but 0 or 2
@@ -89,7 +91,27 @@ fn run() -> Result<i32, String> {
         coordinator: serde_json::from_str(&read("--coordinator-file")?)
             .map_err(|e| format!("coordinator: {e}"))?,
     };
-    match caller::call(&plan, &c, &caller::Http, Duration::from_secs(2))? {
+    let mut extra = json!({});
+    if let Some(i) = args.iter().position(|a| a == "--recovery-id") {
+        let id = args.get(i + 1).ok_or("--recovery-id value")?;
+        let ok = (1..=64).contains(&id.len())
+            && id.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+            && id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if !ok {
+            return Err("--recovery-id: 1-64 of [A-Za-z0-9_-]".into());
+        }
+        extra["recovery_id"] = json!(id);
+    }
+    match caller::call_with_extra(
+        &plan,
+        &c,
+        &caller::Http,
+        Duration::from_secs(2),
+        Duration::from_secs(60),
+        &extra,
+    )? {
         Called::NotStarted(why) => {
             println!("{}", json!({"started": false, "reason": why}));
             Ok(2)
