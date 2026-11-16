@@ -169,6 +169,14 @@ fn rate(overage: &str) -> String {
     .to_string()
 }
 
+/// A spare marker as a person attaches it (user decision 2026-11-17 and its addition): the
+/// reason, the replaced attempt, the cause report reference, who approved it and when.
+fn spare_marker(reason: &str, replaces: &str) -> Value {
+    json!({"spare": {"reason": reason, "replaces": replaces, "evidence_ref": "cause-report#1",
+                     "by": {"kind": "user", "name": "alice-ops"},
+                     "approved_at": "2026-11-17T00:00:00Z"}})
+}
+
 fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -738,7 +746,19 @@ fn the_caller_talks_to_the_service_over_http() {
     };
     let (code, out) = spare_cli(&["--spare-reason", "env"]);
     assert_eq!(code, Some(1), "{out}");
+    // the four go together (user decision 2026-11-17, addition: evidence and approver)
     let (code, out) = spare_cli(&["--spare-reason", "env", "--replaces", "d1"]);
+    assert_eq!(code, Some(1), "{out}");
+    let (code, out) = spare_cli(&[
+        "--spare-reason",
+        "env",
+        "--replaces",
+        "d1",
+        "--evidence-ref",
+        "rep#1",
+        "--approver",
+        "alice",
+    ]);
     assert_eq!(code, Some(2), "{out}");
     assert!(
         out.contains("has no spare run in the 02-04 budget"),
@@ -2406,8 +2426,7 @@ fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
     m.insert("dev".to_string(), service_0205(&t.0, "development"));
     m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
     let a = InProc(m);
-    let by = json!({"kind": "user", "name": "alice-ops"});
-    let spare = |reason: &str, replaces: &str| json!({"spare": {"reason": reason, "replaces": replaces, "by": by}});
+    let spare = spare_marker;
     let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
         caller::call_with_extra(
             &p,
@@ -2442,11 +2461,41 @@ fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
             "needs a reason",
         ),
         (json!({"spare": {"reason": "env"}}), "needs a reason"),
-        // who attached it is required (review b38e8df M-1)
+    ] {
+        let why = not_started(call("development", "x4", "hi", extra.clone()));
+        assert!(why.contains(want), "{extra}: {why}");
+    }
+    // the cause report reference, a person and the approval time are required (user decision
+    // 2026-11-17, addition; review b38e8df M-1): a reason alone proves nothing
+    let without = |path: &[&str], v: Value| {
+        let mut m = spare_marker("env", "d2");
+        let mut x = &mut m["spare"];
+        for k in &path[..path.len() - 1] {
+            x = &mut x[*k];
+        }
+        x[path[path.len() - 1]] = v;
+        m
+    };
+    for (extra, want) in [
         (
-            json!({"spare": {"reason": "env", "replaces": "d2"}}),
-            "names no one",
+            without(&["evidence_ref"], Value::Null),
+            "needs an evidence_ref",
         ),
+        (
+            without(&["evidence_ref"], json!("  ")),
+            "needs an evidence_ref",
+        ),
+        (without(&["by"], Value::Null), "attached by a person"),
+        (
+            without(&["by", "kind"], json!("service")),
+            "attached by a person",
+        ),
+        (
+            without(&["by", "kind"], json!("host_operator")),
+            "attached by a person",
+        ),
+        (without(&["by", "name"], json!(" ")), "attached by a person"),
+        (without(&["approved_at"], Value::Null), "no approval time"),
     ] {
         let why = not_started(call("development", "x4", "hi", extra.clone()));
         assert!(why.contains(want), "{extra}: {why}");
@@ -2461,10 +2510,18 @@ fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
     ));
     assert_eq!(
         r3["spare"],
-        json!({"reason": "execution environment defect, cause reported", "replaces": "d2",
-               "by": {"kind": "user", "name": "alice-ops"}}),
+        spare_marker("execution environment defect, cause reported", "d2")["spare"],
         "{r3}"
     );
+    // the failed run's record and usage stay as they were (appended, nothing reset)
+    let d2: Vec<Value> = std::fs::read_to_string(t.0.join("ledger/records.jsonl"))
+        .expect("ledger")
+        .lines()
+        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .filter(|r| r["attempt_id"] == "d2")
+        .collect();
+    assert_eq!(d2.len(), 1);
+    assert_eq!(d2[0], r2, "R2's record is kept");
     let ledger = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
     assert!(
         ledger.contains("execution environment defect, cause reported"),
@@ -2473,6 +2530,23 @@ fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
     // one spare only (also the budget's 4 runs are used now)
     let why = not_started(call("development", "x5", "hi", spare("again", "d2")));
     assert!(why.contains("used already"), "{why}");
+    // the same request again (a duplicate) starts no extra run
+    let n = std::fs::read_to_string(t.0.join("ledger/records.jsonl"))
+        .expect("ledger")
+        .lines()
+        .count();
+    let why = not_started(call(
+        "development",
+        "d3",
+        "hi",
+        spare("execution environment defect, cause reported", "d2"),
+    ));
+    assert!(why.contains("used already"), "{why}");
+    let n2 = std::fs::read_to_string(t.0.join("ledger/records.jsonl"))
+        .expect("ledger")
+        .lines()
+        .count();
+    assert_eq!(n, n2, "no record for a refused duplicate");
     let why = not_started(call("development", "x6", "hi", json!({})));
     assert!(why.contains("planned runs are used"), "{why}");
 }
@@ -2508,12 +2582,7 @@ fn the_0205_spare_may_redo_the_first_planned_run() {
     // R1's failure asks for a person: nothing runs without the spare marker
     let why = not_started(call("x1", "hi", json!({})));
     assert!(why.contains("asks for a person"), "{why}");
-    recorded(call(
-        "d1b",
-        "hi",
-        json!({"spare": {"reason": "env defect", "replaces": "d1",
-                         "by": {"kind": "user", "name": "alice-ops"}}}),
-    ));
+    recorded(call("d1b", "hi", spare_marker("env defect", "d1")));
     recorded(call("d2", "hi", json!({})));
     let why = not_started(call("d3", "hi", json!({})));
     assert!(why.contains("planned runs are used"), "{why}");
@@ -2529,17 +2598,72 @@ fn the_spare_gate_refuses_ambiguous_records() {
         "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")}}}))
     .expect("plan");
     let run = |attempt: &str, budget: &str, failed: bool| {
-        json!({"format": "ieo-role-run/v0", "attempt_id": attempt, "role": "development",
-               "budget": budget, "model_request": true, "stop_required": failed,
-               "outcome": {"result": {"subtype": "success", "is_error": failed}}})
+        let mut r = json!({"format": "ieo-role-run/v0", "attempt_id": attempt,
+               "role": "development", "budget": budget, "model_request": true,
+               "stop_required": failed, "usage": {"run": {"state": "measured"}},
+               "outcome": {"result": {"subtype": "success", "is_error": failed}}});
+        if failed {
+            r["stop_reason"] = json!("result \"success\" (is_error true)");
+        }
+        r
     };
     let recs = vec![run("d1", "02-05", false), run("d2", "02-05", true)];
-    let by = json!({"kind": "user", "name": "alice-ops"});
-    let marker = json!({"spare": {"reason": "env", "replaces": "d2", "by": by}});
+    let marker = spare_marker("env", "d2");
     assert_eq!(
         caller::spare_gate(&p, "development", &recs, &recs, &marker),
-        Ok(Some(json!({"reason": "env", "replaces": "d2", "by": by})))
+        Ok(Some(marker["spare"].clone()))
     );
+    // user decision 2026-11-17 addition §3: the marker releases only a stop for the run's
+    // result; any other reason of the named run keeps blocking (fail-closed)
+    for (reason, unmeasured, want) in [
+        ("no result event", false, None),
+        (
+            "result \"error_during_execution\" (is_error true); no result event",
+            false,
+            None,
+        ),
+        ("result \"success\" (is_error true)", true, Some("usage")),
+        (
+            "this run's signal: overageStatus allowed",
+            false,
+            Some("overageStatus"),
+        ),
+        (
+            "result \"success\" (is_error true); this run's signal: overageStatus allowed",
+            false,
+            Some("overageStatus"),
+        ),
+        ("process-group cleanup failed", false, Some("cleanup")),
+        (
+            "environment not subscription-only: [\"ANTHROPIC_API_KEY\"]",
+            false,
+            Some("subscription-only"),
+        ),
+        (
+            "start sent but its answer was lost (eof)",
+            false,
+            Some("answer was lost"),
+        ),
+        ("", false, Some("without a reason")),
+    ] {
+        let mut d2 = run("d2", "02-05", true);
+        d2["stop_reason"] = json!(reason);
+        if unmeasured {
+            d2["usage"]["run"]["state"] = json!("unmeasured");
+        }
+        let rs = vec![run("d1", "02-05", false), d2];
+        let got = caller::spare_gate(&p, "development", &rs, &rs, &marker);
+        match want {
+            None => assert!(got.is_ok(), "{reason}: {got:?}"),
+            Some(w) => {
+                let e = got.expect_err(reason);
+                assert!(
+                    e.contains("not one a spare releases") && e.contains(w),
+                    "{e}"
+                );
+            }
+        }
+    }
     // review b38e8df L-1: a run corrected to a clean success (the effective record) is no
     // failure, although its raw line asked for a person
     let mut corrected = run("d2", "02-05", false);
@@ -2601,10 +2725,7 @@ fn a_failed_spare_stops_the_budget_again() {
         )
         .expect("call")
     };
-    let marker = |replaces: &str| {
-        json!({"spare": {"reason": "env defect", "replaces": replaces,
-                         "by": {"kind": "user", "name": "alice-ops"}}})
-    };
+    let marker = |replaces: &str| spare_marker("env defect", replaces);
     recorded(call("development", "d1", "AUTHFAIL", json!({})));
     let s1 = recorded(call("development", "d1b", "AUTHFAIL", marker("d1")));
     assert_eq!(s1["stop_required"], true, "{s1}");
@@ -2712,23 +2833,44 @@ fn ieo_role_call_records_the_spare_marker() {
     let (code, out) = cli("d1", "AUTHFAIL", &[]);
     assert_eq!(code, Some(3), "{out}");
     // a flag value that is another flag is refused (review b38e8df I-2)
+    let flags = |reason: &str, evidence: &str, approver: &str| {
+        vec![
+            "--spare-reason".to_string(),
+            reason.into(),
+            "--replaces".into(),
+            "d1".into(),
+            "--evidence-ref".into(),
+            evidence.into(),
+            "--approver".into(),
+            approver.into(),
+        ]
+    };
+    let cli_f = |attempt: &str, f: Vec<String>| {
+        let f: Vec<&str> = f.iter().map(String::as_str).collect();
+        cli(attempt, "hi", &f)
+    };
     let (code, out) = cli("d2", "hi", &["--spare-reason", "--replaces", "d1"]);
     assert_eq!(code, Some(1), "{out}");
-    // the reason is capped like the coordinator's (2,000 bytes)
+    // the reason and the evidence reference are capped like the coordinator's (2,000 bytes),
+    // the approver at 128; a flag is no value; blank values are refused
     let long = "x".repeat(2001);
-    let (code, out) = cli("d2", "hi", &["--spare-reason", &long, "--replaces", "d1"]);
-    assert_eq!(code, Some(1), "{out}");
+    for f in [
+        flags(&long, "rep#1", "alice"),
+        flags("env defect", &long, "alice"),
+        flags("env defect", "rep#1", &"a".repeat(129)),
+        flags("env defect", " ", "alice"),
+        flags("env defect", "rep#1", "--x"),
+    ] {
+        let (code, out) = cli_f("d2", f.clone());
+        assert_eq!(code, Some(1), "{f:?}: {out}");
+    }
     assert!(
         !t.0.join("ledger/records.jsonl").exists() || {
             let l = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("l");
             !l.contains("\"d2\"")
         }
     );
-    let (code, out) = cli(
-        "d2",
-        "hi",
-        &["--spare-reason", "env defect", "--replaces", "d1"],
-    );
+    let (code, out) = cli_f("d2", flags("env defect", "cause-report#7", "alice"));
     assert_eq!(code, Some(0), "{out}");
     let recs = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
     let d2: Value = recs
@@ -2736,11 +2878,143 @@ fn ieo_role_call_records_the_spare_marker() {
         .filter_map(|l| serde_json::from_str::<Value>(l).ok())
         .find(|r| r["attempt_id"] == "d2")
         .expect("d2 record");
+    let mut spare = d2["spare"].clone();
+    let at = spare["approved_at"].take();
+    assert!(at.as_str().is_some_and(|a| a.ends_with('Z')), "{d2}");
     assert_eq!(
-        d2["spare"],
-        json!({"reason": "env defect", "replaces": "d1",
-               "by": {"kind": "host_operator", "name": "host-op", "authenticated": false,
-                      "via": "ieo-role-call"}}),
+        spare,
+        json!({"reason": "env defect", "replaces": "d1", "evidence_ref": "cause-report#7",
+               "by": {"kind": "user", "name": "alice", "authenticated": false,
+                      "via": "ieo-role-call", "host_user": "host-op"},
+               "approved_at": null}),
         "{d2}"
     );
+}
+
+/// User decision 2026-11-17, addition §3: a marker releases only the named run's stop for its
+/// result. A named run stopped by an overage signal (unmeasured) is not released, and a valid
+/// marker does not pass another record that asks for a person or an unmeasured run.
+#[test]
+fn a_spare_marker_releases_nothing_else() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare-scope");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = InProc(m);
+    let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    // R1 stopped by an overage signal: unmeasured; a spare naming it is refused
+    let r1 = recorded(call("development", "d1", "OVERAGE", json!({})));
+    assert_eq!(r1["usage"]["run"]["state"], "unmeasured", "{r1}");
+    let why = not_started(call("development", "x1", "hi", spare_marker("env", "d1")));
+    assert!(why.contains("not one a spare releases"), "{why}");
+    // a second ledger: R1 fails for its result (releasable), G1 asks for a person
+    let t2 = Tmp::new("b0205-spare-scope2");
+    std::fs::write(t2.0.join("adapter.token"), TOKEN).expect("tok");
+    let p2 = Plan::from_json(
+        &json!({"budget": "02-05", "ledger_dir": t2.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first-observation.jsonl"),
+                              "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t2.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t2.0.join("adapter.token")}}}),
+    )
+    .expect("plan");
+    let mut m2 = BTreeMap::new();
+    m2.insert("dev".to_string(), service_0205(&t2.0, "development"));
+    m2.insert("gr".to_string(), service_0205(&t2.0, "guardrail"));
+    let a2 = InProc(m2);
+    let call2 = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p2,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a2,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    recorded(call2("development", "d1", "AUTHFAIL", json!({})));
+    // G1's record that asks for a person (written as the ledger would hold it)
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(t2.0.join("ledger/records.jsonl"))
+        .expect("ledger");
+    std::io::Write::write_all(
+        &mut f,
+        format!(
+            "{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "g1", "role": "guardrail",
+                   "budget": "02-05", "model_request": true, "duration_ms": 1000,
+                   "stop_required": true, "stop_reason": "process-group cleanup failed",
+                   "usage": {"run": {"state": "measured", "tokens": {"input": 1, "output": 1,
+                             "cache_creation": 1, "cache_read": 1}}}})
+        )
+        .as_bytes(),
+    )
+    .expect("append");
+    let why = not_started(call2("development", "x2", "hi", spare_marker("env", "d1")));
+    assert!(why.contains("record \"g1\" asks for a person"), "{why}");
+    // an unmeasured run elsewhere in the ledger keeps the budget stopped, marker or not
+    let t3 = Tmp::new("b0205-spare-scope3");
+    std::fs::write(t3.0.join("adapter.token"), TOKEN).expect("tok");
+    let p3 = Plan::from_json(
+        &json!({"budget": "02-05", "ledger_dir": t3.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first-observation.jsonl"),
+                              "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t3.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t3.0.join("adapter.token")}}}),
+    )
+    .expect("plan");
+    let mut m3 = BTreeMap::new();
+    m3.insert("dev".to_string(), service_0205(&t3.0, "development"));
+    m3.insert("gr".to_string(), service_0205(&t3.0, "guardrail"));
+    let a3 = InProc(m3);
+    let call3 = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p3,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a3,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    recorded(call3("development", "d1", "AUTHFAIL", json!({})));
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(t3.0.join("ledger/records.jsonl"))
+        .expect("ledger");
+    std::io::Write::write_all(
+        &mut f,
+        format!(
+            "{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "u1", "role": "guardrail",
+                   "budget": "02-05", "model_request": true, "stop_required": false,
+                   "usage": {"run": {"state": "unmeasured", "reason": "test"}}})
+        )
+        .as_bytes(),
+    )
+    .expect("append");
+    let why = not_started(call3("development", "x3", "hi", spare_marker("env", "d1")));
+    assert!(why.contains("unmeasured run(s)"), "{why}");
 }

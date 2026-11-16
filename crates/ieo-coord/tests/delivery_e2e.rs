@@ -1132,9 +1132,16 @@ fn e2e(transport: &str) {
     // decision 2026-11-17 (나)): a malformed one is refused; this 02-04 budget has no spare
     for bad in [
         json!({"reason": "x"}),
-        json!({"reason": "", "replaces": "a7"}),
-        json!({"reason": "x", "replaces": "a/7"}),
-        json!({"reason": "x", "replaces": "a7", "more": 1}),
+        json!({"reason": "", "replaces": "a7", "evidence_ref": "r"}),
+        json!({"reason": "x", "replaces": "a/7", "evidence_ref": "r"}),
+        json!({"reason": "x", "replaces": "a7", "evidence_ref": "r", "more": 1}),
+        // the cause report reference is required (user decision 2026-11-17, addition)
+        json!({"reason": "x", "replaces": "a7"}),
+        json!({"reason": "x", "replaces": "a7", "evidence_ref": " "}),
+        json!({"reason": "x", "replaces": "a7", "evidence_ref": "r".repeat(2001)}),
+        // who approved it and when are the coordinator's to write, not the body's
+        json!({"reason": "x", "replaces": "a7", "evidence_ref": "r",
+               "by": {"kind": "user", "name": "x"}}),
     ] {
         let (st, b) = deliver(
             "operator",
@@ -1150,7 +1157,8 @@ fn e2e(transport: &str) {
         "a81",
         1,
         "s2",
-        json!({"spare": {"reason": "env defect", "replaces": "a7"}}),
+        json!({"spare": {"reason": "env defect", "replaces": "a7",
+                         "evidence_ref": "cause-report#1"}}),
     );
     let (st, b) = deliver("operator", "dlv-key-0082", "development", &spare_body);
     assert_eq!(

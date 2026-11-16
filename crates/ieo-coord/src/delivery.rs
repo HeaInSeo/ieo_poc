@@ -112,15 +112,19 @@ fn check_body(req: &Req) -> Result<Value, Resp> {
     // attempt it replaces; the shared budget check decides
     if !body["spare"].is_null() {
         let s = &body["spare"];
-        let ok = s.as_object().is_some_and(|o| o.len() == 2)
-            && s["reason"]
-                .as_str()
+        let text = |k: &str| {
+            s[k].as_str()
                 .is_some_and(|r| !r.trim().is_empty() && r.len() <= 2000)
+        };
+        let ok = s.as_object().is_some_and(|o| o.len() == 3)
+            && text("reason")
+            && text("evidence_ref")
             && s["replaces"].as_str().is_some_and(safe_id);
         if !ok {
             return Err(bad(
                 "spare",
-                "`spare` is {reason (1-2000 bytes), replaces (the failed attempt id)}",
+                "`spare` is {reason, evidence_ref (each 1-2000 bytes), replaces (the failed \
+                 attempt id)}",
             ));
         }
     }
@@ -135,6 +139,7 @@ fn spare_extra(spare: &Value, who: &Caller) -> Value {
     }
     let mut s = spare.clone();
     s["by"] = json!({"name": who.name, "kind": "user", "via": "deliverAssignment"});
+    s["approved_at"] = json!(ieo_evidence::time::now());
     json!({"spare": s})
 }
 
@@ -1038,10 +1043,17 @@ mod tests {
             role: None,
         };
         assert_eq!(spare_extra(&Value::Null, &who), json!({}));
+        let mut got = spare_extra(
+            &json!({"reason": "env", "replaces": "a7", "evidence_ref": "rep#1"}),
+            &who,
+        );
+        let at = got["spare"]["approved_at"].take();
+        assert!(at.as_str().is_some_and(|a| a.ends_with('Z')), "{at}");
         assert_eq!(
-            spare_extra(&json!({"reason": "env", "replaces": "a7"}), &who),
-            json!({"spare": {"reason": "env", "replaces": "a7",
-                "by": {"name": "alice-ops", "kind": "user", "via": "deliverAssignment"}}})
+            got,
+            json!({"spare": {"reason": "env", "replaces": "a7", "evidence_ref": "rep#1",
+                "by": {"name": "alice-ops", "kind": "user", "via": "deliverAssignment"},
+                "approved_at": null}})
         );
     }
 }

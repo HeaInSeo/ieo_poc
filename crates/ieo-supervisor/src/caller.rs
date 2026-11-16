@@ -724,11 +724,16 @@ pub struct Admission {
 /// The spare gate of a budget that has one (user decision 2026-11-17 (나)): `Ok(None)` when the
 /// call is no spare, `Ok(Some(marker))` for an allowed spare, `Err(why)` otherwise (nothing
 /// starts). Without a marker the role runs at most its `planned_runs` (runs that are no spare);
-/// a run beyond them needs `extra.spare = {reason, replaces}`. `replaces` names an earlier run
-/// of this role and budget whose record is a failure (`stop_required`, or a result that is not a
-/// clean success). The spare may redo either planned run (R1 or R2), so it is the run after a
-/// failure, not only the third. One spare only; a role without a spare never carries a marker.
-/// An unreadable or ambiguous record refuses.
+/// the spare needs `extra.spare = {reason, replaces, evidence_ref, by, approved_at}` (user
+/// decision 2026-11-17, addition): a person (`by.kind` "user") names the earlier failed run of
+/// this role and budget it replaces, a reason, and a reference to the cause report or evidence
+/// (the reason alone proves no environment defect). The replaced run's effective record is a
+/// failure (`stop_required`, or a result that is not a clean success), and its stop is one the
+/// marker may release: the run's result only ([`spare_releasable`]); unmeasured usage, a
+/// limit or overage signal, a failed cleanup or an environment that is not subscription-only
+/// keep blocking. The spare may redo either planned run (R1 or R2), so it need not be the
+/// third call. One spare only; a role without a spare never carries a marker. An unreadable or
+/// ambiguous record refuses.
 pub fn spare_gate(
     plan: &Plan,
     role: &str,
@@ -775,11 +780,21 @@ pub fn spare_gate(
     let (Some(reason), Some(replaces)) = (reason, replaces) else {
         return Err("the spare marker needs a reason and the attempt it replaces".into());
     };
-    // who attached it (review b38e8df M-1): a person; the record keeps it
+    // the cause report or evidence the person states (user decision 2026-11-17, addition)
+    let Some(evidence_ref) = marker["evidence_ref"]
+        .as_str()
+        .filter(|r| !r.trim().is_empty())
+    else {
+        return Err("the spare marker needs an evidence_ref (the cause report or evidence)".into());
+    };
+    // who attached it and when (review b38e8df M-1): a person; the record keeps it
     let by = &marker["by"];
-    if by["kind"].as_str().is_none_or(str::is_empty) {
-        return Err("the spare marker names no one who attached it (`by`)".into());
+    if by["kind"] != "user" || by["name"].as_str().is_none_or(|n| n.trim().is_empty()) {
+        return Err("the spare marker is attached by a person (`by`: kind user, a name)".into());
     }
+    let Some(approved_at) = marker["approved_at"].as_str().filter(|a| !a.is_empty()) else {
+        return Err("the spare marker has no approval time (`approved_at`)".into());
+    };
     let found: Vec<&Value> = raw
         .iter()
         .filter(|r| r["format"] == RECORD_FORMAT && r["attempt_id"] == replaces)
@@ -812,9 +827,41 @@ pub fn spare_gate(
             "spare: the replaced attempt {replaces} did not fail (a spare replaces a failed run)"
         ));
     }
+    if let Err(why) = spare_releasable(r) {
+        return Err(format!(
+            "spare: the stop of {replaces} is not one a spare releases: {why}"
+        ));
+    }
     Ok(Some(
-        serde_json::json!({"reason": reason, "replaces": replaces, "by": by}),
+        serde_json::json!({"reason": reason, "replaces": replaces,
+        "evidence_ref": evidence_ref, "by": by, "approved_at": approved_at}),
     ))
+}
+
+/// Whether a spare marker may release the stop of the failed run it names (user decision
+/// 2026-11-17, addition, §3): only a stop for the run's own result ("result …", "no result
+/// event"), and only with its usage measured. Any other reason (unmeasured usage, a limit or
+/// overage signal, a failed process-group cleanup, an environment that is not
+/// subscription-only, an answer that was lost) keeps blocking. Fail-closed: a reason not on
+/// the list keeps blocking.
+pub fn spare_releasable(r: &Value) -> Result<(), String> {
+    if r["usage"]["run"]["state"] != "measured" {
+        return Err(format!("usage {}", r["usage"]["run"]["state"]));
+    }
+    if r["stop_required"] != true {
+        return Ok(());
+    }
+    let reason = r["stop_reason"].as_str().unwrap_or_default();
+    if reason.is_empty() {
+        return Err("a stop without a reason".into());
+    }
+    match reason
+        .split("; ")
+        .find(|p| !(p.starts_with("result ") || *p == "no result event"))
+    {
+        None => Ok(()),
+        Some(p) => Err(p.to_string()),
+    }
 }
 
 /// The ledger's effective records when no call of the budget is running (02-05 step 5): the

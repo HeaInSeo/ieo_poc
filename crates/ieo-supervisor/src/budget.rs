@@ -46,8 +46,9 @@ pub struct Budget {
 
 /// A spare run (user decision 2026-11-17 (나), docs/poc/User_Decisions_2026-11-17_spare.md):
 /// the role runs at most `planned_runs` runs without a marker; its 1 spare carries an explicit
-/// marker (a person's reason and the earlier failed run of this role and budget it replaces)
-/// and may follow either planned run; no other role has one.
+/// marker (a person's reason, the earlier failed run of this role and budget it replaces, the
+/// cause report or evidence reference, who approved it and when) and may follow either planned
+/// run; no other role has one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpareRule {
     pub role: &'static str,

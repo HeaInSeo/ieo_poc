@@ -118,21 +118,45 @@ fn run() -> Result<i32, String> {
             })
             .transpose()
     };
-    match (flag("--spare-reason")?, flag("--replaces")?) {
-        (None, None) => {}
-        (Some(reason), Some(replaces)) => {
-            if reason.trim().is_empty() || reason.len() > 2000 {
-                return Err("--spare-reason: 1-2000 bytes".into());
+    let spare = [
+        flag("--spare-reason")?,
+        flag("--replaces")?,
+        flag("--evidence-ref")?,
+        flag("--approver")?,
+    ];
+    match spare {
+        [None, None, None, None] => {}
+        [
+            Some(reason),
+            Some(replaces),
+            Some(evidence_ref),
+            Some(approver),
+        ] => {
+            for (k, v, max) in [
+                ("--spare-reason", &reason, 2000),
+                ("--evidence-ref", &evidence_ref, 2000),
+                ("--approver", &approver, 128),
+            ] {
+                if v.trim().is_empty() || v.len() > max {
+                    return Err(format!("{k}: 1-{max} bytes"));
+                }
             }
-            // the host caller's operator attaches it; this path is inside the trust boundary
-            // (like --recovery-id) and has no authenticated identity: the record says so and
-            // keeps the local user name (review b38e8df M-1)
-            let user = std::env::var("USER").unwrap_or_else(|_| "unknown".into());
+            // the person who approves the spare names themself; this path is inside the trust
+            // boundary (like --recovery-id) and has no authenticated identity: the record says
+            // so and keeps the local user name too (review b38e8df M-1, user decision
+            // 2026-11-17 addition)
+            let host_user = std::env::var("USER").unwrap_or_else(|_| "unknown".into());
             extra["spare"] = json!({"reason": reason, "replaces": replaces,
-                "by": {"kind": "host_operator", "name": user,
-                       "authenticated": false, "via": "ieo-role-call"}});
+                "evidence_ref": evidence_ref,
+                "by": {"kind": "user", "name": approver, "authenticated": false,
+                       "via": "ieo-role-call", "host_user": host_user},
+                "approved_at": ieo_evidence::time::now()});
         }
-        _ => return Err("--spare-reason and --replaces go together".into()),
+        _ => {
+            return Err(
+                "--spare-reason, --replaces, --evidence-ref and --approver go together".into(),
+            );
+        }
     }
     match caller::call_with_extra(
         &plan,
