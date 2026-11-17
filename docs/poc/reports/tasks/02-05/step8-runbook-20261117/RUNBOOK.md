@@ -6,7 +6,7 @@
 | 근거 | [사용자 결정 2026-11-15](../../../../User_Decisions_2026-11-15_0205-x08.md) §2.1(예산 (나)·멈춤 규칙), [사용자 결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md)(예비), [02-05 계획](../plan-20261115/PLAN.md) §4, 코드(main 5d69102 + 후속 PR feat/0205-pre8b) |
 | 만든 방법 | 코드와 문서에서만 끌어냈다. 영속 PoC DB(55433)·코디네이터(58090)·비밀·실행 기록은 보지 않았고 아무것도 실행하지 않았다 |
 | 승인 | 이 절차서는 실제 호출·예비 사용·추가 결제를 승인하지 않는다. **[실 시스템 변경]** 표시 단계는 그때마다 사용자의 명시적 승인을 받는다. 예비는 사람(`kind: user`)이 붙이고 **그 건마다 사용자의 승인**을 받는다(사용자 결정 2026-11-17 §4.5). 02-04 남은 5회는 쓰지 않고 유지, 추가 청구 USD 0. 남은 사용자 결정·승인은 §10 |
-| 개정 | PR #83 검토 67b5cae 반영: 세션 id는 새 소문자 UUID(§5·§6), 예비·재시작의 승인 표시(§6·§8), 정지 유예 900초, 778ee47의 멈춤, 준비 절(§1A), 보고 조건, 사용자 결정·승인 목록(§10) |
+| 개정 | PR #83 병합 뒤 검토 8336044 반영(§11): §1A의 순서(등록·의미 검토는 재배포 뒤), 의미 검토 본문, 바인딩은 선택, UUID로 `not_called`된 뒤의 새 시도 id. 그 전 PR #83 검토 67b5cae 반영: 세션 id는 새 소문자 UUID(§5·§6), 예비·재시작의 승인 표시(§6·§8), 정지 유예 900초, 778ee47의 멈춤, 준비 절(§1A), 보고 조건, 사용자 결정·승인 목록(§10) |
 
 표기: **[읽기]** 읽기만 한다(잠금·쓰기 없음). **[실 시스템 변경]** 58090 코디네이터, 55433 영속 DB, 역할 컨테이너·볼륨, 모델 호출 중 하나를 바꾼다. 비밀 값(토큰·자격)은 어느 단계에서도 출력하지 않는다(파일의 존재·이름·종류만 본다).
 
@@ -23,7 +23,7 @@
 3. **새 표가 미리 없음**(55433): `SELECT table_name FROM information_schema.tables WHERE table_name IN ('role_checkpoints','role_tamper_events','role_first_actions','role_session_status','role_deliveries','role_delivery_results','role_takeovers','assignment_run_usage','assignment_limit_events','role_recoveries','role_recovery_uses')` → 0행. 있으면 main이 아닌 빌드가 만든 것이다. 열 정의를 `crates/ieo-coord/src/schema.sql`과 대조하고 사람이 정한다(`migrate`는 `IF NOT EXISTS`라 그 모양을 그대로 둔다).
 4. **바인딩과 sprint 소유**(55433): 비공개 바인딩 파일의 각 repo `sprint_id`에 대해 (a) 두 repo가 같은 id를 대지 않는다, (b) `SELECT 1 FROM notion_imports WHERE test_id = $1` → 0행, (c) `SELECT DISTINCT repo_id FROM sprint_revisions WHERE sprint_id = $1` → 없음 또는 그 repo뿐. 아니면 새 코디네이터가 기동하지 않는다(`check_bindings`).
 5. **대상 repo·역할에 다른 배정의 중앙 체크포인트가 없다**(55433): `SELECT assignment_id, generation, seq, phase FROM role_checkpoints WHERE repo_id = '<repo>' AND role IN ('development','guardrail')` → 0행. 재배포 전에는 이 표가 없어 질의가 “relation does not exist” 오류로 끝난다: **그것이 정상**이다(항목 3과 같은 뜻). 재배포 뒤 §3 항목 5에서 다시 본다.
-6. **sprint revision.** 단계 8 배정이 쓸 sprint revision이 `registration_state = ready`, `review_state = semantic_review_passed`이고 그 `limits`(`elapsed_seconds`·`total_tokens`)가 계획(개발 1,800초·150,000, Guardrail 600초·50,000)을 덮는다: `SELECT sprint_id, revision, repo_id, registration_state, review_state, spec->'limits' FROM sprint_revisions WHERE sprint_id = '<sprint>'`.
+6. **sprint revision**(§1A 항목 4·5 뒤에 확인: 그 revision은 재배포 뒤에 등록된다). 단계 8 배정이 쓸 sprint revision이 `registration_state = ready`, `review_state = semantic_review_passed`이고 그 `limits`(`elapsed_seconds`·`total_tokens`)가 계획(개발 1,800초·150,000, Guardrail 600초·50,000)을 덮는다: `SELECT sprint_id, revision, repo_id, registration_state, review_state, spec->'limits' FROM sprint_revisions WHERE sprint_id = '<sprint>'`.
    - **사용자 결정 필요(이 절차서를 병합할 때 확인).** L01의 **값**은 아직 정해지지 않았다([사용자 결정 2026-11-16](../../../../User_Decisions_2026-11-16_l01-step5.md)은 셈법만 정함). 실제 sprint는 `total_tokens = null`인 draft로 남아 등록 검사 `UNBOUND_DRAFT`가 막는다. 그래서 위 조건을 채우는 sprint revision이 지금은 없을 수 있다. 단계 8 전에 사용자가 (가) 단계 8 전용 sprint revision의 한도 값(예: 계획과 같은 1,800초·150,000 / 600초·50,000)을 L01의 값으로 승인하거나, (나) 다른 방법을 정해야 한다. 이 확인 없이는 §4로 가지 않는다.
 7. **첫 관측.** `first_observation`으로 쓸 stream의 모든 `rate_limit_event`가 `status: allowed`, `overageStatus: rejected`, `isUsingOverage: false`이고, R1을 보낼 때 그 관측이 **7일 이내**다(`OBSERVATION_MAX_AGE_SECONDS`). 아니면 R1은 보류된다. 후보는 가장 새 실제 stream(02-04 실제 회차, 2026-11-15)이다. 그 시각은 장부 담당이 그 stream의 기록으로 확인한다(이 절차서는 실행 기록을 읽지 않았다).
 8. **자격**(재배포 뒤 적용: 새 `tokens.json`은 §1A에서 준비하고 778ee47은 그것을 읽지 못한다. §3 항목 6에서 확인).
@@ -34,12 +34,14 @@
 
 단계 8에 필요하지만 아직 없는 것이다. 각 항목은 사용자의 승인을 받은 뒤에만 한다. 어느 것도 예산을 쓰지 않는다(빠지면 닫는 쪽으로 실패한다).
 
+**순서**(검토 8336044 L-B): 항목 1~3과 6은 재배포 전에 준비한다. 항목 4·5(등록·의미 검토)는 새 `tokens.json`의 주체(`sprints:register`, `review:semantic`)가 필요하므로 **재배포(§2 항목 3) 뒤**에 한다. 지금의 778ee47이 그 범위의 주체를 이미 갖고 있다면 재배포 전에 778ee47에서 해도 된다(두 빌드 모두 이 두 요청을 받는다). 항목 7은 §4 바로 전이다. §1 항목 6의 확인은 항목 4·5 뒤에 한다.
+
 1. **입력 고르기**(사용자 결정, §10 항목 3): repo, `task_id`, `target_sha`(40자 소문자 hex), `branch_ref`(`refs/heads/<이름>`), R1·R2·G1의 짧은 지시 셋(읽기·답하기 수준, GitHub 쓰기 없음).
 2. **새 `tokens.json`** [실 시스템 변경: 파일]. 코디네이터 자격 파일에 주체를 더한다(값이 아니라 SHA-256 digest만 들어간다): 개발·Guardrail supervisor의 `agent` 주체(`checkpoint:report`, `role`, 그 repo), 배정용 `coordinator:assign`, 전달용 `roles:control`(서비스), 증거 입력용 `evidence:ingest`, 예비용 **사람** 주체(`kind: user`, `roles:control`, 그 repo), sprint 등록용 `sprints:register`와 의미 검토용 `review:semantic`(등록자와 **다른 사람**, 정책 G3). 778ee47은 `agent` 주체가 든 이 파일을 읽지 못하므로 새 빌드로 기동할 때(§2.3) 처음 쓴다.
 3. **supervisor 자격 파일** [실 시스템 변경: 파일]. 두 역할 볼륨의 `cred/coordinator_token`(위 `agent` 주체의 토큰 값)과 `cred/adapter.sha256`, 어댑터 토큰 파일. 값은 출력하지 않는다.
-4. **단계 8 sprint revision 등록** [실 시스템 변경: 55433]. L01 값이 정해진 뒤(§1 항목 6의 사용자 결정, §10 항목 1) `POST /v0/sprints?mode=executable`(`sprints:register`, `Idempotency-Key`)로 등록한다. 그 revision의 `limits`는 개발 1,800초·150,000 / Guardrail 600초·50,000을 덮어야 한다.
-5. **의미 검토** [실 시스템 변경: 55433]. 등록자와 다른 사람이 `POST /v0/sprints/{sprint_id}/revisions/{revision}/semantic-review`(`review:semantic`)로 `passed`를 남긴다(정책 G3).
-6. **비공개 바인딩** [실 시스템 변경: 파일]. 그 repo → `sprint_id`를 바인딩 파일에 더한다. §1 항목 4의 질의로 충돌이 없음을 먼저 본다(새 코디네이터는 충돌이 있으면 기동하지 않는다).
+4. **단계 8 sprint revision 등록** [실 시스템 변경: 55433, 재배포 뒤]. L01 값이 정해진 뒤(§1 항목 6의 사용자 결정, §10 항목 1) `POST /v0/sprints?mode=executable`(`sprints:register`, `Idempotency-Key`)로 등록한다. 그 revision의 `limits`는 개발 1,800초·150,000 / Guardrail 600초·50,000을 덮어야 한다.
+5. **의미 검토** [실 시스템 변경: 55433, 재배포 뒤]. 등록자와 다른 사람이 `POST /v0/sprints/{sprint_id}/revisions/{revision}/semantic-review`(`review:semantic`)로 본문 `{"decision": "passed", "reason": "<검토 이유>", "digest": "<그 revision의 저장된 digest>"}`를 보낸다(정책 G3). `digest`는 등록 응답 또는 `SELECT digest FROM sprint_revisions WHERE sprint_id = '<sprint>' AND revision = <rev>`[읽기]의 값이다.
+6. **비공개 바인딩(선택, C2 예약)** [실 시스템 변경: 파일]. 바인딩은 그 `sprint_id`를 그 repo 것으로 **예약**한다(다른 repo가 같은 id를 등록·변환하면 409 `SPRINT_REPO_CONFLICT`). 단계 8에 꼭 필요하지는 않다. 더하면 그 repo → `sprint_id`를 바인딩 파일에 넣고, §1 항목 4의 질의로 충돌이 없음을 먼저 본다(새 코디네이터는 충돌이 있으면 기동하지 않는다).
 7. **현재 배정 head** [읽기, §4 전]. `SELECT repo_id, role, assignment_id, generation FROM assignment_heads WHERE repo_id = '<repo>'` → 없으면 §4의 `expected_current: null`, 있으면 그 값을 `expected_current`로 쓴다(그리고 §1 항목 5·§3 항목 5의 조건을 다시 본다).
 
 ## 2. 재배포 **[실 시스템 변경 — 사용자 승인]**
@@ -48,7 +50,7 @@
 
 1. **58090(778ee47) 멈춤** [실 시스템 변경]. 778ee47에는 신호 처리기가 없다(PID 1이 SIGTERM을 무시). 그래서 `podman stop -t N`은 **N초를 다 기다린 뒤 SIGKILL**한다. 이 멈춤은 §1 항목 2의 (1)~(3)이 참일 때만 안전하다(`ieo-role-call`이 돌지 않고 02-04 `caller.lock`이 비어 있음). 그때는 진행 중인 것이 없으므로 N은 멈춤 시간만 정한다(사용자가 정하는 재배포 시간 창). 새 빌드의 멈춤 규칙(§8)은 이 멈춤에 해당하지 않는다.
 2. **55433 백업** [실 시스템 변경 아님, 그러나 쓰기 공간 필요]. 재배포 전 영속 DB를 백업한다(장부 담당의 기존 절차). `/home`은 쓰지 않는다.
-3. **새 빌드로 58090 기동** [실 시스템 변경: 55433 스키마]. §1A의 새 `tokens.json`, 바인딩, `roles.json`(§3 항목 2)으로. `ieo-coord serve`는 기동 때 `migrate`(schema.sql)를 돈다. 778ee47 뒤 더해진 것: 새 표 11개(§1 항목 3), 열 4개(`assignments.limits`, `role_checkpoints.current_assignment`, `role_first_actions.source`, `role_delivery_results.github`), `evidence.kind`에 `branch_head`(제약을 지우고 다시 만듦), `role_recovery_uses`의 옛 유일 제약 삭제, 새 표마다 추가 전용 트리거. 지우거나 줄이는 것은 없다. 기동 인자에 `--roles <roles.json>`(§3)과 기존 `--tokens`·`--manifest`·`--policy`·`--bindings`.
+3. **새 빌드로 58090 기동** [실 시스템 변경: 55433 스키마]. §1A의 새 `tokens.json`, (선택) 바인딩, `roles.json`(§3 항목 2)으로. 기동과 §3 항목 1의 확인 뒤 §1A 항목 4·5(등록·의미 검토)를 하고 §1 항목 6을 확인한다. `ieo-coord serve`는 기동 때 `migrate`(schema.sql)를 돈다. 778ee47 뒤 더해진 것: 새 표 11개(§1 항목 3), 열 4개(`assignments.limits`, `role_checkpoints.current_assignment`, `role_first_actions.source`, `role_delivery_results.github`), `evidence.kind`에 `branch_head`(제약을 지우고 다시 만듦), `role_recovery_uses`의 옛 유일 제약 삭제, 새 표마다 추가 전용 트리거. 지우거나 줄이는 것은 없다. 기동 인자에 `--roles <roles.json>`(§3)과 기존 `--tokens`·`--manifest`·`--policy`·`--bindings`.
 4. **`ieo-role-call` 교체** [실 시스템 변경 아님]. 호스트의 `ieo-role-call`도 같은 병합 SHA 빌드로 바꾼다(단계 8에서는 쓰지 않는다. §3 항목 4).
 
 ## 3. 재배포 뒤 확인과 설정
@@ -73,7 +75,7 @@
 ## 5. 회차 요청 **[실 시스템 변경 — 모델 호출, 사용자 승인]**
 
 모든 전달: `POST /v0/repos/<repo>/roles/<role>/deliveries`, `roles:control` 자격.
-- **`session_id`는 회차마다 새 소문자 UUID**다(예: `uuidgen | tr A-Z a-z` 또는 `cat /proc/sys/kernel/random/uuid`). R1, R2, G1, 예비가 모두 다르다. 보내기 전에 `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`인지 본다. start는 `claude --session-id <id>`가 되고 CLI는 UUID만 받는다(아니면 곧 실패해 미계측이 되고 예비로도 풀 수 없다). 코디네이터도 start의 비-UUID를 `not_called`로 막는다(PR #83 검토 67b5cae M-1).
+- **`session_id`는 회차마다 새 소문자 UUID**다(예: `uuidgen | tr A-Z a-z` 또는 `cat /proc/sys/kernel/random/uuid`). R1, R2, G1, 예비가 모두 다르다. 보내기 전에 `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`인지 본다. start는 `claude --session-id <id>`가 되고 CLI는 UUID만 받는다(아니면 곧 실패해 미계측이 되고 예비로도 풀 수 없다). 코디네이터도 start의 비-UUID를 `not_called`로 막는다(PR #83 검토 67b5cae M-1). 그렇게 `not_called`된 전달의 시도 id는 쓰인 것이다: 고친 뒤에는 **새 `attempt_id`와 새 멱등 키**로 보낸다(검토 8336044 I-C).
 - **`Idempotency-Key`**: 8~128바이트, 회차마다 새 키. 전달은 진행 창(120초)까지 걸릴 수 있으니 클라이언트 시간 제한은 150초 이상으로 둔다. 시간이 넘으면 **같은 키·같은 본문으로** 다시 보낸다(새 키는 두 번째 전달이 된다).
 - **토큰을 출력하지 않고 보내기**: `curl -sS -H @<(printf 'Authorization: Bearer %s\n' "$(cat <토큰 파일>)") -H 'Content-Type: application/json' -H 'Idempotency-Key: <키>' --data @<본문 파일> --max-time 150 <url>`(토큰이 명령줄·화면·셸 기록에 남지 않는다). 본문 키는 `assignment_id`·`generation`·`attempt_id`·`session_id`·`prompt`(그리고 선택 `logical_name`·`new_session`·`recovery_id`·`spare`)뿐이다. 지시(`prompt`)는 **읽기·답하기 수준으로 짧게**: 가드가 멈춘 회차(시간·토큰 상한, overage)는 미계측이 되고 예비로 풀 수 없다. GitHub 쓰기·push·PR 없음.
 
@@ -138,7 +140,6 @@ R1 또는 R2가 실패했을 때만 본다(G1은 예비가 없다).
 - 예비의 전제(§6 항목 2)가 아님, 또는 원인이 실행 환경 결함이 아님.
 - 장부에 `inflight.json`이 남음, 장부와 연결 조회가 다름(`ledger_mismatch`), 첫 행동이 연결되지 않음(409 `CHECKPOINT_MISMATCH`).
 - 비밀이 출력되었거나 자격이 맞지 않음.
-
 - 확인되지 않은 외부 효과(`pending_external_requests`가 비어 있지 않음).
 
 보고에 넣을 것: 회차마다 전달 id·판단·결과, 장부 기록(사용량 네 항목, 시간, `stop_required`·`stop_reason`), 연결 조회(takeover·첫 행동·체크포인트), 예비를 썼으면 표식 전체와 사용자의 건별 승인, 누적 사용량과 남은 예산, 추가 청구 0 근거(관측). **미계측 회차는 미계측으로 적는다(0으로 적지 않는다).**
@@ -153,3 +154,13 @@ R1 또는 R2가 실패했을 때만 본다(G1은 예비가 없다).
 4. **관측 마감**(§1 항목 7): 첫 관측이 2026-11-15의 02-04 stream이면 R1은 그 `observed_unix`부터 7일 안(2026-11-22경)에 보내야 한다. 그 뒤에는 새 무추가청구 관측을 얻는 방법을 사용자가 정한다(실제 stream만이 출처다).
 5. **예비의 사람과 건별 승인**(§6): `kind: user` 자격을 가진 사람. 실패가 생기면 원인 보고, `replaces` 시도, 연산(R2는 reconnect 또는 `new_session: true`, 검토 67b5cae L-5)의 건별 승인.
 6. **각 [실 시스템 변경] 단계의 승인**: 재배포 시간 창(778ee47 멈춤 포함, §2.1), 백업을 뜬 뒤의 55433 마이그레이션(백업 위치는 `/home`이 아님), 새 `tokens.json`·`roles.json`·역할 컨테이너와 볼륨, R1·R2·G1 각각.
+
+## 11. 병합 뒤 정정(PR #83 검토 8336044)
+
+| 항목 | 처분 |
+| --- | --- |
+| L-B(§1A 항목 4·5의 순서와 본문) | 정정. 등록·의미 검토는 새 `tokens.json`의 주체가 필요하므로 재배포 뒤(§1A 순서 문단, §2 항목 3). §1 항목 6의 확인은 그 뒤. 의미 검토 본문 `{decision, reason, digest}`. 바인딩(§1A 항목 6)은 선택(C2 예약) |
+| I-C(UUID로 `not_called`된 뒤) | 정정. 고친 뒤에는 새 `attempt_id`·새 멱등 키(§5) |
+| I-E(§9 목록의 빈 줄) | 정정 |
+| L-A, I-A, I-B, I-F(코드) | 후속 PR feat/0205-pre8c(79bf6a3). 멈춤 다시 보기를 복구 승인의 사용 앞으로 옮겨 멈춤이 승인을 쓰지 않는다. 새 `not_called`에는 `op`가 없다. 재개는 비-UUID 세션으로도 그대로임을 시험. 두 멈춤 기다림이 멈춤 시각부터 세어 합쳐 한 한도를 넘지 않는다. 운영 절차는 바뀌지 않는다(`podman stop -t 900`) |
+| main CI 44003424073 조사(코드) | 후속 PR feat/0205-pre8c(7519738). 코디네이터의 gRPC 쪽이 멈춤 뒤 열린 연결을 끝없이 기다리던 것을, 진행 중 호출의 가장 긴 마감(16초)까지만 기다리게 고쳤다. `--grpc-listen`에 클라이언트가 붙어 있어도 §8의 멈춤은 진행 중 회차를 기다린 뒤 스스로 끝난다. `podman stop -t 900`은 그대로(16초는 그 안에 든다). 재시작 뒤 이전 프로세스가 포트·DB를 쥐고 남는 경로는 없다 |

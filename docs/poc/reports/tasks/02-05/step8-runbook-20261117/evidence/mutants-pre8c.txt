@@ -1,0 +1,21 @@
+# 02-05 pre-step-8c mutants (PR #83 review 8336044 L-A, I-A, I-B, I-F; the gRPC stop bound found with main CI 44003424073; earlier R, Q, U re-run): each applied alone to the code of 7519738 (W*, U*, R*, Q1-Q3, G*: Q6 and W/U/R on 79bf6a3, whose code for them is unchanged), then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). G1-G2: the gRPC stop waits only for calls in progress. Columns: id | mutation | result | target: failing tests
+R1 | the default wait is the old 720 s (one margin) | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+R2 | a run with a longer bound does not extend the wait | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+R3 | a run's bound has one margin only | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+R4 | a delivery is not counted before the stop check (L-4) | SURVIVED (not deterministic: needs a delivery between the stop check and the signal; the re-check before the call (W1) and the second wait cover the same run)
+Q1 | a stopping coordinator still takes deliveries | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q2 | the stop does not wait for the runs being finished | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q3 | an accepted run is not counted as being finished | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q6 | wait_finishing returns at once | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+U1 | a start with a non-UUID session is called | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+U2 | an uppercase UUID passes | KILLED | ieo-coord --lib a_start_session: delivery::tests::a_start_session_is_a_lowercase_uuid
+U4 | the wait ignores the latest counted bound (L-1) | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+U5 | a later, shorter run lowers the latest bound (mutation A) | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+W1 | the stop re-check before the call is removed (L-A position) | SURVIVED (not deterministic: needs the signal between the first stop check and the re-check; fails closed (the review probe); now placed before the recovery use (L-A))
+W2 | the waits do not count from the stop (I-F) | KILLED | ieo-coord --lib the_shutdown_waits_count: delivery::tests::the_shutdown_waits_count_from_the_stop
+W3 | a second signal moves the stop time (I-F) | KILLED | ieo-coord --lib the_shutdown_waits_count: delivery::tests::the_shutdown_waits_count_from_the_stop
+W4 | a reconnect needs a UUID too (I-B, V4) | KILLED | ieo-coord --test delivery_e2e: deliveries_go_through_compare_budget_and_the_supervisor; deliveries_go_through_compare_budget_and_the_supervisor_over_grpc
+W5 | the non-UUID not_called keeps its op (I-A) | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+G1 | the gRPC stop waits for open connections again (no bound) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
+G2 | the gRPC stop grace is shorter than a call deadline | SURVIVED (no test keeps a gRPC call in progress across a stop; the bound itself is tested by G1)
+# 16 of 19 killed; R4, W1 and G2 survive (see their lines)

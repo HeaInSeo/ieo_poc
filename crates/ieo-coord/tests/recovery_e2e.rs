@@ -88,34 +88,55 @@ struct Coord {
 
 impl Coord {
     fn start(&mut self) {
-        let child = Command::new(env!("CARGO_BIN_EXE_ieo-coord"))
+        // the coordinator's stderr is kept (appended across restarts) and shown when it does not
+        // start (main CI ad96116: "the coordinator did not start" without a reason)
+        let log = std::env::temp_dir().join(format!(
+            "ieo-rcv-coord-{}-{}.log",
+            self.port,
+            std::process::id()
+        ));
+        let err = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log)
+            .expect("coordinator log");
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ieo-coord"))
             .args(&self.args)
             .env("IEO_DB_URL", &self.db_url)
-            .stderr(std::process::Stdio::null())
+            .stderr(err)
             .spawn()
             .expect("spawn coordinator");
-        self.child = Some(child);
         let t0 = Instant::now();
         while http(self.port, None, None, "GET", "/v0/health", None).map(|r| r.0) != Some(200) {
+            let exited = child.try_wait().ok().flatten();
             assert!(
-                t0.elapsed() < Duration::from_secs(20),
-                "the coordinator did not start"
+                t0.elapsed() < Duration::from_secs(20) && exited.is_none(),
+                "the coordinator did not start (exit {exited:?}): {}",
+                std::fs::read_to_string(&log).unwrap_or_default()
             );
             std::thread::sleep(Duration::from_millis(100));
         }
+        self.child = Some(child);
     }
-    fn stop(&mut self) {
-        if let Some(mut c) = self.child.take() {
-            let _ = Command::new("kill")
-                .args(["-TERM", &c.id().to_string()])
-                .status();
-            let t0 = Instant::now();
-            while c.try_wait().ok().flatten().is_none() {
-                if t0.elapsed() > Duration::from_secs(10) {
-                    let _ = c.kill();
-                }
-                std::thread::sleep(Duration::from_millis(50));
+    /// SIGTERM, then SIGKILL after 30 s; whether it exited by itself with status 0.
+    fn stop(&mut self) -> bool {
+        let Some(mut c) = self.child.take() else {
+            return true;
+        };
+        let _ = Command::new("kill")
+            .args(["-TERM", &c.id().to_string()])
+            .status();
+        let t0 = Instant::now();
+        let mut killed = false;
+        loop {
+            if let Some(st) = c.try_wait().ok().flatten() {
+                return !killed && st.success();
             }
+            if t0.elapsed() > Duration::from_secs(30) && !killed {
+                let _ = c.kill();
+                killed = true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
         }
     }
 }
@@ -303,11 +324,23 @@ fn a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc() {
     e2e("grpc");
 }
 
+/// A free port **below the ephemeral range** (02-05 pre-step-8c): a port taken by binding port 0
+/// is an ephemeral port, and between this check and the coordinator's own bind the system may
+/// hand it out as the local port of an outgoing connection (to PostgreSQL, to a role service),
+/// so the coordinator cannot bind it and never answers (main CI 44003424073: "the coordinator
+/// did not start" at its first start). Ports from 20000-32767 are never given to outgoing
+/// connections; the pick is spread by process and call and checked by binding.
 fn free_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .and_then(|l| l.local_addr())
-        .expect("port")
-        .port()
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    for _ in 0..1000 {
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let p = 20_000 + (std::process::id().wrapping_mul(7919).wrapping_add(n * 131)) % 12_768;
+        let p = u16::try_from(p).expect("port");
+        if std::net::TcpListener::bind(("127.0.0.1", p)).is_ok() {
+            return p;
+        }
+    }
+    panic!("no free port below the ephemeral range");
 }
 
 fn unix_now() -> u64 {
@@ -1341,7 +1374,16 @@ fn e2e(transport: &str) {
     assert_eq!(st, 200, "{r8}");
     assert_eq!(r8["result"]["outcome"], "accepted", "{r8}");
     assert_eq!(r8["result"]["requeried"], true, "{r8}");
-    coord.stop();
+    // SIGTERM ends the coordinator by itself (exit 0) even with the supervisor's gRPC connection
+    // open: the gRPC side waits only for calls in progress (stop_grace), not for idle
+    // connections (02-05 pre-step-8c; before, the stop waited until SIGKILL)
+    let t0 = Instant::now();
+    assert!(coord.stop(), "the coordinator exits by itself on SIGTERM");
+    assert!(
+        t0.elapsed()
+            < ieo_coord::grpc::stop_grace(Duration::from_secs(15)) + Duration::from_secs(5),
+        "within the gRPC stop grace"
+    );
     coord.start();
     {
         // the role process restarts on the same volume

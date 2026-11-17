@@ -585,7 +585,7 @@ async fn db_healthy(pool: &Pool, app: &Arc<App>, limit: Duration) -> bool {
 /// A running gRPC server. Dropping it (or [`GrpcServer::stop`]) shuts it down.
 pub struct GrpcServer {
     pub addr: SocketAddr,
-    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
+    shutdown: Option<tokio::sync::watch::Sender<bool>>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -614,7 +614,11 @@ impl GrpcServer {
             .local_addr()
             .map_err(|e| format!("grpc listen {listen}: {e}"))?;
         let (reporter, health) = tonic_health::server::health_reporter();
-        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        // after the stop, calls in progress get their longest deadline; then the server is dropped
+        // even if a client keeps a connection or a stream open (02-05 pre-step-8c: a connected
+        // supervisor's idle HTTP/2 connection kept the graceful stop waiting until SIGKILL)
+        let grace = stop_grace(cfg.max_deadline);
         let svc = Coordinator {
             app: Arc::clone(&app),
             pool: Arc::clone(&pool),
@@ -639,14 +643,28 @@ impl GrpcServer {
                 let server = SupervisorServiceServer::new(svc)
                     .max_decoding_message_size(ieo_proto::MAX_MESSAGE)
                     .max_encoding_message_size(ieo_proto::MAX_MESSAGE);
-                let r = tonic::transport::Server::builder()
+                let mut graceful = rx.clone();
+                let mut bounded = rx;
+                let serving = tonic::transport::Server::builder()
                     .timeout(cfg.max_deadline + TRANSPORT_SLACK)
                     .add_service(health)
                     .add_service(server)
-                    .serve_with_incoming_shutdown(incoming, async {
-                        let _ = rx.await;
-                    })
-                    .await;
+                    .serve_with_incoming_shutdown(incoming, async move {
+                        let _ = graceful.wait_for(|stop| *stop).await;
+                    });
+                let r = tokio::select! {
+                    r = serving => r,
+                    () = async move {
+                        let _ = bounded.wait_for(|stop| *stop).await;
+                        tokio::time::sleep(grace).await;
+                    } => {
+                        eprintln!(
+                            "ieo-coord grpc: stopped after {} s with connections still open",
+                            grace.as_secs()
+                        );
+                        Ok(())
+                    }
+                };
                 if let Err(e) = r {
                     eprintln!("ieo-coord grpc: {e}");
                 }
@@ -668,7 +686,7 @@ impl GrpcServer {
 
     fn shut(&mut self) {
         if let Some(tx) = self.shutdown.take() {
-            let _ = tx.send(());
+            let _ = tx.send(true);
         }
         if let Some(t) = self.thread.take() {
             let _ = t.join();
@@ -680,6 +698,12 @@ impl Drop for GrpcServer {
     fn drop(&mut self) {
         self.shut();
     }
+}
+
+/// How long a stopping gRPC server waits for calls in progress: the longest call deadline plus
+/// the transport slack. Open connections or streams past that do not keep the process alive.
+pub fn stop_grace(max_deadline: Duration) -> Duration {
+    max_deadline + TRANSPORT_SLACK
 }
 
 async fn set_health(r: &tonic_health::server::HealthReporter, names: &[&str], ok: bool) {
