@@ -1,6 +1,6 @@
-# 02-05 step 8 RESUME dry run (fake claude, test PostgreSQL 55432/ieo_t_s8res_3266701, test coordinator 127.0.0.1:58290, roles 58231/58232, no model call) · 2026-11-17T14:47:11Z
-# branch 662e952 · old (46799b0) supervisor 5fca01584a09 coordinator d6a742145ea1 · new supervisor 9f91a3d8d060 coordinator b605836b3520
-PASS test database ieo_t_s8res_3266701 created on 55432
+# 02-05 step 8 RESUME dry run (fake claude, test PostgreSQL 55432/ieo_t_s8res_3314563, test coordinator 127.0.0.1:58290, roles 58231/58232, no model call) · 2026-11-17T15:09:38Z
+# branch 5327610 · old (46799b0) supervisor 5fca01584a09 coordinator d6a742145ea1 · new supervisor e84edced10de coordinator 3d3e539b37ce
+PASS test database ieo_t_s8res_3314563 created on 55432
 # role containers up: ieo-s8dry-ieo-poc-test-{development,guardrail} on 127.0.0.1:58231/58232 · image docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c · network slirp4netns:allow_host_loopback=true · coordinator http://10.0.2.2:58290
 # target https://github.com/HeaInSeo/ieo_poc_test @ 2ab9d8760012516f37674a9446ca2fb2699973c0 (read-only copies) · credentials: OAuth form (values not printed) · roles entry: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8res-dry/run/roles-entry.json
 PASS old (46799b0) role supervisors up (run-step8-roles.sh)
