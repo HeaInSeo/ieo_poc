@@ -7,10 +7,12 @@
 #       (0600, only when those hold) at $D/ledger-0205-obs/D6.jsonl (an existing copy must be identical) and prints its SHA-256.
 #   [2] nothing of 02-04 in flight: no inflight.json, no process holding caller.lock, no ieo-role-call.
 #   [3] the database of the captured coordinator (after `coord-switch.sh capture`): user, dbname,
-#       host and port of IEO_DB_URL from $D/private/s8/coord-778ee47/env0. Never the password.
+#       host and port of IEO_DB_URL from $D/private/s8/coord-778ee47/env0. Never the password (on a
+#       parse error only the exception type).
 #   [4] the role workdir (after run-step8-roles.sh): exactly one /opt/rust/ieo_poc_runs/02-05-s8-*
-#       with roles-entry.json; installs adapter.header (0600) and roles-entry.json (0644) into
-#       $D/private/s8/ (existing copies must be identical). The adapter token stays in the workdir
+#       with roles-entry.json; when both roles point at W/adapter.token and the header has its form,
+#       installs adapter.header (0600) and roles-entry.json (0644) into $D/private/s8/ (existing
+#       copies must be identical). The adapter token stays in the workdir
 #       (the coordinator reads it there).
 # [3] and [4] are skipped (not failed) before their step. Prints counts, True/False, names, paths
 # and SHA-256 of non-secret files only: no token, credential, password or environment value.
@@ -83,18 +85,21 @@ if [ ! -e "$E" ]; then
 else
   python3 -I - "$E" <<'PY' || fail "IEO_DB_URL in $E"
 import sys, urllib.parse
-env = dict(kv.split("=", 1) for kv in open(sys.argv[1], "rb").read().decode(errors="replace").split("\0") if "=" in kv)
-u = env.get("IEO_DB_URL")
-if not u:
-    print("  IEO_DB_URL present: False"); sys.exit(1)
-if "://" in u:
-    p = urllib.parse.urlparse(u)
-    print("  form url; user", p.username, "dbname", p.path.lstrip("/"), "host", p.hostname, "port", p.port,
-          "; password set:", p.password is not None)
-else:
-    kv = dict(x.split("=", 1) for x in u.split() if "=" in x)
-    print("  form key=value; user", kv.get("user"), "dbname", kv.get("dbname"), "host", kv.get("host"),
-          "port", kv.get("port"), "; password set:", "password" in kv)
+# on any parse error only the exception type is printed: a message could quote part of the value
+try:
+    env = dict(kv.split("=", 1) for kv in open(sys.argv[1], "rb").read().decode(errors="replace").split("\0") if "=" in kv)
+    u = env.get("IEO_DB_URL")
+    if not u:
+        print("  IEO_DB_URL present: False"); sys.exit(1)
+    if "://" in u:
+        p = urllib.parse.urlparse(u)
+        f = ("url", p.username, p.path.lstrip("/"), p.hostname, p.port, p.password is not None)
+    else:
+        kv = dict(x.split("=", 1) for x in u.split() if "=" in x)
+        f = ("key=value", kv.get("user"), kv.get("dbname"), kv.get("host"), kv.get("port"), "password" in kv)
+except Exception as e:
+    print("  IEO_DB_URL not parseable:", type(e).__name__); sys.exit(1)
+print("  form %s; user %s dbname %s host %s port %s ; password set: %s" % f)
 PY
 fi
 
@@ -106,22 +111,29 @@ elif [ "${#entries[@]}" -gt 1 ]; then
   fail "more than one role workdir: ${entries[*]}"
 else
   W=$(dirname "${entries[0]}"); echo "  W=$W"
-  python3 -I - "$W" <<'PY' || fail "roles-entry.json or adapter.header of $W"
+  if python3 -I - "$W" <<'PY'
 import json, re, sys
 w = sys.argv[1]
-e = json.load(open(f"{w}/roles-entry.json"))
+try:
+    e = json.load(open(f"{w}/roles-entry.json"))
+    h = open(f"{w}/adapter.header").read()
+except Exception as x:
+    print("  roles-entry.json or adapter.header not readable:", type(x).__name__); sys.exit(1)
 ok = set(e) == {"development", "guardrail"} and all(e[r].get("adapter_token_file") == f"{w}/adapter.token" for r in e)
 print("  roles", sorted(e), "; quota_group_id", {r: e[r].get("quota_group_id") for r in sorted(e)},
       "; adapter_token_file in W:", ok)
-h = open(f"{w}/adapter.header").read()
 form = re.fullmatch(r"Authorization: Bearer [0-9a-f]{48}\n", h) is not None
 print("  adapter.header form ok:", form)
 sys.exit(0 if ok and form else 1)
 PY
-  mkdir -p -m 700 "$D/private/s8"
-  put "$W/adapter.header" "$D/private/s8/adapter.header" 0600
-  put "$W/roles-entry.json" "$D/private/s8/roles-entry.json" 0644
-  echo "  sha256 $(sha256sum < "$D/private/s8/roles-entry.json" | cut -c1-64) $D/private/s8/roles-entry.json"
+  then
+    mkdir -p -m 700 "$D/private/s8"
+    put "$W/adapter.header" "$D/private/s8/adapter.header" 0600
+    put "$W/roles-entry.json" "$D/private/s8/roles-entry.json" 0644
+    echo "  sha256 $(sha256sum < "$D/private/s8/roles-entry.json" | cut -c1-64) $D/private/s8/roles-entry.json"
+  else
+    fail "roles-entry.json or adapter.header of $W (nothing installed)"
+  fi
 fi
 
 if [ "$fails" -eq 0 ]; then echo "## obs-check: PASS"; exit 0; fi
