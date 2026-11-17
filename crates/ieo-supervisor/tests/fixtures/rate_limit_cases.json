@@ -1,0 +1,569 @@
+[
+ {
+  "name": "s8-r1 real event (CLI 2.1.322, 2026-11-17)",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1795334400,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "unifiedWindows": {
+     "five_hour": {
+      "utilization": 0.04,
+      "resetsAt": 1794933000,
+      "status": "allowed"
+     },
+     "seven_day": {
+      "utilization": 0.86,
+      "resetsAt": 1795334400,
+      "status": "allowed_warning",
+      "surpassedThreshold": 0.75
+     }
+    }
+   },
+   "uuid": "b59d8029-33b1-4ab5-87b1-fbff93a3a04d",
+   "session_id": "5c991c71-b6e2-4cfb-bd76-6bb18a36e090"
+  },
+  "expected": "warning"
+ },
+ {
+  "name": "allowed, overage off",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed",
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false
+   }
+  },
+  "expected": "allowed"
+ },
+ {
+  "name": "allowed_warning, overage off, no windows",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "warning"
+ },
+ {
+  "name": "allowed with a window in allowed_warning",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed",
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "unifiedWindows": {
+     "five_hour": {
+      "utilization": 0.1,
+      "resetsAt": 1,
+      "status": "allowed"
+     },
+     "seven_day": {
+      "utilization": 0.8,
+      "resetsAt": 2,
+      "status": "allowed_warning",
+      "surpassedThreshold": 0.75
+     }
+    }
+   }
+  },
+  "expected": "warning"
+ },
+ {
+  "name": "allowed with every window allowed",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed",
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "unifiedWindows": {
+     "five_hour": {
+      "utilization": 0.1,
+      "resetsAt": 1,
+      "status": "allowed"
+     }
+    }
+   }
+  },
+  "expected": "allowed"
+ },
+ {
+  "name": "status rejected",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "rejected",
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "status missing",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "status unknown value",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "blocked",
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "status not a string",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": 1,
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, overageStatus missing",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, overageStatus allowed",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "allowed",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, overageStatus allowed_warning",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "allowed_warning",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, isUsingOverage missing",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, isUsingOverage true",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": true,
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, isUsingOverage a string",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": "false",
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, overageInUse true",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "overageInUse": true
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, overageInUse false",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "overageInUse": false
+   }
+  },
+  "expected": "warning"
+ },
+ {
+  "name": "warning, overageEnabled true (usage credits on)",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "overageEnabled": true
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "warning, overageEnabled false",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "overageEnabled": false
+   }
+  },
+  "expected": "warning"
+ },
+ {
+  "name": "warning, overageEnabled not a boolean",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "overageEnabled": "yes"
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "errorCode credits_required",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed",
+    "resetsAt": 1794933000,
+    "rateLimitType": "five_hour",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "errorCode": "credits_required"
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "rateLimitType overage",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "overage",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "rateLimitType seven_day_overage_included",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day_overage_included",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "rateLimitType unknown",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed",
+    "resetsAt": 1794933000,
+    "rateLimitType": "monthly",
+    "utilization": 0.04,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "unifiedWindows not an object",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "unifiedWindows": []
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "a window rejected under a top-level warning",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "unifiedWindows": {
+     "five_hour": {
+      "utilization": 1.0,
+      "resetsAt": 1,
+      "status": "rejected",
+      "surpassedThreshold": 1
+     },
+     "seven_day": {
+      "utilization": 0.86,
+      "resetsAt": 2,
+      "status": "allowed_warning"
+     }
+    }
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "a window without a status",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "unifiedWindows": {
+     "seven_day": {
+      "utilization": 0.86,
+      "resetsAt": 2
+     }
+    }
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "a window with an unknown status",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "unifiedWindows": {
+     "seven_day": {
+      "utilization": 0.86,
+      "resetsAt": 2,
+      "status": "throttled"
+     }
+    }
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "a window that is not an object",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": {
+    "status": "allowed_warning",
+    "resetsAt": 1794933000,
+    "rateLimitType": "seven_day",
+    "utilization": 0.86,
+    "overageStatus": "rejected",
+    "overageDisabledReason": "out_of_credits",
+    "isUsingOverage": false,
+    "surpassedThreshold": 0.75,
+    "unifiedWindows": {
+     "seven_day": "allowed"
+    }
+   }
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "rate_limit_info missing",
+  "event": {
+   "type": "rate_limit_event"
+  },
+  "expected": "stop"
+ },
+ {
+  "name": "rate_limit_info not an object",
+  "event": {
+   "type": "rate_limit_event",
+   "rate_limit_info": "allowed"
+  },
+  "expected": "stop"
+ }
+]

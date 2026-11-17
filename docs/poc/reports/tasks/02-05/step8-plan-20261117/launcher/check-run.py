@@ -5,11 +5,22 @@ check-run.py --g1-prompt <ledger dir> <G1 head file> <out file>     the numbered
 
 Reads only the 02-05 ledger (records and the run streams the caller kept), the answers run-step8.sh
 saved (role status, coordinator role status, chain) and prints no credential.
+
+Rate-limit events are judged by rate_limit_policy.py, the same rule as the supervisor (user decision
+2026-11-17, warning): allowed_warning with paid extra usage off passes and is printed as WARNING.
 """
+import importlib.util
 import json
 import math
 import os
 import sys
+
+# the no-extra-billing rule shared with the supervisor (decision 2026-11-17, warning); loaded by
+# absolute path because python3 -I keeps the script's directory off sys.path
+_spec = importlib.util.spec_from_file_location(
+    "rate_limit_policy", os.path.join(os.path.dirname(os.path.abspath(__file__)), "rate_limit_policy.py"))
+policy = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(policy)
 
 CAPS = {"runs": 4, "seconds": 2400, "billable": 200_000, "cache_read": 2_000_000}  # BUDGET_0205
 SHARES = {"development": {"runs": 3, "seconds": 1800, "billable": 150_000, "cache_read": 1_500_000},
@@ -89,19 +100,23 @@ def check(ledger, out, att, role, aid):
     env = (r.get("outcome") or {}).get("env_names") or []
     if "CLAUDE_CODE_OAUTH_TOKEN" not in env or any(n.startswith("ANTHROPIC_") for n in env):
         bad.append(f"environment not subscription-only: {env}")
-    signals, offered, used = [], None, []
+    offered, used = None, []
+    with open(r["stream"]["path"]) as f:
+        verdicts = policy.stream_verdicts(f.read().splitlines())
     for e in events(r["stream"]["path"]):
-        if e.get("type") == "rate_limit_event":
-            signals.append(e.get("rate_limit_info") or {})
         if e.get("type") == "system" and e.get("subtype") == "init":
             offered = set(e.get("tools") or [])
         if e.get("type") == "assistant":
             for c in (e.get("message") or {}).get("content") or []:
                 if isinstance(c, dict) and c.get("type") == "tool_use":
                     used.append(c.get("name"))
-    if not signals or any(s.get("status") != "allowed" or s.get("overageStatus") != "rejected"
-                          or s.get("isUsingOverage") is not False for s in signals):
-        bad.append(f"rate-limit signals not all allowed/rejected/false: {signals}")
+    # every event is judged; a warning never clears a stop (no later event overrides one)
+    if not verdicts:
+        bad.append("no rate_limit_event in this run (the no-extra-billing condition is unconfirmed)")
+    warnings = [v[1] for _, v in verdicts if v[0] == "warning"]
+    bad += [f"rate-limit signal line {n}: {v[1]}" for n, v in verdicts if v[0] == "stop"]
+    if (r.get("rate_limit_warnings") or []) != warnings:
+        bad.append(f"the record's rate_limit_warnings {r.get('rate_limit_warnings')} differ from the stream's {warnings}")
     if offered is None:
         bad.append("no init event")
     elif not offered <= OFFERED[role]:
@@ -144,9 +159,18 @@ def check(ledger, out, att, role, aid):
         bad.append(f"chain: the delivery of {att} is not taken over with a first action: {link}")
     if os.path.exists(os.path.join(ledger, "inflight.json")):
         bad.append("in-flight marker left")
-    b, c = tokens(r)
-    print(f"{att}: measured, {math.ceil((r.get('duration_ms') or 0) / 1000)} s, billable {b}, cache_read {c}, "
-          f"tools offered {sorted(offered or [])}, used {used}; totals {total}")
+    # the run's own state, never "measured" for an unmeasured run (R1 2026-11-17 printed it)
+    if run.get("state") == "measured":
+        b, c = tokens(r)
+        usage = f"measured, billable {b}, cache_read {c}"
+    else:
+        o = (r.get("outcome") or {}).get("observed") or {}
+        usage = (f"{run.get('state')} (observed lower bound billable {o.get('billable_lower_bound')}, "
+                 f"cache_read {o.get('cache_read_lower_bound')}; not a total)")
+    print(f"{att}: {usage}, {math.ceil((r.get('duration_ms') or 0) / 1000)} s, "
+          f"tools offered {sorted(offered or [])}, used {used}; measured totals {total}")
+    for w in warnings:
+        print(f"WARNING {att}: {w}")
     for m in bad:
         print(f"CHECK FAILED {att}: {m}")
     return 1 if bad else 0

@@ -18,14 +18,18 @@
 //! after the request that crossed the room (see its limits).
 //!
 //! **Extra billing.** Only subscription usage is allowed (additional charge USD 0). The CLI's
-//! `total_cost_usd` is a conversion estimate, not a bill, and is never capped at 0. The CLI
-//! (2.1.322) types `overageStatus` as `allowed | allowed_warning | rejected`, where the first
-//! two mean paid extra usage covers the overflow. A run may start only when **every**
-//! `rate_limit_event` of the latest observed stream shows `overageStatus: "rejected"`,
-//! `isUsingOverage: false` and `status: "allowed"`, and that observation is not older than
-//! [`OBSERVATION_MAX_AGE_SECONDS`]. Otherwise that call is held with the reason. During a
-//! run, [`stream_stop`] tells the adapter to stop the process on the first event that breaks
-//! the condition.
+//! `total_cost_usd` is a conversion estimate, not a bill, and is never capped at 0. One rule
+//! ([`rate_limit_verdict`], user decision 2026-11-17 on `allowed_warning`,
+//! `docs/poc/User_Decisions_2026-11-17_warning.md`) judges every `rate_limit_event` on every
+//! path: before a call ([`observation_check`], every event of the latest observed stream, not
+//! older than [`OBSERVATION_MAX_AGE_SECONDS`]), during a run ([`stream_stop`]: the adapter stops
+//! the process on the first event that is a stop) and after it (the caller's record). An event
+//! passes only when the subscription status is `allowed` or `allowed_warning` **and** paid extra
+//! usage is shown off (`overageStatus: "rejected"` and `isUsingOverage: false`, both present);
+//! `allowed_warning` passes as a recorded warning ([`rate_limit_warning`]). Anything else is a
+//! stop, and a later event never clears an earlier stop. The CLI (2.1.322) types `status`,
+//! `overageStatus` and each window's status as `allowed | allowed_warning | rejected`; for
+//! `overageStatus` the first two mean paid extra usage covers the overflow.
 
 use serde_json::Value;
 
@@ -258,28 +262,174 @@ pub fn rate_limit_events(stream: &str) -> Result<Vec<Value>, String> {
     Ok(out)
 }
 
-/// No-extra-billing condition for one event.
-pub fn overage_check(event: &Value) -> Result<(), String> {
+/// How one `rate_limit_event` is judged (the same on every path).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RateLimitVerdict {
+    /// Subscription usage allowed, paid extra usage off.
+    Allowed,
+    /// Allowed, paid extra usage off, but a warning threshold is passed: go on, record it.
+    Warning(String),
+    /// Stop (before a call: hold it; during a run: stop the process; after: stop the budget).
+    Stop(String),
+}
+
+const LIMIT_STATUS: [&str; 3] = ["allowed", "allowed_warning", "rejected"];
+const RATE_LIMIT_TYPES: [&str; 6] = [
+    "five_hour",
+    "seven_day",
+    "seven_day_opus",
+    "seven_day_sonnet",
+    "seven_day_overage_included",
+    "overage",
+];
+
+/// The no-extra-billing rule for one `rate_limit_event` (user decision 2026-11-17, warning).
+///
+/// Stop when any of these holds, checked in this order (the first one is the reason):
+/// * the event has no `rate_limit_info` object, or `status` is missing or not one of
+///   `allowed | allowed_warning | rejected` (unknown);
+/// * `status` is `rejected` (the subscription refuses requests);
+/// * `overageStatus` is not the string `rejected` (missing: unconfirmed; `allowed` or
+///   `allowed_warning`: paid extra usage would cover the overflow);
+/// * `isUsingOverage` is not the boolean `false` (missing, not a boolean, or extra usage in use);
+/// * `overageInUse` is present and not `false`, or `overageEnabled` is present and not `false`
+///   (usage credits turned on: paid extra usage is possible), or `errorCode` is present;
+/// * `rateLimitType` is present and unknown, or is `overage` / `seven_day_overage_included`
+///   (a warning about the paid bucket contradicts `overageStatus: rejected`);
+/// * `unifiedWindows` is present and not an object, or a window in it is not an object, has no
+///   readable `status` (the CLI leaves it out when it cannot read it) or has `rejected` (an
+///   exhausted window is never overridden by the top-level status; conservative, the CLI says
+///   the top-level status decides whether requests are refused).
+///
+/// Otherwise: `allowed_warning` at the top level or in a window is a [`RateLimitVerdict::Warning`]
+/// (recorded and shown, the run goes on); else [`RateLimitVerdict::Allowed`].
+pub fn rate_limit_verdict(event: &Value) -> RateLimitVerdict {
+    use RateLimitVerdict::{Allowed, Stop, Warning};
     let info = &event["rate_limit_info"];
+    if !info.is_object() {
+        return Stop("rate_limit_info missing".into());
+    }
+    let status = match info["status"].as_str() {
+        Some(s) if LIMIT_STATUS.contains(&s) => s,
+        _ => {
+            return Stop(format!(
+                "rate limit status {} (missing or unknown)",
+                info["status"]
+            ));
+        }
+    };
+    if status == "rejected" {
+        return Stop("rate limit status \"rejected\" (subscription usage refused)".into());
+    }
     if info["overageStatus"] != "rejected" {
-        return Err(format!(
+        return Stop(format!(
             "overageStatus {} (only \"rejected\" excludes paid extra usage)",
             info["overageStatus"]
         ));
     }
     if info["isUsingOverage"] != false {
-        return Err(format!(
+        return Stop(format!(
             "isUsingOverage {} (extra usage in use or unknown)",
             info["isUsingOverage"]
         ));
     }
-    if info["status"] != "allowed" {
-        return Err(format!(
-            "rate limit status {} (not allowed)",
-            info["status"]
+    for k in ["overageInUse", "overageEnabled"] {
+        if !info[k].is_null() && info[k] != false {
+            return Stop(format!(
+                "{k} {} (paid extra usage possible or unknown)",
+                info[k]
+            ));
+        }
+    }
+    if !info["errorCode"].is_null() {
+        return Stop(format!("errorCode {}", info["errorCode"]));
+    }
+    let kind = &info["rateLimitType"];
+    if !kind.is_null() {
+        match kind.as_str() {
+            Some("overage" | "seven_day_overage_included") => {
+                return Stop(format!(
+                    "rateLimitType {kind} with overageStatus \"rejected\" (contradictory)"
+                ));
+            }
+            Some(k) if RATE_LIMIT_TYPES.contains(&k) => {}
+            _ => return Stop(format!("rateLimitType {kind} (unknown)")),
+        }
+    }
+    let mut warned: Vec<String> = Vec::new();
+    if status == "allowed_warning" {
+        warned.push(format!(
+            "{} {} of the limit (threshold {}, resets {})",
+            kind.as_str().unwrap_or("limit"),
+            info["utilization"],
+            info["surpassedThreshold"],
+            info["resetsAt"]
         ));
     }
-    Ok(())
+    let windows = &info["unifiedWindows"];
+    if !windows.is_null() {
+        let Some(ws) = windows.as_object() else {
+            return Stop("unifiedWindows is not an object".into());
+        };
+        for (name, w) in ws {
+            match w["status"].as_str() {
+                _ if !w.is_object() => {
+                    return Stop(format!("unifiedWindows.{name} is not an object"));
+                }
+                Some("allowed") => {}
+                Some("allowed_warning") => {
+                    let line = format!(
+                        "window {name} {} (threshold {}, resets {})",
+                        w["utilization"], w["surpassedThreshold"], w["resetsAt"]
+                    );
+                    warned.push(line);
+                }
+                Some("rejected") => {
+                    return Stop(format!("unifiedWindows.{name} status \"rejected\""));
+                }
+                _ => {
+                    return Stop(format!(
+                        "unifiedWindows.{name} status {} (missing or unknown)",
+                        w["status"]
+                    ));
+                }
+            }
+        }
+    }
+    if warned.is_empty() {
+        Allowed
+    } else {
+        Warning(format!(
+            "rate limit warning (allowed_warning; paid extra usage off): {}",
+            warned.join("; ")
+        ))
+    }
+}
+
+/// No-extra-billing condition for one event: `Err` exactly when [`rate_limit_verdict`] is a
+/// stop (a warning passes).
+pub fn overage_check(event: &Value) -> Result<(), String> {
+    match rate_limit_verdict(event) {
+        RateLimitVerdict::Stop(why) => Err(why),
+        _ => Ok(()),
+    }
+}
+
+/// The warning of one event, when it passes with one.
+pub fn rate_limit_warning(event: &Value) -> Option<String> {
+    match rate_limit_verdict(event) {
+        RateLimitVerdict::Warning(w) => Some(w),
+        _ => None,
+    }
+}
+
+/// The warnings of a stream's events that pass (in order); stops are not listed here.
+pub fn rate_limit_warnings(stream: &str) -> Vec<String> {
+    rate_limit_events(stream)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(rate_limit_warning)
+        .collect()
 }
 
 /// The no-extra-billing condition from an observation: at least one event, every event passes,

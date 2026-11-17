@@ -8,7 +8,9 @@
 //!    everything until it is reconciled; an unmeasured run stops the budget ([`budget::next`]).
 //! 2. No-extra-billing check before the call, from three sources together (user decision
 //!    2026-11-14 pr30 §2): the newest observed stream of the account (age-limited, every
-//!    `rate_limit_event` must show `overageStatus: "rejected"`), the role environment (the run's
+//!    `rate_limit_event` must pass [`budget::rate_limit_verdict`]: subscription `allowed` or
+//!    `allowed_warning`, `overageStatus: "rejected"`, `isUsingOverage: false`; a warning is
+//!    recorded as `rate_limit_warnings`), the role environment (the run's
 //!    reported variable names: the OAuth variable and no API key), and this run's own signal
 //!    (the run guard stops on the first breaking event; the caller re-checks the stream after the
 //!    run and asks for a person if any event breaks the condition).
@@ -1408,6 +1410,7 @@ impl After<'_> {
             )));
         }
         let mut notes = Vec::new();
+        let mut warnings: Vec<String> = Vec::new();
         if stop_sent {
             notes.push("the caller sent a stop at its deadline".to_string());
         }
@@ -1417,9 +1420,15 @@ impl After<'_> {
                     .to_string(),
             ),
             Ok(evs) => {
+                // every event is judged: a warning never clears a stop (user decision
+                // 2026-11-17, warning)
                 for e in &evs {
-                    if let Err(why) = budget::overage_check(e) {
-                        reasons.push(other_stop_reason(format!("this run's signal: {why}")));
+                    match budget::rate_limit_verdict(e) {
+                        budget::RateLimitVerdict::Stop(why) => {
+                            reasons.push(other_stop_reason(format!("this run's signal: {why}")))
+                        }
+                        budget::RateLimitVerdict::Warning(w) => warnings.push(w),
+                        budget::RateLimitVerdict::Allowed => {}
                     }
                 }
             }
@@ -1449,6 +1458,10 @@ impl After<'_> {
         }
         if !notes.is_empty() {
             r["notes"] = json!(notes);
+        }
+        // allowed_warning events that passed: recorded and shown, never a stop by themselves
+        if !warnings.is_empty() {
+            r["rate_limit_warnings"] = json!(warnings);
         }
         Ok(r)
     }
