@@ -130,7 +130,8 @@ import json, sys
 d, ledger, case = sys.argv[1:]
 recs = [json.loads(l) for l in open(d + "/records.jsonl")]
 for r in recs:
-    if r["attempt_id"] == "s8-r1":
+    # a settlement or correction line has no attempt_id (PR #90 review d971f59 L-5): runs only
+    if r.get("format") == "ieo-role-run/v0" and r.get("attempt_id") == "s8-r1":
         lines = open(r["stream"]["path"]).read().splitlines()
         if case == "overage":
             lines = [l.replace('"overageStatus":"rejected"', '"overageStatus":"allowed"') for l in lines]

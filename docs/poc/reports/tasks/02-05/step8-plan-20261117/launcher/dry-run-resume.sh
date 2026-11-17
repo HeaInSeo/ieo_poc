@@ -134,6 +134,13 @@ PY
 R1_SID=$(python3 -I -c "import json,sys; print(json.loads(open(sys.argv[1]).readline())['session']['session_id'])" "$LEDGER/records.jsonl")
 R1_END=$(python3 -I -c "import json,sys; print(json.loads(open(sys.argv[1]).readline())['ended_unix'])" "$LEDGER/records.jsonl")
 bash "$HERE/coord-switch.sh" capture "$W/coord.pid" "$W/bin-old/ieo-coord" "$CPORT" "$W/private/coord-old" >/dev/null; ok $? "capture of the running old coordinator (like private/s8/coord-778ee47)"
+# the settlement is pinned to the real s8-r1 (budget, attempt, session, stream SHA-256); this
+# synthetic R1 is admitted by a test pin, which only these debug binaries honour (release builds
+# know only the real pin): for ieo-role-call here, and for the new coordinator through its
+# captured environment (only in this rehearsal's capture)
+R1_STREAM_SHA=$(python3 -I -c "import json,sys; print(json.loads(open(sys.argv[1]).readline())['stream']['sha256'])" "$LEDGER/records.jsonl")
+export IEO_SETTLEMENT_TEST_PINS="02-05|s8-r1|$R1_SID|$R1_STREAM_SHA"
+chmod u+w "$W/private/coord-old/env0"; printf 'IEO_SETTLEMENT_TEST_PINS=%s\0' "$IEO_SETTLEMENT_TEST_PINS" >> "$W/private/coord-old/env0"; chmod 0400 "$W/private/coord-old/env0"
 # ---- B. copies, SHA256SUMS, the rule change ----
 bash "$HERE/make-resume-copies.sh" "$ROOT" "$W/D" "$W/bin-new" "$W/rules.json" > "$OUT/copies.log" 2>&1; ok $? "make-resume-copies.sh: $(tail -1 "$OUT/copies.log")"
 L="$W/D/step8-resume/launcher"
