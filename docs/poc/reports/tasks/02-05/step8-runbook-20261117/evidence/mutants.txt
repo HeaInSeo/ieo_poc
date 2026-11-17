@@ -1,0 +1,10 @@
+# 02-05 pre-step-8b mutants (PR #82 review 4531772 L-3/L-4): each applied alone to the code of 1999494, then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). R1-R3: L-3 (the 780 s default and a run's own bound); R4: L-4 (a delivery counted before the stop check); Q1-Q3, Q6: the stop of review 63fefc1 M-1 (a) re-run. Columns: id | mutation | result | target: failing tests
+R1 | the default wait is the old 720 s (one margin) | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+R2 | a run with a longer bound does not extend the wait | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+R3 | a run's bound has one margin only | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+R4 | a delivery is not counted before the stop check (L-4) | SURVIVED (not deterministic: the race needs a delivery between the stop check and the signal; the second wait in main after the workers end covers the same run) | ieo-coord --test spare_e2e
+Q1 | a stopping coordinator still takes deliveries | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q2 | the stop does not wait for the runs being finished | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q3 | an accepted run is not counted as being finished | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q6 | wait_finishing returns at once | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+# 7 of 8 killed; R4 survives (see its line)
