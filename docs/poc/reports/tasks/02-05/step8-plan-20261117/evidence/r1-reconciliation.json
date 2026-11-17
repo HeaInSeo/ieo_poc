@@ -1,0 +1,163 @@
+{
+ "what": "02-05 s8-r1 usage reconciliation (no content copied: entry kinds, timestamps, token counts only)",
+ "ledger_record": {
+  "attempt_id": "s8-r1",
+  "usage_run_state": "unmeasured",
+  "stopped_by_guard": true,
+  "exit_code": 143,
+  "started_at": "2026-11-17T12:19:45.462Z",
+  "ended_at": "2026-11-17T12:19:49.763Z",
+  "duration_ms": 4119,
+  "observed_lower_bound": {
+   "billable_lower_bound": 1429,
+   "cache_read_lower_bound": 3223,
+   "incomplete_lines": 0,
+   "messages": 1
+  },
+  "stream_sha256": "252609c73723fc8bff77ff50ad6a2c57f85ee818f4cfd2dfe685e0f11ff34c94"
+ },
+ "kept_stream": {
+  "path": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/ledger-0205/streams/s8-r1.jsonl",
+  "sha256": "252609c73723fc8bff77ff50ad6a2c57f85ee818f4cfd2dfe685e0f11ff34c94",
+  "lines": 7,
+  "types": [
+   "system/session_title_changed",
+   "system/init",
+   "assistant",
+   "user",
+   "assistant",
+   "rate_limit_event",
+   "user"
+  ],
+  "result_event": false,
+  "assistant_events": [
+   {
+    "line": 3,
+    "message_id": "msg_011Ch8VK8xqFqtXxXwi2PwZj",
+    "usage": {
+     "input_tokens": 2,
+     "output_tokens": 16,
+     "cache_creation_input_tokens": 1411,
+     "cache_read_input_tokens": 3223
+    }
+   },
+   {
+    "line": 5,
+    "message_id": "msg_011Ch8VK8xqFqtXxXwi2PwZj",
+    "usage": {
+     "input_tokens": 2,
+     "output_tokens": 16,
+     "cache_creation_input_tokens": 1411,
+     "cache_read_input_tokens": 3223
+    }
+   }
+  ],
+  "note": "both assistant events are partial streaming snapshots of one message (output_tokens 16)"
+ },
+ "session_transcript": {
+  "path": "/opt/rust/ieo_poc_runs/02-05-s8-20261118/development/state/claude/projects/-state-work-ieo-poc-test/5c991c71-b6e2-4cfb-bd76-6bb18a36e090.jsonl (role state volume, CLAUDE_CONFIG_DIR, not cred/)",
+  "sha256": "806746fd5b120020796a41527c7f01322a7f2de2c40d591731b060244824dc68",
+  "bytes": 49297,
+  "mtime_utc": "2026-11-17T12:19:48Z",
+  "entries": 25,
+  "types": [
+   "custom-title",
+   "agent-name",
+   "queue-operation",
+   "queue-operation",
+   "user",
+   "attachment",
+   "attachment",
+   "atis-latch",
+   "attachment",
+   "attachment",
+   "attachment",
+   "api-request-shape",
+   "api-request-blob",
+   "api-request",
+   "tools-used",
+   "assistant",
+   "user",
+   "assistant",
+   "last-prompt",
+   "custom-title",
+   "agent-name",
+   "atis-latch",
+   "cost-state",
+   "user",
+   "attachment"
+  ],
+  "api_request_entries": [
+   {
+    "line": 14,
+    "timestamp": "2026-11-17T12:19:47.084Z",
+    "querySource": "sdk"
+   }
+  ],
+  "assistant_entries": [
+   {
+    "line": 16,
+    "timestamp": "2026-11-17T12:19:48.592Z",
+    "message_id": "msg_011Ch8VK8xqFqtXxXwi2PwZj",
+    "stop_reason": "tool_use",
+    "usage": {
+     "input_tokens": 2,
+     "output_tokens": 130,
+     "cache_creation_input_tokens": 1411,
+     "cache_read_input_tokens": 3223
+    }
+   },
+   {
+    "line": 18,
+    "timestamp": "2026-11-17T12:19:48.817Z",
+    "message_id": "msg_011Ch8VK8xqFqtXxXwi2PwZj",
+    "stop_reason": "tool_use",
+    "usage": {
+     "input_tokens": 2,
+     "output_tokens": 130,
+     "cache_creation_input_tokens": 1411,
+     "cache_read_input_tokens": 3223
+    }
+   }
+  ],
+  "cost_state": {
+   "line": 23,
+   "modelUsage": {
+    "claude-sonnet-5-5": {
+     "inputTokens": 2,
+     "outputTokens": 130,
+     "thinkingTokens": 0,
+     "cacheReadInputTokens": 3223,
+     "cacheCreationInputTokens": 1411,
+     "cacheCreationEphemeral5mInputTokens": 0,
+     "cacheCreationEphemeral1hInputTokens": 1411,
+     "webSearchRequests": 0,
+     "costUSD": 0.0072702999999999995
+    }
+   },
+   "totalCostUSD_reported": 0.0072702999999999995,
+   "totalAPIDuration_ms": 1756,
+   "totalDuration_ms": 3310,
+   "hasUnknownModelCost": false
+  },
+  "last_timestamped_entry": "2026-11-17T12:19:48.855Z"
+ },
+ "finding": {
+  "model_requests_logged": 1,
+  "final_usage_of_the_one_message": {
+   "input_tokens": 2,
+   "output_tokens": 130,
+   "cache_creation_input_tokens": 1411,
+   "cache_read_input_tokens": 3223
+  },
+  "cost_state_tokens": {
+   "input": 2,
+   "output": 130,
+   "cache_creation": 1411,
+   "cache_read": 3223
+  },
+  "billable_input_output_cache_creation": 1543,
+  "stream_lower_bound_billable": 1429,
+  "difference": 114
+ }
+}

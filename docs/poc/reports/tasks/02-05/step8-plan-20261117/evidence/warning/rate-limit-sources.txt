@@ -1,0 +1,45 @@
+# Sources for the rate_limit_event rule (fetched/extracted 2026-11-17, no model call)
+
+## 1. Official documentation: Agent SDK TypeScript reference, section SDKRateLimitEvent
+URL: https://code.claude.com/docs/en/agent-sdk/typescript.md (lines 5960-5983, sha256 of the fetched page cdb8ee7258e8bbd884a8f26a32a9b46ee2e5f79dae40a5124d96e0a5cfd1bc2d)
+
+### `SDKRateLimitEvent`
+
+Emitted when the session encounters a rate limit.
+
+```typescript theme={null}
+type SDKRateLimitEvent = {
+  type: "rate_limit_event";
+  rate_limit_info: {
+    status: "allowed" | "allowed_warning" | "rejected";
+    resetsAt?: number;
+    utilization?: number;
+    errorCode?: "credits_required";
+    canUserPurchaseCredits?: boolean;
+    hasChargeableSavedPaymentMethod?: boolean;
+    overageEnabled?: boolean;
+  };
+  uuid: UUID;
+  session_id: string;
+};
+```
+
+When `errorCode` is `"credits_required"`, the rejection is from a claude.ai subscription whose included usage is exhausted, and the session cannot continue until the user buys usage credits. `canUserPurchaseCredits` indicates whether the authenticated user can buy credits for the account, and `hasChargeableSavedPaymentMethod` indicates whether a saved payment method is on file. All three fields are absent on rate-limit events that are not credits-required rejections. Requires Claude Code v2.1.181 or later.
+
+On a warning about a plan usage limit, where `status` is `"allowed_warning"`, `overageEnabled` reports whether the account has [usage credits](https://code.claude.com/docs/en/costs.md#add-usage-credits-to-your-subscription) turned on. Requires Claude Code v2.1.295 or later.
+
+The public type documents status (allowed | allowed_warning | rejected) and, for allowed_warning, overageEnabled. It does not document overageStatus, isUsingOverage or unifiedWindows.
+
+## 2. CLI 2.1.322 bundled SDK schema (the binary the role containers run)
+File: /opt/rust/ieo_poc_probe/bin/claude-2.1.322, sha256 bfb3703ad5380242328459bc62ada4bde8ae7ba57c6e1eeadb9c00e08874c478
+
+Schema (byte offset ~285601000, descriptions elided):
+RPo=p(()=>u({status:B(["allowed","allowed_warning","rejected"]),resetsAt:v().int().optional(),rateLimitType:B(["five_hour","seven_day","seven_day_opus","seven_day_sonnet","seven_day_overage_included","overage"]).optional(),utilization:v().optional(),unifiedWindows:u({five_hour:u({utilization:v(),resetsAt:v().int(),status:B(["allowed","allowed_warning","rejected"]).optional().catch(void 0),surpassedThreshold:v().optional().catch(void 0)}).optional(),seven_day:u({utilization:v(),resetsAt:v().int(),status:B(["allowed","allowed_warning","rejected"]).optional().catch(void 0),surpassedThreshold:v().optional().catch(void 0)}).optional(),seven_day_overage_included:u({utilization:v(),resetsAt:v().int(),status:B(["allowed","allowed_warning","rejected"]).optional().catch(void 0),surpassedThreshold:v().optional().catch(void 0)}).optional()}).optional().describe(…),overageStatus:B(["allowed","allowed_warning","rejected"]).optional(),overageResetsAt:v().int().optional(),overageDisabledReason:B(["overage_not_provisioned","org_level_disabled","org_level_disabled_until","out_of_credits","seat_tier_level_disabled","member_level_disabled","seat_tier_zero_credit_limit","group_zero_credit_limit","member_zero_credit_limit","org_service_level_disabled","no_limits_configured","fetch_error","unknown"]).optional(),isUsingOverage:O().optional(),overageInUse:O().optional(),overageEnabled:O().optional(),surpassedThreshold:v().optional(),dailyCapPaused:O().optional().describe(…),rateLimitGraceActive:O().optional().describe(…),overagePeriodMonthly:u({utilization:v()}).optional().describe(…),overagePeriodChannel:u({utilization:v()}).optional().describe(…),limitScope:B(["service","channel","group_pool"]).optional().describe(…),errorCode:B(["credits_required"]).optional(),canUserPurchaseCredits:O().optional(),hasChargeableSavedPaymentMethod:O().optional() …
+
+unifiedWindows description (verbatim):
+@internal Per-window usage for the session (5-hour), weekly (7-day), and overage-included weekly (per-model bucket; present only for accounts whose responses carry that window) subscription rate-limit windows, as read from the anthropic-ratelimit-unified-* response headers. utilization is the fraction of the window used (usually 0-1, same scale as the top-level utilization field; values above 1 occur when usage legitimately runs past a window's cap, e.g. lower-priority episodes past the 5-hour limit); resetsAt is unix epoch seconds. status is the status the server sent for the window: allowed_warning once past a warning threshold, rejected at or past its limit. A rejected window alone does not mean requests are refused; the top-level status says whether they are. surpassedThreshold is the highest warning threshold passed, as a fraction of the limit (1 once rejected). Each is absent when the server sent none or a value this version cannot read. Unlike the top-level status/utilization fields, which describe the currently limiting window, every window is tracked on every observation, and events are emitted when a window's rounded percentage, reset time, status or threshold moves, not only on status transitions. Windows absent from the account state are absent here. Absent until the first response carrying these headers is observed, and always absent for API-key, Bedrock, and Vertex sessions, whose responses do not carry them.
+
+The same binary maps response headers: isUsingOverage = (unified status == "rejected") && (overage status allowed | allowed_warning); test scenarios 'approaching-weekly-limit' set status allowed_warning with representative claim seven_day, 'out-of-credits' sets overage status rejected with reason out_of_credits.
+
+## 3. Observed: 02-05 s8-r1 (CLI 2.1.322, 2026-11-17T12:19Z), the kept stream line 6
+{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1795334400,"rateLimitType":"seven_day","utilization":0.86,"overageStatus":"rejected","overageDisabledReason":"out_of_credits","isUsingOverage":false,"surpassedThreshold":0.75,"unifiedWindows":{"five_hour":{"utilization":0.04,"resetsAt":1794933000,"status":"allowed"},"seven_day":{"utilization":0.86,"resetsAt":1795334400,"status":"allowed_warning","surpassedThreshold":0.75}}},"uuid":"b59d8029-33b1-4ab5-87b1-fbff93a3a04d","session_id":"5c991c71-b6e2-4cfb-bd76-6bb18a36e090"}

@@ -1,0 +1,20 @@
+# replay of the kept s8-r1 stream (IEO_S8R1_STREAM=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/ledger-0205/streams/s8-r1.jsonl, sha256 252609c7…4c94)
+.replayed /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/ledger-0205/streams/s8-r1.jsonl (7 lines): guard no stop, observation ok, 1 warning, display available
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+# post-run check on the kept R1 record and answers (read-only): new launcher/check-run.py
+s8-r1: unmeasured (observed lower bound billable 1429, cache_read 3223; not a total), 5 s, tools offered ['Glob', 'Grep', 'Read'], used ['Read', 'Read']; measured totals {'runs': 0, 'seconds': 0, 'billable': 0, 'cache_read': 0}
+WARNING s8-r1: rate limit warning (allowed_warning; paid extra usage off): seven_day 0.86 of the limit (threshold 0.75, resets 1795334400); window seven_day 0.86 (threshold 0.75, resets 1795334400)
+CHECK FAILED s8-r1: stop_required: no result event; usage unmeasured: "stopped by the run guard (Overage(\"rate limit status \\\"allowed_warning\\\" (not allowed)\")), a result written after the stop is not trusted"; this run's signal: rate limit status "allowed_warning" (not allowed)
+CHECK FAILED s8-r1: usage unmeasured (never counted as 0)
+CHECK FAILED s8-r1: result {}
+CHECK FAILED s8-r1: the record's rate_limit_warnings None differ from the stream's ['rate limit warning (allowed_warning; paid extra usage off): seven_day 0.86 of the limit (threshold 0.75, resets 1795334400); window seven_day 0.86 (threshold 0.75, resets 1795334400)']
+CHECK FAILED s8-r1: s8-r1: unmeasured
+exit 1
+
+# the same with the frozen 46799b0 copy (old rule): its signal line
+s8-r1: measured, 5 s, billable 0, cache_read 0, tools offered ['Glob', 'Grep', 'Read'], used ['Read', 'Read']; totals {'runs': 0, 'seconds': 0, 'billable': 0, 'cache_read': 0}
+CHECK FAILED s8-r1: stop_required: no result event; usage unmeasured: "stopped by the run guard (Overage(\"rate limit status \\\"allowed_warning\\\" (not allowed)\")), a result written after the stop is not trusted"; this run's signal: rate limit status "allowed_warning" (not allowed)
+CHECK FAILED s8-r1: usage unmeasured (never counted as 0)
+CHECK FAILED s8-r1: rate-limit signals not all allowed/rejected/false: [{'status': 'allowed_warning', 'resetsAt': 1795334400, 'rateLimitType': 'seven_day', 'utilization': 0.86, 'overageStatus': 'rejected', 'overageDisabledReason': 'out_of_credits', 'isUsingOverage': False, 'surpassedThreshold': 0.75, 'unifiedWindows': {'five_hour': {'utilization': 0.04, 'resetsAt': 1794933000, 'status': 'allowed'}, 'seven_day': {'utilization': 0.86, 'resetsAt': 1795334400, 'status': 'allowed_warning', 'surpassedThreshold': 0.75}}}]
+CHECK FAILED s8-r1: s8-r1: unmeasured
