@@ -169,8 +169,10 @@ def check(ledger, out, att, role, aid):
     if st.get("central_checkpoint", {}).get("mode") == "local_only":
         bad.append("supervisor in local_only mode")
     rs = json.load(open(os.path.join(out, f"roles-{att}.json")))
-    if rs.get("quota_groups", {}).get("mismatches"):
-        bad.append(f"quota group mismatch: {rs['quota_groups']['mismatches']}")
+    quota_groups = rs.get("quota_groups") if isinstance(rs, dict) else None
+    mismatches = quota_groups.get("mismatches") if isinstance(quota_groups, dict) else None
+    if mismatches != []:
+        bad.append(f"quota group mismatches must be an empty list: {mismatches!r}")
     ch = json.load(open(os.path.join(out, f"chain-{aid}-{att}.json")))
     link = [l for l in ch.get("links", []) if l.get("attempt_id") == att]
     if not link or not link[0].get("taken_over") or not link[0].get("first_action"):

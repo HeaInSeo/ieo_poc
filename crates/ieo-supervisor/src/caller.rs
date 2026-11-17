@@ -1839,7 +1839,9 @@ pub fn settle(
             return Err(e);
         }
     };
-    append(plan, &s)?;
+    // An append error can occur after bytes reach the ledger. Keep the evidence copies
+    // and tell the operator to inspect the ledger before doing anything further.
+    append(plan, &s).map_err(|e| format!("settlement append uncertain: {e}"))?;
     // the ledger must read back with the settlement applied; a failure here is after the append
     // (PR #91 review 4b427c5 F-6): the line stays and the ledger refuses until a person looks
     let after_append = |why: String| {

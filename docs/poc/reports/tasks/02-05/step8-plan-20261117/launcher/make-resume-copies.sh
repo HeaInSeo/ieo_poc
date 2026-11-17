@@ -74,7 +74,7 @@ new = [
     f"Bash({L}/coord-switch.sh start {BIN}/ieo-coord {D}/private/s8/coord-778ee47 {D}/coord.pid {D}/logs/coord-{SHA[:12]}.log --tokens {D}/private/s8/tokens-s8.json -- --roles {D}/private/s8/roles.json)",
     f"Bash({L}/coord-switch.sh start {D}/bin/ieo-coord-M {D}/private/s8/coord-778ee47 {D}/coord.pid {D}/logs/coord-M-rollback.log --tokens {D}/private/s8/tokens-s8.json -- --roles {D}/private/s8/roles.json)",
     # the role containers: the new supervisor in place, and back
-    f"Bash({L}/restart-roles.sh swap {W} {BIN}/ieo-supervisor {SUP})",
+    f"Bash({L}/restart-roles.sh swap {W} {BIN}/ieo-supervisor {SUP} {OLD_SUP})",
     f"Bash({L}/restart-roles.sh rollback {W} {OLD_SUP})",
     # the resume driver and its environment
     f"Bash(export COORD=http://127.0.0.1:58090)",

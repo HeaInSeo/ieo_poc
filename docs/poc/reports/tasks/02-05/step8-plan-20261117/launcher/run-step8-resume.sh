@@ -4,7 +4,7 @@
 #   run-step8-resume.sh r1b-body    write the R1b delivery body (new session, the spare marker) and
 #                                   print the command the USER runs with their own token
 #   run-step8-resume.sh r1b-check   after the user's delivery: its answer, the wait, every §6.2 check
-#   run-step8-resume.sh r2g1        observation deadline (s8-r1's end + 7 d) → R2 (R1b's session) → G1
+#   run-step8-resume.sh r2g1        check R1b, then R2 (R1b's session) and G1 with per-call deadlines
 # Any failed check is a hard stop (exit 3, "STOP: <reason>"): nothing further is sent, no retry, no
 # second spare. The checks count the ledger's EFFECTIVE records (`ieo-role-call records`), so the
 # settled s8-r1 counts as settled. Tokens come from header files and are never printed.
@@ -52,15 +52,17 @@ PY
 }
 # after a delivery was accepted: wait, settle, the answers, every check (run-step8.sh run_one's tail)
 after() { # tag role assignment attempt port
-  local tag=$1 role=$2 aid=$3 att=$4 port=$5
+  local tag=$1 role=$2 aid=$3 att=$4 port=$5 status
   if [ -f "$LEDGER/records.jsonl" ] && grep -q "\"attempt_id\":\"$att\"" "$LEDGER/records.jsonl"; then
     role_status "$port" "status-$att"
   else
     role_wait "$port" "$att" || stop "$att: the role did not finish"
   fi
   settled "$att" || stop "$att: no ledger record, or the in-flight marker stays"
-  req "roles-$att" s8-operator GET "/v0/repos/$REPO_ID/roles" >/dev/null
-  req "chain-$aid-$att" s8-operator GET "/v0/coordinator/assignments/$aid/generations/0/chain" >/dev/null
+  status=$(req "roles-$att" s8-operator GET "/v0/repos/$REPO_ID/roles")
+  [ "$status" = 200 ] || stop "$att: roles status answered HTTP $status"
+  status=$(req "chain-$aid-$att" s8-operator GET "/v0/coordinator/assignments/$aid/generations/0/chain")
+  [ "$status" = 200 ] || stop "$att: chain answered HTTP $status"
   effective || stop "$att: the ledger's effective records do not read"
   python3 -I "$HERE/check-run.py" "$LEDGER" "$OUT" "$att" "$role" "$aid" || stop "$att: a run check failed (above)"
 }
@@ -88,7 +90,8 @@ settle)
     # review 4b427c5 F-6: an appended line whose read-back failed is not "nothing written"
     case "$why" in
     *"was appended"*) stop "settle FAILED AFTER APPENDING (records.jsonl now $n lines): the ledger refuses until a person inspects it: $why";;
-    *) stop "the settlement was refused, nothing written (records.jsonl $n lines): $why";;
+    *"settlement append uncertain:"*) stop "settlement append uncertain (records.jsonl now $n lines): inspect the ledger before retrying: $why";;
+    *) stop "the settlement was refused before appending (records.jsonl $n lines): $why";;
     esac
   fi
   rm -f "$err"

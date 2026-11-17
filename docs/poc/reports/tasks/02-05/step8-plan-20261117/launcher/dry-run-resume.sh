@@ -164,14 +164,37 @@ python3 -I "$L/apply-perm-resume.py" "$W/rules.json" "$W/settings.json" | grep -
 NEWSUP=$(sha "$W/bin-new/ieo-supervisor"); OLDSUP=$(sha "$W/bin-old/ieo-supervisor")
 # PR #91 review 4b427c5 F-1: a swap that fails after the stop (a binary that does not start), then
 # the rollback from that state, and from a state with one container stopped
+WRONG_SHA=$(printf '0%.0s' $(seq 64))
+bash "$L/restart-roles.sh" swap "$W/run" "$W/bin-new/ieo-supervisor" "$NEWSUP" "$WRONG_SHA" > "$OUT/swap-wrong.log" 2>&1
+[ $? = 3 ] && grep -q 'current binary does not match' "$OUT/swap-wrong.log" && [ ! -e "$W/run/bin/ieo-supervisor.prev" ]; ok $? "swap refuses a mismatched rollback SHA before creating a backup"
 mkdir -p "$W/bin-bad"; printf '#!/bin/sh\nexit 1\n' > "$W/bin-bad/ieo-supervisor"; chmod 755 "$W/bin-bad/ieo-supervisor"
-bash "$L/restart-roles.sh" swap "$W/run" "$W/bin-bad/ieo-supervisor" "$(sha "$W/bin-bad/ieo-supervisor")" > "$OUT/swap-bad.log" 2>&1; rc=$?
+bash "$L/restart-roles.sh" swap "$W/run" "$W/bin-bad/ieo-supervisor" "$(sha "$W/bin-bad/ieo-supervisor")" "$OLDSUP" > "$OUT/swap-bad.log" 2>&1; rc=$?
 [ $rc = 3 ] && grep -qx "ROLLBACK: bash $L/restart-roles.sh rollback $W/run $OLDSUP" "$OUT/swap-bad.log"; ok $? "a failed swap stops and prints the exact rollback: $(grep -m1 STOP "$OUT/swap-bad.log" | cut -c1-80)"
-bash "$L/restart-roles.sh" rollback "$W/run" "$(printf '0%.0s' $(seq 64))" > "$OUT/rollback-wrong.log" 2>&1; [ $? = 3 ] && grep -q "not the expected" "$OUT/rollback-wrong.log"; ok $? "rollback with another expected SHA-256: refused, nothing changed"
+bash "$L/restart-roles.sh" rollback "$W/run" "$(printf '0%.0s' $(seq 64))" > "$OUT/rollback-wrong.log" 2>&1; [ $? = 3 ] && grep -q "expected SHA-256" "$OUT/rollback-wrong.log"; ok $? "rollback with another expected SHA-256: refused, nothing changed"
 bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-half.log" 2>&1; ok $? "rollback from the failed swap (containers exited): $(grep -c 'up, idle' "$OUT/rollback-half.log") roles up and idle on the old binary"
 podman stop "ieo-s8dry-ieo-poc-test-guardrail" >/dev/null
 bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-stopped.log" 2>&1; ok $? "rollback with one container stopped: $(grep -c 'up, idle' "$OUT/rollback-stopped.log") roles up and idle"
-bash "$L/restart-roles.sh" swap "$W/run" "$W/bin-new/ieo-supervisor" "$NEWSUP" > "$OUT/restart-roles.log" 2>&1; ok $? "restart-roles.sh swap: $(grep -c 'up, idle' "$OUT/restart-roles.log") roles up and idle on the new binary"
+# Status is idle here. Simulate top failing or finding Claude without stopping either test role.
+mkdir -p "$W/mock-bin"
+export REAL_PODMAN=$(command -v podman)
+cat > "$W/mock-bin/podman" <<'SH'
+#!/bin/sh
+case "$1" in
+  stop) touch "$STOP_PROBE"; exit 99;;
+  top)
+    [ "$TOP_CASE" = failed ] && exit 125
+    printf 'COMMAND\n/opt/claude/claude --print\n'; exit 0;;
+esac
+exec "$REAL_PODMAN" "$@"
+SH
+chmod 755 "$W/mock-bin/podman"
+for scenario in failed claude; do
+  PATH="$W/mock-bin:$PATH" TOP_CASE="$scenario" STOP_PROBE="$W/stop-probe" \
+    bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-top-$scenario.log" 2>&1
+  [ $? = 3 ] && [ ! -e "$W/stop-probe" ] && grep -q 'nothing changed' "$OUT/rollback-top-$scenario.log"
+  ok $? "rollback refuses before stopping an idle role when process inspection returns $scenario"
+done
+bash "$L/restart-roles.sh" swap "$W/run" "$W/bin-new/ieo-supervisor" "$NEWSUP" "$OLDSUP" > "$OUT/restart-roles.log" 2>&1; ok $? "restart-roles.sh swap: $(grep -c 'up, idle' "$OUT/restart-roles.log") roles up and idle on the new binary"
 podman unshare test -s "$W/run/development/state/checkpoint.json"; ok $? "the development volume kept its local checkpoint (s8-r1 after_run)"
 bash "$L/coord-switch.sh" stop "$W/coord.pid" 900 >/dev/null; ok $? "old coordinator stopped"
 bash "$L/coord-switch.sh" start "$W/bin-new/ieo-coord" "$W/private/coord-old" "$W/coord.pid" "$OUT/coord-new.log" --tokens "$W/cwd/tokens.json" -- --roles "$W/cwd/roles.json" >/dev/null; ok $? "new coordinator started with the captured argv/env/cwd, --tokens, --roles"
@@ -190,10 +213,13 @@ DRY=1 bash "$L/run-step8-resume.sh" settle > "$OUT/settle-dry.log" 2>&1; rc=$?
 bash "$L/run-step8-resume.sh" settle > "$OUT/settle.log" 2>&1; ok $? "settle: $(tail -1 "$OUT/settle.log" | cut -c1-140)"
 grep -q "coordinator's reading: s8-r1 measured | settlement guard_stop_on_old_rule_warning" "$OUT/settle.log"; ok $? "after the settlement the coordinator's own budget plan reads s8-r1 as settled"
 [ -f "$LEDGER/children/s8-r1/settlement-transcript.jsonl" ] && [ -f "$LEDGER/children/s8-r1/independent-check.md" ]; ok $? "the transcript and the report copy are kept in the ledger"
-bash "$L/run-step8-resume.sh" settle > "$OUT/settle-again.log" 2>&1; [ $? = 3 ] && grep -q "refused, nothing written" "$OUT/settle-again.log"; ok $? "settle again: refused (already settled, nothing written)"
+bash "$L/run-step8-resume.sh" settle > "$OUT/settle-again.log" 2>&1; [ $? = 3 ] && grep -q "refused before appending" "$OUT/settle-again.log"; ok $? "settle again: refused (already settled, nothing written)"
 # PR #91 review 4b427c5 F-6: a failure after the append is reported as such
 printf '#!/bin/sh\necho "ieo-role-call: the settlement line was appended, but the ledger does not read back with it: x" >&2\nexit 1\n' > "$W/fake-role-call"; chmod 755 "$W/fake-role-call"
 ROLE_CALL="$W/fake-role-call" bash "$L/run-step8-resume.sh" settle > "$OUT/settle-appended.log" 2>&1; [ $? = 3 ] && grep -q "FAILED AFTER APPENDING (records.jsonl now" "$OUT/settle-appended.log"; ok $? "a settle that fails after appending says so (not 'nothing written')"
+printf '#!/bin/sh\necho "ieo-role-call: settlement append uncertain: record append: I/O error" >&2\nexit 1\n' > "$W/fake-role-call"
+ROLE_CALL="$W/fake-role-call" bash "$L/run-step8-resume.sh" settle > "$OUT/settle-uncertain.log" 2>&1
+[ $? = 3 ] && grep -q "settlement append uncertain.*inspect the ledger" "$OUT/settle-uncertain.log"; ok $? "settlement append error requires ledger inspection"
 bash "$L/run-step8-resume.sh" r1b-body > "$OUT/r1b-body.log" 2>&1; ok $? "r1b-body: the body and the user's command"
 grep -q "Idempotency-Key: s8-dlv-r1b-0001" "$OUT/r1b-body.log"; ok $? "the printed user command carries the R1b key and the user's token file"
 grep -q "s8-r1b: observation = s8-r1's stream" "$OUT/r1b-body.log"; ok $? "r1b-body checks the observation deadline against s8-r1's stream (the newest record) before printing the user's command"
@@ -207,6 +233,11 @@ python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); [l.update(taken_
 bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1-refused.log" 2>&1; rc=$?
 [ $rc = 3 ] && grep -q "s8-r1b: a run check fails: no R2" "$OUT/r2g1-refused.log" && [ ! -e "$OUT/r2-body.json" ] && ! grep -q '"attempt_id":"s8-r2"' "$LEDGER/records.jsonl"; ok $? "r2g1 refuses when a check of R1b fails: nothing sent (exit $rc)"
 mv -f "$CH.kept" "$CH"
+ROLES="$OUT/roles-s8-r1b.json"; cp "$ROLES" "$ROLES.kept"
+echo '{"code":"ROLE_STATUS_FAILED"}' > "$ROLES"
+bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1-quota-refused.log" 2>&1; rc=$?
+[ $rc = 3 ] && grep -q "quota group mismatches must be an empty list" "$OUT/r2g1-quota-refused.log" && [ ! -e "$OUT/r2-body.json" ]; ok $? "r2g1 refuses without quota evidence: nothing sent (exit $rc)"
+mv -f "$ROLES.kept" "$ROLES"
 bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1.log" 2>&1; ok $? "r2g1: $(tail -1 "$OUT/r2g1.log")"
 grep -q "s8-r2: observation = s8-r1b's stream" "$OUT/r2g1.log" && grep -q "s8-g1: observation = s8-r2's stream" "$OUT/r2g1.log"; ok $? "the observation deadline is checked against the newest stream before R2 (s8-r1b) and G1 (s8-r2)"
 # the old check (raw ledger lines) would count s8-r1's original line as unmeasured; the effective records do not
@@ -228,7 +259,7 @@ t = sum(recs[a]["usage"]["run"]["tokens"][k] for a in recs for k in ("input", "o
 print("   billable over the 4 runs:", t, "| R1 settled", r1["usage"]["run"]["tokens"])
 PY
 # ---- E. rollback rehearsal ----
-bash "$L/restart-roles.sh" rollback "$W/run" > "$OUT/rollback-roles.log" 2>&1; ok $? "restart-roles.sh rollback: the old supervisor back in the same containers"
+bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-roles.log" 2>&1; ok $? "restart-roles.sh rollback: the old supervisor back in the same containers"
 bash "$L/coord-switch.sh" stop "$W/coord.pid" 900 >/dev/null; ok $? "new coordinator stopped"
 bash "$L/coord-switch.sh" start "$W/bin-old/ieo-coord" "$W/private/coord-old" "$W/coord.pid" "$OUT/coord-rollback.log" --tokens "$W/cwd/tokens.json" -- --roles "$W/cwd/roles.json" >/dev/null; ok $? "rollback: the old coordinator starts on the same ledger and database"
 python3 -I -c "import json,sys; json.dump({'assignment_id': 'S8-DEV-A1', 'generation': 0, 'attempt_id': 's8-x', 'session_id': '$(cat /proc/sys/kernel/random/uuid)', 'prompt': 'x'}, open(sys.argv[1], 'w'))" "$OUT/x-body.json"
