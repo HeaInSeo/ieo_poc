@@ -77,7 +77,21 @@ impl Config {
                 append_system_prompt_file: v["append_system_prompt_file"]
                     .as_str()
                     .map(str::to_string),
+                // 02-05 step 8: `"tools": "read_only"` (PR #86 review 3e4e3d6 M-1); absent = no
+                // tool options, as before; any other value is refused
+                read_only: match &v["tools"] {
+                    Value::Null => false,
+                    Value::String(t) if t == "read_only" => true,
+                    t => {
+                        return Err(format!(
+                            "config.tools: only \"read_only\" is known, not {t}"
+                        ));
+                    }
+                },
             },
+            "guardrail" if !v["tools"].is_null() => {
+                return Err("config.tools: the Guardrail's tools are fixed".into());
+            }
             "guardrail" => Role::Guardrail,
             r => return Err(format!("unknown role {r}")),
         };

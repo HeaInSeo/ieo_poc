@@ -1,0 +1,1 @@
+Use only the Read tool. The files of the reviewed commit are in /state/review/ieo-poc-test. Below are numbered claims made by the development role, one per line. For each claim, read the file it is about and reply with one line: <number> CONFIRMED or <number> CONTRADICTED <file>. Do not write any file.

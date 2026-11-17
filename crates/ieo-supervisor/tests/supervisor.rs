@@ -97,6 +97,7 @@ fn files(root: &Path) -> Vec<String> {
 fn role_arguments_use_edit_paths_and_session_id_only() {
     let dev = Role::Development {
         append_system_prompt_file: Some("/run/ieo/claude-md/CLAUDE.md".into()),
+        read_only: false,
     };
     for role in [dev.clone(), Role::Guardrail] {
         for resume in [false, true] {
@@ -135,6 +136,34 @@ fn role_arguments_use_edit_paths_and_session_id_only() {
     assert!(!g.iter().any(|x| x == "--add-dir"));
     let d = args::build(&dev, "sori", SID, false);
     assert!(d.windows(2).any(|w| w[0] == "--append-system-prompt-file"));
+    // an accepted development run has no tool options (unchanged by the read-only option)
+    for k in ["--tools", "--allowedTools", "--disallowedTools"] {
+        assert!(!d.iter().any(|x| x == k), "{k}: {d:?}");
+    }
+    // 02-05 step 8 (PR #86 review 3e4e3d6 M-1): a read-only development run is offered Read,
+    // Grep and Glob only, reads scoped to its work tree, the supervisor's paths denied
+    let ro = Role::Development {
+        append_system_prompt_file: None,
+        read_only: true,
+    };
+    for resume in [false, true] {
+        let r = args::build(&ro, "ieo-poc-test", SID, resume);
+        let at = |k: &str| r.iter().position(|x| x == k).expect(k);
+        assert_eq!(r[at("--tools") + 1], "Read,Grep,Glob", "{r:?}");
+        let allow = at("--allowedTools");
+        assert_eq!(
+            r[allow + 1..allow + 4].to_vec(),
+            ["Read(//state/work/ieo-poc-test/**)", "Grep", "Glob"]
+        );
+        let deny = at("--disallowedTools");
+        assert_eq!(
+            r[deny + 1..deny + 1 + args::DEVELOPMENT_READ_ONLY_DISALLOWED.len()].to_vec(),
+            args::DEVELOPMENT_READ_ONLY_DISALLOWED.to_vec()
+        );
+        assert!(r.iter().any(|x| x == "--disable-slash-commands"));
+        assert!(!r.iter().any(|x| x.contains("Write") || x.contains("Edit(")));
+    }
+    assert!(args::DEVELOPMENT_READ_ONLY_DISALLOWED.contains(&"Read(//run/ieo/**)"));
     assert_eq!(args::cwd(&Role::Guardrail, "sori"), "/state/guardrail-cwd");
 }
 
@@ -1091,4 +1120,42 @@ fn the_0205_budget_caps_each_number() {
         &b,
         &[rec(json!({"state": "unmeasured", "reason": "x"}), 1000)]
     ));
+}
+
+/// 02-05 step 8 (PR #86 review 3e4e3d6 M-1): the role config's `"tools": "read_only"` selects
+/// the read-only development arguments; any other value, or a `tools` on the Guardrail, is
+/// refused; without it nothing changes.
+#[test]
+fn a_read_only_development_role_is_chosen_in_the_config() {
+    use ieo_supervisor::serve::Config;
+    let cfg = |role: &str, tools: serde_json::Value| {
+        let mut v = serde_json::json!({"role": role, "repo": "ieo-poc-test", "state": "/state",
+            "etc": "/etc/ieo/role", "cred": "/run/ieo/cred", "claude": "/opt/claude/claude",
+            "quota_group_id": "q-1", "checkpoint_central": "local_only", "budget": "02-05"});
+        if !tools.is_null() {
+            v["tools"] = tools;
+        }
+        Config::from_json(&v)
+    };
+    let ro = cfg("development", serde_json::json!("read_only")).expect("read_only");
+    assert_eq!(
+        ro.role,
+        Role::Development {
+            append_system_prompt_file: None,
+            read_only: true
+        }
+    );
+    let plain = cfg("development", serde_json::Value::Null).expect("plain");
+    assert_eq!(
+        plain.role,
+        Role::Development {
+            append_system_prompt_file: None,
+            read_only: false
+        }
+    );
+    for bad in [serde_json::json!("all"), serde_json::json!(["Read"])] {
+        assert!(cfg("development", bad).is_err());
+    }
+    assert!(cfg("guardrail", serde_json::json!("read_only")).is_err());
+    assert!(cfg("guardrail", serde_json::Value::Null).is_ok());
 }
