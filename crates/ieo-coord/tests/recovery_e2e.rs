@@ -7,6 +7,8 @@
 //! delivery), as the coordinator and the role volume hold it after a crash.
 //! Skipped without `IEO_TEST_DB_URL` outside CI.
 
+mod common;
+use common::free_port;
 use ieo_supervisor::serve::{Config, Service};
 use postgres::NoTls;
 use serde_json::{Value, json};
@@ -84,17 +86,16 @@ struct Coord {
     port: u16,
     args: Vec<String>,
     db_url: String,
+    /// The coordinator's stderr, appended across restarts, inside the test's directory (removed
+    /// with it; PR #84 review b291d7c I-1).
+    log: std::path::PathBuf,
 }
 
 impl Coord {
     fn start(&mut self) {
         // the coordinator's stderr is kept (appended across restarts) and shown when it does not
         // start (main CI ad96116: "the coordinator did not start" without a reason)
-        let log = std::env::temp_dir().join(format!(
-            "ieo-rcv-coord-{}-{}.log",
-            self.port,
-            std::process::id()
-        ));
+        let log = self.log.clone();
         let err = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -324,25 +325,6 @@ fn a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc() {
     e2e("grpc");
 }
 
-/// A free port **below the ephemeral range** (02-05 pre-step-8c): a port taken by binding port 0
-/// is an ephemeral port, and between this check and the coordinator's own bind the system may
-/// hand it out as the local port of an outgoing connection (to PostgreSQL, to a role service),
-/// so the coordinator cannot bind it and never answers (main CI 44003424073: "the coordinator
-/// did not start" at its first start). Ports from 20000-32767 are never given to outgoing
-/// connections; the pick is spread by process and call and checked by binding.
-fn free_port() -> u16 {
-    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-    for _ in 0..1000 {
-        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let p = 20_000 + (std::process::id().wrapping_mul(7919).wrapping_add(n * 131)) % 12_768;
-        let p = u16::try_from(p).expect("port");
-        if std::net::TcpListener::bind(("127.0.0.1", p)).is_ok() {
-            return p;
-        }
-    }
-    panic!("no free port below the ephemeral range");
-}
-
 fn unix_now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -470,6 +452,7 @@ fn e2e(transport: &str) {
     let rootdir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
     let mut coord = Coord {
         child: None,
+        log: dir.join("coordinator-stderr.log"),
         port,
         db_url: format!("{base} dbname={dbname}"),
         args: vec![
