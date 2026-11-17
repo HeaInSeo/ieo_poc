@@ -40,18 +40,63 @@ use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
-/// Runs an accepted delivery started and whose record is still being finished by a thread of
-/// this process (review 63fefc1 M-1 (a)): the shutdown waits for them, bounded.
+/// Deliveries in progress and runs an accepted delivery started whose record is still being
+/// finished by a thread of this process (review 63fefc1 M-1 (a)): the shutdown waits for them,
+/// bounded.
 static FINISHING: AtomicUsize = AtomicUsize::new(0);
 
-/// One run being finished; dropped (also on a panic) when its thread ends.
+/// The latest time by which every counted delivery or run should be done (its own bound); the
+/// shutdown waits at least until then (review 4531772 L-3).
+static LATEST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
+/// The caller's finishing margin: `After::finish` waits the run window plus this, and after a
+/// stop it sent, this again.
+pub const FINISH_MARGIN_SECS: u64 = 60;
+
+/// Slack after the caller's waits for fetching the stream and transcripts and writing the record.
+pub const FINISH_SLACK_SECS: u64 = 60;
+
+/// The shutdown wait without a counted run (review 4531772 L-3): the 02-05 run window (600 s =
+/// timeout + grace) + 2 × the finishing margin + the slack = 780 s. A counted run with a longer
+/// window (02-04: 1,800 s, X-02: 3,600 s) extends it to its own bound ([`shutdown_wait`]).
+pub const SHUTDOWN_WAIT_DEFAULT_SECS: u64 = 600 + 2 * FINISH_MARGIN_SECS + FINISH_SLACK_SECS;
+
+/// How long a run with this window (timeout + grace) may take to be finished and recorded.
+pub fn finish_bound(window: Duration) -> Duration {
+    window + Duration::from_secs(2 * FINISH_MARGIN_SECS + FINISH_SLACK_SECS)
+}
+
+/// One delivery in progress or one run being finished; dropped (also on a panic) when it ends.
 struct Finishing;
 
 impl Finishing {
-    fn start() -> Finishing {
+    /// Counted from now; `within` is how long it may take.
+    fn start(within: Duration) -> Finishing {
         FINISHING.fetch_add(1, Ordering::SeqCst);
+        let until = std::time::Instant::now() + within;
+        let mut l = LATEST.lock().unwrap_or_else(|e| e.into_inner());
+        if l.is_none_or(|t| t < until) {
+            *l = Some(until);
+        }
         Finishing
     }
+}
+
+/// The shutdown wait: `IEO_COORD_SHUTDOWN_WAIT_SECS` when set, else the longer of
+/// [`SHUTDOWN_WAIT_DEFAULT_SECS`] and the time left until the latest counted bound.
+pub fn shutdown_wait() -> Duration {
+    if let Some(s) = std::env::var("IEO_COORD_SHUTDOWN_WAIT_SECS")
+        .ok()
+        .and_then(|w| w.parse().ok())
+    {
+        return Duration::from_secs(s);
+    }
+    let left = LATEST
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .map(|t| t.saturating_duration_since(std::time::Instant::now()))
+        .unwrap_or_default();
+    left.max(Duration::from_secs(SHUTDOWN_WAIT_DEFAULT_SECS))
 }
 
 impl Drop for Finishing {
@@ -64,7 +109,9 @@ impl Drop for Finishing {
 static STOPPING: AtomicBool = AtomicBool::new(false);
 
 /// The process is stopping (SIGTERM/SIGINT): new deliveries are refused with 503
-/// `COORDINATOR_STOPPING` while the runs already accepted are finished (review 63fefc1 M-1 (a)).
+/// `COORDINATOR_STOPPING` while the deliveries in progress and the runs already accepted are
+/// finished (review 63fefc1 M-1 (a)). A delivery is counted **before** it reads this flag, so
+/// one that passed the check is waited for (review 4531772 L-4).
 pub fn begin_stop() {
     STOPPING.store(true, Ordering::SeqCst);
 }
@@ -516,6 +563,10 @@ pub fn deliver(
     req: &Req,
     guard: &dyn TxGuard,
 ) -> Result<Resp, Abort> {
+    // counted before the stop check (review 4531772 L-4): a shutdown that starts after the check
+    // waits for this delivery, and a run it starts is counted by its own guard before this one
+    // is dropped. Its bound: the in-flight window of a delivery
+    let _delivery = Finishing::start(Duration::from_secs(bounds().0));
     let pre = (|| {
         need_compare(who, repo, role)?;
         // stopping: the runs already accepted are being finished; nothing new starts and nothing
@@ -858,14 +909,18 @@ pub fn deliver(
             o.supervisor = Some((202, answer));
             // the run is finished, measured and charged by the same library; the ledger lock
             // stays held until its record is written. The shutdown waits for it (bounded)
-            let g = Finishing::start();
+            let window = Duration::from_millis(
+                sent["limits"]["timeout_ms"].as_u64().unwrap_or_default()
+                    + sent["limits"]["grace_ms"].as_u64().unwrap_or_default(),
+            );
+            let g = Finishing::start(finish_bound(window));
             std::thread::spawn(move || {
                 let _g = g;
                 let a = running.attempt_id().to_string();
                 match running.finish(
                     &caller::Http,
                     Duration::from_millis(250),
-                    Duration::from_secs(60),
+                    Duration::from_secs(FINISH_MARGIN_SECS),
                 ) {
                     Ok(r) => eprintln!(
                         "ieo-coord: delivery attempt {a} recorded (stop_required {})",
@@ -1133,7 +1188,17 @@ mod tests {
     /// Review 63fefc1 M-1 (a): the shutdown waits for the runs being finished, bounded.
     #[test]
     fn the_shutdown_waits_for_the_runs_being_finished() {
-        let g = Finishing::start();
+        // review 4531772 L-3: 600 s window + 2 × 60 s margin + 60 s slack
+        assert_eq!(SHUTDOWN_WAIT_DEFAULT_SECS, 780);
+        assert_eq!(
+            finish_bound(Duration::from_secs(600)),
+            Duration::from_secs(SHUTDOWN_WAIT_DEFAULT_SECS)
+        );
+        // a counted run with a longer bound extends the wait to it
+        let long = Finishing::start(Duration::from_secs(5_000));
+        assert!(shutdown_wait() >= Duration::from_secs(4_990));
+        drop(long);
+        let g = Finishing::start(Duration::from_secs(1));
         assert!(finishing() >= 1);
         let t0 = std::time::Instant::now();
         assert!(wait_finishing(Duration::from_millis(200)) >= 1, "bounded");

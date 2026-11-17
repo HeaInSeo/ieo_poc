@@ -113,20 +113,20 @@ fn run() -> Result<(), String> {
                     eprintln!("ieo-coord: stopping (signal)");
                     // review 63fefc1 M-1 (a): an accepted run's record is written by a thread of
                     // this process, and the role reports its after_run checkpoint here. Refuse new
-                    // deliveries and keep serving until those runs are finished (bounded: the
-                    // longest run window, 600 s, plus the stop grace and the caller's margin), so
-                    // a stop does not leave a run unmeasured or its checkpoint unrecorded
+                    // deliveries and keep serving until the deliveries in progress and those runs
+                    // are finished (bounded: `delivery::shutdown_wait`, by default 780 s or the
+                    // latest run's own bound, review 4531772 L-3), so a stop does not leave a run
+                    // unmeasured or its checkpoint unrecorded
                     ieo_coord::delivery::begin_stop();
-                    let wait = std::env::var("IEO_COORD_SHUTDOWN_WAIT_SECS")
-                        .ok()
-                        .and_then(|w| w.parse().ok())
-                        .unwrap_or(720);
+                    let wait = ieo_coord::delivery::shutdown_wait();
                     let n = ieo_coord::delivery::finishing();
                     if n > 0 {
-                        eprintln!("ieo-coord: waiting up to {wait} s for {n} run(s) being finished");
+                        eprintln!(
+                            "ieo-coord: waiting up to {} s for {n} delivery(ies) or run(s) being finished",
+                            wait.as_secs()
+                        );
                     }
-                    let left =
-                        ieo_coord::delivery::wait_finishing(std::time::Duration::from_secs(wait));
+                    let left = ieo_coord::delivery::wait_finishing(wait);
                     if left > 0 {
                         eprintln!(
                             "ieo-coord: stopping with {left} run(s) not finished: their ledger \
@@ -161,6 +161,12 @@ fn run() -> Result<(), String> {
             // the gRPC side stops after the HTTP side (calls in progress finish first)
             if let Some(g) = grpc {
                 g.stop();
+            }
+            // review 4531772 L-4: a run started in the moment between the wait and the unblock is
+            // still waited for here (its record; the role cannot report to a closed server)
+            let left = ieo_coord::delivery::wait_finishing(ieo_coord::delivery::shutdown_wait());
+            if left > 0 {
+                eprintln!("ieo-coord: exiting with {left} run(s) not finished");
             }
             served?;
             eprintln!("ieo-coord: stopped");
