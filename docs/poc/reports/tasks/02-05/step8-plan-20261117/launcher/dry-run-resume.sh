@@ -180,7 +180,11 @@ st=$(req r1b user-dry POST /v0/repos/ieo-poc-test/roles/development/deliveries "
 bash "$L/run-step8-resume.sh" r1b-check > "$OUT/r1b-check.log" 2>&1; ok $? "r1b-check: $(grep -m1 's8-r1b:' "$OUT/r1b-check.log") · $(grep -m1 'spare:' "$OUT/r1b-check.log")"
 grep -q "WARNING s8-r1b" "$OUT/r1b-check.log"; ok $? "R1b got the allowed_warning event: recorded and printed as a warning, not a stop"
 OBS_UNIX=$R1_END bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1.log" 2>&1; ok $? "r2g1: $(tail -1 "$OUT/r2g1.log")"
+# the old check (raw ledger lines) would count s8-r1's original line as unmeasured; the effective records do not
+( unset EFFECTIVE_RECORDS; R1_ATTEMPT=s8-r1b python3 -I "$L/check-run.py" "$LEDGER" "$OUT" s8-r2 development S8-DEV-A1 > "$OUT/raw-check.log" 2>&1 ); rc=$?
+[ $rc = 1 ] && grep -q "s8-r1: unmeasured" "$OUT/raw-check.log"; ok $? "check-run.py on the raw lines would fail on s8-r1's original line (why EFFECTIVE_RECORDS)"
 "$W/bin-new/ieo-role-call" records --plan "$PLAN" > "$OUT/final-records.jsonl"
+EFFECTIVE_RECORDS="$OUT/final-records.jsonl" R1_ATTEMPT=s8-r1b SETTLED=s8-r1 python3 -I "$L/check-run.py" "$LEDGER" "$OUT" s8-r2 development S8-DEV-A1 > "$OUT/eff-check.log" 2>&1; ok $? "the same check on the effective records passes"
 python3 -I - "$OUT/final-records.jsonl" <<'PY'; ok $? "the budget counts 4 runs once each: s8-r1 settled (failed), s8-r1b spare, s8-r2 resumes s8-r1b, s8-g1"
 import json, sys
 recs = {r["attempt_id"]: r for r in (json.loads(l) for l in open(sys.argv[1]) if l.strip())}
