@@ -251,7 +251,7 @@ pub const CORRECTION_FORMAT: &str = "ieo-role-run-correction/v0";
 /// later run, a second correction of one run, a missing or changed file, or any difference
 /// makes the ledger unusable.
 pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
-    let recs = effective(raw_records(plan)?)?;
+    let recs = effective(raw_records(plan)?, &plan.ledger_dir)?;
     // one ledger belongs to one budget (02-05 budget PR): a record of another budget is never
     // counted for, or charged to, this one; the ledger is refused instead (fail closed)
     if let Some(other) = recs
@@ -269,11 +269,48 @@ pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
     Ok(recs)
 }
 
-fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
+fn effective(raw: Vec<Value>, ledger_dir: &Path) -> Result<Vec<Value>, String> {
     let mut runs: Vec<Value> = Vec::new();
     let mut done = std::collections::BTreeSet::new();
+    let mut settled = std::collections::BTreeSet::new();
     for line in raw {
+        if line["format"] == crate::settlement::SETTLEMENT_FORMAT {
+            // a settlement (user decision 2026-11-17 r1-settlement): checked again from its
+            // files on every read, applied to the earlier run it names, one per run, never to a
+            // corrected run (no double counting: the run counts once, the line is no run)
+            let id = line["settles"]
+                .as_str()
+                .ok_or("settlement without `settles`")?
+                .to_owned();
+            if !settled.insert(id.clone()) {
+                return Err(format!("run {id} has more than one settlement"));
+            }
+            let pos = runs
+                .iter()
+                .position(|r| r["attempt_id"] == id.as_str())
+                .ok_or(format!("settlement of an unknown or later run {id}"))?;
+            if !runs[pos]["corrected_by"].is_null() {
+                return Err(format!("settlement of {id}: the run is corrected already"));
+            }
+            let sp = runs[pos]["stream"]["path"].as_str().unwrap_or_default();
+            let stream = std::fs::read_to_string(sp).map_err(|e| {
+                format!(
+                    "settlement of {id}: stream {sp}: {}{}",
+                    e.kind(),
+                    moved_hint(&e)
+                )
+            })?;
+            runs[pos] = crate::settlement::apply(&runs[pos], &line, &stream, ledger_dir)?;
+            continue;
+        }
         if line["format"] != CORRECTION_FORMAT {
+            // what only a settlement sets is never taken from a written run line
+            if !line["settlement"].is_null() || !line["before_settlement"].is_null() {
+                return Err(format!(
+                    "record {} carries settlement fields itself",
+                    line["attempt_id"]
+                ));
+            }
             runs.push(line);
             continue;
         }
@@ -284,6 +321,9 @@ fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
             .to_owned();
         if !done.insert(id.clone()) {
             return Err(format!("run {id} has more than one correction"));
+        }
+        if settled.contains(&id) {
+            return Err(format!("correction of {id}: the run is settled already"));
         }
         let pos = runs
             .iter()
@@ -872,6 +912,20 @@ pub fn other_stop_reason(reason: impl Into<String>) -> String {
 pub fn spare_releasable(r: &Value) -> Result<(), String> {
     if r["usage"]["run"]["state"] != "measured" {
         return Err(format!("usage {}", r["usage"]["run"]["state"]));
+    }
+    // a run the guard stopped has no result of its own: its "no result event" is the guard's,
+    // and only a settled stop on the old rule's warning may be released (user decision
+    // 2026-11-17 r1-settlement §2.3, scoped to that case; PR #89 review 91e87ce L-4). Real
+    // rejects, extra usage, time or token caps and other unmeasured runs are never settled, so
+    // they keep blocking.
+    if r["outcome"]["stopped_by_guard"] == true
+        && (r["settlement"]["policy"] != crate::settlement::POLICY
+            || crate::settlement::pinned(r).is_err())
+    {
+        return Err(format!(
+            "the guard stopped the run ({}) and it has no settlement",
+            r["outcome"]["stop"]
+        ));
     }
     if r["stop_required"] != true {
         return Ok(());
@@ -1601,7 +1655,7 @@ pub fn reevaluate(
         .iter()
         .position(|r| r["attempt_id"] == attempt && r["format"] == RECORD_FORMAT)
         .ok_or(format!("no record of {attempt}"))?;
-    let earlier = effective(raw[..pos].to_vec())?;
+    let earlier = effective(raw[..pos].to_vec(), &plan.ledger_dir)?;
     let r = &raw[pos];
     // measured first from the given files: nothing is copied or written for a refusal
     remeasure(r, &earlier, transcripts)?;
@@ -1656,6 +1710,146 @@ pub fn reevaluate(
     // the ledger must read back with the correction applied
     records(plan)?;
     Ok(c)
+}
+
+/// Settle a guard-stopped run from its session transcript (user decision 2026-11-17
+/// r1-settlement (가); [`crate::settlement`]). Under the ledger lock, with no call in flight:
+/// the run must be eligible, the transcript (`transcript`, the verified evidence copy) is copied
+/// into `children/<attempt>/settlement-transcript.jsonl` (0600; an existing copy must be the
+/// same), its SHA-256 must be `original_sha256`, and the settlement line is appended only when
+/// the ledger then reads back with it applied. With `dry_run` nothing is written: the line is
+/// returned as it would be appended (its copy path is where it would be).
+#[allow(clippy::too_many_arguments)]
+pub fn settle(
+    plan: &Plan,
+    attempt: &str,
+    transcript: &Path,
+    original_path: &str,
+    original_sha256: &str,
+    decision: &str,
+    independent_check: &Value,
+    dry_run: bool,
+) -> Result<Value, String> {
+    if decision.trim().is_empty() {
+        return Err("a settlement needs the decision it follows".into());
+    }
+    crate::settlement::independent_check_ok(independent_check)?;
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(plan.ledger_dir.join("caller.lock"))
+        .map_err(|e| format!("caller lock: {e}"))?;
+    match lock.try_lock() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => {
+            return Err("another caller holds the ledger".into());
+        }
+        Err(std::fs::TryLockError::Error(e)) => return Err(format!("caller lock: {e}")),
+    }
+    if inflight_path(plan).exists() {
+        return Err("a call is in flight without a record: a person reconciles it first".into());
+    }
+    let raw = raw_records(plan)?;
+    if raw
+        .iter()
+        .any(|r| r["format"] == crate::settlement::SETTLEMENT_FORMAT && r["settles"] == attempt)
+    {
+        return Err(format!("{attempt} is already settled"));
+    }
+    let found: Vec<&Value> = raw
+        .iter()
+        .filter(|r| r["format"] == RECORD_FORMAT && r["attempt_id"] == attempt)
+        .collect();
+    let [r] = found.as_slice() else {
+        return Err(format!("{attempt}: {} records (one expected)", found.len()));
+    };
+    if raw
+        .iter()
+        .any(|c| c["format"] == CORRECTION_FORMAT && c["corrects"] == attempt)
+    {
+        return Err(format!("{attempt} is corrected already"));
+    }
+    // the ledger reads as it is (fail closed) before anything is added
+    records(plan)?;
+    let sp = r["stream"]["path"].as_str().unwrap_or_default();
+    let stream =
+        std::fs::read_to_string(sp).map_err(|e| format!("stream {sp}: {e}{}", moved_hint(&e)))?;
+    crate::settlement::eligible(r, &stream)?;
+    let b = std::fs::read(transcript).map_err(|e| format!("{}: {e}", transcript.display()))?;
+    if hex::encode(Sha256::digest(&b)) != original_sha256 {
+        return Err(format!(
+            "{}: SHA-256 differs from the original's {original_sha256}",
+            transcript.display()
+        ));
+    }
+    // the independent check's report, read once here; the ledger keeps a copy (review 7b904de N-1)
+    let rp = independent_check["evidence"].as_str().unwrap_or_default();
+    let report = std::fs::read(rp).map_err(|e| format!("independent check report {rp}: {e}"))?;
+    if dry_run {
+        // measured from the given files' bytes; nothing is written anywhere (review d971f59 L-3)
+        return crate::settlement::build(
+            r,
+            &stream,
+            &b,
+            &report,
+            &plan.ledger_dir,
+            false,
+            original_path,
+            original_sha256,
+            decision,
+            independent_check,
+        );
+    }
+    // the copies: created new in the ledger, never through a symlink; an existing regular file
+    // must be the same bytes (reviews d971f59 L-1, 7b904de N-1)
+    let mut created: Vec<PathBuf> = Vec::new();
+    let mut keep = |name: &str, bytes: &[u8]| -> Result<(), String> {
+        let (p, new) = crate::settlement::write_in_ledger(&plan.ledger_dir, attempt, name, bytes)?;
+        if new {
+            created.push(p);
+        }
+        Ok(())
+    };
+    let kept = keep(crate::settlement::COPY_NAME, &b)
+        .and_then(|()| keep(crate::settlement::REPORT_NAME, &report));
+    let s = kept.and_then(|()| {
+        crate::settlement::build(
+            r,
+            &stream,
+            &b,
+            &report,
+            &plan.ledger_dir,
+            true,
+            original_path,
+            original_sha256,
+            decision,
+            independent_check,
+        )
+    });
+    let s = match s {
+        Ok(s) => s,
+        Err(e) => {
+            for p in &created {
+                let _ = std::fs::remove_file(p);
+            }
+            return Err(e);
+        }
+    };
+    append(plan, &s)?;
+    // the ledger must read back with the settlement applied
+    let recs = records(plan)?;
+    if recs
+        .iter()
+        .find(|x| x["attempt_id"] == attempt)
+        .is_none_or(|x| x["settlement"]["policy"] != crate::settlement::POLICY)
+    {
+        return Err(format!(
+            "{attempt}: the settlement did not apply on reading back"
+        ));
+    }
+    drop(lock);
+    Ok(s)
 }
 
 /// Ledger file of a plan, for reports.

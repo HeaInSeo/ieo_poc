@@ -50,7 +50,7 @@ p, r, obs = sys.argv[1], sys.argv[2], int(sys.argv[3])
 spec = importlib.util.spec_from_file_location("rate_limit_policy", sys.argv[4])
 pol = importlib.util.module_from_spec(spec); spec.loader.exec_module(pol)
 with open(p) as f:
-    vs = pol.stream_verdicts(f.read().splitlines())
+    vs = pol.stream_verdicts(f.read())
 ok_ev = len(vs) >= 1 and all(v[0] != "stop" for _, v in vs)
 print(f"  rate_limit_events {len(vs)}; every one passes the no-extra-billing rule: {ok_ev}")
 for n, v in vs:

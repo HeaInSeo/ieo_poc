@@ -14,7 +14,8 @@
    "incomplete_lines": 0,
    "messages": 1
   },
-  "stream_sha256": "252609c73723fc8bff77ff50ad6a2c57f85ee818f4cfd2dfe685e0f11ff34c94"
+  "stream_sha256": "252609c73723fc8bff77ff50ad6a2c57f85ee818f4cfd2dfe685e0f11ff34c94",
+  "ended_at_note": "ledger ended_at 12:19:49.763Z (duration 4,119 ms); the transcript's last write 12:19:48.953Z"
  },
  "kept_stream": {
   "path": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/ledger-0205/streams/s8-r1.jsonl",
@@ -58,7 +59,7 @@
   "path": "/opt/rust/ieo_poc_runs/02-05-s8-20261118/development/state/claude/projects/-state-work-ieo-poc-test/5c991c71-b6e2-4cfb-bd76-6bb18a36e090.jsonl (role state volume, CLAUDE_CONFIG_DIR, not cred/)",
   "sha256": "806746fd5b120020796a41527c7f01322a7f2de2c40d591731b060244824dc68",
   "bytes": 49297,
-  "mtime_utc": "2026-11-17T12:19:48Z",
+  "mtime_utc": "2026-11-17T12:19:48.953Z",
   "entries": 25,
   "types": [
    "custom-title",
@@ -105,7 +106,9 @@
      "output_tokens": 130,
      "cache_creation_input_tokens": 1411,
      "cache_read_input_tokens": 3223
-    }
+    },
+    "apiBlockIndex": 0,
+    "requestRef": "36a2d590"
    },
    {
     "line": 18,
@@ -117,7 +120,9 @@
      "output_tokens": 130,
      "cache_creation_input_tokens": 1411,
      "cache_read_input_tokens": 3223
-    }
+    },
+    "apiBlockIndex": 1,
+    "requestRef": "36a2d590"
    }
   ],
   "cost_state": {
@@ -140,7 +145,58 @@
    "totalDuration_ms": 3310,
    "hasUnknownModelCost": false
   },
-  "last_timestamped_entry": "2026-11-17T12:19:48.855Z"
+  "last_timestamped_entry": "2026-11-17T12:19:48.855Z",
+  "tail_entries": [
+   {
+    "line": 18,
+    "type": "assistant",
+    "timestamp": "2026-11-17T12:19:48.817Z"
+   },
+   {
+    "line": 19,
+    "type": "last-prompt",
+    "timestamp": null
+   },
+   {
+    "line": 20,
+    "type": "custom-title",
+    "timestamp": null
+   },
+   {
+    "line": 21,
+    "type": "agent-name",
+    "timestamp": null
+   },
+   {
+    "line": 22,
+    "type": "atis-latch",
+    "timestamp": null
+   },
+   {
+    "line": 23,
+    "type": "cost-state",
+    "timestamp": null
+   },
+   {
+    "line": 24,
+    "type": "user",
+    "timestamp": "2026-11-17T12:19:48.852Z"
+   },
+   {
+    "line": 25,
+    "type": "attachment",
+    "timestamp": "2026-11-17T12:19:48.855Z"
+   }
+  ],
+  "tail_note": "Line 23 cost-state (no timestamp; startTime + totalDuration = ~12:19:48.844Z) is followed by line 24, the second tool result (12:19:48.852Z), and line 25, a prompt_snapshot attachment (12:19:48.855Z) that the CLI writes while assembling the next request (the same kind at line 11 preceded api-request by 21 ms). No api-request-shape, api-request or assistant entry follows; the file's last write is 12:19:48.953Z; the ledger ends at 12:19:49.763Z (SIGTERM, exit 143). A next request was prepared; one sent just before SIGTERM whose log write was lost cannot be ruled out client-side (uncovered: unlogged_in_flight_request_at_sigterm); provider-side billing is not visible.",
+  "assistant_note": "lines 16 and 18 are per-content-block entries of ONE message (apiBlockIndex 0 and 1, one tool_use each), each carrying the message's final usage; they are not partial snapshots (that describes the stream's two events, output 16)",
+  "api_request_link": {
+   "api_request_id": "36a2d590",
+   "assistant_requestRef": [
+    "36a2d590"
+   ],
+   "mapping": "1:1 (one api-request, one message id, one requestId)"
+  }
  },
  "finding": {
   "model_requests_logged": 1,
@@ -158,6 +214,21 @@
   },
   "billable_input_output_cache_creation": 1543,
   "stream_lower_bound_billable": 1429,
-  "difference": 114
+  "difference": 114,
+  "label": "CLI exit accounting (client-side), not a provider bill"
+ },
+ "evidence_copy": {
+  "path": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-evidence/s8-r1-transcript.jsonl (0400, outside the repository)",
+  "sha256": "806746fd5b120020796a41527c7f01322a7f2de2c40d591731b060244824dc68",
+  "manifest": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-evidence/MANIFEST.txt"
+ },
+ "independent_verification": {
+  "report": "r1-usage-verification.md",
+  "verdict": "CONFIRMED WITH CAVEAT",
+  "reproduced": {
+   "billable": 1543,
+   "cache_read": 3223
+  },
+  "caveat": "unlogged_in_flight_request_at_sigterm"
  }
 }

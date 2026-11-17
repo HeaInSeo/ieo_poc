@@ -72,13 +72,30 @@ def verdict(event):
     return ("warning", "rate limit warning (allowed_warning; paid extra usage off): " + "; ".join(warned))
 
 
+def _no_constant(name):
+    # NaN, Infinity and -Infinity are not JSON (serde_json refuses them; Python accepts them)
+    raise ValueError(f"not JSON: {name}")
+
+
+def split_lines(text):
+    """The lines of a stream as the supervisor reads them (Rust str::lines): split on "\n" only
+    (never on U+2028, U+0085 and the like), one trailing "\r" removed, no empty last line."""
+    parts = text.split("\n")
+    if parts and parts[-1] == "":
+        parts.pop()
+    return [p[:-1] if p.endswith("\r") else p for p in parts]
+
+
 def stream_verdicts(lines):
     """[(line number, verdict)] for every rate_limit_event of a stream; a line that mentions
-    rate_limit_event but is not JSON is a stop (it may have carried a breaking value)."""
+    rate_limit_event but is not JSON is a stop (it may have carried a breaking value). `lines`
+    is a list (use split_lines) or the stream text itself."""
+    if isinstance(lines, str):
+        lines = split_lines(lines)
     out = []
     for n, line in enumerate(lines, 1):
         try:
-            e = json.loads(line)
+            e = json.loads(line, parse_constant=_no_constant)
         except ValueError:
             if "rate_limit_event" in line:
                 out.append((n, ("stop", f"line {n}: unreadable rate_limit_event")))
