@@ -4,7 +4,7 @@
 #       [read] checks that the pid is that binary listening on 127.0.0.1:<port>, shows its parent
 #       and cgroup (stops when it runs as a systemd service: a unit would restart it), counts the
 #       established clients, and copies its argv, environment and working directory into <out dir>
-#       (argv0, env0: NUL-separated as in /proc; cwd; all 0600). Every path argument (--tokens,
+#       (argv0, env0: NUL-separated as in /proc, owner read-only; cwd 0600; dir 0700). Every path argument (--tokens,
 #       --manifest, --profiles, --bindings, --policy, --roles) must exist from that cwd. Prints
 #       names and paths only, never an environment value.
 #   coord-switch.sh stop <pid file> [timeout s]

@@ -86,7 +86,7 @@ st=$(req fixture s8-registrant POST '/v0/sprints?mode=draft' "$W/out/fixture-spr
 tr '\0' '\n' < "/proc/$(cat "$W/coord.pid")/environ" | grep -q '^BASH_FUNC_s8dry_fn%%=() {'; ok $? "the old process carries an exported multi-line shell function"
 # 2. capture (read), backup with the live row counts, the migration rehearsal (EXECUTION_PLAN.md §3, §5.2 steps 1–4)
 bash "$HERE/coord-switch.sh" capture "$W/coord.pid" "$W/bin/ieo-coord" "$CPORT" "$W/private"; ok $? "capture of the old process (argv0, env0, cwd: 0600; names and paths only shown)"
-[ "$(stat -c %a "$W/private/env0")" = 600 ] && grep -qz '^IEO_DB_URL=' "$W/private/env0" && grep -qz '^BASH_FUNC_s8dry_fn%%=' "$W/private/env0"; ok $? "env0 keeps NUL boundaries (the database URL and the two-line function intact), mode 0600"
+case "$(stat -c %a "$W/private/env0")" in 400|600) true;; *) false;; esac && grep -qz '^IEO_DB_URL=' "$W/private/env0" && grep -qz '^BASH_FUNC_s8dry_fn%%=' "$W/private/env0"; ok $? "env0 keeps NUL boundaries (the database URL and the two-line function intact), owner-only (0400 as copied from /proc)"
 podman exec "$PGC" pg_dump -U ieo -d "$DB" -Fc > "$W/backup/ieo.dump"; ok $? "pg_dump -Fc ($(stat -c %s "$W/backup/ieo.dump") bytes)"
 podman exec -i "$PGC" pg_restore --list < "$W/backup/ieo.dump" > "$W/backup/ieo.dump.list"; ok $? "pg_restore --list ($(grep -c 'TABLE DATA' "$W/backup/ieo.dump.list") tables with data)"
 podman exec "$PGC" psql -U ieo -d "$DB" -At -c "SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE relkind='r' AND nspname='public' ORDER BY 1" \
