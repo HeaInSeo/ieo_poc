@@ -33,4 +33,9 @@ KILLED Y02 python accepts NaN (---- the_launcher_reads_a_stream_like_the_supervi
 KILLED T04 (rerun at 7b2d8da)
 KILLED E08 (rerun at b1f5c68)
 # W02 survives as an equivalent mutant: settlement::build checks the same condition (copy SHA-256 = original SHA-256) before anything is appended
-# total: 32 mutants, 31 killed, 1 equivalent
+KILLED V01 any verdict accepted (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED V02 caveat not required (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED V03 digest form not checked (---- not_enough_evidence_writes_nothing)
+KILLED V04 independent check not required on read (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+# V01-V04 at a4c468a (independent check verdict/digest, caveat required)
+# total: 36 mutants, 35 killed, 1 equivalent (W02)
