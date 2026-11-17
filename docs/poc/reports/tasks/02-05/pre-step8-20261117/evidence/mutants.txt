@@ -1,4 +1,4 @@
-# 02-05 pre-step-8 PR mutants: each applied alone to the code of c552c99, then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). P1: PR #81 review 291a9b0 H5 (N-1); P2-P4: review debf413 I-8 (one first-action condition); P5-P8: N-2 (stop reasons); P9: the gate's person check (the delivery path always writes kind user, so the unit test covers it). Columns: id | mutation | result | target: failing tests
+# 02-05 pre-step-8 PR mutants: each applied alone to the code of e2dd5f3, then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). P1: PR #81 review 291a9b0 H5 (N-1); P2-P4: review debf413 I-8 (one first-action condition); P5-P8: N-2 (stop reasons); P9: the gate's person check; Q1-Q3, Q6: PR #82 review 63fefc1 M-1 (a) (a stop finishes accepted runs); Q4: I-1; Q5: L-1 (the reviewer's R82-B). Columns: id | mutation | result | target: failing tests
 P1 | deliver passes the raw body `spare`, not spare_extra (review 291a9b0 H5) | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
 P2 | recordFirstAction takes any takeover of the session (I-8 undone) | KILLED | ieo-coord --test grpc: supervisor_operations_answer_the_assignment_and_store_claims
 P3 | the link does not bind the delivery's attempt (both paths) | KILLED | ieo-coord --test grpc: supervisor_operations_answer_the_assignment_and_store_claims
@@ -8,4 +8,10 @@ P6 | another stop reason may carry the separator (N-2) | KILLED | ieo-supervisor
 P7 | a run's cleanup failure is not routed through the guard (N-2) | SURVIVED (equivalent: "process-group cleanup failed" neither starts like a result reason nor contains "; ", so the guard returns it unchanged) | ieo-supervisor --test caller
 P8 | the spare check releases any reason that starts like a result | KILLED | ieo-supervisor --test caller: other_stop_reasons_never_read_as_a_result
 P9 | the gate takes a marker attached by a non-person kind (C2 again) | KILLED | ieo-supervisor --test caller: the_0205_spare_run_needs_a_marker_and_a_failed_development_run
-# 8 of 9 killed; P7 equivalent
+Q1 | a stopping coordinator still takes deliveries | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q2 | the stop does not wait for the runs being finished | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q3 | an accepted run is not counted as being finished | KILLED | ieo-coord --test spare_e2e: a_person_attaches_the_0205_spare_through_deliver_assignment
+Q4 | spare_extra writes kind user whatever the caller (I-1) | KILLED | ieo-coord --lib the_spare_names: delivery::tests::the_spare_names_the_person_who_attached_it
+Q5 | the first-action link does not bind the generation (L-1, R82-B) | KILLED | ieo-coord --test grpc: supervisor_operations_answer_the_assignment_and_store_claims
+Q6 | wait_finishing returns at once | KILLED | ieo-coord --lib the_shutdown_waits: delivery::tests::the_shutdown_waits_for_the_runs_being_finished
+# 14 of 15 killed; P7 equivalent
