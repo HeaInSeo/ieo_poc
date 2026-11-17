@@ -2,8 +2,9 @@
 # 02-05 step 8 (MANUAL_STEPS.md): the checks that read the run records and the captured
 # coordinator environment, so that the agent can run them through ONE narrow allow rule
 # (`bash $D/step8-ops/obs-check.sh`, no arguments; all paths are fixed below).
-#   [1] the first observation D6 (02-04): exactly one D6 stream, every rate_limit_event allowed
-#       with overage rejected and not in use, the D6 record ended at 1794698043; installs a copy
+#   [1] the first observation D6 (02-04): exactly one D6 stream, every rate_limit_event passes
+#       rate_limit_policy.py (the supervisor's rule: allowed or allowed_warning, overage rejected
+#       and not in use; a warning is printed), the D6 record ended at 1794698043; installs a copy
 #       (0600, only when those hold) at $D/ledger-0205-obs/D6.jsonl (an existing copy must be identical) and prints its SHA-256.
 #   [2] nothing of 02-04 in flight: no inflight.json, no process holding caller.lock, no ieo-role-call.
 #   [3] the database of the captured coordinator (after `coord-switch.sh capture`): user, dbname,
@@ -20,6 +21,8 @@
 # Exit 0 when every check holds, 1 otherwise. Re-running is safe (installs are idempotent).
 set -uo pipefail
 D=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data
+# the shared no-extra-billing rule lies next to this script (decision 2026-11-17, warning)
+HERE=$(cd "$(dirname "$0")" && pwd)
 RUNS=/opt/rust/ieo_poc_runs
 OBS_UNIX=1794698043
 fails=0
@@ -41,13 +44,18 @@ if [ "${#streams[@]}" -ne 1 ]; then
   fail "expected exactly one D6 stream"
 else
   P=${streams[0]}; R=$(dirname "$(dirname "$P")")/records.jsonl
-  if python3 -I - "$P" "$R" "$OBS_UNIX" <<'PY'
-import json, sys
+  if python3 -I - "$P" "$R" "$OBS_UNIX" "$HERE/rate_limit_policy.py" <<'PY'
+import importlib.util, json, sys
 p, r, obs = sys.argv[1], sys.argv[2], int(sys.argv[3])
-ev = [json.loads(l)["rate_limit_info"] for l in open(p) if '"rate_limit_event"' in l]
-ok_ev = len(ev) >= 1 and all(e.get("status") == "allowed" and e.get("overageStatus") == "rejected"
-                             and e.get("isUsingOverage") is False for e in ev)
-print(f"  rate_limit_events {len(ev)}; all allowed, overage rejected, not in use: {ok_ev}")
+spec = importlib.util.spec_from_file_location("rate_limit_policy", sys.argv[4])
+pol = importlib.util.module_from_spec(spec); spec.loader.exec_module(pol)
+with open(p) as f:
+    vs = pol.stream_verdicts(f.read().splitlines())
+ok_ev = len(vs) >= 1 and all(v[0] != "stop" for _, v in vs)
+print(f"  rate_limit_events {len(vs)}; every one passes the no-extra-billing rule: {ok_ev}")
+for n, v in vs:
+    if v[0] != "allowed":
+        print(f"  line {n}: {v[0]}: {v[1]}")
 d = [x for x in (json.loads(l) for l in open(r) if l.strip()) if x.get("attempt_id") == "D6"]
 ended = d[0].get("ended_unix") if len(d) == 1 else None
 print(f"  D6 records {len(d)}; ended_unix {ended}; equals {obs}: {ended == obs}")

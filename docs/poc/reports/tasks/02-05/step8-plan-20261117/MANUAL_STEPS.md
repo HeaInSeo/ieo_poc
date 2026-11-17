@@ -133,12 +133,12 @@ stat -c '%a %U' "$T"; printf '%s' "$(cat "$T")" | sha256sum | cut -d' ' -f1
 <확인> && bash /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/step8-ops/obs-check.sh
 ```
 `obs-check.sh`는 인자가 없고 경로가 모두 고정이다. 하는 일:
-- [1] D6 stream이 정확히 하나, 그 안의 `rate_limit_event`가 모두 `allowed`·초과 사용 `rejected`·`isUsingOverage` false, D6 기록의 `ended_unix`가 1794698043. 맞을 때만 `$D/ledger-0205-obs/D6.jsonl`(0600)로 복사하고(이미 있으면 같은 내용이어야 함) SHA-256을 출력.
+- [1] D6 stream이 정확히 하나, 그 안의 `rate_limit_event`가 모두 한도 신호 판정을 통과(`allowed` 또는 `allowed_warning`, 초과 사용 `rejected`, `isUsingOverage` false; 이 브랜치의 `obs-check.sh`는 `rate_limit_policy.py`를 씀, 실행본 사본은 [재개안](RESUME_PLAN.md) 승인 뒤 바뀜), D6 기록의 `ended_unix`가 1794698043. 맞을 때만 `$D/ledger-0205-obs/D6.jsonl`(0600)로 복사하고(이미 있으면 같은 내용이어야 함) SHA-256을 출력.
 - [2] 02-04 장부마다 `inflight.json` 없음, `caller.lock`을 연 프로세스 없음(`fuser` exit 1), `ieo-role-call` 프로세스 0.
 - [3] 캡처한 `env0`이 있으면 `IEO_DB_URL`의 user·dbname·host·port와 암호가 있는지(True/False)만. 해석이 안 되면 예외 종류만 출력하고 실패. `env0`이 없으면 건너뜀.
 - [4] 역할 작업 디렉터리가 있으면 확인(두 역할의 `adapter_token_file`이 `W/adapter.token`, `quota_group_id`가 둘 다 `claude-sub-shared`, 헤더 형식) 뒤 헤더·역할 항목 복사(A4). 확인이 실패하면 아무것도 복사하지 않음. 없으면 건너뜀.
 
-예상 출력: `copies ok`, `D6 streams: 1`과 경로, `rate_limit_events <n>; all allowed, overage rejected, not in use: True`, `D6 records 1; ended_unix 1794698043; equals 1794698043: True`, `installed …/ledger-0205-obs/D6.jsonl (0600)`과 SHA-256, `02-04 ledgers: <n>`과 경로들, `inflight.json absent: True`, `processes holding caller.lock: none (fuser exit 1)`(또는 `caller.lock absent`), `ieo-role-call processes: 0`, [3]·[4] `skipped`, 끝 줄 `## obs-check: PASS`(exit 0). `FAIL:`이 있으면 exit 1이고 에이전트가 멈추고 보고한다.
+예상 출력: `copies ok`, `D6 streams: 1`과 경로, `rate_limit_events <n>; every one passes the no-extra-billing rule: True`(실행본 사본 `step8-ops`의 이전 판은 `all allowed, overage rejected, not in use: True`), `D6 records 1; ended_unix 1794698043; equals 1794698043: True`, `installed …/ledger-0205-obs/D6.jsonl (0600)`과 SHA-256, `02-04 ledgers: <n>`과 경로들, `inflight.json absent: True`, `processes holding caller.lock: none (fuser exit 1)`(또는 `caller.lock absent`), `ieo-role-call processes: 0`, [3]·[4] `skipped`, 끝 줄 `## obs-check: PASS`(exit 0). `FAIL:`이 있으면 exit 1이고 에이전트가 멈추고 보고한다.
 
 ## A2 · 옛 코디네이터 캡처(에이전트, 읽기만)
 

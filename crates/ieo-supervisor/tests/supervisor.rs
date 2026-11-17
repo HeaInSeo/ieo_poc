@@ -764,8 +764,12 @@ fn extra_usage_must_be_off_before_and_during_a_call() {
         with("overageStatus", json!("allowed_warning")),
         with("overageStatus", Value::Null),
         with("status", json!("rejected")),
-        with("status", json!("allowed_warning")),
     ];
+    // a subscription warning with paid extra usage off passes (user decision 2026-11-17,
+    // warning); the policy before it held this call
+    let warning = with("status", json!("allowed_warning"));
+    assert!(budget::observation_check(fresh(&warning)).is_ok());
+    assert!(budget::stream_stop(&warning).is_none());
     for bad in &breaking {
         assert!(
             matches!(

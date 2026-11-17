@@ -49,7 +49,9 @@ impl Drop for Tmp {
 /// A fake `claude` whose session totals grow like the CLI's: the cumulative per session is kept
 /// in a file next to the script, and `modelUsage` reports it. Each run uses 3/7/20/10
 /// (input/output/cache_read/cache_creation). Prompt words: OVERAGE (a breaking rate-limit
-/// event), CHILD (leaves a background child), SLEEP, AGENTRUN (one child agent c1), with
+/// event), WARNRUN (the real s8-r1 allowed_warning event, then a normal end), WARNTHENREJECT /
+/// WARNTHENOVERAGE / WARNMISSING (that warning, then a rejected limit, extra usage in use, or a
+/// warning without isUsingOverage), CHILD (leaves a background child), SLEEP, AGENTRUN (one child agent c1), with
 /// AGENTTWO a second child c2 like c1.
 fn fake_claude(dir: &Path) -> PathBuf {
     let p = dir.join("fake-claude");
@@ -71,7 +73,13 @@ esac
 echo "$i $o $r $c" > "$f"
 printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
 printf '{{"type":"assistant","message":{{"id":"m-%s-%s","usage":{{"input_tokens":3,"output_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":20}}}}}}\n' "$sid" "$i"
+# WARN: the event the real CLI 2.1.322 sent in 02-05 s8-r1 (allowed_warning, paid extra usage off)
+warn='{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed_warning","resetsAt":1795334400,"rateLimitType":"seven_day","utilization":0.86,"overageStatus":"rejected","overageDisabledReason":"out_of_credits","isUsingOverage":false,"surpassedThreshold":0.75,"unifiedWindows":{{"five_hour":{{"utilization":0.04,"resetsAt":1794933000,"status":"allowed"}},"seven_day":{{"utilization":0.86,"resetsAt":1795334400,"status":"allowed_warning","surpassedThreshold":0.75}}}}}}}}'
 case "$prompt" in
+  *WARNTHENREJECT*) printf '%s\n' "$warn"; printf '{{"type":"rate_limit_event","rate_limit_info":{{"status":"rejected","rateLimitType":"seven_day","overageStatus":"rejected","isUsingOverage":false}}}}\n'; sleep 30;;
+  *WARNTHENOVERAGE*) printf '%s\n' "$warn"; printf '{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed_warning","rateLimitType":"seven_day","overageStatus":"rejected","isUsingOverage":true}}}}\n'; sleep 30;;
+  *WARNMISSING*) printf '{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed_warning","rateLimitType":"seven_day","overageStatus":"rejected"}}}}\n'; sleep 30;;
+  *WARNRUN*) printf '%s\n' "$warn";;
   *OVERAGE*) printf '{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed","overageStatus":"allowed","isUsingOverage":false}}}}\n'; sleep 30;;
   *) printf '{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed","overageStatus":"rejected","isUsingOverage":false}}}}\n';;
 esac
@@ -408,6 +416,103 @@ fn a_breaking_signal_during_the_run_stops_the_budget() {
         .expect("c"),
     );
     assert!(why.contains("asks for a person"), "{why}");
+}
+
+// ---- user decision 2026-11-17 (warning): allowed_warning with paid extra usage off ----
+
+#[test]
+fn an_allowed_warning_with_extra_usage_off_is_recorded_and_the_run_is_measured() {
+    let _serial = serial();
+    let t = Tmp::new("warn");
+    let (a, p) = both(&t);
+    let r = recorded(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d1", "s1", "WARNRUN"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    // the run went on to its result: measured, nothing asks for a person
+    assert_eq!(r["outcome"]["stop"], "Exited", "{r}");
+    assert_eq!(r["usage"]["run"]["state"], "measured", "{}", r["usage"]);
+    assert_eq!(r["stop_required"], false, "{r}");
+    // the warning is recorded, never hidden
+    let w = r["rate_limit_warnings"].as_array().expect("warnings");
+    assert_eq!(w.len(), 1, "{r}");
+    let w = w[0].as_str().unwrap_or_default();
+    assert!(
+        w.contains("seven_day 0.86") && w.contains("window seven_day"),
+        "{w}"
+    );
+    // the warning stream is the next call's observation: the next call starts
+    let g = recorded(
+        caller::call(
+            &p,
+            &call_of("guardrail", "start", "g1", "sg", "x"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert_eq!(g["stop_required"], false, "{g}");
+    assert!(g["rate_limit_warnings"].is_null(), "{g}");
+    let s = budget::spent(&caller::records(&p).expect("records"));
+    assert_eq!((s.runs, s.unmeasured_runs.len()), (2, 0));
+}
+
+#[test]
+fn a_stop_signal_after_a_warning_stops_the_run_and_the_budget() {
+    for (word, part) in [
+        (
+            "WARNTHENREJECT",
+            "\"rejected\" (subscription usage refused)",
+        ),
+        ("WARNTHENOVERAGE", "isUsingOverage true"),
+        ("WARNMISSING", "isUsingOverage null"),
+    ] {
+        let _serial = serial();
+        let t = Tmp::new("warnstop");
+        let (a, p) = both(&t);
+        let r = recorded(
+            caller::call(
+                &p,
+                &call_of("development", "start", "d1", "s1", word),
+                &a,
+                POLL,
+            )
+            .expect("call"),
+        );
+        // the guard stopped the run on the breaking event; the earlier warning does not clear it
+        let stop = r["outcome"]["stop"].as_str().unwrap_or_default();
+        assert!(stop.starts_with("Overage"), "{word}: {r}");
+        // the warning before the stop is still recorded
+        assert_eq!(
+            r["rate_limit_warnings"].as_array().map_or(0, Vec::len),
+            usize::from(word != "WARNMISSING"),
+            "{word}"
+        );
+        assert_eq!(r["outcome"]["stopped_by_guard"], true, "{word}");
+        // a guard-stopped run stays unmeasured (no result trusted after the stop)
+        assert_eq!(r["usage"]["run"]["state"], "unmeasured", "{word}");
+        assert_eq!(r["stop_required"], true, "{word}");
+        let reason = r["stop_reason"].as_str().unwrap_or_default();
+        assert!(reason.contains(part), "{word}: {reason}");
+        // the unmeasured run blocks the next call of the budget
+        let why = not_started(
+            caller::call(
+                &p,
+                &call_of("guardrail", "start", "g1", "sg", "x"),
+                &a,
+                POLL,
+            )
+            .expect("c"),
+        );
+        assert!(why.contains("asks for a person"), "{word}: {why}");
+        let s = budget::spent(&caller::records(&p).expect("records"));
+        assert_eq!((s.runs, s.unmeasured_runs.len()), (1, 1), "{word}");
+    }
 }
 
 #[test]

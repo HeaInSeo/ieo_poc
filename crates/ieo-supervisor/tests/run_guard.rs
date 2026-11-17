@@ -272,6 +272,43 @@ fn an_extra_usage_or_limit_signal_stops_the_run() {
     }
 }
 
+/// User decision 2026-11-17 (warning): the real s8-r1 event (allowed_warning, paid extra usage
+/// off) no longer stops a run; a stop signal after it still does at once.
+#[test]
+fn a_warning_with_extra_usage_off_does_not_stop_the_run_but_a_later_stop_does() {
+    let warn = include_str!("fixtures/s8-r1-rate-limit-event.jsonl")
+        .trim_end()
+        .to_string();
+    let d = Tmp::new("warn-ok");
+    let o = go(
+        d.p(),
+        fake(
+            d.p(),
+            &[assistant("m1", 2, 16, 1_411, 3_223), warn.clone()],
+            "exit 0",
+        ),
+        limits(10_000),
+    );
+    assert_eq!(o.stop, Stop::Exited, "{:?}", o.stop);
+    let rejected = warn.replace(
+        "\"status\":\"allowed_warning\",\"resetsAt\"",
+        "\"status\":\"rejected\",\"resetsAt\"",
+    );
+    assert_ne!(rejected, warn);
+    let d = Tmp::new("warn-then-stop");
+    let o = go(
+        d.p(),
+        fake(d.p(), &[warn, rejected], "sleep 300"),
+        limits(10_000),
+    );
+    assert!(
+        matches!(&o.stop, Stop::Overage(w) if w.contains("rejected")),
+        "{:?}",
+        o.stop
+    );
+    assert!(o.elapsed < Duration::from_secs(4));
+}
+
 fn ok_obs(stream: &str) -> Option<budget::Observation<'_>> {
     Some(budget::Observation {
         stream,

@@ -232,7 +232,7 @@ podman exec -i ieo-poc-db pg_restore -U <user> -d <db>_restore_<시각> --exit-o
 2. 역할 `GET /v0/role/status`가 `running: null`이 되고 `last.attempt_id`가 이 회차.
 3. 02-05 장부의 이 시도 기록: `budget: 02-05`, `stop_required: false`, `usage.run.state: measured`, 결과 `success`·`is_error: false`. `inflight.json` 없음.
 4. 환경 이름에 `CLAUDE_CODE_OAUTH_TOKEN` 있고 `ANTHROPIC_*` 없음.
-5. 이 회차 stream의 `rate_limit_event`가 하나 이상이고 모두 `allowed`·`rejected`·`isUsingOverage: false`.
+5. 이 회차 stream의 `rate_limit_event`가 하나 이상이고 모두 한도 신호 판정을 통과한다(`allowed` 또는 `allowed_warning`, `rejected`, `isUsingOverage: false`; 경고는 `WARNING`으로 출력되고 기록의 `rate_limit_warnings`와 같아야 함). §12 참고.
 6. **도구**: stream의 `init.tools`가 허용 집합 안(개발 `Read`·`Grep`·`Glob`, Guardrail `Read`·`Grep`·`Glob`·`Write`·`Edit`), 모든 `tool_use` 이름이 `Read`·`Grep`·`Glob`(검토 3e4e3d6 M-1).
 7. R2는 R1과 같은 세션의 resume.
 8. 누적(02-05 장부의 계측된 모델 회차 전부): 예산(4회·2,400초·200,000·2,000,000), 역할 몫(개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000), 배정 한도(개발 1,800초·150,000 / Guardrail 600초·50,000) 안. 미계측 기록이 하나라도 있으면 멈춤(0으로 세지 않음).
@@ -353,3 +353,7 @@ R1 또는 R2가 실패하면 멈추고 보고한다: 실패 기록(사용량 계
 | 예행 기록 | [evidence/dry-run.log](evidence/dry-run.log)(23/23)는 r7 판(`a8d97f12…`)과 저장소 manifest로 한 것이다. 다시 만들지 않았다: 바뀐 것은 명세의 수용 revision 숫자뿐이고 새 명세는 위 검사로 확인했다 |
 
 **원인과 재발 방지.** 실행안은 시험 명세를 저장소의 manifest(46799b0)로만 미리 검사했고, 라이브 배포가 실제로 쓰는 manifest·profiles로는 검사하지 않았다. 앞으로의 규칙: **실행안을 확정하기 전에, 시험 명세를 라이브 배포의 효과 manifest·profiles(읽기 전용)로 `ieo-spec check --executable` 해 본다.** 라이브 프로세스의 `--manifest`·`--profiles` 경로는 인자에서 읽고, 효과 manifest는 코디네이터와 같은 방식(프로파일 배열을 `inspection_profiles` 뒤에 붙임)으로 만든다.
+
+## 12. 변경 이력 · R1 멈춤과 한도 경고 판정(사용자 결정 2026-11-17 경고 (다))
+
+R1(`s8-r1`, 2026-11-17 12:19:45Z)은 실행 가드가 `rate_limit_event` `status: allowed_warning`(7일 창 0.86, 경고 기준 0.75)에서 멈췄다. 추가 사용은 `overageStatus: rejected`(out_of_credits), `isUsingOverage: false`였다. 당시 규칙은 `allowed`가 아닌 상태를 모두 멈춤으로 봤다. 사용자는 규칙 보완 (다)를 골랐다([사용자 결정 2026-11-17 경고](../../../../User_Decisions_2026-11-17_warning.md)). 판정은 [런타임 계약 §20 항목 31](../../01-02/runtime-contract-20261112/Runtime_Contract_v0.md#20-02-05-한도-경고-판정-revision-19)과 [재개안 부록 A](RESUME_PLAN.md#부록-a-한도-경고-판정의-근거-정책-전후-시험)에 있다. 이 실행안의 §6.2 5번과 `check-run.py`·`obs-check.sh`가 그 판정을 쓴다(launcher의 `rate_limit_policy.py`). R1 기록은 당시 규칙의 멈춤으로 보존한다. R1 정산, 회차 집계, 재실행 승인, 배포·허용 규칙 변경은 [재개안](RESUME_PLAN.md)에 있다. **실행본 사본(`$D/step8-46799b0`)과 허용 규칙은 아직 그대로다**: 재개안 승인 뒤 새 사본과 규칙으로 바꾼다.

@@ -6,13 +6,15 @@
 //! | --- | --- |
 //! | `auth_or_billing` | an `assistant` event whose top-level `error` is `authentication_failed`, `oauth_org_not_allowed`, `account_on_hold`, `verification_required`, `billing_error` or `cloud_credential_error` |
 //! | `usage_limit` | a `rate_limit_event` with `rate_limit_info.status` `rejected`, or `isUsingOverage: true` (the subscription limit is reached; going on would be paid extra usage, which is not allowed) |
-//! | `available` | the latest `rate_limit_event` has `status` `allowed` or `allowed_warning`, `isUsingOverage: false`, and no error above came after it |
-//! | `unknown` | anything else: no signal, an unreadable or unrecognised one, a transient error (`rate_limit` without a rejected window, `overloaded`, `server_error`), or a signal that is not fresh |
+//! | `available` | the latest `rate_limit_event` passes the budget rule [`crate::budget::rate_limit_verdict`] (`allowed` or `allowed_warning` with `overageStatus: "rejected"` and `isUsingOverage: false`), no event of the run was a stop, and no error above came after it; an `allowed_warning` is shown in `warning` |
+//! | `unknown` | anything else: no signal, an unreadable or unrecognised one, an event the budget rule stops on that is not a usage limit (paid extra usage possible, a missing or contradictory field), a transient error (`rate_limit` without a rejected window, `overloaded`, `server_error`), or a signal that is not fresh |
 //!
-//! Precedence within one run: `auth_or_billing` > `usage_limit` > the latest availability
-//! signal. A later `allowed` event does not clear an auth/billing error or a rejected window of
-//! the same run; a transient error after an `allowed` event makes the run's status `unknown`
-//! (availability was not observed after it).
+//! Precedence within one run: `auth_or_billing` > `usage_limit` > another stop of the budget
+//! rule (`unknown`) > the latest availability signal. A later `allowed` or `allowed_warning`
+//! event does not clear an auth/billing error, a rejected window or any other stop of the same
+//! run (user decision 2026-11-17, warning: the status display judges like the budget); a
+//! transient error after an `allowed` event makes the run's status `unknown` (availability was
+//! not observed after it).
 //!
 //! **Time.** stream-json events carry no timestamp. A signal is known only to lie between the
 //! run's start and its end (or now, while it runs). Its age is counted from the run's **start**
@@ -42,6 +44,8 @@ const TRANSIENT: [&str; 3] = ["rate_limit", "overloaded", "server_error"];
 pub fn classify(stream: &str) -> Value {
     let mut auth: Option<Value> = None;
     let mut limit: Option<Value> = None;
+    let mut stopped: Option<Value> = None;
+    let mut warning: Option<String> = None;
     let mut latest: Option<(&'static str, Value)> = None;
     let mut unreadable = 0u64;
     for (n, line) in stream.lines().enumerate() {
@@ -65,12 +69,24 @@ pub fn classify(stream: &str) -> Value {
             if st == Some("rejected") || i["isUsingOverage"] == true {
                 limit.get_or_insert(raw.clone());
                 latest = Some(("usage_limit", raw));
-            } else if matches!(st, Some("allowed" | "allowed_warning"))
-                && i["isUsingOverage"] == false
-            {
-                latest = Some(("available", raw));
-            } else {
-                latest = Some(("unknown", raw));
+                continue;
+            }
+            // the same rule as the budget guard (one judgment on every path)
+            match crate::budget::rate_limit_verdict(&v) {
+                crate::budget::RateLimitVerdict::Stop(why) => {
+                    let mut r = raw;
+                    r["stop"] = json!(why);
+                    stopped.get_or_insert(r.clone());
+                    latest = Some(("unknown", r));
+                }
+                crate::budget::RateLimitVerdict::Warning(w) => {
+                    warning = Some(w);
+                    latest = Some(("available", raw));
+                }
+                crate::budget::RateLimitVerdict::Allowed => {
+                    warning = None;
+                    latest = Some(("available", raw));
+                }
             }
         } else if v["type"] == "assistant"
             && let Some(e) = v["error"].as_str()
@@ -89,12 +105,20 @@ pub fn classify(stream: &str) -> Value {
         ("auth_or_billing", a)
     } else if let Some(l) = limit {
         ("usage_limit", l)
+    } else if let Some(x) = stopped {
+        ("unknown", x)
     } else if let Some((v, s)) = latest {
         (v, s)
     } else {
         ("unknown", json!({"kind": "none"}))
     };
-    json!({"value": value, "source": source, "unreadable_lines": unreadable})
+    let mut out = json!({"value": value, "source": source, "unreadable_lines": unreadable});
+    if value == "available"
+        && let Some(w) = warning
+    {
+        out["warning"] = json!(w);
+    }
+    out
 }
 
 /// One run's observation: [`classify`] plus when it can have been observed.
@@ -145,10 +169,14 @@ pub fn current(
             },
         ),
     };
-    (
-        out.into(),
-        json!({"reason": reason, "age_seconds": age, "max_age_seconds": max_age, "observation": o}),
-    )
+    let mut detail =
+        json!({"reason": reason, "age_seconds": age, "max_age_seconds": max_age, "observation": o});
+    // an allowed_warning that passed is shown beside the status, never hidden (decision
+    // 2026-11-17, warning)
+    if out == "available" && o["warning"].is_string() {
+        detail["warning"] = o["warning"].clone();
+    }
+    (out.into(), detail)
 }
 
 /// Seconds since the epoch of an RFC 3339 UTC time `YYYY-MM-DDTHH:MM:SS(.fff)Z`.

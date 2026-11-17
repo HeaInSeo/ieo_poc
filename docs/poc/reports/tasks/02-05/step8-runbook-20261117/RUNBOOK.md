@@ -25,7 +25,7 @@
 5. **대상 repo·역할에 다른 배정의 중앙 체크포인트가 없다**(55433): `SELECT assignment_id, generation, seq, phase FROM role_checkpoints WHERE repo_id = '<repo>' AND role IN ('development','guardrail')` → 0행. 재배포 전에는 이 표가 없어 질의가 “relation does not exist” 오류로 끝난다: **그것이 정상**이다(항목 3과 같은 뜻). 재배포 뒤 §3 항목 5에서 다시 본다.
 6. **sprint revision**(§1A 항목 4·5 뒤에 확인: 그 revision은 재배포 뒤에 등록된다). 단계 8 배정이 쓸 sprint revision이 `registration_state = ready`, `review_state = semantic_review_passed`이고 그 `limits`(`elapsed_seconds`·`total_tokens`)가 계획(개발 1,800초·150,000, Guardrail 600초·50,000)을 덮는다: `SELECT sprint_id, revision, repo_id, registration_state, review_state, spec->'limits' FROM sprint_revisions WHERE sprint_id = '<sprint>'`.
    - **사용자 결정 필요(이 절차서를 병합할 때 확인).** L01의 **값**은 아직 정해지지 않았다([사용자 결정 2026-11-16](../../../../User_Decisions_2026-11-16_l01-step5.md)은 셈법만 정함). 실제 sprint는 `total_tokens = null`인 draft로 남아 등록 검사 `UNBOUND_DRAFT`가 막는다. 그래서 위 조건을 채우는 sprint revision이 지금은 없을 수 있다. 단계 8 전에 사용자가 (가) 단계 8 전용 sprint revision의 한도 값(예: 계획과 같은 1,800초·150,000 / 600초·50,000)을 L01의 값으로 승인하거나, (나) 다른 방법을 정해야 한다. 이 확인 없이는 §4로 가지 않는다.
-7. **첫 관측.** `first_observation`으로 쓸 stream의 모든 `rate_limit_event`가 `status: allowed`, `overageStatus: rejected`, `isUsingOverage: false`이고, R1을 보낼 때 그 관측이 **7일 이내**다(`OBSERVATION_MAX_AGE_SECONDS`). 아니면 R1은 보류된다. 후보는 가장 새 실제 stream(02-04 실제 회차, 2026-11-15)이다. 그 시각은 장부 담당이 그 stream의 기록으로 확인한다(이 절차서는 실행 기록을 읽지 않았다).
+7. **첫 관측.** `first_observation`으로 쓸 stream의 모든 `rate_limit_event`가 한도 신호 판정([런타임 계약 §20 항목 31](../../01-02/runtime-contract-20261112/Runtime_Contract_v0.md#20-02-05-한도-경고-판정-revision-19))을 통과하고(`status: allowed` 또는 `allowed_warning`, `overageStatus: rejected`, `isUsingOverage: false`; 경고는 기록, [사용자 결정 2026-11-17 경고](../../../../User_Decisions_2026-11-17_warning.md)로 바뀜, 그 전에는 `allowed`만), R1을 보낼 때 그 관측이 **7일 이내**다(`OBSERVATION_MAX_AGE_SECONDS`). 아니면 R1은 보류된다. 후보는 가장 새 실제 stream(02-04 실제 회차, 2026-11-15)이다. 그 시각은 장부 담당이 그 stream의 기록으로 확인한다(이 절차서는 실행 기록을 읽지 않았다).
 8. **자격**(재배포 뒤 적용: 새 `tokens.json`은 §1A에서 준비하고 778ee47은 그것을 읽지 못한다. §3 항목 6에서 확인).
 9. **역할 볼륨.** 단계 8의 개발·Guardrail 볼륨(`state`·`etc`·`cred`)이 **새것**이다. 02-04 회차를 돈 볼륨이면 supervisor의 보조 상한이 이미 찼다고 보고 시작하지 않는다.
 10. **장부·관측 경로.** 02-05 장부 디렉터리는 **새 디렉터리**(02-04·X-02 장부와 다름. 장부 하나는 예산 하나)이고, 코디네이터 프로세스가 읽고 쓸 수 있으며 재배포 뒤에도 남는 경로다(컨테이너 안 임시 경로가 아님). 관측 stream도 같다.
@@ -117,7 +117,7 @@ R1 또는 R2가 실패했을 때만 본다(G1은 예비가 없다).
 
 - 미계측 회차(코드도 다음 호출을 멈춘다).
 - 상한 도달: 총 4회(계획 3 + 개발 예비 1), 회당 600초, 합계 2,400초, 과금 토큰 200,000, cache_read 2,000,000, 역할 몫(개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000).
-- 허용되지 않은 한도 신호(`overageStatus`가 `rejected`가 아님, `isUsingOverage`가 `false`가 아님, `status`가 `allowed`가 아님).
+- 허용되지 않은 한도 신호: 런타임 계약 §20 항목 31의 멈춤(`status: rejected`, `overageStatus`가 `rejected`가 아님, `isUsingOverage`가 `false`가 아님, 필수 값 누락·모순·모르는 값, 거부된 창). 추가 사용이 꺼진 `allowed_warning`은 멈춤이 아니고 경고로 기록·보고한다([사용자 결정 2026-11-17 경고](../../../../User_Decisions_2026-11-17_warning.md); 그 전에는 `allowed`가 아니면 멈춤이었다).
 - `stop_required`인 기록.
 - 예상과 다른 경로: 전달 판단이 §5 표의 기대와 다름(`not_called`, `external_reconciliation_required`, `stale_target`, `refused`, `unknown`, `budget_refused`가 예상 밖).
 - 확인되지 않은 외부 효과: 역할 상태의 `pending_external_requests`가 비어 있지 않음(사용자 결정 2026-11-17 §4.3).
