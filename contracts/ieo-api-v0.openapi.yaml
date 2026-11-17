@@ -10,7 +10,10 @@ info:
     0.17.1 (02-05 pre-step-8 PR; PR #75 review debf413 I-8): recordFirstAction's takeover condition is the fill's:
     the session's takeover under the assignment and generation must be linked to the delivery that called the
     reported `attempt_id` (else 409 `CHECKPOINT_MISMATCH`). A spare's `approved_at` is the coordinator's time of the
-    person's deliverAssignment request (PR #81 review 291a9b0 N-3).
+    person's deliverAssignment request (PR #81 review 291a9b0 N-3). A stopping coordinator (SIGTERM/SIGINT) answers
+    deliverAssignment with 503 `COORDINATOR_STOPPING` and records nothing, while it keeps serving until the runs it
+    already accepted are finished and recorded (bounded, `IEO_COORD_SHUTDOWN_WAIT_SECS`, default 720; PR #82 review
+    63fefc1 M-1 (a)).
     0.17.0 (02-05 budget PR, additive; user decisions 2026-11-15 (나) and 2026-11-17 (나) with its addition):
     deliverAssignment takes an optional `spare` {reason, replaces, evidence_ref}: the 02-05 budget's one development
     spare run. The shared budget check decides (outcome `budget_refused` with the reason otherwise): development runs
@@ -1044,6 +1047,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RejectionList' }
         '500': { $ref: '#/components/responses/Internal' }
+        '503':
+          description: '0.17.1: `COORDINATOR_STOPPING` — the coordinator is stopping and finishes the runs it accepted; nothing recorded, deliver again after it restarts'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /v0/repos/{repo_id}/roles/{role}/recoveries:
     post:
       tags: [coordinator]

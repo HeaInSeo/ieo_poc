@@ -111,6 +111,28 @@ fn run() -> Result<(), String> {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                     }
                     eprintln!("ieo-coord: stopping (signal)");
+                    // review 63fefc1 M-1 (a): an accepted run's record is written by a thread of
+                    // this process, and the role reports its after_run checkpoint here. Refuse new
+                    // deliveries and keep serving until those runs are finished (bounded: the
+                    // longest run window, 600 s, plus the stop grace and the caller's margin), so
+                    // a stop does not leave a run unmeasured or its checkpoint unrecorded
+                    ieo_coord::delivery::begin_stop();
+                    let wait = std::env::var("IEO_COORD_SHUTDOWN_WAIT_SECS")
+                        .ok()
+                        .and_then(|w| w.parse().ok())
+                        .unwrap_or(720);
+                    let n = ieo_coord::delivery::finishing();
+                    if n > 0 {
+                        eprintln!("ieo-coord: waiting up to {wait} s for {n} run(s) being finished");
+                    }
+                    let left =
+                        ieo_coord::delivery::wait_finishing(std::time::Duration::from_secs(wait));
+                    if left > 0 {
+                        eprintln!(
+                            "ieo-coord: stopping with {left} run(s) not finished: their ledger \
+                             records are missing (the budget stops; a person reconciles)"
+                        );
+                    }
                     // one unblock per worker waiting in recv
                     for _ in 0..workers.max(1) {
                         server.unblock();

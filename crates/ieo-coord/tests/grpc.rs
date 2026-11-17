@@ -1919,6 +1919,10 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
         (200, &json!(true)),
         "stored value"
     );
+    // review 63fefc1 L-1: the attempt delivered under generation 0 is not linked under
+    // generation 1
+    let (st, r) = write(&fa("A1", 1, &att(1), "s1"));
+    assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
     let (st, r) = write(&fa("A1", 0, &att(3), "s1"));
     assert_eq!((st, &r["current_assignment"]), (201, &json!(false)), "{r}");
     let late = status(

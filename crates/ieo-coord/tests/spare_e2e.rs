@@ -535,15 +535,51 @@ fn a_person_attaches_the_0205_spare_through_deliver_assignment() {
         "{d}"
     );
     assert!(reason(&d).contains("used already"), "{d}");
-    // 7. R2 without a marker: the third development call
+    // 7. R2 without a marker: the third development call. The coordinator is stopped (SIGTERM)
+    //    while R2 runs (about 4 s): it waits for the run's record before it exits (review
+    //    63fefc1 M-1 (a)), so the ledger has R2's record and no in-flight marker at once
     let (st, d) = deliver(
         "operator",
         "sp-key-0007",
-        &dbody("r2", "s5", "hi", json!({})),
+        &dbody("r2", "s5", "LATEACT", json!({})),
     );
     assert_eq!((st, outcome(&d).as_deref()), (201, Some("accepted")), "{d}");
-    role.wait("r2");
-    assert_eq!(settled("r2")["stop_required"], false);
+    assert!(
+        !role.status()["running"].is_null(),
+        "R2 is still running when the coordinator is stopped"
+    );
+    let pid = coord.child.as_ref().expect("running").id();
+    let _ = Command::new("kill")
+        .args(["-TERM", &pid.to_string()])
+        .status();
+    // while it stops, a new delivery starts nothing and records nothing (the signal is seen
+    // within 100 ms)
+    std::thread::sleep(Duration::from_millis(1000));
+    let n = deliveries();
+    let (st, d) = deliver(
+        "operator",
+        "sp-key-0071",
+        &dbody("x7", "s7", "hi", json!({})),
+    );
+    assert_eq!(
+        (st, d["code"].as_str()),
+        (503, Some("COORDINATOR_STOPPING")),
+        "{d}"
+    );
+    assert_eq!(deliveries(), n);
+    coord.stop();
+    let r2 = records().into_iter().find(|r| r["attempt_id"] == "r2");
+    assert!(
+        r2.as_ref().is_some_and(|r| r["stop_required"] == false),
+        "R2's record is written before the coordinator exits: {r2:?}"
+    );
+    assert!(
+        !ledger.join("inflight.json").exists(),
+        "no in-flight marker"
+    );
+    coord.start();
+    // R2's after_run checkpoint reached the coordinator before it stopped, so the next delivery
+    // is judged (not held: "local checkpoint … is not yet recorded")
     // 8. the development role has used its 2 planned runs and its spare
     let (st, d) = deliver(
         "operator",
