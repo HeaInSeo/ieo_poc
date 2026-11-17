@@ -202,6 +202,23 @@ fn the_transcript_accounting_counts_each_message_once_and_must_equal_the_exit_ac
             "exit accounting differs",
         ),
         (transcript(Some(EXIT), 0), "no api-request"),
+        (
+            // nothing requested, nothing used, an exit accounting of zero: still not enough
+            [
+                json!({"type": "custom-title"}),
+                json!({"type": "cost-state", "modelUsage": {"m": {
+                "inputTokens": 0, "outputTokens": 0, "cacheCreationInputTokens": 0,
+                "cacheReadInputTokens": 0}}}),
+            ]
+            .iter()
+            .map(|v| {
+                let mut v = v.clone();
+                v["sessionId"] = json!(SID);
+                v.to_string() + "\n"
+            })
+            .collect::<String>(),
+            "no request at all",
+        ),
         (transcript(Some(EXIT), 2), "two requests, one message"),
         (
             transcript(Some(EXIT), 1).replace(SID, "other-session"),
