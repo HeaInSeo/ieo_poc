@@ -105,7 +105,7 @@
    "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다.",
    "acceptance": {
     "profile_id": "poc-acceptance-v1.3.3",
-    "profile_revision": 7,
+    "profile_revision": 6,
     "item_ids": [
      "02-05.accept"
     ],
@@ -127,5 +127,5 @@
   }
  ],
  "contract_revision": 4,
- "digest": "a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7"
+ "digest": "0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124"
 }

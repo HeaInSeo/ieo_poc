@@ -5,7 +5,7 @@
 | 근거 | [사용자 결정 2026-11-17 단계 8 L01](../../../../User_Decisions_2026-11-17_step8-l01.md)(L01 값 승인, 실행안 요청, 묶음 승인), [단계 8 절차서](../step8-runbook-20261117/RUNBOOK.md), [예산 결정 2026-11-15](../../../../User_Decisions_2026-11-15_0205-x08.md) §2.1, [예비 결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md), [복구 결정 2026-11-16](../../../../User_Decisions_2026-11-16_recovery.md) |
 | 기준 | main 05cf16e(PR #85 병합). 실행은 이 실행안을 담은 PR의 병합 SHA(아래 **M**)의 빌드로 한다 |
 | 만든 방법 | 코드·문서와 원장 담당이 읽기 전용으로 확인한 사실(아래 “확인된 사실”)에서만 끌어냈다. 58090·55433·비밀·실행 기록은 보지 않았다. sprint 명세는 로컬 `ieo-spec check --executable`로 검사했고(§1.2), 실행에 쓰는 스크립트 전부([launcher/](launcher/): 역할 실행, 코디네이터 교체, 마이그레이션 예행, 회차 구동과 확인)를 시험 시스템에서만 처음부터 끝까지 예행했다: 778ee47 빌드의 “옛” 코디네이터와 고정 행 (로그인 셸처럼 내보낸 두 줄 셸 함수와 상대 경로 인자를 지닌 채) → 캡처와 백업·마이그레이션 예행 → 교체 → R1→R2→G1 → 멈춤 확인의 음성 시험 → 되돌리기(§4, 23개 확인 모두 통과) |
-| 개정 | v4: PR #86 검토 a5f9402 반영(§10.2): 옛 프로세스의 환경을 NUL 경계·작업 디렉터리째 그대로 되살림(셸 함수 제외, 값은 어떤 명령줄에도 없음), 02-04에서 쓴 규칙 형식, 실제 바인딩·새 `tokens.json`으로 하는 예행, cgroup 확인, §5.2 순서. v3: PR #86 검토 3e4e3d6 반영(§10.1). 개발 역할의 도구 제한을 supervisor가 강제(코드 750e904), 자동 되돌리기에서 DB 복원 제거와 마이그레이션 예행, 옛 프로세스의 인자·환경 캡처와 정확한 정지·기동 명령, 실제 회차 구동 스크립트 |
+| 개정 | v5: 명세의 수용 프로파일 r7 → r6(라이브 58090에 r7이 없음, 사용자 결정 (가), §11). v4: PR #86 검토 a5f9402 반영(§10.2): 옛 프로세스의 환경을 NUL 경계·작업 디렉터리째 그대로 되살림(셸 함수 제외, 값은 어떤 명령줄에도 없음), 02-04에서 쓴 규칙 형식, 실제 바인딩·새 `tokens.json`으로 하는 예행, cgroup 확인, §5.2 순서. v3: PR #86 검토 3e4e3d6 반영(§10.1). 개발 역할의 도구 제한을 supervisor가 강제(코드 750e904), 자동 되돌리기에서 DB 복원 제거와 마이그레이션 예행, 옛 프로세스의 인자·환경 캡처와 정확한 정지·기동 명령, 실제 회차 구동 스크립트 |
 | 표기 | **[읽기]** 읽기만. **[변경]** 실 시스템을 바꿈. **[모델]** 모델 호출. “실행 시 확인”은 실행 첫 단계에서 읽기 전용으로 확인하고, 다르면 멈추고 보고한다 |
 | 승인 | §8의 묶음 하나를 사용자가 승인하면 그 안의 단계는 다시 묻지 않는다. 멈춤 조건(§6.3)에 걸리면 멈추고 보고한다. 예비는 묶음 밖이다(건별 승인) |
 
@@ -32,7 +32,7 @@
 
 ### 1.2 sprint 명세 초안
 
-`POC-S8-01` r1의 전체 명세는 별도 파일 [sprint-POC-S8-01-r1.json](sprint-POC-S8-01-r1.json)이다. 요점: `registration_state: ready`, `target {repo_id: ieo-poc-test, repository_url}`, 위 `limits`, `unresolved_bindings: []`, 작업 하나(`90-01`, 산출물 `90-01-answers` “README.md·SANDBOX.json·CI 워크플로의 사실에 대한 짧은 답(쓰기 없음)”, 수용 `poc-acceptance-v1.3.3` r7 항목 `02-05.accept`). 나머지 필드(`schedule`·`delegation` 등)는 manifest의 POC-01에서 가져왔고, `sources`에 이 단계의 근거 결정 둘(예산 2026-11-15, L01 값 2026-11-17, 파일 SHA-256)을 더했다(검토 3e4e3d6 L-7). 로컬 검사: `ieo-spec check sprint-POC-S8-01-r1.json --manifest docs/poc/Console_Coordinator_Sprints_v0.json --executable` → **201 `ACCEPTED_FOR_SEMANTIC_REVIEW`**, digest `a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7`. 예행의 새 빌드 코디네이터도 같은 명세를 같은 digest로 등록했다. 근거 결정 파일이 나중에 고쳐지면 그 SHA-256은 등록 때의 내용을 가리키는 기록으로 남는다(명세 검사는 파일과 대조하지 않는다). 수용 항목은 프로파일 r7에 단계 8 전용 항목이 없어 `02-05.accept`를 쓴다: 단계 8은 02-05 수용의 일부이므로 원장 담당이 이 재사용을 받아들였다. 실행 시 확인: 58090이 쓰는 `--manifest`·`--profiles` 파일이 저장소의 manifest와 같은지(다르면 그 파일로 다시 검사).
+`POC-S8-01` r1의 전체 명세는 별도 파일 [sprint-POC-S8-01-r1.json](sprint-POC-S8-01-r1.json)이다. 요점: `registration_state: ready`, `target {repo_id: ieo-poc-test, repository_url}`, 위 `limits`, `unresolved_bindings: []`, 작업 하나(`90-01`, 산출물 `90-01-answers` “README.md·SANDBOX.json·CI 워크플로의 사실에 대한 짧은 답(쓰기 없음)”, 수용 `poc-acceptance-v1.3.3` **r6** 항목 `02-05.accept`(§11: r7에서 바꿈)). 나머지 필드(`schedule`·`delegation` 등)는 manifest의 POC-01에서 가져왔고, `sources`에 이 단계의 근거 결정 둘(예산 2026-11-15, L01 값 2026-11-17, 파일 SHA-256)을 더했다(검토 3e4e3d6 L-7). 로컬 검사: `ieo-spec check sprint-POC-S8-01-r1.json --manifest docs/poc/Console_Coordinator_Sprints_v0.json --executable` → **201 `ACCEPTED_FOR_SEMANTIC_REVIEW`**, digest `0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124`(§11; r7 판의 옛 digest `a8d97f12…7bb7`). 라이브 58090의 효과 manifest(manifest + `--profiles`)로도 201·같은 digest다(§11). 예행의 새 빌드 코디네이터는 r7 판을 그 digest(`a8d97f12…`)로 등록했다(예행 기록은 다시 만들지 않음, §11). 근거 결정 파일이 나중에 고쳐지면 그 SHA-256은 등록 때의 내용을 가리키는 기록으로 남는다(명세 검사는 파일과 대조하지 않는다). 수용 항목은 프로파일에 단계 8 전용 항목이 없어 `02-05.accept`를 쓴다: 단계 8은 02-05 수용의 일부이므로 원장 담당이 이 재사용을 받아들였다. 실행 시 확인: 58090이 쓰는 `--manifest`·`--profiles` 파일이 저장소의 manifest와 같은지(다르면 그 파일로 다시 검사).
 
 ### 1.3 지시문(짧게, 읽기·답하기만)
 
@@ -143,7 +143,7 @@ podman exec -i ieo-poc-db pg_restore -U <user> -d <db>_restore_<시각> --exit-o
 3. 백업(`pg_dump -Fc`, `--list`, 라이브 행 수) → **마이그레이션 예행 통과**(복원 행 수 = 라이브 행 수, 15개 표 그대로, 새 표 11개, `branch_head`, M이 새 `tokens.json`·캡처한 바인딩으로 서비스, SIGTERM에 0).
 4. 역할 컨테이너(실제 스크립트, 가짜 `claude`·자격; 가짜는 받은 `--tools`를 그대로 내놓음).
 5. `stop` → `start`(M, 새 `tokens.json`, `--roles`): 새 프로세스의 환경에 DB URL이 있고 셸 함수가 없으며, 작업 디렉터리는 캡처한 곳, 바이너리는 M.
-6. `run-step8.sh register`(digest `a8d97f12…`) → 사람 주체의 의미 검토 → `prepare` → `runs`: R1 `no_checkpoint`→`start`, R2 `resume_allowed`→`reconnect`(R1 세션), G1 `start`, 회차마다 모든 확인 통과(개발 `init.tools` = `Glob, Grep, Read`, Guardrail = `Edit, Glob, Grep, Read, Write`, 사용 `Read`).
+6. `run-step8.sh register`(digest `a8d97f12…`, r7 판; 지금 명세는 §11의 `0e4d471d…`) → 사람 주체의 의미 검토 → `prepare` → `runs`: R1 `no_checkpoint`→`start`, R2 `resume_allowed`→`reconnect`(R1 세션), G1 `start`, 회차마다 모든 확인 통과(개발 `init.tools` = `Glob, Grep, Read`, Guardrail = `Edit, Glob, Grep, Read, Write`, 사용 `Read`).
 7. 멈춤 확인의 음성 시험: 고친 사본에서 `check-run.py`가 overage 신호와 `Bash` 사용에 각각 멈춤.
 8. 되돌리기: M을 `stop`(정상 종료) → 캡처한 인자·환경·작업 디렉터리로 778ee47 `start`(**상대 경로 인자, 셸 함수가 있던 환경**)가 마이그레이션된 DB에서 상태 조회 200, 단계 8 sprint를 읽음(200) → `stop`.
 58090·55433·비밀·실행 기록·실제 `claude`는 쓰지 않았다. 컨테이너·시험 DB·scratch는 지웠다.
@@ -334,3 +334,22 @@ R1 또는 R2가 실패하면 멈추고 보고한다: 실패 기록(사용량 계
 | I-4(로그의 커밋) | 최종 스크립트 커밋 58819ea에서 다시 만든 [evidence/dry-run.log](evidence/dry-run.log)(23/23) |
 
 **시험(코드가 바뀌었으므로 전체):** `cargo test --workspace --locked` **412 통과, 0 실패**(커밋 58819ea, fmt·clippy `-D warnings` 통과), `docs/poc` 검사기 통과.
+
+## 11. 변경 이력 · 명세의 수용 프로파일 r7 → r6(사용자 결정 2026-11-17, 선택 (가))
+
+**무엇이 문제였나.** 라이브 58090(778ee47)이 쓰는 manifest는 `/opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/docs/poc/Console_Coordinator_Sprints_v0.json`(SHA-256 `45d78f28486013d0d7ac9348427267124f9e56c14d4cd84358251240a247c287`)이고 `--profiles`는 `/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/private/profiles.json`(`6eb8ff33bb436be572b1b694cc445953f19cf6ced1dd2a3805dce7c013e0a560`)이다. 효과 프로파일은 `poc-acceptance-v1.3.3` r4·r5·r6과 `x01-notion-import-test` r1이고 **r7이 없다.** 그래서 r7을 가리키던 명세는 라이브 코디네이터에서 `422 UNKNOWN_PROFILE_ITEM`(“revision 7이(가) 없습니다”)으로 거절된다. 저장소 manifest(46799b0, r4~r7)로만 검사해서 이것을 놓쳤다.
+
+**사용자 결정 (가).** 단계 8 명세의 수용 프로파일 참조만 r7 → r6으로 바꾼다. 수용 기준·지시문·예산·권한 범위는 그대로다.
+
+| 항목 | 기록 |
+| --- | --- |
+| 같은 기준인가 | `02-05.accept`는 r6과 r7에서 같다(저장소 manifest에서 비교; r6과 r7이 다른 항목은 `02-08.accept`·`04-11.accept`·`07-05.accept`뿐). 라이브의 r6 프로파일 전체가 저장소의 r6과 같다 |
+| 바뀐 파일 | [sprint-POC-S8-01-r1.json](sprint-POC-S8-01-r1.json): `tasks[0].acceptance.profile_revision` 7 → 6과 `digest`만. 구동 스크립트의 기본 경로(`run-step8.sh`의 `SPEC`)가 이 이름이라 이름을 유지한다 |
+| 옛 판 | [sprint-POC-S8-01-r1-profile-r7.json](sprint-POC-S8-01-r1-profile-r7.json)(이력, 쓰지 않음), digest `a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7` |
+| 새 digest | **`0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124`** |
+| 검사 | 46799b0의 `ieo-spec`(release)으로 `check --executable`: 효과 라이브 manifest(manifest의 `inspection_profiles` 뒤에 `--profiles` 배열을 붙임, `ieo-coord serve`와 같은 방식) → **201 `ACCEPTED_FOR_SEMANTIC_REVIEW`**, 저장소 manifest → 201, 옛 판 + 효과 라이브 manifest → 422. 기록 [evidence/spec-r6-check.txt](evidence/spec-r6-check.txt) |
+| 실행본 사본 | `$D/step8-46799b0/sprint-POC-S8-01-r1.json`을 새 명세로 바꿨다. 이제 그 사본은 **이 파일 하나만** 46799b0과 다르다(이 수정 브랜치의 blob과 같음, SHA-256 `f28996d64d667b91936429afee9b56ea0296b0145338be4108daf566e939ea19`). 나머지 15개는 46799b0과 같다(사본의 `EXECUTION_PLAN.md`도 46799b0 판 그대로) |
+| 목록과 권한 | `$D/step8-ops/SHA256SUMS`를 다시 만들었다(17개). 목록 자체의 해시가 `d91de424…`에서 `50507966…`으로 바뀌어 [MANUAL_STEPS](MANUAL_STEPS.md)의 확인 줄과 허용 규칙 **한 줄**(`echo '<해시>  step8-ops/SHA256SUMS'`)이 바뀐다. 다른 규칙은 그대로다 |
+| 예행 기록 | [evidence/dry-run.log](evidence/dry-run.log)(23/23)는 r7 판(`a8d97f12…`)과 저장소 manifest로 한 것이다. 다시 만들지 않았다: 바뀐 것은 명세의 수용 revision 숫자뿐이고 새 명세는 위 검사로 확인했다 |
+
+**원인과 재발 방지.** 실행안은 시험 명세를 저장소의 manifest(46799b0)로만 미리 검사했고, 라이브 배포가 실제로 쓰는 manifest·profiles로는 검사하지 않았다. 앞으로의 규칙: **실행안을 확정하기 전에, 시험 명세를 라이브 배포의 효과 manifest·profiles(읽기 전용)로 `ieo-spec check --executable` 해 본다.** 라이브 프로세스의 `--manifest`·`--profiles` 경로는 인자에서 읽고, 효과 manifest는 코디네이터와 같은 방식(프로파일 배열을 `inspection_profiles` 뒤에 붙임)으로 만든다.
