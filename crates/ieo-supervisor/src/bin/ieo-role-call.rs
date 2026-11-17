@@ -92,6 +92,10 @@ fn run() -> Result<i32, String> {
         let report = get("--independent-check")?;
         let bytes = std::fs::read(&report).map_err(|e| format!("{report}: {e}"))?;
         use sha2::Digest;
+        let report = std::path::absolute(&report)
+            .map_err(|e| format!("{report}: {e}"))?
+            .display()
+            .to_string();
         let check = json!({"evidence": report, "sha256": hex::encode(sha2::Sha256::digest(&bytes)),
                            "verdict": get("--independent-verdict")?});
         let s = caller::settle(

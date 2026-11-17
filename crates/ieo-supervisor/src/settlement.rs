@@ -11,7 +11,8 @@
 //! record is never changed. On every ledger read ([`crate::caller::records`]) the settlement is
 //! checked again from the files it names, and applied to the run it settles:
 //!
-//! * the run is eligible ([`eligible`]): a model run of the ledger, stopped by the guard on a
+//! * the run is **the one the decision names** ([`pinned`]: 02-05 `s8-r1`, its session and its
+//!   kept stream; review d971f59 L-4), and it is eligible ([`eligible`]): a model run of the ledger, stopped by the guard on a
 //!   rate-limit signal (`Overage`), unmeasured, without a result event, without child runs,
 //!   whose stop reasons are only "no result event", "usage unmeasured" and "this run's signal"
 //!   and whose kept stream (same SHA-256) has rate-limit events that the current rule all
@@ -34,6 +35,7 @@ use crate::budget::{self, RateLimitVerdict};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 pub const SETTLEMENT_FORMAT: &str = "ieo-role-run-settlement/v0";
 pub const SOURCE: &str = "transcript_exit_accounting";
@@ -50,6 +52,94 @@ pub const RESIDUAL: &str = "settled from the session transcript; one api-request
     request was written at its end with no api-request after it; a request sent just before \
     SIGTERM whose log write was lost cannot be ruled out client-side; provider-side billing is \
     not visible";
+
+/// The decision a settlement follows (it is the only one that allows it).
+pub const DECISION: &str = "docs/poc/User_Decisions_2026-11-17_r1-settlement.md";
+
+/// The one run the decision allows to be settled (user decision 2026-11-17 r1-settlement §2.3:
+/// "이번 s8-r1에 한정한 특례"; PR #90 review d971f59 L-4): the 02-05 budget's `s8-r1`, its
+/// session and its kept stream (SHA-256 of the ledger's `streams/s8-r1.jsonl`, recorded in the
+/// run's record). No other run is ever settled, and no other guard stop is released by a spare.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pin {
+    pub budget: String,
+    pub attempt: String,
+    pub session: String,
+    /// `None` only for a test pin (any stream of that run)
+    pub stream_sha256: Option<String>,
+}
+pub const PIN_BUDGET: &str = "02-05";
+pub const PIN_ATTEMPT: &str = "s8-r1";
+pub const PIN_SESSION: &str = "5c991c71-b6e2-4cfb-bd76-6bb18a36e090";
+pub const PIN_STREAM_SHA256: &str =
+    "252609c73723fc8bff77ff50ad6a2c57f85ee818f4cfd2dfe685e0f11ff34c94";
+
+static TEST_PINS: std::sync::Mutex<Vec<Pin>> = std::sync::Mutex::new(Vec::new());
+
+/// A pin for synthetic ledgers (tests, dry runs), honoured only in a build with debug
+/// assertions; a release build (what is deployed) knows only the decision's pin. Tests in the
+/// same process use this; a debug binary also reads `IEO_SETTLEMENT_TEST_PINS`
+/// (`budget|attempt|session|stream-sha256-or-*`, `;`-separated).
+#[doc(hidden)]
+pub fn allow_test_pin(p: Pin) {
+    if cfg!(debug_assertions) {
+        TEST_PINS.lock().unwrap_or_else(|e| e.into_inner()).push(p);
+    }
+}
+
+/// The pins in force: the decision's, and in a debug build the test pins.
+pub fn pins() -> Vec<Pin> {
+    let mut v = vec![Pin {
+        budget: PIN_BUDGET.into(),
+        attempt: PIN_ATTEMPT.into(),
+        session: PIN_SESSION.into(),
+        stream_sha256: Some(PIN_STREAM_SHA256.into()),
+    }];
+    if cfg!(debug_assertions) {
+        v.extend(
+            TEST_PINS
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .iter()
+                .cloned(),
+        );
+        if let Ok(e) = std::env::var("IEO_SETTLEMENT_TEST_PINS") {
+            for p in e.split(';').filter(|p| !p.is_empty()) {
+                let f: Vec<&str> = p.split('|').collect();
+                if let [b, a, s, h] = f.as_slice() {
+                    v.push(Pin {
+                        budget: (*b).into(),
+                        attempt: (*a).into(),
+                        session: (*s).into(),
+                        stream_sha256: (*h != "*").then(|| (*h).to_string()),
+                    });
+                }
+            }
+        }
+    }
+    v
+}
+
+/// Whether `r` is the run the decision names (budget, attempt, session, kept stream).
+pub fn pinned(r: &Value) -> Result<(), String> {
+    let hit = pins().iter().any(|p| {
+        r["budget"] == p.budget.as_str()
+            && r["attempt_id"] == p.attempt.as_str()
+            && r["session"]["session_id"] == p.session.as_str()
+            && p.stream_sha256
+                .as_deref()
+                .is_none_or(|h| r["stream"]["sha256"] == h)
+    });
+    if hit {
+        Ok(())
+    } else {
+        Err(format!(
+            "{}/{} is not the run the decision allows to settle (02-05 s8-r1 of session \
+             {PIN_SESSION}, its kept stream)",
+            r["budget"], r["attempt_id"]
+        ))
+    }
+}
 
 /// The independent check a settlement follows: `{evidence, sha256, verdict}` with a 64-hex
 /// SHA-256 of the evidence file and a verdict of [`VERDICTS`].
@@ -91,8 +181,11 @@ impl Accounting {
         json!({"input": self.tokens[0], "output": self.tokens[1],
                "cache_creation": self.tokens[2], "cache_read": self.tokens[3]})
     }
-    pub fn billable(&self) -> u64 {
-        self.tokens[0] + self.tokens[1] + self.tokens[2]
+    /// input + output + cache_creation; `None` on overflow (never settled)
+    pub fn billable(&self) -> Option<u64> {
+        self.tokens[0]
+            .checked_add(self.tokens[1])?
+            .checked_add(self.tokens[2])
     }
 }
 
@@ -216,6 +309,7 @@ pub fn transcript_accounting(bytes: &[u8], session_id: &str) -> Result<Accountin
 /// `stream` is the kept stream's text; its SHA-256 must be the record's.
 pub fn eligible(r: &Value, stream: &str) -> Result<(), String> {
     let a = r["attempt_id"].as_str().unwrap_or("?");
+    pinned(r)?;
     if r["format"] != crate::caller::RECORD_FORMAT || r["model_request"] != true {
         return Err(format!("{a} is not a model run record"));
     }
@@ -288,15 +382,46 @@ pub fn eligible(r: &Value, stream: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The kept transcript copy of a settlement, read and checked against the recorded digest.
-fn read_copy(s: &Value) -> Result<Vec<u8>, String> {
+/// Where a settlement's transcript copy lives: `<ledger dir>/children/<attempt>/settlement-transcript.jsonl`
+/// (PR #90 review d971f59 L-1). Absolute, never a symlink anywhere on its way.
+pub fn copy_path(ledger_dir: &Path, attempt: &str) -> Result<PathBuf, String> {
+    std::path::absolute(
+        ledger_dir
+            .join("children")
+            .join(attempt)
+            .join("settlement-transcript.jsonl"),
+    )
+    .map_err(|e| format!("ledger path: {e}"))
+}
+
+/// The kept transcript copy of a settlement: exactly at [`copy_path`], a regular file reached
+/// without a symlink, with the recorded digest.
+fn read_copy(s: &Value, ledger_dir: &Path, attempt: &str) -> Result<Vec<u8>, String> {
+    let want = copy_path(ledger_dir, attempt)?;
     let p = s["evidence"]["ledger_copy"]
         .as_str()
         .ok_or("settlement without evidence.ledger_copy")?;
-    if !std::path::Path::new(p).is_absolute() {
-        return Err(format!("settlement copy {p} is not an absolute path"));
+    if Path::new(p) != want {
+        return Err(format!(
+            "settlement copy {p} is not {} (the copy lives in the ledger)",
+            want.display()
+        ));
     }
-    let b = std::fs::read(p).map_err(|e| format!("settlement copy {p}: {e}"))?;
+    let meta = std::fs::symlink_metadata(&want).map_err(|e| format!("settlement copy {p}: {e}"))?;
+    let canon_dir = std::fs::canonicalize(ledger_dir).map_err(|e| format!("ledger dir: {e}"))?;
+    let canon = std::fs::canonicalize(&want).map_err(|e| format!("settlement copy {p}: {e}"))?;
+    if !meta.file_type().is_file()
+        || canon
+            != canon_dir
+                .join("children")
+                .join(attempt)
+                .join("settlement-transcript.jsonl")
+    {
+        return Err(format!(
+            "settlement copy {p} is not a regular file inside the ledger (symlink?)"
+        ));
+    }
+    let b = std::fs::read(&want).map_err(|e| format!("settlement copy {p}: {e}"))?;
     if s["evidence"]["sha256"] != hex::encode(Sha256::digest(&b)).as_str() {
         return Err(format!(
             "settlement copy {p} differs from its recorded SHA-256"
@@ -305,19 +430,50 @@ fn read_copy(s: &Value) -> Result<Vec<u8>, String> {
     Ok(b)
 }
 
+/// The independent check's report, read again: an absolute path to a readable regular file
+/// whose SHA-256 is the recorded one (PR #90 review d971f59 L-2).
+fn check_report(c: &Value) -> Result<(), String> {
+    independent_check_ok(c)?;
+    let p = c["evidence"].as_str().unwrap_or_default();
+    if !Path::new(p).is_absolute() {
+        return Err(format!(
+            "independent_check.evidence {p} is not an absolute path"
+        ));
+    }
+    let b = std::fs::read(p).map_err(|e| format!("independent_check.evidence {p}: {e}"))?;
+    if c["sha256"] != hex::encode(Sha256::digest(&b)).as_str() {
+        return Err(format!(
+            "independent_check.evidence {p} differs from its recorded SHA-256"
+        ));
+    }
+    Ok(())
+}
+
 /// Check a settlement line against the run it settles (both as written) and return the run as
-/// it counts. `stream` is the run's kept stream text.
-pub fn apply(run: &Value, s: &Value, stream: &str) -> Result<Value, String> {
+/// it counts. `stream` is the run's kept stream text; `ledger_dir` the ledger it is read from.
+pub fn apply(run: &Value, s: &Value, stream: &str, ledger_dir: &Path) -> Result<Value, String> {
+    let a = run["attempt_id"].as_str().unwrap_or("?").to_owned();
+    let copy = read_copy(s, ledger_dir, &a)?;
+    apply_bytes(run, s, stream, &copy)
+}
+
+/// [`apply`] with the transcript copy's bytes given (a dry run reads them from the evidence
+/// copy, writing nothing).
+fn apply_bytes(run: &Value, s: &Value, stream: &str, copy: &[u8]) -> Result<Value, String> {
     let a = run["attempt_id"].as_str().unwrap_or("?");
     if s["source"] != SOURCE || s["policy"] != POLICY || s["model_request"] != false {
         return Err(format!("settlement of {a}: unknown source or policy"));
     }
-    for k in ["decision", "settled_at"] {
-        if s[k].as_str().is_none_or(|v| v.trim().is_empty()) {
-            return Err(format!("settlement of {a}: {k} missing"));
-        }
+    if s["settled_at"].as_str().is_none_or(|v| v.trim().is_empty()) {
+        return Err(format!("settlement of {a}: settled_at missing"));
     }
-    independent_check_ok(&s["independent_check"]).map_err(|e| format!("settlement of {a}: {e}"))?;
+    if s["decision"] != DECISION {
+        return Err(format!(
+            "settlement of {a}: decision {} is not {DECISION}",
+            s["decision"]
+        ));
+    }
+    check_report(&s["independent_check"]).map_err(|e| format!("settlement of {a}: {e}"))?;
     // the caveat travels with the settlement (it is never dropped)
     if s["verification"]["uncovered"] != UNCOVERED || s["verification"]["residual"] != RESIDUAL {
         return Err(format!(
@@ -331,10 +487,17 @@ pub fn apply(run: &Value, s: &Value, stream: &str) -> Result<Value, String> {
     {
         return Err(format!("settlement of {a} does not match the run"));
     }
+    // the copy is the original (review d971f59 L-2): both digests recorded, and equal
+    if s["evidence"]["original_sha256"] != s["evidence"]["sha256"]
+        || s["evidence"]["sha256"] != hex::encode(Sha256::digest(copy)).as_str()
+    {
+        return Err(format!(
+            "settlement of {a}: the copy is not the original (digests differ)"
+        ));
+    }
     eligible(run, stream).map_err(|e| format!("settlement of {a}: {e}"))?;
     let sid = run["session"]["session_id"].as_str().unwrap_or_default();
-    let acc = transcript_accounting(&read_copy(s)?, sid)
-        .map_err(|e| format!("settlement of {a}: {e}"))?;
+    let acc = transcript_accounting(copy, sid).map_err(|e| format!("settlement of {a}: {e}"))?;
     if s["usage_run"]["tokens"] != acc.tokens_json()
         || s["verification"]["api_requests"] != acc.api_requests
         || s["verification"]["messages"] != acc.messages
@@ -343,17 +506,33 @@ pub fn apply(run: &Value, s: &Value, stream: &str) -> Result<Value, String> {
             "settlement of {a} differs from its transcript accounting"
         ));
     }
+    let billable = acc
+        .billable()
+        .ok_or(format!("settlement of {a}: token counts overflow"))?;
     // never the guard's lower bound: the settled usage is the accounting, and not below it
     let o = &run["outcome"]["observed"];
     if o["billable_lower_bound"]
         .as_u64()
-        .is_none_or(|lb| acc.billable() < lb)
+        .is_none_or(|lb| billable < lb)
         || o["cache_read_lower_bound"]
             .as_u64()
             .is_none_or(|lb| acc.tokens[3] < lb)
     {
         return Err(format!(
             "settlement of {a}: the accounting is below the guard's observed lower bound"
+        ));
+    }
+    // within the run's own limits (review d971f59 L-6): a token overrun is not this case
+    let l = &run["limits"];
+    if l["billable_room"]
+        .as_u64()
+        .is_none_or(|room| billable > room)
+        || l["cache_read_room"]
+            .as_u64()
+            .is_none_or(|room| acc.tokens[3] > room)
+    {
+        return Err(format!(
+            "settlement of {a}: the accounting exceeds the run's own limits {l}"
         ));
     }
     let mut r = run.clone();
@@ -369,31 +548,34 @@ pub fn apply(run: &Value, s: &Value, stream: &str) -> Result<Value, String> {
     Ok(r)
 }
 
-/// The settlement line for `run` from a transcript copy already in the ledger directory
-/// (`ledger_copy`, absolute), with its provenance. Checked like a read ([`apply`]) before it is
-/// returned.
+/// The settlement line for `run`: the transcript `bytes` (the verified evidence copy), the copy
+/// path in the ledger it is (or would be) written to, and its provenance. Checked like a read
+/// before it is returned: against the file at `ledger_copy` when `on_disk` (the real write,
+/// after the copy), against `bytes` otherwise (a dry run writes nothing).
 #[allow(clippy::too_many_arguments)]
 pub fn build(
     run: &Value,
     stream: &str,
-    ledger_copy: &std::path::Path,
+    bytes: &[u8],
+    ledger_dir: &Path,
+    on_disk: bool,
     original_path: &str,
     original_sha256: &str,
     decision: &str,
     independent_check: &Value,
 ) -> Result<Value, String> {
     let a = run["attempt_id"].as_str().unwrap_or("?");
-    independent_check_ok(independent_check)?;
+    check_report(independent_check)?;
     eligible(run, stream)?;
-    let b = std::fs::read(ledger_copy).map_err(|e| format!("{}: {e}", ledger_copy.display()))?;
     let sid = run["session"]["session_id"].as_str().unwrap_or_default();
-    let acc = transcript_accounting(&b, sid)?;
+    let acc = transcript_accounting(bytes, sid)?;
     if acc.sha256 != original_sha256 {
         return Err(format!(
             "the copy's SHA-256 {} is not the original's {original_sha256}",
             acc.sha256
         ));
     }
+    let ledger_copy = copy_path(ledger_dir, a)?;
     let signals: Vec<Value> = budget::rate_limit_events(stream)?
         .iter()
         .map(|e| match budget::rate_limit_verdict(e) {
@@ -417,6 +599,10 @@ pub fn build(
         "rule": "runtime contract rev 19 §20 item 31; rev 20 §21 item 32",
         "decision": decision, "independent_check": independent_check,
         "settled_at": ieo_evidence::time::now()});
-    apply(run, &s, stream)?;
+    if on_disk {
+        apply(run, &s, stream, ledger_dir)?;
+    } else {
+        apply_bytes(run, &s, stream, bytes)?;
+    }
     Ok(s)
 }

@@ -251,7 +251,7 @@ pub const CORRECTION_FORMAT: &str = "ieo-role-run-correction/v0";
 /// later run, a second correction of one run, a missing or changed file, or any difference
 /// makes the ledger unusable.
 pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
-    let recs = effective(raw_records(plan)?)?;
+    let recs = effective(raw_records(plan)?, &plan.ledger_dir)?;
     // one ledger belongs to one budget (02-05 budget PR): a record of another budget is never
     // counted for, or charged to, this one; the ledger is refused instead (fail closed)
     if let Some(other) = recs
@@ -269,7 +269,7 @@ pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
     Ok(recs)
 }
 
-fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
+fn effective(raw: Vec<Value>, ledger_dir: &Path) -> Result<Vec<Value>, String> {
     let mut runs: Vec<Value> = Vec::new();
     let mut done = std::collections::BTreeSet::new();
     let mut settled = std::collections::BTreeSet::new();
@@ -300,7 +300,7 @@ fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
                     moved_hint(&e)
                 )
             })?;
-            runs[pos] = crate::settlement::apply(&runs[pos], &line, &stream)?;
+            runs[pos] = crate::settlement::apply(&runs[pos], &line, &stream, ledger_dir)?;
             continue;
         }
         if line["format"] != CORRECTION_FORMAT {
@@ -919,7 +919,8 @@ pub fn spare_releasable(r: &Value) -> Result<(), String> {
     // rejects, extra usage, time or token caps and other unmeasured runs are never settled, so
     // they keep blocking.
     if r["outcome"]["stopped_by_guard"] == true
-        && r["settlement"]["policy"] != crate::settlement::POLICY
+        && (r["settlement"]["policy"] != crate::settlement::POLICY
+            || crate::settlement::pinned(r).is_err())
     {
         return Err(format!(
             "the guard stopped the run ({}) and it has no settlement",
@@ -1654,7 +1655,7 @@ pub fn reevaluate(
         .iter()
         .position(|r| r["attempt_id"] == attempt && r["format"] == RECORD_FORMAT)
         .ok_or(format!("no record of {attempt}"))?;
-    let earlier = effective(raw[..pos].to_vec())?;
+    let earlier = effective(raw[..pos].to_vec(), &plan.ledger_dir)?;
     let r = &raw[pos];
     // measured first from the given files: nothing is copied or written for a refusal
     remeasure(r, &earlier, transcripts)?;
@@ -1782,49 +1783,59 @@ pub fn settle(
             transcript.display()
         ));
     }
-    let to = std::path::absolute(
-        plan.ledger_dir
-            .join("children")
-            .join(attempt)
-            .join("settlement-transcript.jsonl"),
-    )
-    .map_err(|e| format!("ledger path: {e}"))?;
+    let to = crate::settlement::copy_path(&plan.ledger_dir, attempt)?;
     if dry_run {
-        // measured from the given file, nothing written
-        let probe = std::env::temp_dir().join(format!(
-            "ieo-settle-dry-{}-{}.jsonl",
-            std::process::id(),
-            attempt
-        ));
-        write_private(&probe, &b).map_err(|e| format!("dry run copy: {e}"))?;
-        let s = crate::settlement::build(
+        // measured from the given file's bytes; nothing is written anywhere (review d971f59 L-3)
+        return crate::settlement::build(
             r,
             &stream,
-            &probe,
+            &b,
+            &plan.ledger_dir,
+            false,
             original_path,
             original_sha256,
             decision,
             independent_check,
         );
-        let _ = std::fs::remove_file(&probe);
-        let mut s = s?;
-        s["evidence"]["ledger_copy"] = json!(to);
-        return Ok(s);
     }
-    let created = match std::fs::read(&to) {
-        Ok(existing) if existing != b => {
+    // the copy: created new (never through an existing file or a symlink: review d971f59 L-1);
+    // an existing regular file must be the same bytes
+    let created = match std::fs::symlink_metadata(&to) {
+        Ok(m) if !m.file_type().is_file() => {
+            return Err(format!("{} exists and is not a regular file", to.display()));
+        }
+        Ok(_) if std::fs::read(&to).map_err(|e| e.to_string())? != b => {
             return Err(format!("{} already holds a different file", to.display()));
         }
         Ok(_) => false,
         Err(_) => {
-            write_private(&to, &b).map_err(|e| format!("settlement copy: {e}"))?;
+            use std::io::Write;
+            use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+            if let Some(d) = to.parent() {
+                std::fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(d)
+                    .map_err(|e| format!("settlement copy: {e}"))?;
+            }
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&to)
+                .map_err(|e| format!("settlement copy: {e}"))?;
+            f.write_all(&b)
+                .and_then(|()| f.sync_all())
+                .map_err(|e| format!("settlement copy: {e}"))?;
             true
         }
     };
     let s = match crate::settlement::build(
         r,
         &stream,
-        &to,
+        &b,
+        &plan.ledger_dir,
+        true,
         original_path,
         original_sha256,
         decision,

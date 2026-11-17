@@ -115,7 +115,12 @@ struct Ledger {
     p: caller::Plan,
     copy: PathBuf,
     copy_sha: String,
+    report: PathBuf,
+    /// the test pin of this ledger's run, for a debug `ieo-role-call` (`IEO_SETTLEMENT_TEST_PINS`)
+    pin: String,
 }
+
+const DECISION: &str = settlement::DECISION;
 
 /// A ledger with one R1-like record (`patch` edits it) over a stream ending in `event`, and an
 /// evidence copy of `tr`.
@@ -137,18 +142,34 @@ fn ledger(name: &str, event: &str, tr: &str, patch: impl Fn(&mut Value)) -> Ledg
         "result_event": {"present": false},
         "usage": {"run": {"state": "unmeasured", "reason": "stopped by the run guard"}},
         "stream": {"path": sp, "bytes": s.len(), "sha256": sha(s.as_bytes())},
+        "limits": {"billable_room": 150000, "cache_read_room": 1500000, "grace_ms": 6000,
+                   "timeout_is_total": false, "timeout_ms": 594000},
         "stop_required": true,
         "stop_reason": "no result event; usage unmeasured: \"stopped by the run guard\"; this run's signal: rate limit status \"allowed_warning\" (not allowed)"});
+    // the decision pins 02-05 s8-r1 of its session and its real kept stream; a synthetic
+    // ledger's run gets a test pin for exactly its stream (debug builds only)
+    let stream_sha = sha(s.as_bytes());
+    settlement::allow_test_pin(settlement::Pin {
+        budget: "02-05".into(),
+        attempt: "s8-r1".into(),
+        session: SID.into(),
+        stream_sha256: Some(stream_sha.clone()),
+    });
+    let pin = format!("02-05|s8-r1|{SID}|{stream_sha}");
     patch(&mut r);
     std::fs::write(t.0.join("ledger/records.jsonl"), format!("{r}\n")).expect("records");
     let copy = t.0.join("evidence-copy.jsonl");
     std::fs::write(&copy, tr).expect("copy");
     let copy_sha = sha(tr.as_bytes());
+    let report = t.0.join("verification.md");
+    std::fs::write(&report, "# independent verification (test)\n").expect("report");
     Ledger {
         t,
         p,
         copy,
         copy_sha,
+        report,
+        pin,
     }
 }
 
@@ -163,16 +184,17 @@ fn settle(l: &Ledger, dry: bool) -> Result<Value, String> {
         &l.copy,
         "/role-volume/transcript.jsonl",
         &l.copy_sha,
-        "docs/poc/User_Decisions_2026-11-17_r1-settlement.md",
-        &check(),
+        DECISION,
+        &check(l),
         dry,
     )
 }
 
-/// The independent check a settlement follows (verdict as the s8-r1 verification gave it).
-fn check() -> Value {
-    json!({"evidence": "docs/poc/reports/tasks/02-05/step8-plan-20261117/evidence/r1-usage-verification.md",
-           "sha256": "a".repeat(64), "verdict": "CONFIRMED WITH CAVEAT"})
+/// The independent check a settlement follows (verdict as the s8-r1 verification gave it): the
+/// report file (absolute) and its SHA-256.
+fn check(l: &Ledger) -> Value {
+    json!({"evidence": l.report, "sha256": sha(&std::fs::read(&l.report).expect("report")),
+           "verdict": "CONFIRMED WITH CAVEAT"})
 }
 
 fn lines(l: &Ledger) -> Vec<Value> {
@@ -195,7 +217,7 @@ fn the_transcript_accounting_counts_each_message_once_and_must_equal_the_exit_ac
         .expect("accounting");
     assert_eq!(
         (a.tokens, a.api_requests, a.messages, a.billable()),
-        (EXIT, 1, 1, 1543)
+        (EXIT, 1, 1, Some(1543))
     );
     for (tr, why) in [
         (transcript(None, 1), "no cost-state"),
@@ -429,7 +451,7 @@ fn not_enough_evidence_writes_nothing() {
                 "/x",
                 &"0".repeat(64),
                 "d",
-                &check(),
+                &check(&l),
                 false,
             )
         };
@@ -485,7 +507,7 @@ fn not_enough_evidence_writes_nothing() {
             "/x",
             &l.copy_sha,
             "",
-            &check(),
+            &check(&l),
             false
         )
         .is_err()
@@ -504,8 +526,65 @@ fn not_enough_evidence_writes_nothing() {
             "{bad}"
         );
     }
-    let ok = json!({"evidence": "r.md", "sha256": "a".repeat(64), "verdict": "CONFIRMED"});
-    assert!(caller::settle(&l.p, "s8-r1", &l.copy, "/x", &l.copy_sha, "d", &ok, true).is_ok());
+    let mut ok = check(&l);
+    ok["verdict"] = json!("CONFIRMED");
+    assert!(
+        caller::settle(
+            &l.p,
+            "s8-r1",
+            &l.copy,
+            "/x",
+            &l.copy_sha,
+            DECISION,
+            &ok,
+            true
+        )
+        .is_ok()
+    );
+    // another decision, a report that is not there or changed: refused
+    assert!(
+        caller::settle(
+            &l.p,
+            "s8-r1",
+            &l.copy,
+            "/x",
+            &l.copy_sha,
+            "d",
+            &check(&l),
+            true
+        )
+        .is_err()
+    );
+    let mut gone = check(&l);
+    gone["evidence"] = json!(l.t.0.join("no-such-report.md"));
+    assert!(
+        caller::settle(
+            &l.p,
+            "s8-r1",
+            &l.copy,
+            "/x",
+            &l.copy_sha,
+            DECISION,
+            &gone,
+            true
+        )
+        .is_err()
+    );
+    let mut other = check(&l);
+    other["sha256"] = json!("b".repeat(64));
+    assert!(
+        caller::settle(
+            &l.p,
+            "s8-r1",
+            &l.copy,
+            "/x",
+            &l.copy_sha,
+            DECISION,
+            &other,
+            true
+        )
+        .is_err()
+    );
     assert!(
         caller::settle(
             &l.p,
@@ -514,7 +593,7 @@ fn not_enough_evidence_writes_nothing() {
             "/x",
             &l.copy_sha,
             "d",
-            &check(),
+            &check(&l),
             false
         )
         .is_err()
@@ -643,8 +722,7 @@ fn the_settle_command_writes_only_when_everything_holds() {
     std::fs::write(&plan_file, json!({"budget": "02-05", "ledger_dir": l.t.0.join("ledger"),
         "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}}).to_string())
         .expect("plan");
-    let report = l.t.0.join("verification.md");
-    std::fs::write(&report, "# report\n").expect("report");
+    let report = l.report.clone();
     let run = |extra: &[&str], sha: &str| {
         let mut c = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"));
         c.args(["settle", "--plan"])
@@ -657,11 +735,12 @@ fn the_settle_command_writes_only_when_everything_holds() {
                 "--original-sha256",
                 sha,
                 "--decision",
-                "d",
+                DECISION,
                 "--independent-check",
             ])
             .arg(&report)
             .args(["--independent-verdict", "CONFIRMED WITH CAVEAT"])
+            .env("IEO_SETTLEMENT_TEST_PINS", &l.pin)
             .args(extra);
         c.output().expect("run")
     };
@@ -681,4 +760,175 @@ fn the_settle_command_writes_only_when_everything_holds() {
         (json!("s8-r1"), json!(true))
     );
     assert_eq!(lines(&l).len(), 2);
+}
+
+/// PR #90 review d971f59, the scope and provenance on every read: only the decision's run
+/// (L-4), the copy exactly in the ledger and never through a symlink (L-1), the copy equal to the
+/// original and the report as recorded (L-2), the run's own limits (L-6), no overflow (L-7).
+#[test]
+fn only_the_pinned_run_with_its_evidence_in_place_is_settled() {
+    // L-4: the decision's pin itself: 02-05 s8-r1, its session, its real stream
+    let real = json!({"budget": "02-05", "attempt_id": "s8-r1",
+        "session": {"session_id": settlement::PIN_SESSION},
+        "stream": {"sha256": settlement::PIN_STREAM_SHA256}});
+    assert!(settlement::pinned(&real).is_ok());
+    for (k, v) in [
+        ("budget", json!("02-04")),
+        ("attempt_id", json!("s8-r2")),
+        (
+            "session",
+            json!({"session_id": "00000000-0000-0000-0000-000000000000"}),
+        ),
+        ("stream", json!({"sha256": "0".repeat(64)})),
+    ] {
+        let mut r = real.clone();
+        r[k] = v;
+        assert!(settlement::pinned(&r).is_err(), "{k}");
+    }
+    // another attempt or session of the same ledger: not settled, and no spare releases it
+    for (why, patch) in [
+        (
+            "another attempt",
+            Box::new(|r: &mut Value| r["attempt_id"] = json!("s8-r9")) as Patch,
+        ),
+        (
+            "another session",
+            Box::new(|r: &mut Value| {
+                r["session"]["session_id"] = json!("11111111-1111-1111-1111-111111111111")
+            }),
+        ),
+    ] {
+        let l = ledger("pin", WARN, &transcript(Some(EXIT), 1), patch);
+        let a = lines(&l)[0]["attempt_id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        assert!(
+            caller::settle(
+                &l.p,
+                &a,
+                &l.copy,
+                "/x",
+                &l.copy_sha,
+                DECISION,
+                &check(&l),
+                false
+            )
+            .is_err(),
+            "{why}"
+        );
+        let mut forged = lines(&l)[0].clone();
+        forged["usage"]["run"] = json!({"state": "measured", "tokens": {"input": 1, "output": 1, "cache_creation": 0, "cache_read": 0}});
+        forged["stop_reason"] = json!("no result event");
+        forged["settlement"] = json!({"policy": settlement::POLICY});
+        assert!(
+            caller::spare_releasable(&forged).is_err(),
+            "{why}: no spare release"
+        );
+    }
+    // L-6: a settlement above the run's own limits is refused
+    let l = ledger("limits", WARN, &transcript(Some(EXIT), 1), |r| {
+        r["limits"]["billable_room"] = json!(1500)
+    });
+    assert!(
+        settle(&l, false)
+            .expect_err("limits")
+            .contains("own limits")
+    );
+    let l = ledger("nolimits", WARN, &transcript(Some(EXIT), 1), |r| {
+        r["limits"] = Value::Null
+    });
+    assert!(settle(&l, false).is_err());
+    // L-7: token counts that overflow are never settled
+    let huge = transcript(Some([u64::MAX - 1, 130, 1411, 3223]), 1).replace(
+        "\"input_tokens\":2",
+        &format!("\"input_tokens\":{}", u64::MAX - 1),
+    );
+    let acc = settlement::transcript_accounting(huge.as_bytes(), SID).expect("accounting");
+    assert_eq!(acc.billable(), None);
+    let l = ledger("overflow", WARN, &huge, |_| {});
+    assert!(
+        settle(&l, false)
+            .expect_err("overflow")
+            .contains("overflow")
+    );
+    // L-1: the copy must be exactly <ledger>/children/s8-r1/settlement-transcript.jsonl
+    let l = r1_ledger("copy");
+    settle(&l, false).expect("settle");
+    let raw = lines(&l);
+    let rec = l.t.0.join("ledger/records.jsonl");
+    let copy =
+        l.t.0
+            .join("ledger/children/s8-r1/settlement-transcript.jsonl");
+    let elsewhere = l.t.0.join("elsewhere.jsonl");
+    std::fs::copy(&copy, &elsewhere).expect("copy");
+    let mut s = raw[1].clone();
+    s["evidence"]["ledger_copy"] = json!(elsewhere);
+    std::fs::write(&rec, format!("{}\n{s}\n", raw[0])).expect("w");
+    assert!(
+        caller::records(&l.p)
+            .expect_err("elsewhere")
+            .contains("lives in the ledger")
+    );
+    std::fs::write(&rec, format!("{}\n{}\n", raw[0], raw[1])).expect("w");
+    assert!(caller::records(&l.p).is_ok());
+    std::fs::remove_file(&copy).expect("rm");
+    std::os::unix::fs::symlink(&elsewhere, &copy).expect("symlink");
+    assert!(
+        caller::records(&l.p)
+            .expect_err("symlink")
+            .contains("symlink")
+    );
+    std::fs::remove_file(&copy).expect("rm");
+    std::fs::copy(&elsewhere, &copy).expect("copy back");
+    assert!(caller::records(&l.p).is_ok());
+    // L-2: the copy's two digests must agree; the report must be the recorded one
+    let mut s = raw[1].clone();
+    s["evidence"]["original_sha256"] = json!("0".repeat(64));
+    std::fs::write(&rec, format!("{}\n{s}\n", raw[0])).expect("w");
+    assert!(
+        caller::records(&l.p)
+            .expect_err("orig")
+            .contains("not the original")
+    );
+    std::fs::write(&rec, format!("{}\n{}\n", raw[0], raw[1])).expect("w");
+    std::fs::write(&l.report, "# changed\n").expect("w");
+    assert!(
+        caller::records(&l.p)
+            .expect_err("report")
+            .contains("independent_check")
+    );
+    std::fs::remove_file(&l.report).expect("rm");
+    assert!(caller::records(&l.p).is_err(), "a report that is gone");
+    // the writer never writes through a symlink at the copy path
+    let l = r1_ledger("wsym");
+    std::fs::create_dir_all(l.t.0.join("ledger/children/s8-r1")).expect("dir");
+    std::os::unix::fs::symlink(
+        l.t.0.join("target.jsonl"),
+        l.t.0
+            .join("ledger/children/s8-r1/settlement-transcript.jsonl"),
+    )
+    .expect("symlink");
+    assert!(settle(&l, false).is_err());
+    assert!(
+        !l.t.0.join("target.jsonl").exists(),
+        "nothing written through the symlink"
+    );
+    assert_eq!(lines(&l).len(), 1);
+    // the kept stream file changed after the record was written (the record's digest still
+    // matches the pin): refused
+    let l = r1_ledger("streamfile");
+    let sp = l.t.0.join("ledger/streams/s8-r1.jsonl");
+    let mut text = std::fs::read_to_string(&sp).expect("stream");
+    text.push_str("{\"type\":\"user\"}\n");
+    std::fs::write(&sp, text).expect("w");
+    assert!(
+        settle(&l, false)
+            .expect_err("stream")
+            .contains("kept stream differs")
+    );
+    // L-3: a dry run creates no copy anywhere in the ledger
+    let l = r1_ledger("dry");
+    settle(&l, true).expect("dry");
+    assert!(!l.t.0.join("ledger/children").exists());
 }

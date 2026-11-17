@@ -38,4 +38,39 @@ KILLED V02 caveat not required (---- a_changed_or_repeated_or_misdirected_settle
 KILLED V03 digest form not checked (---- not_enough_evidence_writes_nothing)
 KILLED V04 independent check not required on read (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
 # V01-V04 at a4c468a (independent check verdict/digest, caveat required)
-# total: 36 mutants, 35 killed, 1 equivalent (W02)
+# PR #90 review d971f59 correction 1: new checks (scratchpad/muts2.py)
+KILLED P01 pin not checked (---- only_the_pinned_run_with_its_evidence_in_place_is_settled)
+KILLED P02 spare release not pinned (---- only_the_pinned_run_with_its_evidence_in_place_is_settled)
+KILLED P03 pin ignores the stream (---- only_the_pinned_run_with_its_evidence_in_place_is_settled)
+KILLED C01 copy path not checked (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED C02 symlink accepted (---- only_the_pinned_run_with_its_evidence_in_place_is_settled)
+KILLED C03 report digest not checked on read (---- not_enough_evidence_writes_nothing)
+KILLED C04 copy vs original digest not checked (---- only_the_pinned_run_with_its_evidence_in_place_is_settled)
+KILLED C05 decision not pinned (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED L06 run limits not checked (---- only_the_pinned_run_with_its_evidence_in_place_is_settled)
+KILLED L07 billable wraps (---- only_the_pinned_run_with_its_evidence_in_place_is_settled)
+# the earlier mutants on moved code, run again after the correction
+SURVIVED E07 stream digest not compared
+KILLED E08 a current-rule stop accepted (---- other_stops_are_never_settled_and_never_released_by_a_spare)
+APPLY-FAILED A01 decision/check not required
+KILLED A02 run match not checked (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED A03 stated usage not compared (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED A04 lower bound not checked (---- not_enough_evidence_writes_nothing)
+KILLED A05 settled run becomes a success (---- a_settled_r1_counts_once_with_the_transcript_usage_and_stays_failed)
+KILLED A06 old stop reasons kept (---- a_settled_r1_counts_once_with_the_transcript_usage_and_stays_failed)
+KILLED C01 duplicate settlement accepted (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED C02 forged run fields accepted (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED C03 corrected run settled (---- not_enough_evidence_writes_nothing)
+KILLED C04 settled run corrected (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED W01 writer ignores a call in flight (---- not_enough_evidence_writes_nothing)
+SURVIVED W02 writer ignores the original digest
+KILLED W03 writer settles twice (---- a_settled_r1_counts_once_with_the_transcript_usage_and_stays_failed)
+KILLED W04 dry run writes (---- a_settled_r1_counts_once_with_the_transcript_usage_and_stays_failed)
+KILLED V01 any verdict accepted (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+KILLED V02 caveat not required (---- a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable)
+SURVIVED V03 digest form not checked
+APPLY-FAILED V04 independent check not required on read
+# E07 first survived (the per-stream pin caught the case); a changed-stream-file test added, then KILLED (shown above)
+# A01 and V04 no longer apply: replaced by C05 (decision pinned) and C03 (report digest checked on read)
+# equivalent: W02 (build checks the copy digest again before any append), V03 (the report digest is compared with the file's real digest, so a malformed value never matches)
+# total now: 10/10 new killed; all earlier still applicable killed except the 2 equivalent
