@@ -2,12 +2,12 @@
 
 | 항목 | 기록 |
 | --- | --- |
-| 작업 | 02-05 단계 8(실제 회차)의 전제인 예산 코드([계획](../plan-20261115/PLAN.md) §4.2 마지막 항목). [사용자 결정 2026-11-15](../../../../User_Decisions_2026-11-15_0205-x08.md) §2.1의 실제 회차 예산 (나)를 예산 이름 `02-05`로 넣고, 역할 서비스·호스트 호출자·코디네이터 전달이 그 상한과 역할 몫을 쓰게 한다. 예비 회차는 [사용자 결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md) (나)로 강제한다 |
+| 작업 | 02-05 단계 8(실제 회차)의 전제인 예산 코드([계획](../plan-20261115/PLAN.md) §4.2 마지막 항목). [사용자 결정 2026-11-15](../../../../User_Decisions_2026-11-15_0205-x08.md) §2.1의 실제 회차 예산 (나)를 예산 이름 `02-05`로 넣고, 역할 서비스·호스트 호출자·코디네이터 전달이 그 상한과 역할 몫을 쓰게 한다. 예비 회차는 [사용자 결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md) (나)와 같은 날의 추가 결정(해석 둘 확인, 증거 참조·승인자·시각 기록, 해제 범위)으로 강제한다 |
 | 착수 근거 | 단계 7b 병합(PR #80, main e336161) |
-| 검토 반영 | PR #80 검토 d336849 L-a·L-b·L-c, 이월 I-8(§9) |
-| 기준 커밋 | main e336161. 구현 8a4d619, 시험 보강 8d999bd, 예비 관문 5d50e44, 시험 보강 e77ed76, 증거 63dd555(evidence/test.log 첫 줄이 e77ed76, 작업 트리 깨끗). 644d607(8d999bd의 증거)은 63dd555가 대신한다 |
+| 검토 반영 | PR #80 검토 d336849 L-a·L-b·L-c, 이월 I-8(§9). PR #81 검토 b38e8df M-1·L-1~L-3·I-1~I-4(§11) |
+| 기준 커밋 | main e336161. 구현 8a4d619, 시험 보강 8d999bd, 예비 관문 5d50e44, 시험 보강 e77ed76, 보고 b38e8df. 검토 b38e8df 반영: 교정 1ea9233, 시험 cd1910b. 추가 결정 반영 1cf098a, 호스트 경로 거절 03531f1, 증거 7a20769(evidence/test.log 첫 줄이 03531f1, 작업 트리 깨끗). 644d607·63dd555·766c765·add39b4의 증거는 7a20769가 대신한다 |
 | 모델 호출 | 0회. 실제 `claude`·컨테이너·실제 회차 없음. 이 PR은 실제 호출을 하지 않고 기본값으로 켜지도 않는다(설정이 `02-05`를 이름으로 대야만 쓰인다). 영속 PoC DB(55433)·58090 코디네이터는 쓰지 않았다(일회성 시험 DB 55432만) |
-| 상태 | 구현과 시험 완료, **독립 검토 전**. 예비 회차 규칙은 사용자 결정 2026-11-17 (나)로 정해 구현했다(§7). 원장(`state.json`)은 고치지 않았다(원장 담당이 기록) |
+| 상태 | 구현과 시험 완료, 독립 검토 1회(b38e8df, 변경 요청) 반영, **재검토 전**. 예비 회차 규칙은 사용자 결정 2026-11-17 (나)로 정해 구현했다(§7). 구현의 두 해석은 사용자가 2026-11-17 추가 결정에서 조건과 함께 확인했다(§7, §12). 이 확인은 실제 예비 사용을 미리 승인하지 않는다. 원장(`state.json`)은 고치지 않았다(원장 담당이 기록) |
 
 ## 1. 승인된 숫자·규칙과 대응
 
@@ -23,12 +23,14 @@
 | 역할 몫: 개발 3회·1,800초·150,000·1,500,000 | `role_shares[development]` | 상수, 몫의 합 = 예산, 호출자의 방(150,000·1,500,000), 개발 3회(계획 2 + 예비 1, 그 뒤 거절) | N6, N8 |
 | 역할 몫: Guardrail 1회·600초·50,000·500,000 | `role_shares[guardrail]` | 상수, 방(50,000·500,000), 새 장부에서 1회 뒤 2번째는 “guardrail: 1 of 1 runs” | N7, N9 |
 | 역할 몫은 승인의 일부(고정값 아님) | 계획(`Plan::from_json`)과 역할 서비스(`Config`)는 `02-05`에서 승인된 몫을 쓴다. 몫을 생략하거나 승인값과 정확히 같게 줄 때만 받고, 다르면 거절. 승인에 없는 역할(예: Guardrail에 개발 몫)도 거절 | `caller.rs`: 생략 → 승인값, 같은 값 → 받음, 네 항목 각각 다른 값 → 거절, Guardrail에 개발 몫 → 거절, 역할 서비스의 다른 몫 → 거절 | R1, R2, R3 |
-| 예비는 개발에만, 한 번만([결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md) (나)) | `BUDGET_0205.spare = 개발, 계획 2회`. 공유 예산 검사의 `caller::spare_gate`(받기 전): 표식 없이는 개발이 예비가 아닌 회차 2회까지. 예비는 표식 `{reason, replaces}`이 있어야 하고, `replaces`는 이 장부에 기록이 **하나** 있는 이 예산의 개발 회차이며 실패(`stop_required`, 또는 깨끗한 성공이 아닌 결과)여야 함. 예비는 한 번. Guardrail(예비 없는 역할)은 표식을 대면 거절. 기록을 읽을 수 없거나 모호하면 거절. 개발 몫 3회는 그 아래의 보조 상한 | `caller.rs` `the_0205_spare_run_needs_a_marker_and_a_failed_development_run`: 표식 없음 → 거절, 성공한 회차를 대체 → 거절, Guardrail 회차·없는 시도·사유 없음 → 거절, Guardrail의 표식 → 거절, 실패한 R2 대체 → 허용·기록, 두 번째 예비 → 거절. `the_0205_spare_may_redo_the_first_planned_run`: R1 실패 → 예비로 다시 → R2는 표식 없이 → 그다음 거절. `the_spare_gate_refuses_ambiguous_records`: 같은 시도 두 기록·다른 예산의 기록 → 거절, 성공 아닌 결과·결과 없음 = 실패 | S1~S5, S9, N6 |
-| 표식·사유는 원장 기록에 | 받아들인 표식을 그 회차의 원장 기록(`spare`)에 씀(답을 잃은 기록에도) | 예비 회차 기록의 `spare`, 원장 파일에 사유 | S6 |
-| 표식은 대체한 실패 회차에 대한 사람의 결정 | 예비 표식이 이름 댄 실패 기록(`stop_required`)은 그 호출과 그 뒤의 호출에서 “사람을 부르는 기록”으로 보지 않음. 다른 모든 그런 기록은 그대로 멈춤. 미계측 회차는 그대로 예산을 멈춤(0이 아님) | R1 실패 뒤 표식 없는 호출 → 거절(“asks for a person”), 예비 뒤 R2 → 실행 | S7, S8 |
-| 표식 경로: `ieo-role-call`, 전달 본문 | `--spare-reason`·`--replaces`(둘 다 또는 없음), 전달 본문 `spare`(모양 검사, 결정은 예산 검사) | `caller.rs` HTTP 시험(한쪽만 → exit 1, 02-04 예산의 표식 → exit 2 “has no spare”), `delivery_e2e`(잘못된 모양 넷 → 400, 02-04의 표식 → `budget_refused` “has no spare run in the 02-04 budget”) | S10, S11, S12 |
+| 예비는 개발에만, 한 번만([결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md) (나)) | `BUDGET_0205.spare = 개발, 계획 2회`. 공유 예산 검사의 `caller::spare_gate`(받기 전): **개발은 표식 없이 최대 2회, 예비 1회는 표식을 달고 실패한 개발 회차를 대체한다.** 예비는 표식 `{reason, replaces, evidence_ref, by, approved_at}`이 있어야 하고(추가 결정 §2), `replaces`는 이 장부에 원시 기록이 **하나** 있는 이 예산의 개발 회차이며 그 **유효 기록**(정정 반영)이 실패(`stop_required`, 또는 깨끗한 성공이 아닌 결과)여야 함(검토 b38e8df L-1). 예비는 R1 또는 R2를 다시 하므로 세 번째 호출일 필요가 없다(R1 실패 → 예비 → R2 허용, 추가 결정 §1). 예비는 한 번. Guardrail(예비 없는 역할)은 표식을 대면 거절. 기록을 읽을 수 없거나 모호하면 거절. 개발 몫 3회는 그 아래의 보조 상한 | `caller.rs` `the_0205_spare_run_needs_a_marker_and_a_failed_development_run`: 표식 없음 → 거절, 성공한 회차를 대체 → 거절, Guardrail 회차·없는 시도·사유 없음 → 거절, Guardrail의 표식 → 거절, 실패한 R2 대체 → 허용·기록, 두 번째 예비 → 거절. `the_0205_spare_may_redo_the_first_planned_run`: R1 실패 → 예비로 다시 → R2는 표식 없이 → 그다음 거절. `the_spare_gate_refuses_ambiguous_records`: 같은 시도 두 기록·다른 예산의 기록 → 거절, 성공 아닌 결과·결과 없음 = 실패, 깨끗한 성공으로 정정된 회차 → 거절(“did not fail”) | S1~S5, S9, N6, C5 |
+| 표식의 해제 범위(추가 결정 §3) | `caller::spare_releasable`: 표식은 이름 댄 실패 회차의 **결과로 인한** 멈춤(`result …`, `no result event`)만 풀고, 그 회차의 사용량이 계측돼 있어야 한다. 미계측 사용량, overage·한도 신호(`this run's signal`), 정리 실패, 구독 전용이 아닌 환경, 답을 잃은 호출, 사유 없는 멈춤은 그대로 막는다(목록 밖은 막음, 닫는 쪽). 다른 회차의 멈춤, 장부 불일치, 미계측 회차, 예산·몫 한도, 관측 보류는 표식과 상관없이 그대로다(관문 뒤의 기존 검사). 실패 기록과 사용량은 그대로 두고 예비 기록을 더한다(초기화·0으로 만들기 없음) | 관문 단위: 결과 사유만 → 허용, 미계측·overage·결과+overage·정리 실패·환경·답 잃음·빈 사유 → 거절. `a_spare_marker_releases_nothing_else`: overage로 멈춘 R1(미계측)을 대체 → 거절, 표식이 유효해도 G1의 멈춤 기록 → “g1 asks for a person”, 장부의 미계측 회차 → “unmeasured run(s)”. 예비 시험: 예비 뒤 R2의 기록이 그대로 하나 | D4~D7 |
+| 표식은 원장 기록에: 대체 시도, 사유, 원인 보고·증거 참조, 승인자, 승인 시각(추가 결정 §2) | 받아들인 표식(`reason`, `replaces`, `evidence_ref`, `by`, `approved_at`)을 그 예비 회차의 원장 기록(`spare`)에 씀(답을 잃은 기록에도). 사유만으로는 환경 결함의 증거가 아니다: 사람이 증거를 대고 코드는 `evidence_ref`가 비어 있지 않은지만 보고 기록한다. `evidence_ref` 없음·공백, `by` 없음, `by.kind`가 `user`가 아님(서비스·host_operator), 이름 공백, `approved_at` 없음 → 관문이 거절 | 예비 회차 기록의 `spare` = 표식 그대로, 원장 파일에 사유, 빠진 항목 일곱 가지 → 각각 거절 | S6, C2, C3, D1~D3 |
+| 표식은 대체한 실패 회차에 대한 **사람의** 결정 | 예비 표식이 이름 댄 실패 기록(`stop_required`)은 그 호출과 그 뒤의 호출에서 “사람을 부르는 기록”으로 보지 않음. 다른 모든 그런 기록은 그대로 멈춤. **실패한 예비 자신의 기록도 그대로 멈춤.** 미계측 회차는 그대로 예산을 멈춤(0이 아님) | R1 실패 뒤 표식 없는 호출 → 거절(“asks for a person”), 예비 뒤 R2 → 실행. `a_failed_spare_stops_the_budget_again`: 예비가 실패하면 R2·G1 → “asks for a person”, 두 번째 예비 → “used already” | S7, S8, C6 |
+| 표식은 사람이 붙임(검토 b38e8df M-1, 추가 결정 §2) | **유일한 경로는 코디네이터의 `deliverAssignment`다.** `spare`는 `kind: user` 자격(인증된 사람)만 보낼 수 있다. 아니면 403 `HUMAN_APPROVAL_REQUIRED`, 아무것도 기록·호출하지 않음(복구 승인과 같은 규칙). 기록의 `by` = `{name: 자격 이름, kind: "user", via: "deliverAssignment"}`, `approved_at` = 코디네이터 시계(UTC). 본문은 `by`·`approved_at`을 댈 수 없다(키 셋만, 넷이면 400). **호스트 경로는 거절:** `ieo-role-call`은 인증된 신원이 없어 스스로 댄 승인자는 `kind: user` 사람이 아니다. 예비 플래그(`--spare-reason`·`--replaces`·`--evidence-ref`·`--approver`) 중 하나라도 있으면 아무것도 읽거나 시작하기 전에 exit 1(“a spare run is attached only by a person with a user credential through deliverAssignment”). 호스트 경로의 `by` 기록은 없앴다(03531f1) | `delivery_e2e` 8단계: 서비스 자격(`operator`)의 `spare` → 403, 사람 자격(`human-op`)의 같은 본문 → 받아 예산 검사(02-04 → `budget_refused`). `delivery.rs` 단위 `the_spare_names_the_person_who_attached_it`. `ieo_role_call_refuses_a_spare_marker`: 02-05 계획, R1 실패 뒤 네 플래그 → exit 1, 장부 그대로(예비 없음), 플래그 없이 → R1이 여전히 사람을 부름(exit 2). 02-04 HTTP 시험: 플래그 하나씩·넷 모두 → exit 1 | C1, C4, D9, D10, E1, E2 |
+| 표식 경로: 전달 본문 | 전달 본문 `spare` `{reason, replaces, evidence_ref}`(사유·증거 참조 1~2,000바이트, 대체 시도는 안전한 id, 모양 검사, 결정은 예산 검사). 표식은 예산 검사의 것이라 역할 서비스로 보내는 본문에서 뺀다(검토 b38e8df I-4) | `a_failed_spare_stops_the_budget_again`(역할 서비스로 간 본문 어디에도 `spare` 없음), `delivery_e2e`(잘못된 모양 여덟 → 400: `evidence_ref` 없음·공백·2,001바이트, 본문의 `by` 포함, 02-04의 표식 → `budget_refused` “has no spare run in the 02-04 budget”) | S10, S11, C10, D8 |
 | G1은 다시 하지 않음 | Guardrail 몫 1회, 예비 없음 | Guardrail 2번째 거절(“1 of 1 runs”), Guardrail의 표식 거절 | N7, S5 |
-| 자동 재시도 없음 | 기존 호출자(재시도 코드 없음, `stop_required`면 멈춤) 그대로 | 기존 시험(02-04 호출자) | — |
+| 자동 재시도 없음, 표식은 한 번, 중복 요청이 실행을 더 만들지 않음 | 기존 호출자(재시도 코드 없음, `stop_required`면 멈춤) 그대로. 쓰인 표식은 다시 쓸 수 없고(“used already”), 같은 요청을 다시 보내도(같은 시도·같은 표식) 아무것도 시작하지 않는다. 장부 잠금이 동시 호출을 하나로 줄이고, 전달은 멱등 키로 저장된 답을 돌려준다(기존). 실패한 예비는 다시 멈추고 보고한다 | 기존 시험(02-04 호출자), 예비 시험: 같은 요청 다시 → 거절·기록 수 그대로, `a_failed_spare_stops_the_budget_again` | S4, C6 |
 | 미계측 회차는 0이 아님 | 기존 `budget::next`(미계측 → 멈춤) 그대로 | `the_0205_budget_caps_each_number`: 미계측 기록 → 멈춤 | — |
 | 추가 청구 USD 0 | 기존 무추가청구 관측 검사(`overageStatus: rejected`가 아니면 보류) 그대로 | 기존 시험 | — |
 | 02-04(남은 5회)·X-02·01-04 예산 사용·전용 금지 | 예산은 이름으로만 고르고(`budget::named`: `02-04`·`X-02`·`02-05`, 01-04는 예산 이름이 아님), 02-04·X-02의 상수와 몫 방식은 그대로. **장부 하나는 예산 하나**: 장부에 다른 예산의 기록이 있으면 호출자가 거절(사용량을 옮기거나 함께 세지 않음) | 이름 표, 02-04·X-02 상수 그대로, `a_ledger_belongs_to_one_budget` | R5, R6 |
@@ -40,8 +42,12 @@
 - `caller.rs`: `plan.budget`이 `02-05`를 받는다. 승인 몫이 있는 예산이면 계획의 몫은 승인값(생략 또는 같은 값만). `records()`가 다른 예산의 기록이 있는 장부를 거절한다. 코디네이터의 `budget_plan`도 이 코드로 읽으므로 단계 5의 역할 몫 항이 승인값을 쓴다(시험 고정값이 아님).
 - `serve.rs`: `config.budget`이 `02-05`를 받는다. 몫은 승인값(생략 또는 같은 값만). supervisor의 보조 상한(회당 창 600초, 몫의 회차·시간·토큰)도 이 값이다.
 - **예비 관문**(5d50e44): `budget::SpareRule`, `caller::spare_gate`, `caller::admit_with`(표식을 받기 전에 검사, 받아들인 표식을 기록에 씀), 실패 기록의 “사람을 부름”을 그 예비가 답한 것으로 봄. `ieo-role-call --spare-reason/--replaces`.
-- 코디네이터: `deliverAssignment` 본문의 `spare`(모양 검사)를 공유 예산 검사에 넘긴다. 장부 id는 이미 `<예산>@<장부 디렉터리>`.
-- OpenAPI 0.17.0(추가): 전달 본문 `spare`.
+- 코디네이터: `deliverAssignment` 본문의 `spare`(모양 검사, 사람 자격만)를 붙인 사람(`by`)과 함께 공유 예산 검사에 넘긴다. 장부 id는 이미 `<예산>@<장부 디렉터리>`.
+- 검토 b38e8df 반영(1ea9233·cd1910b): 사람 자격 검사와 `by`(M-1), 유효 기록으로 실패 판단(L-1), `budget.rs` 주석과 `SpareRule` 문서(L-3), 역할 서비스 본문에서 `spare` 제외(I-4). `ieo-role-call`의 값 검사·사유 상한(I-2)은 03531f1에서 플래그 자체를 거절하면서 없어졌다.
+- 추가 결정 반영(1cf098a): 표식의 `evidence_ref`·`by`(kind user)·`approved_at` 요구와 기록, `caller::spare_releasable`(해제 범위), 전달 본문 `evidence_ref`와 코디네이터가 적는 승인자·시각(`ieo-coord`가 시계로 `ieo-evidence`에 의존).
+- 호스트 경로 거절(03531f1): `ieo-role-call`이 예비 플래그를 모두 거절, 호스트 경로의 `by` 기록 삭제.
+- OpenAPI 0.17.0(추가): 전달 본문 `spare` `{reason, replaces, evidence_ref}`, 사람 자격만(403 `HUMAN_APPROVAL_REQUIRED`), 기록의 `by`·`approved_at`, 해제 범위, 역할 서비스로 보내지 않음.
+- 런타임 계약 revision 17: 새 §19 항목 30(예비 표식, 역할 서비스 계약은 그대로).
 
 ## 3. 수용된 작업의 동작 변경
 
@@ -50,7 +56,9 @@
 1. **02-04 호스트 호출자·공유 예산 검사(02-04 수용), 장부 읽기.** 장부에 다른 예산 이름의 기록(`budget` 필드)이 있으면 그 호출은 시작하지 않는다(“one ledger per budget”). 지금까지는 함께 셌다. 02-04 장부에는 02-04 기록만 있으므로 02-04 경로는 그대로다. `budget` 필드가 없는 손 정리 기록(`model_request: false`)은 영향이 없다.
 2. **reportCheckpoint(02-04 수용, 단계 7b에서 바뀐 규칙), 검토 d336849 L-a.** 끝나지 않은 회차 위의 takeover가 대는 복구는 그 전달이 **바로 그 체크포인트(최신 중앙 순번)** 에 대해 쓴 승인이어야 하고, 승인의 배정·세대가 보고의 것과 같아야 한다. 아니면 409 `RECOVERY_REQUIRED`. 정상 경로(전달이 그 체크포인트의 승인을 쓴 경우)는 같다.
 3. **공유 예산 검사의 “사람을 부르는 기록”(02-04 수용).** 예비 표식이 이름 댄 실패 기록은 더는 호출을 멈추지 않는다(그 표식이 사람의 결정이다). 예비가 있는 예산(02-05)에서만 생긴다: 02-04·X-02에는 예비가 없어 표식이 늘 거절되므로 02-04 경로의 동작은 같다.
-4. 추가만: `config.budget`·`plan.budget`의 `02-05`, `ieo_supervisor::budget::named`, `ieo-role-call`의 `--spare-reason`·`--replaces`, 전달 본문 `spare`(OpenAPI 0.17.0).
+4. 추가만: `config.budget`·`plan.budget`의 `02-05`, `ieo_supervisor::budget::named`, 전달 본문 `spare`(OpenAPI 0.17.0, 사람 자격만). 전달 본문의 `spare`는 이 PR에서 새로 생긴 필드라 서비스 자격의 403(검토 b38e8df M-1)과 `evidence_ref` 요구는 수용된 동작을 바꾸지 않는다.
+5. **`ieo-role-call`(02-04 수용)의 인자.** `--spare-reason`·`--replaces`·`--evidence-ref`·`--approver`가 있으면 exit 1로 거절한다. 02-04 수용 때는 이 이름의 인자가 없었다(모르는 인자로 무시됐다). 그 밖의 인자와 동작은 같다.
+6. **호스트 호출자가 역할 서비스로 보내는 start 본문(02-04 수용, 검토 b38e8df I-4).** 호출자의 추가 키 중 `spare`는 더는 역할 서비스로 보내지 않는다. 02-04에서는 `spare`를 보낼 길이 없었으므로(02-04 예산은 표식을 늘 거절) 02-04 경로의 본문은 같다.
 
 ## 4. 기존 배정과 장부 전환(정의)
 
@@ -63,7 +71,7 @@
 
 ## 5. 시험
 
-새 시험(6개):
+새 시험(10개, 검토 b38e8df 반영 3개와 추가 결정 반영 1개 포함):
 
 | 시험 | 내용 |
 | --- | --- |
@@ -72,24 +80,30 @@
 | `ieo-supervisor` `tests/caller.rs` `a_ledger_belongs_to_one_budget` | 02-04 계획의 장부에 `02-05` 기록 → 거절 |
 | `tests/caller.rs` `the_0205_spare_run_needs_a_marker_and_a_failed_development_run` | §1 예비 행(실제 호출 경로, 가짜 런타임) |
 | `tests/caller.rs` `the_0205_spare_may_redo_the_first_planned_run` | R1 실패 → 예비 → R2 → 거절 |
-| `tests/caller.rs` `the_spare_gate_refuses_ambiguous_records` | 관문 단위: 허용 표식, 같은 시도 두 기록·다른 예산 → 거절, 실패의 정의 |
+| `tests/caller.rs` `the_spare_gate_refuses_ambiguous_records` | 관문 단위: 허용 표식, 같은 시도 두 기록·다른 예산 → 거절, 실패의 정의, 깨끗한 성공으로 정정된 회차 → 거절(L-1) |
+| `tests/caller.rs` `a_failed_spare_stops_the_budget_again`(L-2 H3, I-4) | R1 실패 → 표식 단 예비도 실패 → R2·G1은 “asks for a person”, 예비를 대체하려는 두 번째 예비는 “used already”. 역할 서비스로 간 본문 어디에도 `spare` 없음 |
+| `tests/caller.rs` `ieo_role_call_refuses_a_spare_marker`(추가 결정 §2, 검토 b38e8df L-2 H4 시험을 대신함) | 실제 `ieo-role-call` 바이너리와 HTTP 역할 서비스(02-05): R1 실패(exit 3), 네 예비 플래그 → exit 1과 “deliverAssignment” 안내, 장부 바이트가 그대로이고 `spare` 없음, 플래그 없이 → exit 2 “asks for a person” |
+| `ieo-coord` `delivery.rs` 단위 `the_spare_names_the_person_who_attached_it`(M-1) | 표식 없음 → 빈 추가 키, 표식 → 사람 자격의 이름·`kind: user`·`via`, `approved_at`(UTC) |
+| `tests/caller.rs` `a_spare_marker_releases_nothing_else`(추가 결정 §3·§4) | overage로 멈춘 R1(미계측)을 이름 댄 예비 → “not one a spare releases”. 결과로 실패한 R1을 이름 댄 유효한 예비라도 G1의 멈춤 기록 → “g1 asks for a person”, 장부의 미계측 회차 → “unmeasured run(s)” |
 
 넓힌 시험:
 - `supervisor.rs` `budget_constants_match_decision_1`: `BUDGET_0205` 전부, 몫의 합 = 예산, 이름 표, 02-04에 고정 몫 없음.
 - `limits_e2e` 10단계(두 전송): §4.
 - `the_0205_budget_fixes_the_role_shares…`: 표식 없는 개발 3번째 → 거절(예비 관문).
-- `caller.rs` HTTP 시험: `--spare-reason`·`--replaces`. `delivery_e2e` 8단계: 본문 `spare`의 모양과 02-04 예산의 거절(전달 수 22, 결과 24).
+- `caller.rs` HTTP 시험(02-04): 예비 플래그 하나씩과 넷 모두 → exit 1(“only by a person”). `delivery_e2e` 8단계: 본문 `spare`의 모양과 02-04 예산의 거절(전달 수 22, 결과 24), 서비스 자격의 `spare` → 403(기록 없음, 수 그대로), 사람 자격(`human-op`, `kind: user`) → 받음(M-1).
+- 기존 예비 시험 셋: 표식에 `evidence_ref`·`by`·`approved_at`. `the_0205_spare_run_needs…`: 빠진 항목 일곱 가지·사람이 아닌 표식 → 거절, 예비 뒤 R2의 기록이 그대로 하나, 같은 요청 다시 → “used already”·기록 수 그대로. 관문 단위: 해제 범위 아홉 가지(§1).
+- 추가 결정 §4의 시험 대응: §12의 표.
 - `recovery_e2e`(두 전송) 12b(검토 L-b: `error` 체크포인트 위 takeover → 409), 12c(L-a: 다른 체크포인트의 사용 → 409), 12d(L-a: A1/0의 승인으로 A1/1 takeover → 409).
 
-결과([evidence/test.log](evidence/test.log), 커밋 e77ed76):
+결과([evidence/test.log](evidence/test.log), 커밋 03531f1):
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`: 통과.
 - `openapi-spec-validator`: OK. proto 변경 없음.
-- `cargo test --workspace --locked`(시험 DB, `RUST_TEST_THREADS=4`): **401 통과, 0 실패, 0 무시**. 기준(e336161) 395에 새 시험 6개.
+- `cargo test --workspace --locked`(시험 DB, `RUST_TEST_THREADS=4`): **405 통과, 0 실패, 0 무시**. 기준(e336161) 395에 새 시험 10개(검토 전 401 + 검토 반영 3 + 추가 결정 1).
 - 공유 대상 디렉터리의 다른 작업 트리 바이너리를 피하려고 작업 공간 일곱 패키지를 `cargo clean -p` 한 뒤 증거를 만들었다.
 
 ## 6. 변이 시험
 
-각 변이를 하나씩 e77ed76 코드에 넣고 대상 시험을 돌린 뒤 파일을 되돌렸다(매번 `git status` 깨끗, [evidence/mutants.txt](evidence/mutants.txt)). **29개 모두 잡혔다.** 예비 관문 전의 17개를 다시 돌렸고 예비 규칙 12개를 더했다. A3은 처음(8a4d619)에 살아남아 시험 12d를 더했다.
+각 변이를 하나씩 03531f1 코드에 넣고 대상 시험을 돌린 뒤 파일을 되돌렸다(매번 `git status` 깨끗, [evidence/mutants.txt](evidence/mutants.txt)). **47개 모두 잡혔다.** 검토 전의 28개(S12 제외)를 다시 돌렸고(S11·C2·C3는 바뀐 코드에 맞춰 같은 뜻으로 고쳐 넣음), 검토 b38e8df 반영 7개(C1~C6, C10), 추가 결정 반영 10개(D1~D10), 호스트 경로 거절 2개(E1·E2)를 더했다. 호스트 경로의 표식 코드를 없애면서 그 변이(S12, C7~C9, D11, D12)도 뺐다. C6은 검토의 H3이다(H4는 매핑 코드가 없어져 E1이 대신한다). A3은 처음(8a4d619)에 살아남아 시험 12d를 더했다.
 
 | id | 변이 | 잡은 시험 |
 | --- | --- | --- |
@@ -110,16 +124,34 @@
 | S9 | 모호한 대체 시도(두 기록)에서 첫 기록을 씀 | 관문 단위 시험 |
 | S10 | 전달 본문 `spare`의 모양을 보지 않음 | `delivery_e2e` |
 | S11 | 전달이 `spare`를 예산 검사에 넘기지 않음 | 같음 |
-| S12 | `ieo-role-call`이 예비 플래그를 버림 | `caller.rs` HTTP |
 | A1 | 복구 사용을 체크포인트 순번에 묶지 않음(L-a) | `recovery_e2e` 12c |
 | A2 | `takeover` 단계만 복구를 요구(L-b, 검토의 H3) | 같음 12b |
 | A3 | 승인의 배정·세대를 보지 않음(L-a) | 같음 12d |
+| C1 | `deliverAssignment`가 서비스 자격의 `spare`를 받음(M-1) | `delivery_e2e`(두 전송) |
+| C2 | 관문이 `by` 없는 표식을 받음(M-1) | 예비 시험 |
+| C3 | 관문이 `by`를 기록에 남기지 않음(M-1) | 같음 |
+| C4 | 전달이 다른 이름을 `by`로 기록(M-1) | `delivery.rs` 단위 |
+| C5 | “실패”를 원시 줄에서 읽음(정정 무시, L-1) | 관문 단위 |
+| C6 | 예비 자신의 `stop_required`가 멈추지 않음(L-2, 검토 H3) | `a_failed_spare_stops_the_budget_again` |
+| C10 | `spare`를 역할 서비스로 보냄(I-4) | `a_failed_spare_stops_the_budget_again` |
+| D1 | 관문이 `evidence_ref` 없는 표식을 받음(추가 §2) | 예비 시험 |
+| D2 | 관문이 승인 시각 없는 표식을 받음(추가 §2) | 같음 |
+| D3 | 관문이 `evidence_ref`를 기록하지 않음(추가 §2) | 같음 |
+| D4 | 표식이 이름 댄 회차의 어떤 멈춤이든 풂(추가 §3) | `a_spare_marker_releases_nothing_else`, 관문 단위 |
+| D5 | 결과 사유 뒤의 다른 사유도 풂(추가 §3) | 관문 단위 |
+| D6 | 미계측 회차도 풂(추가 §3) | 같음 |
+| D7 | 사유 없는 멈춤도 풂(닫는 쪽 위반) | 같음 |
+| D8 | 전달 본문에 `evidence_ref`가 필요 없음(추가 §2) | `delivery_e2e` |
+| D9 | 전달 본문이 클라이언트가 쓴 `by`를 받음 | 같음 |
+| D10 | 전달이 승인 시각을 적지 않음 | `delivery.rs` 단위 |
+| E1 | `ieo-role-call`이 예비 플래그를 받음(추가 §2: 사람만) | `ieo_role_call_refuses_a_spare_marker` |
+| E2 | `ieo-role-call`이 `--evidence-ref`·`--approver`만 있을 때는 받음 | `caller.rs` HTTP(02-04) |
 
 ## 7. 결정한 것
 
-- **예비 회차: 사용자 결정 2026-11-17 (나)로 정함**([결정 기록](../../../../User_Decisions_2026-11-17_spare.md)). 횟수와 명시적 표식이다. 코드는 표식이 있고 그것이 이 예산의 실패한 개발 회차를 대체한다는 것만 확인한다. “실행 환경 결함”과 “원인 보고 뒤”라는 판단은 표식을 붙이는 사람의 몫이다. 구현에서 정한 해석 둘:
+- **예비 회차: 사용자 결정 2026-11-17 (나)로 정함**([결정 기록](../../../../User_Decisions_2026-11-17_spare.md)). 횟수와 명시적 표식이다. 규칙은 “**개발은 표식 없이 최대 2회, 예비 1회는 표식을 달고 실패한 개발 회차를 대체한다**”이다(“세 번째 개발 회차가 예비”가 아님, 검토 b38e8df L-3). 코드는 표식이 있고, 사람이 붙였고, 그것이 이 예산의 실패한 개발 회차를 대체한다는 것만 확인한다. “실행 환경 결함”과 “원인 보고 뒤”라는 판단은 표식을 붙이는 사람의 몫이다. 구현에서 정한 해석 둘은 검토 b38e8df가 사용자 확인을 요청했고, **사용자가 2026-11-17 추가 결정에서 조건과 함께 확인했다**(§12):
   - **예비는 실패 바로 다음 회차다(세 번째만이 아님).** 결정은 R1 또는 R2를 다시 하는 것이다. R1이 실패하면 그 기록이 사람을 부르므로 R2도 시작할 수 없다. 그래서 “표식 없이는 예비가 아닌 회차 2회까지, 예비는 실패한 개발 회차를 대체하는 한 번”으로 구현했다. R2가 실패하면 예비는 세 번째 회차이고, R1이 실패하면 예비는 두 번째 회차이고 R2가 세 번째다. 둘 다 개발 3회(= 몫), 예비 1회다.
-  - **표식은 대체한 실패 기록에 대한 사람의 결정이다.** 그 실패 기록(`stop_required`)은 그 호출과 그 뒤의 호출을 더는 멈추지 않는다. 이렇게 하지 않으면 실패 기록이 모든 호출을 멈춰 예비를 쓸 수 없다. 다른 기록은 그대로 멈추고, 실패 회차가 미계측이면 예산 검사가 그대로 멈춘다(0으로 세지 않음).
+  - **표식은 대체한 실패 기록에 대한 사람의 결정이다.** 그 실패 기록(`stop_required`)은 그 호출과 그 뒤의 호출을 더는 멈추지 않는다. 이렇게 하지 않으면 실패 기록이 모든 호출을 멈춰 예비를 쓸 수 없다. 다른 기록은 그대로 멈추고(실패한 예비 자신의 기록 포함), 실패 회차가 미계측이면 예산 검사가 그대로 멈춘다(0으로 세지 않음). 표식이 사람이 멈춘 것을 푸는 힘이 되므로 **사람만 붙인다**: 경로는 `deliverAssignment`의 `kind: user` 자격 하나이고, 기록에 붙인 사람과 시각을 남긴다(검토 b38e8df M-1, 복구 승인과 같은 규칙). 호스트 경로(`ieo-role-call`)는 인증된 신원이 없어 예비를 거절한다. 추가 결정 §3에 따라 표식은 그 실패의 결과로 인한 멈춤만 푼다(§1 해제 범위).
 - **역할 몫은 승인의 일부다.** 02-04·X-02는 배포마다 몫을 정하지만(예산 안에서), 02-05 승인은 몫까지 정했다. 그래서 `02-05`에서는 몫을 설정하지 않는다(같은 값을 적는 것만 허용). 다른 몫을 적으면 기동·계획이 실패한다.
 - **장부 하나는 예산 하나.** 예산 사이의 전용 금지를 장부 수준에서 닫았다. 다른 예산의 기록을 “세지 않고 넘어가기” 대신 거절했다. 장부를 잘못 연결한 것은 사람이 고쳐야 할 설정 오류이기 때문이다.
 - **기존 배정은 옮기지 않는다(§4).** 장부를 바꾸면 그 배정은 멈춘다.
@@ -131,6 +163,10 @@
 | **단계 8 전제: 중앙 기록** | 다른 배정의 체크포인트가 중앙 기록에 있는 역할에는 새 배정이 시작하지 않는다(기존 규칙, §4). 단계 8은 그런 체크포인트가 없는 저장소·역할로 한다. 새 경로는 만들지 않았다 | 단계 8 |
 | **단계 8 전제: 새 역할 볼륨** | 다른 예산으로 회차를 돈 볼륨은 `02-05`에서 시작하지 않는다(supervisor의 보조 상한이 볼륨 전체를 셈). 단계 8은 새 역할 볼륨으로 한다. 새 경로는 만들지 않았다 | 단계 8 |
 | 예비의 정당성 | “실행 환경 결함”·“원인 보고”는 코드가 판단하지 않는다(표식을 붙이는 사람의 몫, 결정 2026-11-17 §2) | 단계 8 실행 절차 |
+| 예비 해석 둘의 사용자 확인(검토 b38e8df 메모) | 사용자가 2026-11-17 추가 결정으로 확인했다(§12). 결정 기록 §2·§4의 문구는 원장 담당이 고친다. 이 확인은 실제 예비 사용을 미리 승인하지 않는다 | 원장 담당(결정 기록) |
+| 호스트 경로의 예비 | `ieo-role-call`은 예비를 거절한다(인증된 신원 없음). 단계 8에서 예비를 쓰려면 코디네이터 경로(`deliverAssignment`, 사람의 `user` 자격)로 해야 한다. 02-04식 호스트 호출로 회차를 돌리면 실패 뒤 예비 없이 멈춘다 | 단계 8 실행 절차 |
+| 원인 보고·증거의 내용 | 코드는 `evidence_ref`가 비어 있지 않은지만 보고 기록한다. 참조가 가리키는 보고가 있는지, 실행 환경 결함을 보이는지는 사람이 판단한다(추가 결정 §2) | 단계 8 실행 절차 |
+| 02-04 실제 장부의 예산 필드(검토 b38e8df I-3) | “02-04 장부에는 02-04 기록만 있다”(§3 항목 1)는 이 작업에서 실제 장부(`/opt/rust/ieo_poc_runs`)를 읽어 확인한 것이 아니다(읽기 금지). 다른 예산 기록이 있으면 다음 02-04 호출이 시작하지 않고 멈춘다(닫는 쪽) | 장부 담당, 다음 02-04 호출 전 읽기 전용 확인 |
 | 단계 8의 다른 전제 | 이 PR 병합 뒤 빌드로 재배포, 바인딩 읽기 전용 대조 등은 그대로 남는다. 이 PR은 아무 호출도 켜지 않는다 | 단계 8 |
 | 사용 뒤 풀리지 않는 체크포인트(검토 d336849 L-c) | 받았으나 실행되지 않은 start(코디네이터가 결과 전에 멈추고 takeover 보고도 실패: 재조회는 보낸 digest가 없어 늘 `unknown`)와 takeover가 거절된 `accepted` 사용은 그 체크포인트를 소비한 채로 둔다. 새 승인은 보류로만 기록된다. 닫는 쪽이고 이중 실행은 없다. 런타임 계약 항목 27에 적음 | 02-05 단계 9(해제 경로: supervisor의 `spawned: false` + takeover 없음, 또는 사람의 기록된 확인) |
 | 이월 I-8(직접 첫 행동 보고와 채움 조건) | 이번 범위에 맞지 않아 손대지 않음(단계 2 회귀 표의 첫 행동 시험 고정값 다수를 바꿔야 함) | 단계 8 전 정리(기존 담당 그대로) |
@@ -148,5 +184,35 @@
 
 ## 10. 검증 명령과 정리
 
-- 로그: [evidence/test.log](evidence/test.log)(fmt·clippy·openapi·전체 시험, 커밋 e77ed76), [evidence/mutants.txt](evidence/mutants.txt)(29개).
-- 시험 DB(55432) 정리: 이 작업의 실행이 남긴 `ieo_t_*`를 이름으로 지웠다. 끝난 뒤 `ieo_t_*`는 0개다. `/home`에는 아무것도 쓰지 않았다. 55433·58090은 건드리지 않았다.
+- 로그: [evidence/test.log](evidence/test.log)(fmt·clippy·openapi·전체 시험, 커밋 03531f1), [evidence/mutants.txt](evidence/mutants.txt)(47개).
+- 시험 DB(55432) 정리: 이 작업의 실행이 남긴 `ieo_t_*`를 이름으로 지웠다. 검토 반영과 추가 결정 반영 작업의 변이 실행(A1~A3 등, 실패한 시험이 남김)이 남긴 12개, 16개, 16개도 지웠다. 끝난 뒤 `ieo_t_*`는 0개다. `/home`에는 아무것도 쓰지 않았다. 55433·58090은 건드리지 않았다.
+
+## 11. 검토 반영(PR #81 검토 b38e8df)
+
+| 항목 | 처분 |
+| --- | --- |
+| **M-1**(예비 표식이 사람 없이 붙음, 붙인 주체 미기록) | 교정(1ea9233·cd1910b). `deliverAssignment`의 `spare`는 `kind: user` 자격만, 아니면 403 `HUMAN_APPROVAL_REQUIRED`이고 아무것도 기록·호출하지 않는다(멱등 키 기록 전). 관문은 `by`(붙인 주체) 없는 표식을 거절하고 받아들인 `by`를 원장 기록의 `spare`에 쓴다. 전달 경로의 `by` = 자격 이름 + `kind: user` + `via: deliverAssignment`. `ieo-role-call`은 처음(1ea9233) `host_operator`로, 1cf098a에서 스스로 댄 승인자로 기록했으나, 추가 결정 §2(kind=user인 사람만)에 따라 03531f1에서 예비 플래그를 모두 거절하도록 바꿨다(인증된 신원이 없다). 종단: 서비스 자격 → 403, 사람 자격 → 받음. OpenAPI 0.17.0 문구. 변이 C1~C4, E1·E2 |
+| L-1(정정된 회차를 실패로 봄) | 교정. 대체 시도가 “기록 하나”인지는 원시 줄로, 실패인지는 유효 기록(정정 반영)으로 판단. 시험: 깨끗한 성공으로 정정된 회차 → 거절. 변이 C5 |
+| L-2(H3·H4 생존) | 교정. H3: `a_failed_spare_stops_the_budget_again`(실패한 예비 → R2·G1·두 번째 예비 멈춤), 변이 C6. H4: 처음에 `ieo_role_call_records_the_spare_marker`(플래그 값 → 기록, 변이 C7)로 잡았고, 호스트 경로를 거절로 바꾼 뒤(03531f1) 매핑 코드가 없어져 `ieo_role_call_refuses_a_spare_marker`(변이 E1)가 대신한다 |
+| L-3(“세 번째 개발 회차가 예비” 문구) | 코드 주석(`budget.rs`의 `BUDGET_0205` 주석, `SpareRule` 문서)과 이 보고 §1·§7을 “개발은 표식 없이 최대 2회, 예비 1회는 표식을 달고 실패한 개발 회차를 대체”로 고침. 결정 기록 §2 둘째 항목은 원장 담당이 고친다(이 작업은 손대지 않음). 사용자 확인은 §12 |
+| I-1(`api.rs` 배정 조건 H1이 `recovery_e2e`에서 생존) | 기록. 그 조건은 `check_delivery`와 현재 배정 검사 뒤의 중복 층이라 실제로는 동등 변이다. 고치지 않음 |
+| I-2(`ieo-role-call` 플래그 값, 사유 상한) | 교정했다가(1ea9233, 변이 C8·C9) 호스트 경로가 예비 플래그 자체를 거절하면서(03531f1) 그 코드가 없어졌다. 코디네이터 경로의 상한(사유·증거 참조 2,000바이트)은 그대로 |
+| I-3(02-04 실제 장부 확인) | 기록(§8). 이 작업은 실제 장부를 읽지 않았다 |
+| I-4(`spare`가 역할 서비스로 감) | 교정. 호출자가 추가 키에서 `spare`를 빼고 보낸다(§3 항목 5). 변이 C10 |
+
+## 12. 추가 사용자 결정 반영(2026-11-17)
+
+사용자가 검토 b38e8df 메모의 해석 둘을 조건과 함께 확인했다(원장 담당이 결정 기록 §2·§4에 옮김). 이 결정은 실제 예비 사용을 미리 승인하지 않는다. 추가 청구 USD 0, 02-04 예비 5회 미사용은 그대로다. 반영 커밋 1cf098a, 호스트 경로 거절 03531f1(원장 담당의 판단: 스스로 댄 승인자는 kind=user 사람이 아니다).
+
+| 결정 | 반영 |
+| --- | --- |
+| §1 순서: 표식 없는 개발 계획 회차 ≤2, 예비 ≤1, 예비는 실패한 R1 또는 R2를 다시 하며 세 번째 호출일 필요 없음(“R1 실패 → 예비가 R1 다시 → R2” 허용). 개발 3·Guardrail 1·총 4와 시간·토큰·USD 상한 그대로, G1 재시도 없음 | 기존 구현 그대로(해석 1). 시험 `the_0205_spare_may_redo_the_first_planned_run`, `the_0205_spare_run_needs…`. 숫자 변이 N1~N9 |
+| §2 표식은 kind=user인 사람만. 장부에 대체한 같은 예산의 실패한 개발 계획 회차 id, 예비 사유, 원인 보고·증거 참조(새 필수 `evidence_ref`), 승인자, 승인 시각을 기록. 사유 문자열만으로 환경 결함의 증거로 보지 않음 | 관문이 `evidence_ref`(공백 아님)·`by.kind == "user"`와 이름·`approved_at`을 요구하고 모두 기록. 전달: `user` 자격만, 본문 `{reason, replaces, evidence_ref}`, 승인자·시각은 코디네이터가 적음. `ieo-role-call`: 예비 플래그 거절(인증된 신원 없음), 장부에 아무것도 남지 않음. 시험: 관문의 빠진 항목 일곱 가지, 전달 403·400, `ieo_role_call_refuses_a_spare_marker`. 변이 C1~C4, D1~D3, D8~D10, E1·E2 |
+| §3 해제 범위: 이름 댄 실패 회차의 그 사유로 인한 `stop_required`만 풂. 미계측, 장부 불일치, 한도 도달, overage·허용되지 않은 한도 신호, 확인되지 않은 외부 효과 등은 계속 막음. 원래 실패 기록·사용량 보존, 기록은 더하기만, 초기화 없음. 표식은 한 번, 중복 요청이 실행을 더 만들지 않음, 실패한 예비는 다시 멈추고 보고 | `spare_releasable`: 결과 사유만 풀고 사용량이 계측돼 있어야 함. 런 가드가 멈춘 회차(회당·전체 시간, 토큰 상한, overage)는 사용량이 늘 미계측이라(`charge_reported`) 풀리지 않는다. 정리 실패(남은 프로세스, 확인되지 않은 효과)와 답을 잃은 호출(미계측)도 막음. 장부 불일치(다른 예산의 기록)는 관문보다 먼저 `records()`가 거절. 다른 멈춤·한도·관측·외부 요청 검사는 관문 뒤에 그대로. 시험 `a_spare_marker_releases_nothing_else`, 관문 단위 아홉 가지, 같은 요청 다시 → 기록 수 그대로, 실패한 예비 → 멈춤. 변이 D4~D7, S4, C6 |
+| §4 시험: R1 실패 → 예비가 두 번째 호출 → R2가 세 번째 | `the_0205_spare_may_redo_the_first_planned_run`(호출자 수준, 실제 호출 경로·가짜 런타임): R1 실패 → 표식 없는 호출 거절 → 예비(R1 다시) → R2 표식 없이 → 그다음 거절. 변이 S1, S7, S8 |
+| §4 시험: R2 실패 → 예비 | `the_0205_spare_run_needs_a_marker_and_a_failed_development_run`: R1·G1·R2 실패 → 표식 없이 거절 → 예비가 R2 대체 → 기록. 변이 S2, S6, S7 |
+| §4 거절: 사람이 아닌 표식 | 관문: `by` 없음·`kind` service·host_operator·이름 공백·시각 없음·`evidence_ref` 없음·공백 → 거절(`the_0205_spare_run_needs…`). 전달: 서비스 자격 → 403(`delivery_e2e`). 호스트 경로: 거절(`ieo_role_call_refuses_a_spare_marker`, 02-04 HTTP). 변이 C1, C2, D1, D2, E1, E2 |
+| §4 거절: 다른 예산·역할·성공한 회차를 이름 댄 표식 | 다른 예산(관문 단위 “of the 02-05 budget”), Guardrail 회차(“is not a development run”), 성공한 R1(“did not fail”), 깨끗한 성공으로 정정된 회차(L-1), 없는 시도·두 기록(모호). 변이 S2, S3, S9, C5 |
+| §4 거절: 표식 다시 쓰기·중복 요청 | 두 번째 예비 → “used already”, 같은 요청 다시 → “used already”·장부 줄 수 그대로, 실패한 예비를 대체하려는 예비 → “used already”. 변이 S4, C6 |
+| §4 거절: 다른 막는 조건 우회 | `a_spare_marker_releases_nothing_else`(overage로 멈춘 미계측 회차 대체 → 거절, 유효한 표식이라도 G1의 멈춤·장부의 미계측 회차 → 멈춤), 관문 단위 해제 범위 아홉 가지, `a_failed_spare_stops_the_budget_again`(실패한 예비 → R2·G1 멈춤), `a_ledger_belongs_to_one_budget`(장부 불일치). 변이 D4~D7, C6, R5 |
+| 계약·OpenAPI·보고 갱신 | OpenAPI 0.17.0 문구와 스키마(`evidence_ref` 필수), 런타임 계약 revision 17 §19 항목 30, 이 보고 |
