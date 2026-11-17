@@ -10,7 +10,9 @@
 # settled s8-r1 counts as settled. Tokens come from header files and are never printed.
 # Env: COORD, TOKDIR, OUT, LEDGER, ADAPTER_HEADER (as run-step8.sh), PLAN (the 02-05 plan for
 # ieo-role-call), ROLE_CALL (the new ieo-role-call); settle: TRANSCRIPT, ORIGINAL_PATH,
-# ORIGINAL_SHA256, DECISION, CHECK_REPORT, CHECK_VERDICT; r2g1: OBS_UNIX (default s8-r1's end).
+# ORIGINAL_SHA256, DECISION, CHECK_REPORT, CHECK_VERDICT, COORD_ROLES (the coordinator's --roles
+# file: after the settlement the ledger is read again with the coordinator's own budget plan);
+# r2g1: OBS_UNIX (default s8-r1's end).
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/lib-step8.sh"
@@ -59,6 +61,32 @@ settle)
     || stop "the settlement was refused (nothing written)"
   printf '%s\n' "$out" | head -1
   effective || stop "the ledger's effective records do not read"
+  if [ "${DRY:-0}" != 1 ]; then
+    # the coordinator's own reading (PR #90 review 7b904de N-2): its budget plan from its --roles
+    # file, exactly as it reads the ledger, must count s8-r1 as settled before R1b
+    python3 -I - "${COORD_ROLES:?}" "$REPO_ID" "$OUT/plan-coordinator.json" <<'PY' || stop "no budget plan in ${COORD_ROLES}"
+import json, sys
+roles, repo, out = sys.argv[1:4]
+e = json.load(open(roles))[repo]
+bp = e["budget_plan"]
+plan = {"budget": bp["budget"], "ledger_dir": bp["ledger_dir"],
+        "roles": {r: {"url": e[r]["url"], "adapter_token_file": e[r]["adapter_token_file"]}
+                  for r in ("development", "guardrail")}}
+if "first_observation" in bp:
+    plan["first_observation"] = bp["first_observation"]
+json.dump(plan, open(out, "w"), indent=1)
+print("coordinator's ledger:", bp["ledger_dir"])
+PY
+    "$ROLE_CALL" records --plan "$OUT/plan-coordinator.json" > "$OUT/effective-coordinator.jsonl" \
+      || stop "the ledger does not read with the coordinator's budget plan"
+    python3 -I - "$OUT/effective-coordinator.jsonl" <<'PY' || stop "the coordinator's reading does not count s8-r1 as settled"
+import json, sys
+r = [x for x in (json.loads(l) for l in open(sys.argv[1]) if l.strip()) if x.get("attempt_id") == "s8-r1"][0]
+s = r.get("settlement") or {}
+print("coordinator's reading: s8-r1", r["usage"]["run"]["state"], "| settlement", s.get("policy"))
+sys.exit(0 if s.get("policy") == "guard_stop_on_old_rule_warning" and r["usage"]["run"]["state"] == "measured" else 1)
+PY
+  fi
   python3 -I - "$EFFECTIVE_RECORDS" "${DRY:-0}" <<'PY' || stop "s8-r1 does not count through its settlement"
 import json, sys
 recs = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]

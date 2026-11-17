@@ -174,11 +174,14 @@ ORIG_SHA=$(podman unshare sha256sum "$W/run/development/state/claude/projects/-s
 echo "# dry-run verification report" > "$W/evidence/verification.md"
 export PLAN="$W/private/plan-0205.json" ROLE_CALL="$W/bin-new/ieo-role-call" TRANSCRIPT="$W/evidence/transcript.jsonl" \
   ORIGINAL_PATH="$W/run/development/state/claude/projects/-state-work-ieo-poc-test/$R1_SID.jsonl" ORIGINAL_SHA256="$ORIG_SHA" \
-  DECISION=docs/poc/User_Decisions_2026-11-17_r1-settlement.md CHECK_REPORT="$W/evidence/verification.md" CHECK_VERDICT="CONFIRMED WITH CAVEAT"
+  DECISION=docs/poc/User_Decisions_2026-11-17_r1-settlement.md CHECK_REPORT="$W/evidence/verification.md" CHECK_VERDICT="CONFIRMED WITH CAVEAT" \
+  COORD_ROLES="$W/cwd/roles.json"
 n0=$(wc -l < "$LEDGER/records.jsonl")
 DRY=1 bash "$L/run-step8-resume.sh" settle > "$OUT/settle-dry.log" 2>&1; rc=$?
 [ $rc = 0 ] && [ "$(wc -l < "$LEDGER/records.jsonl")" = "$n0" ]; ok $? "settle, dry run: nothing written ($(tail -1 "$OUT/settle-dry.log"))"
 bash "$L/run-step8-resume.sh" settle > "$OUT/settle.log" 2>&1; ok $? "settle: $(tail -1 "$OUT/settle.log" | cut -c1-140)"
+grep -q "coordinator's reading: s8-r1 measured | settlement guard_stop_on_old_rule_warning" "$OUT/settle.log"; ok $? "after the settlement the coordinator's own budget plan reads s8-r1 as settled"
+[ -f "$LEDGER/children/s8-r1/settlement-transcript.jsonl" ] && [ -f "$LEDGER/children/s8-r1/independent-check.md" ]; ok $? "the transcript and the report copy are kept in the ledger"
 bash "$L/run-step8-resume.sh" settle > /dev/null 2>&1; [ $? = 3 ]; ok $? "settle again: refused (already settled, nothing written)"
 bash "$L/run-step8-resume.sh" r1b-body > "$OUT/r1b-body.log" 2>&1; ok $? "r1b-body: the body and the user's command"
 grep -q "Idempotency-Key: s8-dlv-r1b-0001" "$OUT/r1b-body.log"; ok $? "the printed user command carries the R1b key and the user's token file"

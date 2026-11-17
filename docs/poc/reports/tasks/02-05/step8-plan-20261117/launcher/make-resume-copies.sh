@@ -77,6 +77,7 @@ new = [
     "Bash(export ORIGINAL_SHA256=806746fd5b120020796a41527c7f01322a7f2de2c40d591731b060244824dc68)",
     "Bash(export DECISION=docs/poc/User_Decisions_2026-11-17_r1-settlement.md)",
     f"Bash(export CHECK_REPORT={D}/step8-resume/evidence/r1-usage-verification.md)",
+    f"Bash(export COORD_ROLES={D}/private/s8/roles.json)",
     "Bash(export CHECK_VERDICT=\"CONFIRMED WITH CAVEAT\")",
     "Bash(export DRY=1)",
 ] + [f"Bash({L}/run-step8-resume.sh {p})" for p in ("settle", "r1b-body", "r1b-check", "r2g1")]
