@@ -101,7 +101,7 @@ R1을 대신할 개발 회차(아래 **R1b**)와 R2를 모두 하면 개발 회�
 
 ## 9. 최종 재개 묶음(사용자 결정 2026-11-17 정산 §2.5)
 
-이 절은 실제 정산 반영·운영 변경·모델 호출 **직전에 한 번에 승인받을 묶음**이다. 아래 명령은 모두 시험 시스템에서 처음부터 끝까지 예행했다([evidence/dry-run-resume.log](evidence/dry-run-resume.log), 34/34). 그 예행은 46799b0 바이너리로 2026-11-17의 R1 멈춤을 재현한 뒤 재개했다. `<SHA>`는 정산 PR과 재개 PR이 병합된 main의 SHA, `<SHA12>`는 그 앞 12자, `<SUMS>`·`<SUP>`는 A1이 출력하는 해시다. `$D` = `/opt/rust/src/github.com/HeaInSeo/ieo_poc-data`(규칙 명령에서는 글자 그대로 쓴다).
+이 절은 실제 정산 반영·운영 변경·모델 호출 **직전에 한 번에 승인받을 묶음**이다. 아래 명령은 모두 시험 시스템에서 처음부터 끝까지 예행했다([evidence/dry-run-resume.log](evidence/dry-run-resume.log), 36/36). 그 예행은 46799b0 바이너리로 2026-11-17의 R1 멈춤을 재현한 뒤 재개했다. `<SHA>`는 정산 PR과 재개 PR이 병합된 main의 SHA, `<SHA12>`는 그 앞 12자, `<SUMS>`·`<SUP>`는 A1이 출력하는 해시다. `$D` = `/opt/rust/src/github.com/HeaInSeo/ieo_poc-data`(규칙 명령에서는 글자 그대로 쓴다).
 
 ### 9.1 근거와 수치
 
