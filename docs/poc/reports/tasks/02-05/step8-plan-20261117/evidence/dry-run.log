@@ -1,0 +1,32 @@
+# 02-05 step 8 dry run (fake claude, fake credentials, test coordinator on 55432/ieo_t_s8dry_2574586, no model call) · 2026-11-17T05:34:04Z
+# branch 05cf16e · supervisor bff0a2fc01a1 · coordinator cf3070174fc5
+# role containers up: ieo-s8dry-ieo-poc-test-{development,guardrail} on 127.0.0.1:58221/58222 · image docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c · network slirp4netns:allow_host_loopback=true · coordinator http://10.0.2.2:58290
+# target https://github.com/HeaInSeo/ieo_poc_test @ 2ab9d8760012516f37674a9446ca2fb2699973c0 (read-only copies) · credentials: OAuth form (values not printed) · roles entry: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8dry/run/roles-entry.json
+PASS run-step8-roles.sh starts both role containers
+PASS test database ieo_t_s8dry_2574586 created on 55432
+PASS test coordinator healthy (200), coordinator listens on 127.0.0.1 only
+PASS sprint POC-S8-01 r1 registered (201)
+PASS semantic review by the user principal (201)
+PASS development assignment S8-DEV-A1 (201)
+PASS guardrail assignment S8-GR-A1 (201)
+PASS branch_head input (201)
+PASS s8-r1: ('no_checkpoint', 'start', 'accepted')
+PASS s8-r1: the role finished the run
+PASS s8-r1: ledger record written, no in-flight marker
+PASS s8-r2: ('resume_allowed', 'reconnect', 'accepted')
+PASS s8-r2: the role finished the run
+PASS s8-r2: ledger record written, no in-flight marker
+PASS s8-g1: ('no_checkpoint', 'start', 'accepted')
+PASS s8-g1: the role finished the run
+PASS s8-g1: ledger record written, no in-flight marker
+PASS three 02-05 ledger records
+PASS none asks for a person
+PASS every run measured
+PASS R2 resumed R1's session
+PASS both supervisors report to the coordinator (not local_only)
+PASS no pending external requests (safe_shutdown)
+PASS S8-DEV-A1 chain: 2 delivery(ies) taken over with a first action
+PASS S8-GR-A1 chain: 1 delivery(ies) taken over with a first action
+PASS the test coordinator stops on SIGTERM (exit 0)
+PASS coordinator log: stopped
+## result: 21 passed, 0 failed
