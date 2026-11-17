@@ -140,7 +140,50 @@
    "totalDuration_ms": 3310,
    "hasUnknownModelCost": false
   },
-  "last_timestamped_entry": "2026-11-17T12:19:48.855Z"
+  "last_timestamped_entry": "2026-11-17T12:19:48.855Z",
+  "tail_entries": [
+   {
+    "line": 18,
+    "type": "assistant",
+    "timestamp": "2026-11-17T12:19:48.817Z"
+   },
+   {
+    "line": 19,
+    "type": "last-prompt",
+    "timestamp": null
+   },
+   {
+    "line": 20,
+    "type": "custom-title",
+    "timestamp": null
+   },
+   {
+    "line": 21,
+    "type": "agent-name",
+    "timestamp": null
+   },
+   {
+    "line": 22,
+    "type": "atis-latch",
+    "timestamp": null
+   },
+   {
+    "line": 23,
+    "type": "cost-state",
+    "timestamp": null
+   },
+   {
+    "line": 24,
+    "type": "user",
+    "timestamp": "2026-11-17T12:19:48.852Z"
+   },
+   {
+    "line": 25,
+    "type": "attachment",
+    "timestamp": "2026-11-17T12:19:48.855Z"
+   }
+  ],
+  "tail_note": "PR #89 review 91e87ce L-5: the exit records (lines 19-23, cost-state at 23, no timestamps) come before the second tool result (line 24, 12:19:48.852Z) and an attachment (line 25, 12:19:48.855Z). The CLI's loop went on after it wrote its exit accounting; a second request would have followed the tool result. None is recorded (no api-request after line 14). A request killed in flight before its entry was written cannot be seen on the client side."
  },
  "finding": {
   "model_requests_logged": 1,
@@ -158,6 +201,12 @@
   },
   "billable_input_output_cache_creation": 1543,
   "stream_lower_bound_billable": 1429,
-  "difference": 114
+  "difference": 114,
+  "label": "CLI exit accounting (client-side), not a provider bill"
+ },
+ "evidence_copy": {
+  "path": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-evidence/s8-r1-transcript.jsonl (0400, outside the repository)",
+  "sha256": "806746fd5b120020796a41527c7f01322a7f2de2c40d591731b060244824dc68",
+  "manifest": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-evidence/MANIFEST.txt"
  }
 }

@@ -43,3 +43,7 @@ The same binary maps response headers: isUsingOverage = (unified status == "reje
 
 ## 3. Observed: 02-05 s8-r1 (CLI 2.1.322, 2026-11-17T12:19Z), the kept stream line 6
 {"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1795334400,"rateLimitType":"seven_day","utilization":0.86,"overageStatus":"rejected","overageDisabledReason":"out_of_credits","isUsingOverage":false,"surpassedThreshold":0.75,"unifiedWindows":{"five_hour":{"utilization":0.04,"resetsAt":1794933000,"status":"allowed"},"seven_day":{"utilization":0.86,"resetsAt":1795334400,"status":"allowed_warning","surpassedThreshold":0.75}}},"uuid":"b59d8029-33b1-4ab5-87b1-fbff93a3a04d","session_id":"5c991c71-b6e2-4cfb-bd76-6bb18a36e090"}
+
+## 4. Notes (PR #89 review 91e87ce I-1)
+- The docs say overageEnabled is reported on allowed_warning (CLI >= 2.1.295), but the real 2.1.322 warning event of s8-r1 has no overageEnabled. The rule accepts its absence (the three required fields are status, overageStatus "rejected" and isUsingOverage false); overageStatus "rejected" covers it.
+- rateLimitType seven_day_overage_included is, per the binary, an included-allowance weekly bucket, not paid overage. The rule stops on it conservatively; its reason text "contradictory" is a simplification (a false-stop risk only).
