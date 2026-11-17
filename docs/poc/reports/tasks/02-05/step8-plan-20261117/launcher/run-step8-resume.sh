@@ -18,6 +18,7 @@ set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/lib-step8.sh"
 PHASE=${1:?settle|r1b-body|r1b-check|r2g1}
+export STEP8_SINGLE_POST=1
 COORD=${COORD:-http://127.0.0.1:58090}
 : "${TOKDIR:?}" "${OUT:?}" "${LEDGER:?}" "${ADAPTER_HEADER:?}" "${PLAN:?}" "${ROLE_CALL:?}"
 REPO_ID=${REPO_ID:-ieo-poc-test}
@@ -54,7 +55,7 @@ PY
 after() { # tag role assignment attempt port
   local tag=$1 role=$2 aid=$3 att=$4 port=$5 status
   if [ -f "$LEDGER/records.jsonl" ] && grep -q "\"attempt_id\":\"$att\"" "$LEDGER/records.jsonl"; then
-    role_status "$port" "status-$att"
+    role_status "$port" "status-$att" || stop "$att: role status request failed"
   else
     role_wait "$port" "$att" || stop "$att: the role did not finish"
   fi
@@ -166,25 +167,35 @@ PY
   cat <<CMD
 # the USER runs (own token, never printed; the coordinator records the person and the time):
 T=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/private/user/heain.token
-curl -sS --max-time 150 -o $OUT/r1b.json -w 'http %{http_code}\n' \\
+if st=\$(curl -sS --max-time 150 -o $OUT/r1b.incomplete.json -w '%{http_code}' \\
   -H @<(printf 'Authorization: Bearer %s\n' "\$(cat "\$T")") -H 'Content-Type: application/json' -H 'Idempotency-Key: s8-dlv-r1b-0001' \\
-  -X POST $COORD/v0/repos/$REPO_ID/roles/development/deliveries --data @$OUT/r1b-body.json
-python3 -I -c 'import json; d=json.load(open("$OUT/r1b.json")); r=d.get("result") or {}; print(r.get("decision"), r.get("op"), r.get("outcome"), d.get("code"), d.get("message"))'
-# expected: "http 201" (or 200 for the same request again), then "resume_allowed start accepted None None"
+  -X POST $COORD/v0/repos/$REPO_ID/roles/development/deliveries --data @$OUT/r1b-body.json); then
+  printf 'http %s\n' "\$st"
+  case "\$st" in
+    201|200) mv -f $OUT/r1b.incomplete.json $OUT/r1b.json &&
+      python3 -I -c 'import json; d=json.load(open("$OUT/r1b.json")); r=d.get("result") or {}; print(r.get("decision"), r.get("op"), r.get("outcome"), d.get("code"), d.get("message"))';;
+    *) printf '%s\n' 'STOP: delivery was not accepted; inspect r1b.incomplete.json';;
+  esac
+else
+  printf '%s\n' 'STOP: delivery transfer failed; inspect the evidence before any further step'
+fi
+# expected: "http 201", then "resume_allowed start accepted None None"
 CMD
   ;;
 r1b-check)
+  rm -f "$OUT/r1b-checked" || stop "cannot invalidate the previous R1b check"
   [ -s "$OUT/r1b.json" ] || stop "no answer of the user's R1b delivery in $OUT/r1b.json"
   got=$(j r1b "(d['result']['decision'], d['result']['op'], d['result']['outcome'])" 2>/dev/null)
   [ "$got" = "('resume_allowed', 'start', 'accepted')" ] || stop "s8-r1b: the delivery answered $got: $(head -c 600 "$OUT/r1b.json")"
   echo "s8-r1b: $got"
   after r1b development S8-DEV-A1 s8-r1b "$PORT_DEV"
   spare_check
+  touch "$OUT/r1b-checked" || stop "cannot record that R1b passed its checks"
   ;;
 r2g1)
   # review 4b427c5 F-2: R1b's checks again first (the answers r1b-check saved), nothing is sent
   # unless every one of them holds; R2's own checks gate G1 (run_one stops on any)
-  [ -s "$OUT/status-s8-r1b.json" ] && [ -s "$OUT/chain-S8-DEV-A1-s8-r1b.json" ] || stop "no r1b-check answers in $OUT: run r1b-check first"
+  [ -f "$OUT/r1b-checked" ] || stop "no completed r1b-check in $OUT"
   effective || stop "the ledger's effective records do not read"
   python3 -I "$HERE/check-run.py" "$LEDGER" "$OUT" s8-r1b development S8-DEV-A1 || stop "s8-r1b: a run check fails: no R2 (above)"
   spare_check

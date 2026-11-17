@@ -176,19 +176,25 @@ podman stop "ieo-s8dry-ieo-poc-test-guardrail" >/dev/null
 bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-stopped.log" 2>&1; ok $? "rollback with one container stopped: $(grep -c 'up, idle' "$OUT/rollback-stopped.log") roles up and idle"
 # Status is idle here. Simulate top failing or finding Claude without stopping either test role.
 mkdir -p "$W/mock-bin"
-export REAL_PODMAN=$(command -v podman)
+REAL_PODMAN=$(command -v podman)
+export REAL_PODMAN
 cat > "$W/mock-bin/podman" <<'SH'
 #!/bin/sh
 case "$1" in
   stop) touch "$STOP_PROBE"; exit 99;;
   top)
-    [ "$TOP_CASE" = failed ] && exit 125
-    printf 'COMMAND\n/opt/claude/claude --print\n'; exit 0;;
+    case "$TOP_CASE" in
+      failed) exit 125;;
+      malformed) printf 'bad\nunknown\n';;
+      invalid_row) printf 'PID COMMAND\n1 /opt/ieo/ieo-supervisor\nunknown\n';;
+      claude) printf 'PID COMMAND\n1 /opt/ieo/ieo-supervisor\n2 /opt/claude/claude --print\n';;
+    esac
+    exit 0;;
 esac
 exec "$REAL_PODMAN" "$@"
 SH
 chmod 755 "$W/mock-bin/podman"
-for scenario in failed claude; do
+for scenario in failed malformed invalid_row claude; do
   PATH="$W/mock-bin:$PATH" TOP_CASE="$scenario" STOP_PROBE="$W/stop-probe" \
     bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-top-$scenario.log" 2>&1
   [ $? = 3 ] && [ ! -e "$W/stop-probe" ] && grep -q 'nothing changed' "$OUT/rollback-top-$scenario.log"
@@ -223,10 +229,38 @@ ROLE_CALL="$W/fake-role-call" bash "$L/run-step8-resume.sh" settle > "$OUT/settl
 bash "$L/run-step8-resume.sh" r1b-body > "$OUT/r1b-body.log" 2>&1; ok $? "r1b-body: the body and the user's command"
 grep -q "Idempotency-Key: s8-dlv-r1b-0001" "$OUT/r1b-body.log"; ok $? "the printed user command carries the R1b key and the user's token file"
 grep -q "s8-r1b: observation = s8-r1's stream" "$OUT/r1b-body.log"; ok $? "r1b-body checks the observation deadline against s8-r1's stream (the newest record) before printing the user's command"
-# the user's command, with the dry run's user principal (same request, same key)
-st=$(req r1b user-dry POST /v0/repos/ieo-poc-test/roles/development/deliveries "$OUT/r1b-body.json" s8-dlv-r1b-0001); ok "$([ "$st" = 201 ] || [ "$st" = 200 ]; echo $?)" "the user's R1b delivery ($st)"
+# Execute the printed U2 command against the fake coordinator with the test-only user token.
+sed -n '/^# the USER runs/,$p' "$OUT/r1b-body.log" | sed "s|^T=.*|T=$W/tok/user-dry.token|" > "$OUT/r1b-user-command.sh"
+bash "$OUT/r1b-user-command.sh" > "$OUT/r1b-user.log" 2>&1
+grep -qx 'http 201' "$OUT/r1b-user.log" && grep -qx 'resume_allowed start accepted None None' "$OUT/r1b-user.log"
+ok $? "the printed U2 command successfully checks transfer and HTTP status with the test user"
 bash "$L/run-step8-resume.sh" r1b-check > "$OUT/r1b-check.log" 2>&1; ok $? "r1b-check: $(grep -m1 's8-r1b:' "$OUT/r1b-check.log") · $(grep -m1 'spare:' "$OUT/r1b-check.log")"
 grep -q "WARNING s8-r1b" "$OUT/r1b-check.log"; ok $? "R1b got the allowed_warning event: recorded and printed as a warning, not a stop"
+# A 200 status plus a complete-looking body still fails when the transfer itself fails.
+REAL_CURL=$(command -v curl)
+export REAL_CURL
+cat > "$W/mock-bin/curl" <<'SH'
+#!/bin/sh
+case "${*}" in
+  *'/v0/repos/ieo-poc-test/roles')
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = -o ]; then printf '{"quota_groups":{"mismatches":[]}}' > "$2"; break; fi
+      shift
+    done
+    printf 200
+    exit 18;;
+esac
+exec "$REAL_CURL" "$@"
+SH
+chmod 755 "$W/mock-bin/curl"
+PATH="$W/mock-bin:$PATH" bash "$L/run-step8-resume.sh" r1b-check > "$OUT/r1b-incomplete.log" 2>&1; rc=$?
+[ $rc = 3 ] && grep -q 'roles status answered HTTP 000' "$OUT/r1b-incomplete.log" && [ -s "$OUT/roles-s8-r1b.incomplete.json" ] && [ ! -e "$OUT/r1b-checked" ]
+ok $? "HTTP 200 and plausible quota JSON with a failed transfer do not complete r1b-check"
+bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1-incomplete.log" 2>&1; rc=$?
+[ $rc = 3 ] && grep -q 'no completed r1b-check' "$OUT/r2g1-incomplete.log" && [ ! -e "$OUT/r2-body.json" ]
+ok $? "r2g1 refuses after the incomplete R1b check: nothing sent"
+bash "$L/run-step8-resume.sh" r1b-check > "$OUT/r1b-check.log" 2>&1
+ok $? "completed R1b check after restoring the test transport"
 # PR #91 review 4b427c5 F-2: if a check of R1b fails, r2g1 sends nothing
 CH="$OUT/chain-S8-DEV-A1-s8-r1b.json"; cp "$CH" "$CH.kept"
 python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); [l.update(taken_over=False) for l in d['links']]; json.dump(d, open(sys.argv[1], 'w'))" "$CH"

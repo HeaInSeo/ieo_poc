@@ -46,21 +46,32 @@ name() { echo "$NAME_PREFIX-$REPO_ID-$1"; }
 status() { curl -s --max-time 5 -o "$2" -w '%{http_code}' -H @"$HDR" "http://127.0.0.1:${PORT[$1]}/v0/role/status"; }
 # answer: idle (200, `running` present and null: review 4b427c5 F-7) | busy (200, a run) | none
 answer() {
-  local f st rc; f=$(mktemp); st=$(status "$1" "$f")
+  local f st rc; f=$(mktemp) || { echo none; return; }
+  st=$(status "$1" "$f") || st=000
   python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if "running" in d and d["running"] is None else 4 if d.get("running") is not None else 5)' "$f" 2>/dev/null
   rc=$?; rm -f "$f"
   if [ "$st" = 200 ] && [ $rc = 0 ]; then echo idle; elif [ "$st" = 200 ] && [ $rc = 4 ]; then echo busy; else echo none; fi; }
 running() { # the container's state: true | false (a missing container is a STOP)
   podman inspect -f '{{.State.Running}}' "$(name "$1")" 2>/dev/null || die "no container $(name "$1")"; }
 check_processes() {
-  local processes
-  processes=$(podman top "$(name "$1")" args 2>/dev/null) \
+  local processes rc
+  processes=$(podman top "$(name "$1")" pid args 2>/dev/null) \
     || die "could not inspect processes in role $1: nothing changed"
-  [[ "$processes" == *$'\n'?* ]] \
-    || die "unexpected process list in role $1: nothing changed"
-  if [[ "$processes" == *'/opt/claude/claude'* ]]; then
-    die "role $1 has a claude process: nothing changed"
-  fi
+  awk '
+    NR == 1 { if (NF != 2 || $1 != "PID" || $2 != "COMMAND") invalid = 1; next }
+    NF < 2 || $1 !~ /^[1-9][0-9]*$/ || seen[$1]++ { invalid = 1; next }
+    /(^|[[:space:]])(\/opt\/claude\/claude|claude|\[claude\])([[:space:]]|$)/ { busy = 1 }
+    END {
+      if (invalid || !seen[1]) exit 2
+      if (busy) exit 3
+    }
+  ' <<< "$processes"
+  rc=$?
+  case "$rc" in
+    0) ;;
+    3) die "role $1 has a claude process: nothing changed";;
+    *) die "unexpected process list in role $1: nothing changed";;
+  esac
 }
 declare -A WAS
 for r in development guardrail; do
