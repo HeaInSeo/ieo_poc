@@ -19,11 +19,12 @@
   "permissions": {
     "allow": [
       "Bash(cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-data)",
-      "Bash(echo 'c92f4fec198cb1374b01e493c23b055ef11cfb35124ec0af7d30df005f30223b  step8-ops/SHA256SUMS')",
+      "Bash(echo 'd91de4245b3da246a390dacc5311d4304df39f5a27c84c9593fc0b26c2d50fa0  step8-ops/SHA256SUMS')",
       "Bash(sha256sum --quiet --strict -c -)",
       "Bash(sha256sum --quiet --strict -c step8-ops/SHA256SUMS)",
       "Bash(find step8-46799b0 step8-ops -perm /222)",
-      "Bash(grep -q .)",
+      "Bash(wc -l)",
+      "Bash(grep -qx 0)",
       "Bash(echo \"copies ok\")",
       "Bash(bash /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/step8-ops/obs-check.sh)",
       "Bash(bash /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/step8-46799b0/launcher/coord-switch.sh capture /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/coord.pid /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/bin/ieo-coord 58090 /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/private/s8/coord-778ee47)",
@@ -58,14 +59,16 @@
   }
 }
 ```
-- 처음 일곱 줄은 [실행본 확인](#실행본-확인에이전트-규칙에-걸리는-명령마다) 한 줄의 하위 명령이다(모두 읽기 전용). `! find … | grep -q .`의 `!`가 규칙 대조에서 어떻게 다뤄지는지는 시험하지 않았다. 그 줄이 확인 창을 띄우면 사용자가 승인한다(읽기만 함).
-- `export QUOTA_GROUP_ID=claude-sub-shared`는 **U2에서 “같다”고 답했을 때만** 넣는다. “다르다”면 이 줄을 넣지 않는다. A4 전에 멈추고, 실행안 §9 Q2의 결정 뒤 그 값의 `export` 한 줄로 바꾼다.
+- 처음 여덟 줄은 [실행본 확인](#실행본-확인에이전트-규칙에-걸리는-명령마다) 한 줄의 하위 명령이다(모두 읽기 전용). 부정(`!`) 없이 `find … | wc -l | grep -qx 0`으로 쓴다: 파이프라인의 종료 상태는 `grep`의 것이라 쓰기 가능한 항목이 0개일 때만 성공한다. 그래도 그 줄이 확인 창을 띄우면 사용자가 승인한다(읽기만 함).
+- `export QUOTA_GROUP_ID=claude-sub-shared`는 **U2에서 “같다”고 답했을 때만** 넣는다. “다르다”면 이 줄을 넣지 않는다. A4 전에 멈추고, 실행안 §9 Q2의 결정 뒤 그 값의 `export` 한 줄로 바꾼다. `obs-check.sh` [4]도 두 역할이 `claude-sub-shared`인지 확인하므로, 그때는 도우미·목록·이 문서의 해시도 새로 고쳐 검토를 받는다.
 - `EXPECTED_CURRENT_DEV/GR`은 `null`만 규칙에 둔다. `ieo-poc-test`는 단계 8에서 처음 쓰는 repo라 `assignment_heads`가 비어 있어야 한다. 값이 있으면(앞선 `prepare`가 일부 진행됐거나 계획에 없는 배정) A8.1에서 멈추고 보고한다. 그래서 값이 있는 `export`를 승인할 일은 없다.
 - `deny`는 `Read` 도구에만 걸린다. `ieo_poc_runs`·`coord-778ee47` 디렉터리 전체는 막지 않는다(A2·A4·A6 명령의 인자다).
 
 명령 형식의 약속(에이전트):
 - 규칙에 걸리는 명령은 언제나 **따로 선 하위 명령**이고 규칙과 글자가 같다. `sh`, `./`, 변수(`$D`), 명령 치환(`$(…)`)을 쓰지 않는다.
 - 환경 변수는 같은 하위 명령 앞에 붙이지 않는다(`X=1 bash …` 금지). 같은 Bash 호출 안에서 `export X=…`를 별도 하위 명령으로 먼저 두고 `&&`로 잇는다(호출 사이에는 셸 상태가 이어지지 않는다; `;`는 앞이 실패해도 뒤를 실행하므로 쓰지 않는다).
+- **규칙 명령은 그 단계에서만 실행한다.** 그 단계가 끝났거나 `STOP`(또는 실패)으로 끝난 뒤에는 **사용자가 명시적으로 지시하기 전에는 다시 실행하지 않는다.** 규칙은 단계 8 내내 살아 있어 확인 창 없이 다시 통과하므로, 이 약속이 시점을 지킨다. 예: 회차 중의 `stop`(회차 중 재시작은 묶음 밖), `STOP` 뒤의 `runs` 재호출(일시적인 멈춤 뒤에 다시 부르면 G1까지 갈 수 있음). 예외는 이 문서에 적힌 것뿐이다: `obs-check.sh`의 재실행(A2·A4·A5, 읽기와 같은 내용의 복사만), A6 실패 뒤 되돌리기의 `stop`·옛 바이너리 `start` 한 번씩.
+- 사용자는 A6 확인이 끝나면 `capture`, `run-step8-roles.sh`, M의 `start` 줄을 먼저 지워도 된다(되돌리기용 `stop`·옛 `start`는 단계 8 끝까지 둔다).
 
 **여전히 확인 창(또는 분류기 판단)을 거치는 호출**: A2의 `mkdir`, A3 전부(주체 토큰 만들기, 두 JSON 쓰기·요약, manifest 비교, 55433 읽기 질의, 백업, 시험 DB 예행), A4 뒤의 `podman ps`, A5의 `roles.json` 쓰기·재확인, A6의 생존 확인 읽기, A8.1의 `assignment_heads` 질의. 모두 민감한 경로를 건드리지 않는다.
 
@@ -77,7 +80,7 @@
 
 규칙에 걸리는 명령(A1·A2·A4·A5·A6·A7·A8)을 실행하는 Bash 호출은 언제나 이 줄로 시작하고 `&&`로 잇는다. 목록 파일의 해시를 문서의 값과 비교하고, 목록의 17개 파일을 확인하고, 쓰기 가능한 항목이 있으면 실패한다. 실패하면 뒤의 명령은 실행되지 않는다.
 ```
-cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-data && echo 'c92f4fec198cb1374b01e493c23b055ef11cfb35124ec0af7d30df005f30223b  step8-ops/SHA256SUMS' | sha256sum --quiet --strict -c - && sha256sum --quiet --strict -c step8-ops/SHA256SUMS && ! find step8-46799b0 step8-ops -perm /222 | grep -q . && echo "copies ok"
+cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-data && echo 'd91de4245b3da246a390dacc5311d4304df39f5a27c84c9593fc0b26c2d50fa0  step8-ops/SHA256SUMS' | sha256sum --quiet --strict -c - && sha256sum --quiet --strict -c step8-ops/SHA256SUMS && find step8-46799b0 step8-ops -perm /222 | wc -l | grep -qx 0 && echo "copies ok"
 ```
 아래에서 이 줄을 `<확인> &&`로 줄여 적는다. 실제 호출에는 줄 전체를 쓴다. 예상 출력: `copies ok`. 그 밖의 출력이 나오면 멈추고 보고한다. 목록의 17개 중 규칙 명령에 쓰는 넷:
 
@@ -86,7 +89,7 @@ cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-data && echo 'c92f4fec198cb1374b01e
 | `step8-46799b0/launcher/coord-switch.sh` | `6e0245f2750c2db4c9a9fafda114d981537273fee617b76dcf6eb6f5de5b4b06` |
 | `step8-46799b0/launcher/run-step8-roles.sh` | `b07cde82fa947785529488bd887b1a448e20c0ba3bf10d4fb044feccfdd14ac2` |
 | `step8-46799b0/launcher/run-step8.sh` | `26cfca17c80b236096c07202d66e12cdfadbc3ea6d49abbc2b0f908408e282c4` |
-| `step8-ops/obs-check.sh` | `b357383f7b10e0118f45b6108bafaee707028761ee9b471f8d42c26e704ed868` |
+| `step8-ops/obs-check.sh` | `bb66054adb78689b87ca51c03f48e0ba166dce65c6ea2487767fe24598e6f9eb` |
 
 ## 순서 한눈에
 
@@ -132,7 +135,7 @@ stat -c '%a %U' "$T"; printf '%s' "$(cat "$T")" | sha256sum | cut -d' ' -f1
 - [1] D6 stream이 정확히 하나, 그 안의 `rate_limit_event`가 모두 `allowed`·초과 사용 `rejected`·`isUsingOverage` false, D6 기록의 `ended_unix`가 1794698043. 맞을 때만 `$D/ledger-0205-obs/D6.jsonl`(0600)로 복사하고(이미 있으면 같은 내용이어야 함) SHA-256을 출력.
 - [2] 02-04 장부마다 `inflight.json` 없음, `caller.lock`을 연 프로세스 없음(`fuser` exit 1), `ieo-role-call` 프로세스 0.
 - [3] 캡처한 `env0`이 있으면 `IEO_DB_URL`의 user·dbname·host·port와 암호가 있는지(True/False)만. 해석이 안 되면 예외 종류만 출력하고 실패. `env0`이 없으면 건너뜀.
-- [4] 역할 작업 디렉터리가 있으면 확인 뒤 헤더·역할 항목 복사(A4). 확인이 실패하면 아무것도 복사하지 않음. 없으면 건너뜀.
+- [4] 역할 작업 디렉터리가 있으면 확인(두 역할의 `adapter_token_file`이 `W/adapter.token`, `quota_group_id`가 둘 다 `claude-sub-shared`, 헤더 형식) 뒤 헤더·역할 항목 복사(A4). 확인이 실패하면 아무것도 복사하지 않음. 없으면 건너뜀.
 
 예상 출력: `copies ok`, `D6 streams: 1`과 경로, `rate_limit_events <n>; all allowed, overage rejected, not in use: True`, `D6 records 1; ended_unix 1794698043; equals 1794698043: True`, `installed …/ledger-0205-obs/D6.jsonl (0600)`과 SHA-256, `02-04 ledgers: <n>`과 경로들, `inflight.json absent: True`, `processes holding caller.lock: none (fuser exit 1)`(또는 `caller.lock absent`), `ieo-role-call processes: 0`, [3]·[4] `skipped`, 끝 줄 `## obs-check: PASS`(exit 0). `FAIL:`이 있으면 exit 1이고 에이전트가 멈추고 보고한다.
 
@@ -225,7 +228,7 @@ U2가 “같다”일 때만 한다(실행안 §5.2 단계 5, §5.3). 스크립�
 
 `… credential is not the OAuth token form`, `role … did not come up`, `already holds role volumes`가 나오면 멈추고 보고한다(컨테이너만 지우고 볼륨은 둔다).
 
-그다음 A1의 호출을 다시 한다. [4]가 `W=/opt/rust/ieo_poc_runs/02-05-s8-20261118` 하나를 찾고, 두 역할의 `quota_group_id`(`claude-sub-shared`)와 `adapter_token_file`이 `W/adapter.token`인지, 헤더 형식을 확인한 뒤에만 `adapter.header`(0600)·`roles-entry.json`(0644)을 `$D/private/s8/`로 복사한다. 어댑터 토큰 자체는 `W`에 남는다(코디네이터 프로세스가 읽음). 에이전트는 `W` 안을 직접 읽지 않는다. 마지막으로 `podman ps --format '{{.Names}} {{.Status}} {{.Ports}}'`로 `ieo-s8-ieo-poc-test-development`·`…-guardrail`이 `Up`이고 `127.0.0.1:58221->8080/tcp`, `127.0.0.1:58222->8080/tcp`인지 본다.
+그다음 A1의 호출을 다시 한다. [4]가 `W=/opt/rust/ieo_poc_runs/02-05-s8-20261118` 하나를 찾고, 두 역할의 `quota_group_id`(`claude-sub-shared`)와 `adapter_token_file`이 `W/adapter.token`인지, 헤더 형식을 확인한 뒤에만(출력 `both claude-sub-shared: True ; adapter_token_file in W: True`, `adapter.header form ok: True`) `adapter.header`(0600)·`roles-entry.json`(0644)을 `$D/private/s8/`로 복사한다. 어댑터 토큰 자체는 `W`에 남는다(코디네이터 프로세스가 읽음). 에이전트는 `W` 안을 직접 읽지 않는다. 마지막으로 `podman ps --format '{{.Names}} {{.Status}} {{.Ports}}'`로 `ieo-s8-ieo-poc-test-development`·`…-guardrail`이 `Up`이고 `127.0.0.1:58221->8080/tcp`, `127.0.0.1:58222->8080/tcp`인지 본다.
 
 ## A5 · 기동 준비(에이전트)
 

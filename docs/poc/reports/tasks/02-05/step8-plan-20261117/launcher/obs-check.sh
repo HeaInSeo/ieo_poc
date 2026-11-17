@@ -10,7 +10,8 @@
 #       host and port of IEO_DB_URL from $D/private/s8/coord-778ee47/env0. Never the password (on a
 #       parse error only the exception type).
 #   [4] the role workdir (after run-step8-roles.sh): exactly one /opt/rust/ieo_poc_runs/02-05-s8-*
-#       with roles-entry.json; when both roles point at W/adapter.token and the header has its form,
+#       with roles-entry.json; when both roles point at W/adapter.token with quota_group_id
+#       claude-sub-shared and the header has its form,
 #       installs adapter.header (0600) and roles-entry.json (0644) into $D/private/s8/ (existing
 #       copies must be identical). The adapter token stays in the workdir
 #       (the coordinator reads it there).
@@ -114,14 +115,18 @@ else
   if python3 -I - "$W" <<'PY'
 import json, re, sys
 w = sys.argv[1]
+QUOTA = "claude-sub-shared"  # the approved quota group (user: both role credentials are the 01-04 account)
 try:
     e = json.load(open(f"{w}/roles-entry.json"))
     h = open(f"{w}/adapter.header").read()
 except Exception as x:
     print("  roles-entry.json or adapter.header not readable:", type(x).__name__); sys.exit(1)
-ok = set(e) == {"development", "guardrail"} and all(e[r].get("adapter_token_file") == f"{w}/adapter.token" for r in e)
+roles = set(e) == {"development", "guardrail"}
+tok = roles and all(e[r].get("adapter_token_file") == f"{w}/adapter.token" for r in e)
+quota = roles and all(e[r].get("quota_group_id") == QUOTA for r in e)
 print("  roles", sorted(e), "; quota_group_id", {r: e[r].get("quota_group_id") for r in sorted(e)},
-      "; adapter_token_file in W:", ok)
+      "; both", QUOTA + ":", quota, "; adapter_token_file in W:", tok)
+ok = tok and quota
 form = re.fullmatch(r"Authorization: Bearer [0-9a-f]{48}\n", h) is not None
 print("  adapter.header form ok:", form)
 sys.exit(0 if ok and form else 1)
