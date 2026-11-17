@@ -478,6 +478,16 @@ fn other_stops_are_never_settled_and_never_released_by_a_spare() {
     let allowed = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","overageStatus":"rejected","isUsingOverage":false}}"#;
     let tr = transcript(Some(EXIT), 1);
     let cases: Vec<(&str, String, Patch)> = vec![
+        (
+            "a warning, then a real reject",
+            format!("{}\n{rejected}", WARN.trim_end()),
+            Box::new(|_| {}),
+        ),
+        (
+            "a warning, then extra usage",
+            format!("{}\n{overage}", WARN.trim_end()),
+            Box::new(|_| {}),
+        ),
         ("real reject", rejected.to_string(), Box::new(|_| {})),
         ("extra usage", overage.to_string(), Box::new(|_| {})),
         (
