@@ -238,11 +238,6 @@ fn unix_now() -> u64 {
         .as_secs()
 }
 
-/// R1 fails → a service's spare is refused (403) → a person's spare re-runs R1 as the second
-/// call and its ledger record carries who approved it, when and the evidence reference → the
-/// same request again starts nothing → a second spare is refused → R2 runs as the third call
-/// without a marker → the development role stops at its share.
-
 /// A delivery's session id as a lowercase UUID (a start's `claude --session-id` takes only a
 /// UUID; PR #83 review 67b5cae M-1): the test's short name, fixed per name.
 fn sid(name: &str) -> String {
@@ -259,6 +254,10 @@ fn sid(name: &str) -> String {
     )
 }
 
+/// R1 fails → a service's spare is refused (403) → a person's spare re-runs R1 as the second
+/// call and its ledger record carries who approved it, when and the evidence reference → the
+/// same request again starts nothing → a second spare is refused → R2 runs as the third call
+/// without a marker → the development role stops at its share.
 #[test]
 fn a_person_attaches_the_0205_spare_through_deliver_assignment() {
     let Ok(base) = std::env::var("IEO_TEST_DB_URL") else {
