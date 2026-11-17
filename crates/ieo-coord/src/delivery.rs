@@ -114,6 +114,20 @@ static STOPPING: AtomicBool = AtomicBool::new(false);
 /// one that passed the check is waited for (review 4531772 L-4).
 pub fn begin_stop() {
     STOPPING.store(true, Ordering::SeqCst);
+    let mut at = STOP_AT.lock().unwrap_or_else(|e| e.into_inner());
+    at.get_or_insert_with(std::time::Instant::now);
+}
+
+/// When the stop began: both shutdown waits count from it, so together they never take longer
+/// than one bound (PR #83 review 8336044 I-F).
+static STOP_AT: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
+/// The start of the shutdown wait: the stop's time, or now when no stop began.
+fn wait_start() -> std::time::Instant {
+    STOP_AT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .unwrap_or_else(std::time::Instant::now)
 }
 
 /// How many accepted runs are still being finished in this process.
@@ -126,7 +140,7 @@ pub fn finishing() -> usize {
 /// set, that long; else at least [`SHUTDOWN_WAIT_DEFAULT_SECS`] and until the latest counted
 /// bound. The number still being finished when it returns (0: all records written).
 pub fn wait_finishing_bounded() -> usize {
-    let t0 = std::time::Instant::now();
+    let t0 = wait_start();
     let fixed = std::env::var("IEO_COORD_SHUTDOWN_WAIT_SECS")
         .ok()
         .and_then(|w| w.parse::<u64>().ok())
@@ -792,6 +806,7 @@ pub fn deliver(
         let mut o = base("not_called");
         o.reasons =
             json!(["a start's session_id must be a new lowercase UUID (claude --session-id)"]);
+        o.op = None;
         return run_tx(db, guard, &|tx| {
             record_result(tx, repo, role, &id, &o, 201, None)
         });
@@ -934,6 +949,18 @@ pub fn deliver(
     for (k, v) in extra.as_object().into_iter().flatten() {
         sent[k] = v.clone();
     }
+    // the stop again, right before the call (PR #83 review 67b5cae L-1): a delivery that passed the
+    // first check before the signal starts nothing once the coordinator is stopping. Before the
+    // recovery's use (review 8336044 L-A): a stop here never spends the approval
+    if STOPPING.load(Ordering::SeqCst) {
+        drop(adm);
+        let mut o = base("not_called");
+        o.reasons = json!(["the coordinator is stopping: nothing was called"]);
+        o.op = None;
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
+    }
     // the approval's one use, committed before the start is sent (02-05 step 7b): a second
     // delivery, a replay or a restart can never start a second run with it
     if let Some(rid) = &recovery {
@@ -959,16 +986,6 @@ pub fn deliver(
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
-    // the stop again, right before the call (PR #83 review 67b5cae L-1): a delivery that passed the
-    // first check before the signal starts nothing once the coordinator is stopping
-    if STOPPING.load(Ordering::SeqCst) {
-        drop(adm);
-        let mut o = base("not_called");
-        o.reasons = json!(["the coordinator is stopping: nothing was called"]);
-        return run_tx(db, guard, &|tx| {
-            record_result(tx, repo, role, &id, &o, 201, None)
-        });
-    }
     let mut o = base("unknown");
     o.github = github.clone();
     o.limits = Some(sent["limits"].clone());
@@ -1269,6 +1286,17 @@ mod tests {
         ] {
             assert!(!session_uuid(bad), "{bad}");
         }
+    }
+
+    /// PR #83 review 8336044 I-F: the shutdown waits count from the stop, once.
+    #[test]
+    fn the_shutdown_waits_count_from_the_stop() {
+        begin_stop();
+        let first = wait_start();
+        std::thread::sleep(Duration::from_millis(30));
+        begin_stop();
+        assert_eq!(wait_start(), first, "a second signal keeps the first time");
+        assert!(wait_start().elapsed() >= Duration::from_millis(30));
     }
 
     /// Review 63fefc1 M-1 (a): the shutdown waits for the runs being finished, bounded.

@@ -467,6 +467,7 @@ fn a_person_attaches_the_0205_spare_through_deliver_assignment() {
         "{d}"
     );
     assert!(reason(&d).contains("UUID"), "{d}");
+    assert!(d["result"]["op"].is_null(), "nothing was called: {d}");
     assert!(records().is_empty(), "no run, no ledger record");
     // 1. R1 fails (an error result): its record asks for a person
     let (st, d) = deliver(

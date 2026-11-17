@@ -771,13 +771,11 @@ fn e2e(transport: &str) {
     assert_eq!(cmp["github"]["result"], "match", "{cmp}");
 
     // 4. a normal after_run → reconnect with the same session; the logical name is recorded but
-    //    is not the resume key (C1)
-    let (st, d2) = deliver(
-        "operator",
-        "dlv-key-0002",
-        "development",
-        &dbody("a2", 0, "s9", json!({"logical_name": "renamed"})),
-    );
+    //    is not the resume key (C1). The body's session id is not a UUID: a reconnect resumes the
+    //    checkpoint's session, so only a start needs a UUID (PR #83 review 8336044 I-B)
+    let mut b2 = dbody("a2", 0, "s9", json!({"logical_name": "renamed"}));
+    b2["session_id"] = json!("s9");
+    let (st, d2) = deliver("operator", "dlv-key-0002", "development", &b2);
     assert_eq!(st, 201, "{d2}");
     assert_eq!(
         outcome(&d2),
