@@ -463,6 +463,8 @@ fn not_enough_evidence_writes_nothing() {
                 .exists(),
             "{name}"
         );
+        // review 758ac03 O-1: no empty directory is left behind either
+        assert!(!l.t.0.join("ledger/children").exists(), "{name}");
         assert_eq!(
             caller::records(&l.p).expect("records")[0]["usage"]["run"]["state"],
             "unmeasured",
@@ -1058,4 +1060,55 @@ fn the_records_command_prints_the_settled_run() {
     assert_eq!(r["settlement"]["policy"], settlement::POLICY);
     std::fs::write(l.t.0.join("ledger/inflight.json"), "{}").expect("w");
     assert_eq!(records().status.code(), Some(2));
+}
+
+/// PR #90 review 758ac03 O-1: the writer checks `children` and `children/<attempt>` before it
+/// creates anything; a refused settlement leaves no directory, in the ledger or through a
+/// symlink outside it.
+#[test]
+fn a_refused_settlement_creates_no_directory_anywhere() {
+    // a symlinked children: refused before anything is created, nothing appears outside
+    let l = r1_ledger("o1-children");
+    let outside = l.t.0.join("outside-children");
+    std::fs::create_dir_all(&outside).expect("dir");
+    std::os::unix::fs::symlink(&outside, l.t.0.join("ledger/children")).expect("link");
+    assert!(
+        settle(&l, false)
+            .expect_err("children")
+            .contains("nothing created")
+    );
+    assert_eq!(
+        std::fs::read_dir(&outside).expect("ls").count(),
+        0,
+        "no s8-r1 created outside"
+    );
+    assert_eq!(lines(&l).len(), 1);
+    // a refusal after the directories were made (the report copy is a different file): both
+    // the created copy and the created directories are removed again
+    let l = r1_ledger("o1-cleanup");
+    std::fs::create_dir_all(l.t.0.join("ledger/children/s8-r1")).expect("dir");
+    std::fs::write(
+        l.t.0.join("ledger/children/s8-r1/independent-check.md"),
+        "other",
+    )
+    .expect("w");
+    assert!(settle(&l, false).is_err());
+    assert!(
+        !l.t.0
+            .join("ledger/children/s8-r1/settlement-transcript.jsonl")
+            .exists()
+    );
+    assert!(
+        l.t.0.join("ledger/children/s8-r1").exists(),
+        "directories it did not create stay"
+    );
+    std::fs::remove_dir_all(l.t.0.join("ledger/children")).expect("rm");
+    let l2 = ledger("o1-late", WARN, &transcript(Some(EXIT), 1), |r| {
+        r["limits"]["billable_room"] = json!(1500)
+    });
+    assert!(settle(&l2, false).is_err());
+    assert!(
+        !l2.t.0.join("ledger/children").exists(),
+        "created directories removed"
+    );
 }

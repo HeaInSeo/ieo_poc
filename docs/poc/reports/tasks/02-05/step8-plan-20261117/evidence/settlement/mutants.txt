@@ -84,3 +84,9 @@ KILLED N06 ledger dir not canonical (---- the_ledger_is_one_place_however_it_is_
 KILLED N07 created copies kept on failure (---- not_enough_evidence_writes_nothing)
 # N05 equivalent: an existing different file at a copy path is refused anyway when the settlement is checked against the ledger's files before the append (SHA-256), and nothing is written or removed
 # correction 2 total: 6/7 killed, 1 equivalent
+
+# PR #90 review 758ac03 O-1 (resume branch): scratchpad/muts4.py
+KILLED O01 children not checked before creating (---- a_refused_settlement_creates_no_directory_anywhere)
+KILLED O02 created directories never removed (---- not_enough_evidence_writes_nothing)
+KILLED O03 settle does not remove its directories (---- not_enough_evidence_writes_nothing)
+# O-1: 3/3 killed

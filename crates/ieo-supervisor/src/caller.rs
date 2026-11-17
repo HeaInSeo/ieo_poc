@@ -1803,6 +1803,8 @@ pub fn settle(
     }
     // the copies: created new in the ledger, never through a symlink; an existing regular file
     // must be the same bytes (reviews d971f59 L-1, 7b904de N-1)
+    // the directories first, each checked before anything is created (review 758ac03 O-1)
+    let made_dirs = crate::settlement::prepare_dirs(&plan.ledger_dir, attempt)?;
     let mut created: Vec<PathBuf> = Vec::new();
     let mut keep = |name: &str, bytes: &[u8]| -> Result<(), String> {
         let (p, new) = crate::settlement::write_in_ledger(&plan.ledger_dir, attempt, name, bytes)?;
@@ -1833,6 +1835,7 @@ pub fn settle(
             for p in &created {
                 let _ = std::fs::remove_file(p);
             }
+            crate::settlement::remove_made(&made_dirs);
             return Err(e);
         }
     };
