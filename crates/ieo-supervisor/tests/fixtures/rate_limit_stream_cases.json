@@ -1,0 +1,65 @@
+[
+ {
+  "name": "warning then allowed",
+  "stream": "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed_warning\",\"resetsAt\":1795334400,\"rateLimitType\":\"seven_day\",\"utilization\":0.86,\"overageStatus\":\"rejected\",\"overageDisabledReason\":\"out_of_credits\",\"isUsingOverage\":false,\"surpassedThreshold\":0.75,\"unifiedWindows\":{\"five_hour\":{\"utilization\":0.04,\"resetsAt\":1794933000,\"status\":\"allowed\"},\"seven_day\":{\"utilization\":0.86,\"resetsAt\":1795334400,\"status\":\"allowed_warning\",\"surpassedThreshold\":0.75}}},\"uuid\":\"b59d8029-33b1-4ab5-87b1-fbff93a3a04d\",\"session_id\":\"5c991c71-b6e2-4cfb-bd76-6bb18a36e090\"}\n{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n",
+  "expected": [
+   "warning",
+   "allowed"
+  ]
+ },
+ {
+  "name": "a truncated rate_limit_event line",
+  "stream": "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allo\n",
+  "expected": [
+   "stop"
+  ]
+ },
+ {
+  "name": "a NaN value (not JSON)",
+  "stream": "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"utilization\":NaN,\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n",
+  "expected": [
+   "stop"
+  ]
+ },
+ {
+  "name": "an Infinity value (not JSON)",
+  "stream": "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"utilization\":Infinity,\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n",
+  "expected": [
+   "stop"
+  ]
+ },
+ {
+  "name": "a U+2028 inside a string is no line break",
+  "stream": "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageDisabledReason\":\"a b\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n",
+  "expected": [
+   "allowed"
+  ]
+ },
+ {
+  "name": "a U+0085 inside a string is no line break",
+  "stream": "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageDisabledReason\":\"ab\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n",
+  "expected": [
+   "allowed"
+  ]
+ },
+ {
+  "name": "CRLF line ends",
+  "stream": "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\r\n{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed_warning\",\"resetsAt\":1795334400,\"rateLimitType\":\"seven_day\",\"utilization\":0.86,\"overageStatus\":\"rejected\",\"overageDisabledReason\":\"out_of_credits\",\"isUsingOverage\":false,\"surpassedThreshold\":0.75,\"unifiedWindows\":{\"five_hour\":{\"utilization\":0.04,\"resetsAt\":1794933000,\"status\":\"allowed\"},\"seven_day\":{\"utilization\":0.86,\"resetsAt\":1795334400,\"status\":\"allowed_warning\",\"surpassedThreshold\":0.75}}},\"uuid\":\"b59d8029-33b1-4ab5-87b1-fbff93a3a04d\",\"session_id\":\"5c991c71-b6e2-4cfb-bd76-6bb18a36e090\"}\r\n",
+  "expected": [
+   "allowed",
+   "warning"
+  ]
+ },
+ {
+  "name": "other lines and broken non-event lines are ignored",
+  "stream": "{\"type\":\"assistant\",\"message\":{\"id\":\"m1\"}}\n{not json\n{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"overageStatus\":\"rejected\",\"isUsingOverage\":false}}\n",
+  "expected": [
+   "allowed"
+  ]
+ },
+ {
+  "name": "no event",
+  "stream": "{\"type\":\"assistant\",\"message\":{\"id\":\"m1\"}}\n",
+  "expected": []
+ }
+]

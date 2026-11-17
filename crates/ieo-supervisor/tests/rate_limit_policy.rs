@@ -211,3 +211,81 @@ fn the_kept_s8_r1_stream_replays_without_a_stop() {
         text.lines().count()
     );
 }
+
+const STREAM_CASES: &str = include_str!("fixtures/rate_limit_stream_cases.json");
+
+/// Stream-level parity (PR #89 review 91e87ce L-1): how a whole stream is split and parsed. Rust
+/// reads lines with `str::lines` and refuses a stream with an unreadable event line; the Python
+/// copy must split on "\n" only and refuse `NaN`/`Infinity`, which are not JSON.
+#[test]
+fn the_launcher_reads_a_stream_like_the_supervisor() {
+    let script = r#"
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("p", sys.argv[1])
+p = importlib.util.module_from_spec(spec); spec.loader.exec_module(p)
+cases = json.load(sys.stdin)
+print(json.dumps([[v[0] for _, v in p.stream_verdicts(c["stream"])] for c in cases]))
+"#;
+    let mut child = std::process::Command::new("python3")
+        .args(["-I", "-c", script, POLICY_PY])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("python3");
+    {
+        use std::io::Write;
+        let mut i = child.stdin.take().expect("stdin");
+        i.write_all(STREAM_CASES.as_bytes()).expect("write");
+    }
+    let out = child.wait_with_output().expect("python3 output");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let py: Vec<Vec<String>> = serde_json::from_slice(&out.stdout).expect("python");
+    let cases: Vec<Value> = serde_json::from_str(STREAM_CASES).expect("cases");
+    assert_eq!(py.len(), cases.len());
+    for (c, p) in cases.iter().zip(py) {
+        let s = c["stream"].as_str().expect("stream");
+        let rust: Vec<&str> = match budget::rate_limit_events(s) {
+            Err(_) => vec!["stop"],
+            Ok(evs) => evs
+                .iter()
+                .map(|e| kind(&budget::rate_limit_verdict(e)).0)
+                .collect(),
+        };
+        let expected: Vec<&str> = c["expected"]
+            .as_array()
+            .expect("expected")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        if expected == ["stop"] {
+            // the supervisor refuses the stream; the launcher stops on the line
+            assert_eq!(rust, ["stop"], "{}", c["name"]);
+            assert!(p.iter().any(|k| k == "stop"), "{}: {p:?}", c["name"]);
+            // and the run guard stops on that line during the run
+            assert!(
+                s.lines().any(|l| budget::stream_stop(l).is_some()),
+                "{}",
+                c["name"]
+            );
+        } else {
+            assert_eq!(rust, expected, "{}", c["name"]);
+            assert_eq!(p, expected, "{}", c["name"]);
+        }
+    }
+}
+
+/// PR #89 review 91e87ce L-3: a warning followed by an `allowed` event shows no stale warning.
+#[test]
+fn a_later_allowed_event_clears_the_displayed_warning() {
+    let warn = S8_R1_EVENT.trim_end();
+    let ok = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","overageStatus":"rejected","isUsingOverage":false}}"#;
+    let c = provider::classify(&format!("{warn}\n{ok}\n"));
+    assert_eq!(c["value"], "available");
+    assert!(c["warning"].is_null(), "{c}");
+    let c = provider::classify(&format!("{ok}\n{warn}\n"));
+    assert!(c["warning"].is_string(), "{c}");
+}

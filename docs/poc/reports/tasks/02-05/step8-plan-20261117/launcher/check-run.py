@@ -102,7 +102,7 @@ def check(ledger, out, att, role, aid):
         bad.append(f"environment not subscription-only: {env}")
     offered, used = None, []
     with open(r["stream"]["path"]) as f:
-        verdicts = policy.stream_verdicts(f.read().splitlines())
+        verdicts = policy.stream_verdicts(f.read())
     for e in events(r["stream"]["path"]):
         if e.get("type") == "system" and e.get("subtype") == "init":
             offered = set(e.get("tools") or [])
