@@ -25,7 +25,7 @@ ureq = { version = "2", default-features = false, features = ["json"] }
 ieo-proto = { path = "../ieo-proto" }
 tonic = "0.14"
 tonic-health = "0.14"
-tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "net"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "net", "macros"] }
 
 [dev-dependencies]
 # X-04 regression: a relay that drops answers after commit

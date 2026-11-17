@@ -285,11 +285,23 @@ fn deliveries_go_through_compare_budget_and_the_supervisor_over_grpc() {
     e2e("grpc");
 }
 
+/// A free port **below the ephemeral range** (02-05 pre-step-8c): a port taken by binding port 0
+/// is an ephemeral port, and between this check and the coordinator's own bind the system may
+/// hand it out as the local port of an outgoing connection (to PostgreSQL, to a role service),
+/// so the coordinator cannot bind it and never answers (main CI 44003424073: "the coordinator
+/// did not start" at its first start). Ports from 20000-32767 are never given to outgoing
+/// connections; the pick is spread by process and call and checked by binding.
 fn free_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .and_then(|l| l.local_addr())
-        .expect("port")
-        .port()
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    for _ in 0..1000 {
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let p = 20_000 + (std::process::id().wrapping_mul(7919).wrapping_add(n * 131)) % 12_768;
+        let p = u16::try_from(p).expect("port");
+        if std::net::TcpListener::bind(("127.0.0.1", p)).is_ok() {
+            return p;
+        }
+    }
+    panic!("no free port below the ephemeral range");
 }
 
 fn unix_now() -> u64 {
