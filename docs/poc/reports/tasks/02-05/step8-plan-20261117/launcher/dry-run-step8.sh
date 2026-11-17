@@ -1,9 +1,12 @@
 #!/bin/bash
 # Dry run of EXECUTION_PLAN.md §3–§6 end to end on test systems only, with the SAME scripts as the
 # real run (run-step8-roles.sh, coord-switch.sh, rehearse-migration.sh, run-step8.sh, check-run.py):
-#   1. an "old" coordinator (a 778ee47 build) as a host process on a test database with fixture rows
-#   2. backup (pg_dump -Fc) and the migration rehearsal of the new build on a scratch copy
-#   3. capture of the old process, stop, start of the new build with the captured argv/env
+#   1. an "old" coordinator (a 778ee47 build) as a host process on a test database with fixture rows,
+#      started like a login shell would: an exported two-line bash function in its environment and
+#      relative --tokens/--bindings paths from its working directory (review a5f9402 N-1)
+#   2. capture of the old process; backup (pg_dump -Fc, live row counts) and the migration rehearsal
+#      of the new build on a scratch copy (with the new tokens.json and the captured bindings)
+#   3. stop, start of the new build with the captured argv/env/cwd
 #   4. role containers (fake claude, fake credentials), register → the user's review → prepare → runs
 #   5. the driver's stop checks on doctored copies (an overage signal, an extra tool)
 #   6. the rollback: stop the new build, start the old one with the captured argv/env on the migrated DB
@@ -19,7 +22,9 @@ PGC=${TEST_PG_CONTAINER:-ieo-poc-0203-pg}; PGPORT=${TEST_PG_PORT:-55432}; CPORT=
 [ "$CPORT" = 58090 ] && { echo "refusing the live coordinator port"; exit 1; }
 if [ -e "$W" ] && [ ! -e "$W/fake/claude" ]; then echo "$W is not a dry-run workdir: refusing to delete it"; exit 1; fi
 for r in development guardrail; do podman rm -f "ieo-s8dry-ieo-poc-test-$r" >/dev/null 2>&1 || true; done
-podman unshare rm -rf "$W"; mkdir -p "$W/fake/secrets" "$W/tok" "$W/out" "$W/backup" "$W/private"; chmod 700 "$W"
+podman unshare rm -rf "$W"; mkdir -p "$W/fake/secrets" "$W/tok" "$W/out" "$W/backup" "$W/private" "$W/bin" "$W/oldcwd"; chmod 700 "$W"
+# the binaries as on the host: the old one at bin/ieo-coord, the new build beside it
+cp "$OLD" "$W/bin/ieo-coord"; cp "$BIN_DIR/ieo-coord" "$W/bin/ieo-coord-M"; OLD="$W/bin/ieo-coord"
 DB=ieo_t_s8dry_$$
 cleanup() {
   [ -s "$W/coord.pid" ] && kill -KILL "$(cat "$W/coord.pid")" 2>/dev/null
@@ -60,12 +65,17 @@ for p in s8-registrant user-dry s8-assigner s8-operator s8-ingest s8-sup-dev s8-
 # clients also hold the fixture sprint's repo; an agent is bound to exactly one repo
 pr() { local repos='["ieo-poc-test", "console-coordinator"]'; [ "$2" = agent ] && repos='["ieo-poc-test"]'
   printf '{"name": "%s", "token_sha256": "%s", "kind": "%s", "scopes": %s, "repo_ids": %s%s}' "$1" "$(dg "$1")" "$2" "$3" "$repos" "${4:-}"; }
-echo "{\"principals\": [$(pr s8-registrant service '["sprints:register", "sprints:read"]'), $(pr old-reviewer user '["review:semantic", "sprints:read"]')]}" > "$W/tokens-old.json"
+echo "{\"principals\": [$(pr s8-registrant service '["sprints:register", "sprints:read"]'), $(pr old-reviewer user '["review:semantic", "sprints:read"]')]}" > "$W/oldcwd/tokens-old.json"
+echo '{"ieo-poc-test": {"sprint_id": "POC-S8-01"}}' > "$W/oldcwd/bindings.json"
 echo "{\"principals\": [$(pr s8-registrant service '["sprints:register", "sprints:read"]'), $(pr old-reviewer user '["review:semantic", "sprints:read"]'), $(pr user-dry user '["review:semantic", "sprints:read", "roles:control"]'), $(pr s8-assigner service '["coordinator:assign"]'), $(pr s8-operator service '["roles:control"]'), $(pr s8-ingest service '["evidence:ingest"]'), $(pr s8-sup-dev agent '["checkpoint:report"]' ', "role": "development"'), $(pr s8-sup-gr agent '["checkpoint:report"]' ', "role": "guardrail"')]}" > "$W/tokens-new.json"
 DBURL="host=127.0.0.1 port=$PGPORT user=ieo dbname=$DB password=$(cat "$TEST_DB_PASSWORD_FILE")"
 # 1. the old coordinator as a host process (like 58090: setsid, pid file), fixture rows through its API
 podman exec "$PGC" createdb -U ieo "$DB"; ok $? "test database $DB created on $PGPORT"
-( export IEO_DB_URL="$DBURL"; setsid nohup "$OLD" serve --listen "127.0.0.1:$CPORT" --tokens "$W/tokens-old.json" \
+( cd "$W/oldcwd"; export IEO_DB_URL="$DBURL"
+  s8dry_fn() { echo one
+    echo two; }
+  export -f s8dry_fn   # an exported two-line function: BASH_FUNC_s8dry_fn%% in the environment
+  setsid nohup "$OLD" serve --listen "127.0.0.1:$CPORT" --tokens tokens-old.json --bindings bindings.json \
     --manifest "$ROOT/docs/poc/Console_Coordinator_Sprints_v0.json" --policy "$ROOT/contracts/judgment-policy-v0.json" --workers 2 \
     >> "$W/out/coord-old.log" 2>&1 < /dev/null & echo $! > "$W/coord.pid" )
 for _ in $(seq 1 100); do curl -s -o /dev/null "http://127.0.0.1:$CPORT/v0/health" && break; sleep 0.2; done
@@ -73,10 +83,16 @@ COORD="http://127.0.0.1:$CPORT"; TOKDIR="$W/tok"; OUT="$W/out"; LEDGER="$W/ledge
 . "$HERE/lib-step8.sh"
 python3 -I -c "import json,sys; m=json.load(open(sys.argv[1])); json.dump(m['sprints'][0], open(sys.argv[2],'w'))" "$ROOT/docs/poc/Console_Coordinator_Sprints_v0.json" "$W/out/fixture-sprint.json"
 st=$(req fixture s8-registrant POST '/v0/sprints?mode=draft' "$W/out/fixture-sprint.json" fixture-0001); [ "$st" = 201 ]; ok $? "old build: a fixture draft sprint registered ($st)"
-# 2. backup and the migration rehearsal (EXECUTION_PLAN.md §3, §5.2 step 1b)
+tr '\0' '\n' < "/proc/$(cat "$W/coord.pid")/environ" | grep -q '^BASH_FUNC_s8dry_fn%%=() {'; ok $? "the old process carries an exported multi-line shell function"
+# 2. capture (read), backup with the live row counts, the migration rehearsal (EXECUTION_PLAN.md §3, §5.2 steps 1–4)
+bash "$HERE/coord-switch.sh" capture "$W/coord.pid" "$W/bin/ieo-coord" "$CPORT" "$W/private"; ok $? "capture of the old process (argv0, env0, cwd: 0600; names and paths only shown)"
+[ "$(stat -c %a "$W/private/env0")" = 600 ] && grep -qz '^IEO_DB_URL=' "$W/private/env0" && grep -qz '^BASH_FUNC_s8dry_fn%%=' "$W/private/env0"; ok $? "env0 keeps NUL boundaries (the database URL and the two-line function intact), mode 0600"
 podman exec "$PGC" pg_dump -U ieo -d "$DB" -Fc > "$W/backup/ieo.dump"; ok $? "pg_dump -Fc ($(stat -c %s "$W/backup/ieo.dump") bytes)"
 podman exec -i "$PGC" pg_restore --list < "$W/backup/ieo.dump" > "$W/backup/ieo.dump.list"; ok $? "pg_restore --list ($(grep -c 'TABLE DATA' "$W/backup/ieo.dump.list") tables with data)"
-TEST_DB_PASSWORD_FILE="$TEST_DB_PASSWORD_FILE" bash "$HERE/rehearse-migration.sh" "$W/backup/ieo.dump" "$BIN_DIR/ieo-coord" 58291 > "$W/out/rehearsal.log" 2>&1; ok $? "migration rehearsal on a scratch copy"
+podman exec "$PGC" psql -U ieo -d "$DB" -At -c "SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE relkind='r' AND nspname='public' ORDER BY 1" \
+  | while read -r t; do echo "$t=$(podman exec "$PGC" psql -U ieo -d "$DB" -Atc "SELECT count(*) FROM \"$t\"")"; done > "$W/backup/live-counts.txt"
+TEST_DB_PASSWORD_FILE="$TEST_DB_PASSWORD_FILE" TOKENS_FILE="$W/tokens-new.json" BINDINGS_FILE="$W/oldcwd/bindings.json" \
+  bash "$HERE/rehearse-migration.sh" "$W/backup/ieo.dump" "$W/bin/ieo-coord-M" 58291 "$W/backup/live-counts.txt" > "$W/out/rehearsal.log" 2>&1; ok $? "migration rehearsal on a scratch copy (new tokens.json, the captured bindings, live counts)"
 sed 's/^/    /' "$W/out/rehearsal.log"
 # 4a. the role containers (the real launcher; fake claude and credentials; test coordinator port)
 CLAUDE_BIN="$W/fake/claude" SECRETS_DIR="$W/fake/secrets" NAME_PREFIX=ieo-s8dry QUOTA_GROUP_ID=dry-run-quota \
@@ -92,11 +108,12 @@ e["budget_plan"] = {"budget": "02-05", "ledger_dir": w + "/ledger-0205",
                     "roles": {"development": {"max_window_seconds": 600}, "guardrail": {"max_window_seconds": 600}}}
 json.dump({"ieo-poc-test": e}, open(w + "/roles.json", "w"), indent=1)
 PY
-# 3. capture, stop, start the new build (EXECUTION_PLAN.md §5.2 steps 2–4)
-bash "$HERE/coord-switch.sh" capture "$W/coord.pid" "$OLD" "$CPORT" "$W/private"; ok $? "capture of the old process (argv, env: 0600, names only shown)"
+# 3. stop, start the new build (EXECUTION_PLAN.md §5.2 steps 7–8)
 bash "$HERE/coord-switch.sh" stop "$W/coord.pid" 30; ok $? "old coordinator stopped"
-bash "$HERE/coord-switch.sh" start "$BIN_DIR/ieo-coord" "$W/private" "$W/coord.pid" "$W/out/coord-new.log" --tokens "$W/tokens-new.json" -- --roles "$W/roles.json"; ok $? "new build started with the captured argv/env, new tokens, --roles"
-grep -q "user=ieo" "$W/private/env" && [ "$(stat -c %a "$W/private/env")" = 600 ]; ok $? "the captured environment holds the database URL, mode 0600"
+bash "$HERE/coord-switch.sh" start "$W/bin/ieo-coord-M" "$W/private" "$W/coord.pid" "$W/out/coord-new.log" --tokens "$W/tokens-new.json" -- --roles "$W/roles.json"; ok $? "new build started with the captured argv/env/cwd (relative --bindings), new tokens, --roles"
+NP=$(cat "$W/coord.pid")
+grep -qz '^IEO_DB_URL=' "/proc/$NP/environ" && ! grep -qz '^BASH_FUNC_' "/proc/$NP/environ" && [ "$(readlink "/proc/$NP/cwd")" = "$W/oldcwd" ] \
+  && [ "$(readlink "/proc/$NP/exe")" = "$W/bin/ieo-coord-M" ]; ok $? "the new process: captured environment without the shell function, the captured cwd, the new binary"
 # 4b. the run: register → the user's review → prepare → runs (the real driver)
 export COORD TOKDIR OUT LEDGER ADAPTER_HEADER
 bash "$HERE/run-step8.sh" register; ok $? "run-step8.sh register"
@@ -128,7 +145,7 @@ done
 # 6. rollback rehearsal: stop the new build (it waits for runs in progress), the old one on the migrated DB
 bash "$HERE/coord-switch.sh" stop "$W/coord.pid" 900; ok $? "new build stopped"
 grep -q "ieo-coord: stopped" "$W/out/coord-new.log"; ok $? "new build log: stopped (graceful)"
-bash "$HERE/coord-switch.sh" start "$OLD" "$W/private" "$W/coord.pid" "$W/out/coord-rollback.log"; ok $? "rollback: the old build starts with the captured argv/env on the migrated database"
+bash "$HERE/coord-switch.sh" start "$W/bin/ieo-coord" "$W/private" "$W/coord.pid" "$W/out/coord-rollback.log"; ok $? "rollback: the old build starts with the captured argv/env/cwd (relative --tokens/--bindings) on the migrated database"
 st=$(req after-rollback s8-registrant GET /v0/sprints/POC-S8-01/revisions/1); [ "$st" = 200 ]; ok $? "rollback: the old build reads the step-8 sprint ($st)"
 bash "$HERE/coord-switch.sh" stop "$W/coord.pid" 30; ok $? "old build stopped"
 echo "## result: $pass passed, $fail failed"

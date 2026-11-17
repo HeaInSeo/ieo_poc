@@ -153,11 +153,7 @@ fn role_arguments_use_edit_paths_and_session_id_only() {
         let allow = at("--allowedTools");
         assert_eq!(
             r[allow + 1..allow + 4].to_vec(),
-            [
-                "Read(//state/work/ieo-poc-test/**)",
-                "Grep(//state/work/ieo-poc-test/**)",
-                "Glob(//state/work/ieo-poc-test/**)"
-            ]
+            ["Read(//state/work/ieo-poc-test/**)", "Grep", "Glob"]
         );
         let deny = at("--disallowedTools");
         assert_eq!(

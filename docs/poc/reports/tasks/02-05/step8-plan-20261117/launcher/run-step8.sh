@@ -70,7 +70,12 @@ runs)
     got=$(j "$tag" "(d['result']['decision'], d['result']['op'], d['result']['outcome'])" 2>/dev/null)
     { [ "$st" = 201 ] || [ "$st" = 200 ]; } && [ "$got" = "('$dec', '$op', 'accepted')" ] || stop "$att: delivery answered $st $got: $(head -c 600 "$OUT/$tag.json")"
     echo "$att: $got"
-    role_wait "$port" "$att" || stop "$att: the role did not finish"
+    # a rerun after this attempt was recorded (review a5f9402 I-3): the stored answer above, no wait
+    if [ -f "$LEDGER/records.jsonl" ] && grep -q "\"attempt_id\":\"$att\"" "$LEDGER/records.jsonl"; then
+      role_status "$port" "status-$att"
+    else
+      role_wait "$port" "$att" || stop "$att: the role did not finish"
+    fi
     settled "$att" || stop "$att: no ledger record, or the in-flight marker stays"
     st=$(req "roles-$att" s8-operator GET "/v0/repos/$REPO_ID/roles")
     st=$(req "chain-$aid-$att" s8-operator GET "/v0/coordinator/assignments/$aid/generations/0/chain")

@@ -1,7 +1,7 @@
 {
   "autoMemoryEnabled": false,
   "permissions": {
-    "allow": ["Read(//state/work/__REPO__/**)", "Grep(//state/work/__REPO__/**)", "Glob(//state/work/__REPO__/**)"],
+    "allow": ["Read(//state/work/__REPO__/**)", "Grep", "Glob"],
     "deny": [
       "Task", "Agent", "Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch",
       "Workflow", "RemoteTrigger", "CronCreate", "CronDelete", "ScheduleWakeup", "SendMessage",

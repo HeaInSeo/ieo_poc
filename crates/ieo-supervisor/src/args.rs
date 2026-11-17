@@ -99,12 +99,14 @@ pub fn build(role: &Role, repo: &str, session_id: &str, resume: bool) -> Vec<Str
             if *read_only {
                 a.push("--disable-slash-commands".into());
                 a.extend(["--tools".into(), DEVELOPMENT_READ_TOOLS.into()]);
+                // the rule forms 02-04 gave this CLI: a scoped `Read(//…)` (the CLI applies it to
+                // Grep and Glob too) and plain `Grep`, `Glob` (PR #86 review a5f9402 L-8)
                 a.push("--allowedTools".into());
-                a.extend(
-                    ["Read", "Grep", "Glob"]
-                        .iter()
-                        .map(|t| format!("{t}(//state/work/{repo}/**)")),
-                );
+                a.extend([
+                    format!("Read(//state/work/{repo}/**)"),
+                    "Grep".into(),
+                    "Glob".into(),
+                ]);
                 a.push("--disallowedTools".into());
                 a.extend(
                     DEVELOPMENT_READ_ONLY_DISALLOWED
