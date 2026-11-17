@@ -4416,23 +4416,27 @@ fn insert_first_action(
     Ok(())
 }
 
-/// Whether a takeover checkpoint of `session` is stored under the assignment and generation.
-fn taken_over(
+/// Whether a takeover of `session` is stored under the assignment and generation **and linked to
+/// the delivery that called `attempt`** (review 5dbb3d8 L-2, I-2). The one condition of both
+/// first-action paths: the direct report (`recordFirstAction`) and the fill from an
+/// `after_run`/`error` checkpoint (review debf413 I-8). EXISTS: a resumed session has one
+/// takeover per run under the same generation.
+fn takeover_linked(
     tx: &mut Transaction,
     repo: &str,
     role: &str,
     session: &str,
     aid: &str,
     generation: u64,
+    attempt: &str,
 ) -> Result<bool, Resp> {
-    // EXISTS: a resumed session has one takeover per run under the same generation (a
-    // `query_opt` over those rows failed with 500 for its second run's first action)
     Ok(tx
         .query_one(
-            "SELECT EXISTS (SELECT 1 FROM role_checkpoints WHERE repo_id = $1 AND role = $2
-               AND phase = 'takeover' AND session_id = $3 AND assignment_id = $4
-               AND generation = $5)",
-            &[&repo, &role, &session, &aid, &i64_of(generation)],
+            "SELECT EXISTS (SELECT 1 FROM role_takeovers t
+                 JOIN role_deliveries d ON d.delivery_id = t.delivery_id
+                 WHERE t.repo_id = $1 AND t.role = $2 AND t.session_id = $3
+                   AND t.assignment_id = $4 AND t.generation = $5 AND d.attempt_id = $6)",
+            &[&repo, &role, &session, &aid, &i64_of(generation), &attempt],
         )?
         .get(0))
 }
@@ -4469,22 +4473,15 @@ fn fill_first_action(
         .is_some();
     // the session's takeover is stored and linked to the delivery that called this attempt
     // (review 5dbb3d8 L-2, I-2)
-    let linked: bool = tx
-        .query_one(
-            "SELECT EXISTS (SELECT 1 FROM role_takeovers t
-                 JOIN role_deliveries d ON d.delivery_id = t.delivery_id
-                 WHERE t.repo_id = $1 AND t.role = $2 AND t.session_id = $3
-                   AND t.assignment_id = $4 AND t.generation = $5 AND d.attempt_id = $6)",
-            &[
-                &repo,
-                &role,
-                &body["session_id"].as_str().unwrap_or_default(),
-                &aid,
-                &i64_of(generation),
-                &body["attempt_id"].as_str().unwrap_or_default(),
-            ],
-        )?
-        .get(0);
+    let linked = takeover_linked(
+        tx,
+        repo,
+        role,
+        body["session_id"].as_str().unwrap_or_default(),
+        aid,
+        generation,
+        body["attempt_id"].as_str().unwrap_or_default(),
+    )?;
     if exists || !linked {
         return Ok(());
     }
@@ -5209,13 +5206,16 @@ fn record_first_action(tx: &mut Transaction, who: &Caller, repo: &str, role: &st
         };
     }
     let current = issued_here(tx, repo, role, aid, generation, "assignment_id")?;
-    if !taken_over(tx, repo, role, session, aid, generation)? {
+    // the fill's condition (review debf413 I-8): the session's takeover, linked to the delivery
+    // that called this attempt
+    if !takeover_linked(tx, repo, role, session, aid, generation, attempt)? {
         return Err(one(
             409,
             "CHECKPOINT_MISMATCH",
             "session_id",
-            "no takeover checkpoint of this session is stored under this assignment and generation",
-            "report the takeover checkpoint first",
+            "no takeover of this session under this assignment and generation is linked to the \
+             delivery that called this attempt",
+            "report the takeover checkpoint of the delivered attempt first",
         ));
     }
     insert_first_action(tx, who, repo, role, &body, current, "report")?;

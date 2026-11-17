@@ -1,12 +1,16 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.17.0
+  version: 0.17.1
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.17.1 (02-05 pre-step-8 PR; PR #75 review debf413 I-8): recordFirstAction's takeover condition is the fill's:
+    the session's takeover under the assignment and generation must be linked to the delivery that called the
+    reported `attempt_id` (else 409 `CHECKPOINT_MISMATCH`). A spare's `approved_at` is the coordinator's time of the
+    person's deliverAssignment request (PR #81 review 291a9b0 N-3).
     0.17.0 (02-05 budget PR, additive; user decisions 2026-11-15 (나) and 2026-11-17 (나) with its addition):
     deliverAssignment takes an optional `spare` {reason, replaces, evidence_ref}: the 02-05 budget's one development
     spare run. The shared budget check decides (outcome `budget_refused` with the reason otherwise): development runs
@@ -1140,7 +1144,8 @@ paths:
         same body again → 200 with the stored receipt (nothing changes); another body under the key → 409
         `EVENT_CONTENT_CONFLICT`. A new record needs: the assignment issued to this (repo, role) (else 409
         `STALE_ASSIGNMENT`) and a stored `takeover` checkpoint of that session under that assignment and
-        generation (else 409 `CHECKPOINT_MISMATCH`). Like the later checkpoints of a run, a first action
+        generation **linked to the delivery that called this `attempt_id`** (0.17.1, the fill's condition;
+        else 409 `CHECKPOINT_MISMATCH`). Like the later checkpoints of a run, a first action
         recorded after the assignment moved on is kept with `current_assignment: false`.
         Order: 401 → 404 role → 403 → 400 format → 409 key → 409 assignment, takeover. Refusals leave no row.
         A report lost on the way is filled from the run's `after_run`/`error` checkpoint (reportCheckpoint,

@@ -2990,3 +2990,30 @@ fn a_spare_marker_releases_nothing_else() {
     let why = not_started(call3("development", "x3", "hi", spare_marker("env", "d1")));
     assert!(why.contains("unmeasured run(s)"), "{why}");
 }
+
+/// PR #81 review 291a9b0 N-2: a stop reason other than the run's own result never reads as one
+/// and never splits into one, so a new reason cannot become releasable by its wording.
+#[test]
+fn other_stop_reasons_never_read_as_a_result() {
+    assert_eq!(
+        caller::other_stop_reason("result looks bad"),
+        "other: result looks bad"
+    );
+    assert_eq!(
+        caller::other_stop_reason("no result event"),
+        "other: no result event"
+    );
+    assert_eq!(
+        caller::other_stop_reason("a; result b; c"),
+        "a, result b, c"
+    );
+    assert_eq!(
+        caller::other_stop_reason("process-group cleanup failed"),
+        "process-group cleanup failed"
+    );
+    for reason in ["result looks bad", "x; result y", "no result event"] {
+        let r = json!({"usage": {"run": {"state": "measured"}}, "stop_required": true,
+                       "stop_reason": caller::other_stop_reason(reason)});
+        assert!(caller::spare_releasable(&r).is_err(), "{reason}");
+    }
+}
