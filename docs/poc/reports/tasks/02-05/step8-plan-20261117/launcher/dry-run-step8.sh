@@ -71,7 +71,7 @@ echo "{\"principals\": [$(pr s8-registrant service '["sprints:register", "sprint
 DBURL="host=127.0.0.1 port=$PGPORT user=ieo dbname=$DB password=$(cat "$TEST_DB_PASSWORD_FILE")"
 # 1. the old coordinator as a host process (like 58090: setsid, pid file), fixture rows through its API
 podman exec "$PGC" createdb -U ieo "$DB"; ok $? "test database $DB created on $PGPORT"
-( cd "$W/oldcwd"; export IEO_DB_URL="$DBURL"
+( cd "$W/oldcwd" || exit 1; export IEO_DB_URL="$DBURL"
   s8dry_fn() { echo one
     echo two; }
   export -f s8dry_fn   # an exported two-line function: BASH_FUNC_s8dry_fn%% in the environment

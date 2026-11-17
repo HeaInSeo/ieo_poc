@@ -2,6 +2,8 @@
 # 02-05 step 8 resume (RESUME_PLAN.md §9): the read-only copies the resume runs from, the new
 # SHA256SUMS, and the exact permission-rule change (old lines out, new lines in).
 #   make-resume-copies.sh <repo checkout at the merged SHA> <D> <bin dir of that SHA> <rules out file>
+#   env OLD_SUPERVISOR: the ieo-supervisor the role containers run now (46799b0's); its SHA-256 is
+#   pinned in the rollback rule (PR #91 review 4b427c5 F-10)
 # <D> is /opt/rust/src/github.com/HeaInSeo/ieo_poc-data in the real run (a scratch directory in the
 # dry run). Writes:
 #   <D>/step8-resume/   launcher/ (all), sprint-POC-S8-01-r1.json, EXECUTION_PLAN.md, RESUME_PLAN.md,
@@ -17,6 +19,9 @@ P="$SRC/docs/poc/reports/tasks/02-05/step8-plan-20261117"
 [ -f "$P/launcher/run-step8-resume.sh" ] || { echo "STOP: $SRC has no resume launcher"; exit 3; }
 for b in ieo-coord ieo-supervisor ieo-role-call; do [ -x "$BIN/$b" ] || { echo "STOP: $BIN/$b missing"; exit 3; }; done
 [ -e "$D/step8-resume" ] && { echo "STOP: $D/step8-resume exists"; exit 3; }
+# every byte from the commit (PR #91 review 4b427c5 F-5): a checkout with changes is refused
+[ -z "$(git -C "$SRC" status --porcelain)" ] || { echo "STOP: $SRC has uncommitted changes"; exit 3; }
+OLD_SUP_SHA=$(sha256sum < "${OLD_SUPERVISOR:?the old ieo-supervisor (46799b0)}" | cut -c1-64)
 SHA=$(git -C "$SRC" rev-parse HEAD)
 mkdir -p "$D/step8-resume/evidence"
 # only what the commit holds (never an untracked file such as a __pycache__), from its blobs
@@ -34,17 +39,24 @@ done
   [ "$(git -C "$SRC" show "HEAD:docs/poc/reports/tasks/02-05/step8-plan-20261117/$src" | sha256sum | cut -c1-64)" = \
     "$(sha256sum < "$D/step8-resume/$rel" | cut -c1-64)" ] || { echo "STOP: $rel differs from $SHA"; exit 3; }
 done
-mkdir -p "$D/step8-ops"; chmod -R u+w "$D/step8-ops"
-cp "$P/launcher/obs-check.sh" "$D/step8-ops/obs-check.sh"; cp "$P/launcher/rate_limit_policy.py" "$D/step8-ops/rate_limit_policy.py"
+mkdir -p "$D/step8-ops"
+# the step-8 files it replaces are kept as they were (review 4b427c5 F-11)
+if [ -e "$D/step8-ops/SHA256SUMS" ] && [ ! -e "$D/step8-ops-46799b0" ]; then
+  cp -a "$D/step8-ops" "$D/step8-ops-46799b0"; chmod -R a-w "$D/step8-ops-46799b0"
+fi
+chmod -R u+w "$D/step8-ops"
+# from the blob-verified copy, not the working tree (review 4b427c5 F-5)
+cp "$D/step8-resume/launcher/obs-check.sh" "$D/step8-ops/obs-check.sh"
+cp "$D/step8-resume/launcher/rate_limit_policy.py" "$D/step8-ops/rate_limit_policy.py"
 chmod 0555 "$D/step8-ops/obs-check.sh"; chmod 0444 "$D/step8-ops/rate_limit_policy.py"
 ( cd "$D" && { find step8-resume -type f | sort; echo step8-ops/obs-check.sh; echo step8-ops/rate_limit_policy.py; } | xargs sha256sum > step8-ops/SHA256SUMS )
 chmod -R a-w "$D/step8-resume" "$D/step8-ops"
 SUMS=$(sha256sum < "$D/step8-ops/SHA256SUMS" | cut -c1-64)
 SUP=$(sha256sum < "$BIN/ieo-supervisor" | cut -c1-64)
 echo "# commit $SHA · step8-resume $(find "$D/step8-resume" -type f | wc -l) files · SHA256SUMS $SUMS ($(wc -l < "$D/step8-ops/SHA256SUMS") files) · ieo-supervisor $SUP · ieo-coord $(sha256sum < "$BIN/ieo-coord" | cut -c1-64) · ieo-role-call $(sha256sum < "$BIN/ieo-role-call" | cut -c1-64)"
-python3 -I - "$P/MANUAL_STEPS.md" "$D" "$BIN" "$SUMS" "$SUP" "$SHA" "$RULES" <<'PY'
+python3 -I - "$D/step8-resume/MANUAL_STEPS.md" "$D" "$BIN" "$SUMS" "$SUP" "$SHA" "$RULES" "$OLD_SUP_SHA" <<'PY'
 import json, re, sys
-manual, D, BIN, SUMS, SUP, SHA, out = sys.argv[1:8]
+manual, D, BIN, SUMS, SUP, SHA, out, OLD_SUP = sys.argv[1:9]
 old = json.loads(re.search(r"```json\n(.*?)```", open(manual).read(), re.S).group(1))["permissions"]["allow"]
 W = "/opt/rust/ieo_poc_runs/02-05-s8-20261118"
 L = f"bash {D}/step8-resume/launcher"
@@ -63,7 +75,7 @@ new = [
     f"Bash({L}/coord-switch.sh start {D}/bin/ieo-coord-M {D}/private/s8/coord-778ee47 {D}/coord.pid {D}/logs/coord-M-rollback.log --tokens {D}/private/s8/tokens-s8.json -- --roles {D}/private/s8/roles.json)",
     # the role containers: the new supervisor in place, and back
     f"Bash({L}/restart-roles.sh swap {W} {BIN}/ieo-supervisor {SUP})",
-    f"Bash({L}/restart-roles.sh rollback {W})",
+    f"Bash({L}/restart-roles.sh rollback {W} {OLD_SUP})",
     # the resume driver and its environment
     f"Bash(export COORD=http://127.0.0.1:58090)",
     f"Bash(export TOKDIR={D}/private/s8)",

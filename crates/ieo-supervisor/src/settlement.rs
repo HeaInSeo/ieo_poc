@@ -533,9 +533,15 @@ pub fn write_in_ledger(
         .mode(0o600)
         .open(&to)
         .map_err(|e| format!("settlement copy {}: {e}", to.display()))?;
-    f.write_all(bytes)
-        .and_then(|()| f.sync_all())
-        .map_err(|e| format!("settlement copy: {e}"))?;
+    if let Err(e) = f.write_all(bytes).and_then(|()| f.sync_all()) {
+        // a partial file is never left behind (PR #91 review 4b427c5 F-4)
+        drop(f);
+        let _ = std::fs::remove_file(&to);
+        return Err(format!(
+            "settlement copy {}: {e} (partial file removed)",
+            to.display()
+        ));
+    }
     Ok((to, true))
 }
 

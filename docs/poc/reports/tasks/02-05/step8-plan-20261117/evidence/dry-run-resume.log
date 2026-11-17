@@ -1,6 +1,6 @@
-# 02-05 step 8 RESUME dry run (fake claude, test PostgreSQL 55432/ieo_t_s8res_3426218, test coordinator 127.0.0.1:58290, roles 58231/58232, no model call) · 2026-11-17T16:00:20Z
-# branch f92cdcb · old (46799b0) supervisor 5fca01584a09 coordinator d6a742145ea1 · new supervisor d8ac3cdec7bb coordinator ae7c5819a59b
-PASS test database ieo_t_s8res_3426218 created on 55432
+# 02-05 step 8 RESUME dry run (fake claude, test PostgreSQL 55432/ieo_t_s8res_3475363, test coordinator 127.0.0.1:58290, roles 58231/58232, no model call) · 2026-11-17T16:36:06Z
+# branch 74ac99c · old (46799b0) supervisor 5fca01584a09 coordinator d6a742145ea1 · new supervisor f8cf083c8fb2 coordinator 537f1eaa7fd0
+PASS test database ieo_t_s8res_3475363 created on 55432
 # role containers up: ieo-s8dry-ieo-poc-test-{development,guardrail} on 127.0.0.1:58231/58232 · image docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c · network slirp4netns:allow_host_loopback=true · coordinator http://10.0.2.2:58290
 # target https://github.com/HeaInSeo/ieo_poc_test @ 2ab9d8760012516f37674a9446ca2fb2699973c0 (read-only copies) · credentials: OAuth form (values not printed) · roles entry: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8res-dry/run/roles-entry.json
 PASS old (46799b0) role supervisors up (run-step8-roles.sh)
@@ -15,6 +15,10 @@ PASS make-resume-copies.sh: # rules: remove 28 old allow lines, add 32 new ones 
 PASS the gate passes on the copies (self-hash, every file, read-only)
 PASS apply-perm-resume.py on a settings copy: allow 28 -> 32 (removed 28, added 32), deny 7; new lines all present once: True;
 PASS apply-perm-resume.py again: already applied, nothing changed
+PASS a failed swap stops and prints the exact rollback: STOP: role development does not answer idle after the restart
+PASS rollback with another expected SHA-256: refused, nothing changed
+PASS rollback from the failed swap (containers exited): 2 roles up and idle on the old binary
+PASS rollback with one container stopped: 2 roles up and idle
 PASS restart-roles.sh swap: 2 roles up and idle on the new binary
 PASS the development volume kept its local checkpoint (s8-r1 after_run)
 PASS old coordinator stopped
@@ -25,12 +29,16 @@ PASS settle: s8-r1 counts: measured {'cache_creation': 10, 'cache_read': 20, 'in
 PASS after the settlement the coordinator's own budget plan reads s8-r1 as settled
 PASS the transcript and the report copy are kept in the ledger
 PASS settle again: refused (already settled, nothing written)
+PASS a settle that fails after appending says so (not 'nothing written')
 PASS r1b-body: the body and the user's command
 PASS the printed user command carries the R1b key and the user's token file
+PASS r1b-body checks the observation deadline against s8-r1's stream (the newest record) before printing the user's command
 PASS the user's R1b delivery (201)
 PASS r1b-check: s8-r1b: ('resume_allowed', 'start', 'accepted') · s8-r1b spare: replaces s8-r1 by user user-dry
 PASS R1b got the allowed_warning event: recorded and printed as a warning, not a stop
+PASS r2g1 refuses when a check of R1b fails: nothing sent (exit 3)
 PASS r2g1: R1b, R2 and G1 recorded and checked
+PASS the observation deadline is checked against the newest stream before R2 (s8-r1b) and G1 (s8-r2)
 PASS check-run.py on the raw lines would fail on s8-r1's original line (why EFFECTIVE_RECORDS)
 PASS the same check on the effective records passes
    billable over the 4 runs: 103 | R1 settled {'cache_creation': 10, 'cache_read': 20, 'input': 3, 'output': 30}
@@ -41,4 +49,4 @@ PASS rollback: the old coordinator starts on the same ledger and database
    old build answered: ['ASSIGNMENT_USAGE_UNMEASURED']  awaiting_human_decision
 PASS rollback: the old build does not know the settlement: it refuses the next call, nothing starts (fail closed)
 PASS old coordinator stopped
-## result: 36 passed, 0 failed
+## result: 44 passed, 0 failed

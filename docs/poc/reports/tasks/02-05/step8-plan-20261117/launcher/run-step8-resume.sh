@@ -11,8 +11,9 @@
 # Env: COORD, TOKDIR, OUT, LEDGER, ADAPTER_HEADER (as run-step8.sh), PLAN (the 02-05 plan for
 # ieo-role-call), ROLE_CALL (the new ieo-role-call); settle: TRANSCRIPT, ORIGINAL_PATH,
 # ORIGINAL_SHA256, DECISION, CHECK_REPORT, CHECK_VERDICT, COORD_ROLES (the coordinator's --roles
-# file: after the settlement the ledger is read again with the coordinator's own budget plan);
-# r2g1: OBS_UNIX (default s8-r1's end).
+# file: after the settlement the ledger is read again with the coordinator's own budget plan).
+# Before each call the coordinator's observation (the newest record's stream) must be younger
+# than 7 days minus 10 minutes: s8-r1's before R1b, s8-r1b's before R2, s8-r2's before G1.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/lib-step8.sh"
@@ -21,10 +22,34 @@ COORD=${COORD:-http://127.0.0.1:58090}
 : "${TOKDIR:?}" "${OUT:?}" "${LEDGER:?}" "${ADAPTER_HEADER:?}" "${PLAN:?}" "${ROLE_CALL:?}"
 REPO_ID=${REPO_ID:-ieo-poc-test}
 PORT_DEV=${PORT_DEV:-58221}; PORT_GR=${PORT_GR:-58222}; PROMPTS=${PROMPTS:-$HERE/prompts}
-R1_END=1794917989   # s8-r1 ended_unix (2026-11-17T12:19:49Z): its stream is the observation now
 mkdir -p "$OUT"
 export R1_ATTEMPT=s8-r1b SETTLED=s8-r1 EFFECTIVE_RECORDS="$OUT/effective-records.jsonl"
 effective() { "$ROLE_CALL" records --plan "$PLAN" > "$EFFECTIVE_RECORDS.tmp" && mv -f "$EFFECTIVE_RECORDS.tmp" "$EFFECTIVE_RECORDS"; }
+# the observation the coordinator uses for the next call: the newest record (in ledger order) with
+# a kept stream; it must be younger than 7 days minus a 10-minute margin (review 4b427c5 F-3)
+deadline() { # what is about to be sent
+  effective || stop "the ledger's effective records do not read"
+  python3 -I - "$EFFECTIVE_RECORDS" "$1" <<'PY' || stop "$1: the observation is too old (above)"
+import json, sys, time, datetime
+recs = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+newest = next(r for r in reversed(recs) if (r.get("stream") or {}).get("path") and isinstance(r.get("ended_unix"), int))
+end = newest["ended_unix"] + 604800
+left = end - 600 - int(time.time())
+iso = datetime.datetime.utcfromtimestamp(end).strftime("%Y-%m-%dT%H:%M:%SZ")
+print(f"{sys.argv[2]}: observation = {newest['attempt_id']}'s stream, valid until {iso} ({left // 60} min left before the margin)")
+sys.exit(0 if left > 0 else 1)
+PY
+}
+# the spare of s8-r1b is a person's and replaces s8-r1
+spare_check() {
+  python3 -I - "$EFFECTIVE_RECORDS" <<'PY' || stop "s8-r1b is not the spare replacing s8-r1"
+import json, sys
+r = [x for x in (json.loads(l) for l in open(sys.argv[1]) if l.strip()) if x.get("attempt_id") == "s8-r1b"][0]
+s = r.get("spare") or {}
+print("s8-r1b spare: replaces", s.get("replaces"), "by", (s.get("by") or {}).get("kind"), (s.get("by") or {}).get("name"))
+sys.exit(0 if s.get("replaces") == "s8-r1" and (s.get("by") or {}).get("kind") == "user" else 1)
+PY
+}
 # after a delivery was accepted: wait, settle, the answers, every check (run-step8.sh run_one's tail)
 after() { # tag role assignment attempt port
   local tag=$1 role=$2 aid=$3 att=$4 port=$5
@@ -55,10 +80,18 @@ run_one() { # tag role assignment attempt key port decision op prompt-file
 case "$PHASE" in
 settle)
   extra=(); [ "${DRY:-0}" = 1 ] && extra=(--dry-run)
-  out=$("$ROLE_CALL" settle --plan "$PLAN" --attempt s8-r1 --transcript "${TRANSCRIPT:?}" \
+  err=$(mktemp)
+  if ! out=$("$ROLE_CALL" settle --plan "$PLAN" --attempt s8-r1 --transcript "${TRANSCRIPT:?}" \
     --original-path "${ORIGINAL_PATH:?}" --original-sha256 "${ORIGINAL_SHA256:?}" --decision "${DECISION:?}" \
-    --independent-check "${CHECK_REPORT:?}" --independent-verdict "${CHECK_VERDICT:?}" "${extra[@]}") \
-    || stop "the settlement was refused (nothing written)"
+    --independent-check "${CHECK_REPORT:?}" --independent-verdict "${CHECK_VERDICT:?}" "${extra[@]}" 2> "$err"); then
+    why=$(cat "$err"); rm -f "$err"; n=$(wc -l < "$LEDGER/records.jsonl")
+    # review 4b427c5 F-6: an appended line whose read-back failed is not "nothing written"
+    case "$why" in
+    *"was appended"*) stop "settle FAILED AFTER APPENDING (records.jsonl now $n lines): the ledger refuses until a person inspects it: $why";;
+    *) stop "the settlement was refused, nothing written (records.jsonl $n lines): $why";;
+    esac
+  fi
+  rm -f "$err"
   printf '%s\n' "$out" | head -1
   effective || stop "the ledger's effective records do not read"
   if [ "${DRY:-0}" != 1 ]; then
@@ -102,7 +135,7 @@ sys.exit(0 if s.get("policy") == "guard_stop_on_old_rule_warning" and r["usage"]
 PY
   ;;
 r1b-body)
-  effective || stop "the ledger's effective records do not read"
+  deadline s8-r1b
   python3 -I - "$EFFECTIVE_RECORDS" <<'PY' || stop "s8-r1 is not settled: the spare cannot replace it"
 import json, sys
 r = [x for x in (json.loads(l) for l in open(sys.argv[1]) if l.strip()) if x.get("attempt_id") == "s8-r1"][0]
@@ -143,19 +176,19 @@ r1b-check)
   [ "$got" = "('resume_allowed', 'start', 'accepted')" ] || stop "s8-r1b: the delivery answered $got: $(head -c 600 "$OUT/r1b.json")"
   echo "s8-r1b: $got"
   after r1b development S8-DEV-A1 s8-r1b "$PORT_DEV"
-  python3 -I - "$EFFECTIVE_RECORDS" <<'PY' || stop "s8-r1b is not the spare replacing s8-r1"
-import json, sys
-r = [x for x in (json.loads(l) for l in open(sys.argv[1]) if l.strip()) if x.get("attempt_id") == "s8-r1b"][0]
-s = r.get("spare") or {}
-print("s8-r1b spare: replaces", s.get("replaces"), "by", (s.get("by") or {}).get("kind"), (s.get("by") or {}).get("name"))
-sys.exit(0 if s.get("replaces") == "s8-r1" and (s.get("by") or {}).get("kind") == "user" else 1)
-PY
+  spare_check
   ;;
 r2g1)
-  OBS_UNIX=${OBS_UNIX:-$R1_END}
-  [ "$(date +%s)" -lt $((OBS_UNIX + 604800 - 600)) ] || stop "the observation (s8-r1's stream) is too old (deadline $(date -u -d @$((OBS_UNIX + 604800)) +%FT%TZ))"
+  # review 4b427c5 F-2: R1b's checks again first (the answers r1b-check saved), nothing is sent
+  # unless every one of them holds; R2's own checks gate G1 (run_one stops on any)
+  [ -s "$OUT/status-s8-r1b.json" ] && [ -s "$OUT/chain-S8-DEV-A1-s8-r1b.json" ] || stop "no r1b-check answers in $OUT: run r1b-check first"
+  effective || stop "the ledger's effective records do not read"
+  python3 -I "$HERE/check-run.py" "$LEDGER" "$OUT" s8-r1b development S8-DEV-A1 || stop "s8-r1b: a run check fails: no R2 (above)"
+  spare_check
+  deadline s8-r2
   run_one r2 development S8-DEV-A1 s8-r2 s8-dlv-r2-0001 "$PORT_DEV" resume_allowed reconnect "$PROMPTS/R2.txt"
   python3 -I "$HERE/check-run.py" --g1-prompt "$LEDGER" "$PROMPTS/G1-head.txt" "$OUT/G1.txt" || stop "G1 prompt (above)"
+  deadline s8-g1
   run_one g1 guardrail S8-GR-A1 s8-g1 s8-dlv-g1-0001 "$PORT_GR" no_checkpoint start "$OUT/G1.txt"
   echo "R1b, R2 and G1 recorded and checked"
   ;;

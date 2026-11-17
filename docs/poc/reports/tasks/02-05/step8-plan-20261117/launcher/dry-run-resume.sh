@@ -132,7 +132,6 @@ assert r["usage"]["run"]["state"] == "unmeasured" and r["stop_required"] is True
 print("  ", r["stop_reason"][:160])
 PY
 R1_SID=$(python3 -I -c "import json,sys; print(json.loads(open(sys.argv[1]).readline())['session']['session_id'])" "$LEDGER/records.jsonl")
-R1_END=$(python3 -I -c "import json,sys; print(json.loads(open(sys.argv[1]).readline())['ended_unix'])" "$LEDGER/records.jsonl")
 bash "$HERE/coord-switch.sh" capture "$W/coord.pid" "$W/bin-old/ieo-coord" "$CPORT" "$W/private/coord-old" >/dev/null; ok $? "capture of the running old coordinator (like private/s8/coord-778ee47)"
 # the settlement is pinned to the real s8-r1 (budget, attempt, session, stream SHA-256); this
 # synthetic R1 is admitted by a test pin, which only these debug binaries honour (release builds
@@ -142,7 +141,7 @@ R1_STREAM_SHA=$(python3 -I -c "import json,sys; print(json.loads(open(sys.argv[1
 export IEO_SETTLEMENT_TEST_PINS="02-05|s8-r1|$R1_SID|$R1_STREAM_SHA"
 chmod u+w "$W/private/coord-old/env0"; printf 'IEO_SETTLEMENT_TEST_PINS=%s\0' "$IEO_SETTLEMENT_TEST_PINS" >> "$W/private/coord-old/env0"; chmod 0400 "$W/private/coord-old/env0"
 # ---- B. copies, SHA256SUMS, the rule change ----
-bash "$HERE/make-resume-copies.sh" "$ROOT" "$W/D" "$W/bin-new" "$W/rules.json" > "$OUT/copies.log" 2>&1; ok $? "make-resume-copies.sh: $(tail -1 "$OUT/copies.log")"
+OLD_SUPERVISOR="$W/bin-old/ieo-supervisor" bash "$HERE/make-resume-copies.sh" "$ROOT" "$W/D" "$W/bin-new" "$W/rules.json" > "$OUT/copies.log" 2>&1; ok $? "make-resume-copies.sh: $(tail -1 "$OUT/copies.log")"
 L="$W/D/step8-resume/launcher"
 SUMS=$(python3 -I -c "import json,sys; print(json.load(open(sys.argv[1]))['sums'])" "$W/rules.json")
 ( cd "$W/D" && echo "$SUMS  step8-ops/SHA256SUMS" | sha256sum --quiet --strict -c - && sha256sum --quiet --strict -c step8-ops/SHA256SUMS && find step8-resume step8-ops -perm /222 | wc -l | grep -qx 0 ); ok $? "the gate passes on the copies (self-hash, every file, read-only)"
@@ -162,7 +161,16 @@ assert s["permissions"]["deny"] and s["hooks"] == {"SessionStart": []} and s["pe
 PY
 python3 -I "$L/apply-perm-resume.py" "$W/rules.json" "$W/settings.json" | grep -q "already applied"; ok $? "apply-perm-resume.py again: already applied, nothing changed"
 # ---- C. the new supervisor in the same containers; the coordinator switch ----
-NEWSUP=$(sha "$W/bin-new/ieo-supervisor")
+NEWSUP=$(sha "$W/bin-new/ieo-supervisor"); OLDSUP=$(sha "$W/bin-old/ieo-supervisor")
+# PR #91 review 4b427c5 F-1: a swap that fails after the stop (a binary that does not start), then
+# the rollback from that state, and from a state with one container stopped
+mkdir -p "$W/bin-bad"; printf '#!/bin/sh\nexit 1\n' > "$W/bin-bad/ieo-supervisor"; chmod 755 "$W/bin-bad/ieo-supervisor"
+bash "$L/restart-roles.sh" swap "$W/run" "$W/bin-bad/ieo-supervisor" "$(sha "$W/bin-bad/ieo-supervisor")" > "$OUT/swap-bad.log" 2>&1; rc=$?
+[ $rc = 3 ] && grep -qx "ROLLBACK: bash $L/restart-roles.sh rollback $W/run $OLDSUP" "$OUT/swap-bad.log"; ok $? "a failed swap stops and prints the exact rollback: $(grep -m1 STOP "$OUT/swap-bad.log" | cut -c1-80)"
+bash "$L/restart-roles.sh" rollback "$W/run" "$(printf '0%.0s' $(seq 64))" > "$OUT/rollback-wrong.log" 2>&1; [ $? = 3 ] && grep -q "not the expected" "$OUT/rollback-wrong.log"; ok $? "rollback with another expected SHA-256: refused, nothing changed"
+bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-half.log" 2>&1; ok $? "rollback from the failed swap (containers exited): $(grep -c 'up, idle' "$OUT/rollback-half.log") roles up and idle on the old binary"
+podman stop "ieo-s8dry-ieo-poc-test-guardrail" >/dev/null
+bash "$L/restart-roles.sh" rollback "$W/run" "$OLDSUP" > "$OUT/rollback-stopped.log" 2>&1; ok $? "rollback with one container stopped: $(grep -c 'up, idle' "$OUT/rollback-stopped.log") roles up and idle"
 bash "$L/restart-roles.sh" swap "$W/run" "$W/bin-new/ieo-supervisor" "$NEWSUP" > "$OUT/restart-roles.log" 2>&1; ok $? "restart-roles.sh swap: $(grep -c 'up, idle' "$OUT/restart-roles.log") roles up and idle on the new binary"
 podman unshare test -s "$W/run/development/state/checkpoint.json"; ok $? "the development volume kept its local checkpoint (s8-r1 after_run)"
 bash "$L/coord-switch.sh" stop "$W/coord.pid" 900 >/dev/null; ok $? "old coordinator stopped"
@@ -182,14 +190,25 @@ DRY=1 bash "$L/run-step8-resume.sh" settle > "$OUT/settle-dry.log" 2>&1; rc=$?
 bash "$L/run-step8-resume.sh" settle > "$OUT/settle.log" 2>&1; ok $? "settle: $(tail -1 "$OUT/settle.log" | cut -c1-140)"
 grep -q "coordinator's reading: s8-r1 measured | settlement guard_stop_on_old_rule_warning" "$OUT/settle.log"; ok $? "after the settlement the coordinator's own budget plan reads s8-r1 as settled"
 [ -f "$LEDGER/children/s8-r1/settlement-transcript.jsonl" ] && [ -f "$LEDGER/children/s8-r1/independent-check.md" ]; ok $? "the transcript and the report copy are kept in the ledger"
-bash "$L/run-step8-resume.sh" settle > /dev/null 2>&1; [ $? = 3 ]; ok $? "settle again: refused (already settled, nothing written)"
+bash "$L/run-step8-resume.sh" settle > "$OUT/settle-again.log" 2>&1; [ $? = 3 ] && grep -q "refused, nothing written" "$OUT/settle-again.log"; ok $? "settle again: refused (already settled, nothing written)"
+# PR #91 review 4b427c5 F-6: a failure after the append is reported as such
+printf '#!/bin/sh\necho "ieo-role-call: the settlement line was appended, but the ledger does not read back with it: x" >&2\nexit 1\n' > "$W/fake-role-call"; chmod 755 "$W/fake-role-call"
+ROLE_CALL="$W/fake-role-call" bash "$L/run-step8-resume.sh" settle > "$OUT/settle-appended.log" 2>&1; [ $? = 3 ] && grep -q "FAILED AFTER APPENDING (records.jsonl now" "$OUT/settle-appended.log"; ok $? "a settle that fails after appending says so (not 'nothing written')"
 bash "$L/run-step8-resume.sh" r1b-body > "$OUT/r1b-body.log" 2>&1; ok $? "r1b-body: the body and the user's command"
 grep -q "Idempotency-Key: s8-dlv-r1b-0001" "$OUT/r1b-body.log"; ok $? "the printed user command carries the R1b key and the user's token file"
+grep -q "s8-r1b: observation = s8-r1's stream" "$OUT/r1b-body.log"; ok $? "r1b-body checks the observation deadline against s8-r1's stream (the newest record) before printing the user's command"
 # the user's command, with the dry run's user principal (same request, same key)
 st=$(req r1b user-dry POST /v0/repos/ieo-poc-test/roles/development/deliveries "$OUT/r1b-body.json" s8-dlv-r1b-0001); ok "$([ "$st" = 201 ] || [ "$st" = 200 ]; echo $?)" "the user's R1b delivery ($st)"
 bash "$L/run-step8-resume.sh" r1b-check > "$OUT/r1b-check.log" 2>&1; ok $? "r1b-check: $(grep -m1 's8-r1b:' "$OUT/r1b-check.log") · $(grep -m1 'spare:' "$OUT/r1b-check.log")"
 grep -q "WARNING s8-r1b" "$OUT/r1b-check.log"; ok $? "R1b got the allowed_warning event: recorded and printed as a warning, not a stop"
-OBS_UNIX=$R1_END bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1.log" 2>&1; ok $? "r2g1: $(tail -1 "$OUT/r2g1.log")"
+# PR #91 review 4b427c5 F-2: if a check of R1b fails, r2g1 sends nothing
+CH="$OUT/chain-S8-DEV-A1-s8-r1b.json"; cp "$CH" "$CH.kept"
+python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); [l.update(taken_over=False) for l in d['links']]; json.dump(d, open(sys.argv[1], 'w'))" "$CH"
+bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1-refused.log" 2>&1; rc=$?
+[ $rc = 3 ] && grep -q "s8-r1b: a run check fails: no R2" "$OUT/r2g1-refused.log" && [ ! -e "$OUT/r2-body.json" ] && ! grep -q '"attempt_id":"s8-r2"' "$LEDGER/records.jsonl"; ok $? "r2g1 refuses when a check of R1b fails: nothing sent (exit $rc)"
+mv -f "$CH.kept" "$CH"
+bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1.log" 2>&1; ok $? "r2g1: $(tail -1 "$OUT/r2g1.log")"
+grep -q "s8-r2: observation = s8-r1b's stream" "$OUT/r2g1.log" && grep -q "s8-g1: observation = s8-r2's stream" "$OUT/r2g1.log"; ok $? "the observation deadline is checked against the newest stream before R2 (s8-r1b) and G1 (s8-r2)"
 # the old check (raw ledger lines) would count s8-r1's original line as unmeasured; the effective records do not
 ( unset EFFECTIVE_RECORDS; R1_ATTEMPT=s8-r1b python3 -I "$L/check-run.py" "$LEDGER" "$OUT" s8-r2 development S8-DEV-A1 > "$OUT/raw-check.log" 2>&1 ); rc=$?
 [ $rc = 1 ] && grep -q "s8-r1: unmeasured" "$OUT/raw-check.log"; ok $? "check-run.py on the raw lines would fail on s8-r1's original line (why EFFECTIVE_RECORDS)"

@@ -1112,3 +1112,59 @@ fn a_refused_settlement_creates_no_directory_anywhere() {
         "created directories removed"
     );
 }
+
+/// PR #91 review 4b427c5 F-4: a copy whose write fails (here the file size limit, as a full disk
+/// would) leaves no partial file and no directory; nothing is appended.
+#[test]
+fn a_failed_copy_write_leaves_nothing() {
+    // a transcript larger than the 1 KiB file size limit below
+    let mut tr = transcript(Some(EXIT), 1);
+    for _ in 0..40 {
+        tr = format!(
+            "{}\n{tr}",
+            json!({"type": "custom-title", "sessionId": SID})
+        );
+    }
+    assert!(tr.len() > 2048);
+    let l = ledger("enospc", WARN, &tr, |_| {});
+    let plan_file = l.t.0.join("plan.json");
+    std::fs::write(
+        &plan_file,
+        json!({"budget": "02-05", "ledger_dir": l.t.0.join("ledger"),
+        "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}})
+        .to_string(),
+    )
+    .expect("plan");
+    let o = std::process::Command::new("bash")
+        .args(["-c", "trap '' XFSZ; ulimit -f 1; exec \"$0\" \"$@\""])
+        .arg(env!("CARGO_BIN_EXE_ieo-role-call"))
+        .args(["settle", "--plan"])
+        .arg(&plan_file)
+        .args(["--attempt", "s8-r1", "--transcript"])
+        .arg(&l.copy)
+        .args([
+            "--original-path",
+            "/role/x.jsonl",
+            "--original-sha256",
+            &l.copy_sha,
+        ])
+        .args(["--decision", DECISION, "--independent-check"])
+        .arg(&l.report)
+        .args(["--independent-verdict", "CONFIRMED WITH CAVEAT"])
+        .env("IEO_SETTLEMENT_TEST_PINS", &l.pin)
+        .output()
+        .expect("run");
+    assert_eq!(
+        o.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&o.stderr).contains("partial file removed"),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(!l.t.0.join("ledger/children").exists());
+    assert_eq!(lines(&l).len(), 1);
+}

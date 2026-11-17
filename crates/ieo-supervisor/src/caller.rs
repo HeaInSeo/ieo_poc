@@ -1840,16 +1840,23 @@ pub fn settle(
         }
     };
     append(plan, &s)?;
-    // the ledger must read back with the settlement applied
-    let recs = records(plan)?;
+    // the ledger must read back with the settlement applied; a failure here is after the append
+    // (PR #91 review 4b427c5 F-6): the line stays and the ledger refuses until a person looks
+    let after_append = |why: String| {
+        format!(
+            "the settlement line was appended, but the ledger does not read back with it: {why}; \
+             the ledger now refuses every call until a person inspects records.jsonl"
+        )
+    };
+    let recs = records(plan).map_err(after_append)?;
     if recs
         .iter()
         .find(|x| x["attempt_id"] == attempt)
         .is_none_or(|x| x["settlement"]["policy"] != crate::settlement::POLICY)
     {
-        return Err(format!(
-            "{attempt}: the settlement did not apply on reading back"
-        ));
+        return Err(after_append(format!(
+            "{attempt}: the settlement did not apply"
+        )));
     }
     drop(lock);
     Ok(s)
