@@ -1015,3 +1015,47 @@ fn the_ledger_is_one_place_however_it_is_spelled_and_has_no_symlink_inside() {
     assert_eq!(std::fs::read_dir(&outside).expect("ls").count(), 0);
     assert_eq!(lines(&l).len(), 1);
 }
+
+/// `ieo-role-call records`: the effective records (the settled run as it counts), read only;
+/// exit 2 while a call is in flight.
+#[test]
+fn the_records_command_prints_the_settled_run() {
+    let l = r1_ledger("records");
+    let plan_file = l.t.0.join("plan.json");
+    std::fs::write(
+        &plan_file,
+        json!({"budget": "02-05", "ledger_dir": l.t.0.join("ledger"),
+        "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}})
+        .to_string(),
+    )
+    .expect("plan");
+    let records = || {
+        std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"))
+            .args(["records", "--plan"])
+            .arg(&plan_file)
+            .env("IEO_SETTLEMENT_TEST_PINS", &l.pin)
+            .output()
+            .expect("run")
+    };
+    let first = |o: &std::process::Output| -> Value {
+        serde_json::from_slice(o.stdout.split(|b| *b == b'\n').next().unwrap_or(b"{}"))
+            .expect("record")
+    };
+    let o = records();
+    assert!(o.status.success());
+    assert_eq!(first(&o)["usage"]["run"]["state"], "unmeasured");
+    settle(&l, false).expect("settle");
+    let o = records();
+    assert!(o.status.success());
+    let out = String::from_utf8_lossy(&o.stdout);
+    assert_eq!(
+        out.lines().count(),
+        1,
+        "the settlement line is no record of its own"
+    );
+    let r = first(&o);
+    assert_eq!(r["usage"]["run"]["state"], "measured");
+    assert_eq!(r["settlement"]["policy"], settlement::POLICY);
+    std::fs::write(l.t.0.join("ledger/inflight.json"), "{}").expect("w");
+    assert_eq!(records().status.code(), Some(2));
+}
