@@ -7,6 +7,11 @@ pub enum Role {
     /// (§10 item 2); `None` records "not supplied".
     Development {
         append_system_prompt_file: Option<String>,
+        /// Read-only tool restriction (02-05 step 8, PR #86 review 3e4e3d6 M-1): when set, the
+        /// CLI offers only [`DEVELOPMENT_READ_TOOLS`], reads are scoped to the work tree and the
+        /// supervisor's own paths are denied. Unset (the default, every accepted run so far): no
+        /// tool options, as before.
+        read_only: bool,
     },
     Guardrail,
 }
@@ -23,6 +28,21 @@ pub const GUARDRAIL_ALLOWED: [&str; 4] = [
 
 /// Guardrail deny rules (§4.1).
 pub const GUARDRAIL_DISALLOWED: [&str; 6] = [
+    "Read(//run/ieo/**)",
+    "Read(//etc/ieo/**)",
+    "Read(//state/claude/**)",
+    "Read(//state/home/**)",
+    "Read(//proc/**)",
+    "Bash",
+];
+
+/// The tools a read-only development run is offered (`--tools`): no child agents, no shell,
+/// no writes, no network.
+pub const DEVELOPMENT_READ_TOOLS: &str = "Read,Grep,Glob";
+
+/// Deny rules of a read-only development run: the supervisor's credentials, configuration and
+/// state, and the process table (the Guardrail's list without its own paths).
+pub const DEVELOPMENT_READ_ONLY_DISALLOWED: [&str; 6] = [
     "Read(//run/ieo/**)",
     "Read(//etc/ieo/**)",
     "Read(//state/claude/**)",
@@ -69,12 +89,28 @@ pub fn build(role: &Role, repo: &str, session_id: &str, resume: bool) -> Vec<Str
     match role {
         Role::Development {
             append_system_prompt_file,
+            read_only,
         } => {
-            // Not here yet: the development role's --allowedTools/--disallowedTools lists. §4.1
-            // names them, but their content is open (§9) and is set with 03-02; until then the
-            // development role relies on the read-only settings and permission mode.
+            // The general development lists of §4.1 are still open (§9, set with 03-02). A
+            // read-only run (02-05 step 8) gets a fixed restriction instead.
             if let Some(f) = append_system_prompt_file {
                 a.extend(["--append-system-prompt-file".into(), f.clone()]);
+            }
+            if *read_only {
+                a.push("--disable-slash-commands".into());
+                a.extend(["--tools".into(), DEVELOPMENT_READ_TOOLS.into()]);
+                a.push("--allowedTools".into());
+                a.extend(
+                    ["Read", "Grep", "Glob"]
+                        .iter()
+                        .map(|t| format!("{t}(//state/work/{repo}/**)")),
+                );
+                a.push("--disallowedTools".into());
+                a.extend(
+                    DEVELOPMENT_READ_ONLY_DISALLOWED
+                        .iter()
+                        .map(|s| s.to_string()),
+                );
             }
         }
         Role::Guardrail => {
