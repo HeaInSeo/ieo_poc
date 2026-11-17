@@ -121,6 +121,46 @@ pub fn finishing() -> usize {
     FINISHING.load(Ordering::SeqCst)
 }
 
+/// Wait until nothing is being finished, re-reading the bound while it waits (PR #83 review
+/// 67b5cae L-1: a run counted during the wait extends it): with `IEO_COORD_SHUTDOWN_WAIT_SECS`
+/// set, that long; else at least [`SHUTDOWN_WAIT_DEFAULT_SECS`] and until the latest counted
+/// bound. The number still being finished when it returns (0: all records written).
+pub fn wait_finishing_bounded() -> usize {
+    let t0 = std::time::Instant::now();
+    let fixed = std::env::var("IEO_COORD_SHUTDOWN_WAIT_SECS")
+        .ok()
+        .and_then(|w| w.parse::<u64>().ok())
+        .map(Duration::from_secs);
+    loop {
+        let n = finishing();
+        if n == 0 {
+            return 0;
+        }
+        let latest = *LATEST.lock().unwrap_or_else(|e| e.into_inner());
+        if bound_reached(t0.elapsed(), fixed, latest, std::time::Instant::now()) {
+            return n;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// Whether a shutdown wait that began `elapsed` ago is over: the fixed bound when one is set,
+/// else at least the default and not before the latest counted bound.
+fn bound_reached(
+    elapsed: Duration,
+    fixed: Option<Duration>,
+    latest: Option<std::time::Instant>,
+    now: std::time::Instant,
+) -> bool {
+    match fixed {
+        Some(f) => elapsed >= f,
+        None => {
+            elapsed >= Duration::from_secs(SHUTDOWN_WAIT_DEFAULT_SECS)
+                && latest.is_none_or(|l| now >= l)
+        }
+    }
+}
+
 /// Wait until no accepted run is being finished, at most `limit`; the number still being
 /// finished when it returns (0: all records written).
 pub fn wait_finishing(limit: Duration) -> usize {
@@ -145,6 +185,16 @@ const BODY_KEYS: [&str; 9] = [
     "recovery_id",
     "spare",
 ];
+
+/// A lowercase UUID in its 8-4-4-4-12 form: the only session id `claude --session-id` takes
+/// (runtime contract evidence `claude-help.txt`).
+fn session_uuid(s: &str) -> bool {
+    s.len() == 36
+        && s.char_indices().all(|(i, c)| match i {
+            8 | 13 | 18 | 23 => c == '-',
+            _ => c.is_ascii_digit() || ('a'..='f').contains(&c),
+        })
+}
 
 /// An id the supervisor accepts as a file name and CLI argument (its `safe_id`).
 fn safe_id(s: &str) -> bool {
@@ -736,6 +786,16 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     };
+    // a start becomes `claude --session-id <session_id>`, which takes a UUID only: anything else
+    // fails at once and would spend a budgeted run (PR #83 review 67b5cae M-1). Nothing is called
+    if op == "start" && !session_uuid(d["session_id"].as_str().unwrap_or_default()) {
+        let mut o = base("not_called");
+        o.reasons =
+            json!(["a start's session_id must be a new lowercase UUID (claude --session-id)"]);
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
+    }
     let budget_refused = |why: String| {
         let mut o = base("budget_refused");
         o.reasons = json!([why]);
@@ -899,6 +959,16 @@ pub fn deliver(
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
+    // the stop again, right before the call (PR #83 review 67b5cae L-1): a delivery that passed the
+    // first check before the signal starts nothing once the coordinator is stopping
+    if STOPPING.load(Ordering::SeqCst) {
+        drop(adm);
+        let mut o = base("not_called");
+        o.reasons = json!(["the coordinator is stopping: nothing was called"]);
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
+    }
     let mut o = base("unknown");
     o.github = github.clone();
     o.limits = Some(sent["limits"].clone());
@@ -1185,6 +1255,22 @@ mod tests {
         assert_eq!(got["spare"]["by"]["kind"], "service");
     }
 
+    /// PR #83 review 67b5cae M-1: a start's session id is a lowercase UUID.
+    #[test]
+    fn a_start_session_is_a_lowercase_uuid() {
+        assert!(session_uuid("0f8fad5b-d9cb-469f-a165-70867728950e"));
+        for bad in [
+            "s1",
+            "0F8FAD5B-D9CB-469F-A165-70867728950E",
+            "0f8fad5bd9cb469fa16570867728950e",
+            "0f8fad5b-d9cb-469f-a165-70867728950",
+            "0f8fad5b-d9cb-469f-a165-70867728950g",
+            "0f8fad5b_d9cb-469f-a165-70867728950e",
+        ] {
+            assert!(!session_uuid(bad), "{bad}");
+        }
+    }
+
     /// Review 63fefc1 M-1 (a): the shutdown waits for the runs being finished, bounded.
     #[test]
     fn the_shutdown_waits_for_the_runs_being_finished() {
@@ -1197,7 +1283,35 @@ mod tests {
         // a counted run with a longer bound extends the wait to it
         let long = Finishing::start(Duration::from_secs(5_000));
         assert!(shutdown_wait() >= Duration::from_secs(4_990));
-        drop(long);
+        // PR #83 review 67b5cae mutation A: a shorter run counted later keeps the latest bound
+        let short = Finishing::start(Duration::from_secs(1));
+        assert!(shutdown_wait() >= Duration::from_secs(4_990));
+        drop((long, short));
+        // review 67b5cae L-1: the bound is re-read while waiting
+        let now = std::time::Instant::now();
+        let d = SHUTDOWN_WAIT_DEFAULT_SECS;
+        assert!(!bound_reached(Duration::from_secs(d - 1), None, None, now));
+        assert!(bound_reached(Duration::from_secs(d), None, None, now));
+        let later = now + Duration::from_secs(100);
+        assert!(!bound_reached(
+            Duration::from_secs(d),
+            None,
+            Some(later),
+            now
+        ));
+        assert!(bound_reached(Duration::from_secs(d), None, Some(now), now));
+        assert!(bound_reached(
+            Duration::from_secs(5),
+            Some(Duration::from_secs(5)),
+            Some(later),
+            now
+        ));
+        assert!(!bound_reached(
+            Duration::from_secs(4),
+            Some(Duration::from_secs(5)),
+            None,
+            now
+        ));
         let g = Finishing::start(Duration::from_secs(1));
         assert!(finishing() >= 1);
         let t0 = std::time::Instant::now();

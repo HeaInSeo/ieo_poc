@@ -15,7 +15,10 @@ info:
     already accepted are finished and recorded (bounded, `IEO_COORD_SHUTDOWN_WAIT_SECS`; PR #82 review 63fefc1 M-1
     (a)). Default (PR #82 review 4531772 L-3): 780 s = the 02-05 run window 600 s + 2 × the caller's 60 s finishing
     margin + 60 s slack, or longer up to the bound of a run in progress with a longer window. A delivery already
-    past the stop check is waited for too (L-4).
+    past the stop check is waited for too (L-4), and the stop is checked again right before the supervisor call
+    (PR #83 review 67b5cae L-1: `not_called`, nothing called). A delivery whose judgment chooses a `start` with a
+    `session_id` that is not a lowercase UUID (`claude --session-id` takes only a UUID) is recorded `not_called` with
+    the reason and calls nothing (PR #83 review 67b5cae M-1).
     0.17.0 (02-05 budget PR, additive; user decisions 2026-11-15 (나) and 2026-11-17 (나) with its addition):
     deliverAssignment takes an optional `spare` {reason, replaces, evidence_ref}: the 02-05 budget's one development
     spare run. The shared budget check decides (outcome `budget_refused` with the reason otherwise): development runs

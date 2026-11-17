@@ -233,6 +233,22 @@ fn unix_now() -> u64 {
         .as_secs()
 }
 
+/// A delivery's session id as a lowercase UUID (a start's `claude --session-id` takes only a
+/// UUID; PR #83 review 67b5cae M-1): the test's short name, fixed per name.
+fn sid(name: &str) -> String {
+    let h = name.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+    });
+    format!(
+        "{:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}",
+        h >> 32,
+        (h >> 16) & 0xffff,
+        h & 0xfff,
+        (h >> 4) & 0xfff,
+        h & 0xffff_ffff_ffff
+    )
+}
+
 #[test]
 fn the_chain_links_delivery_takeover_and_first_action() {
     e2e("http");
@@ -435,7 +451,7 @@ fn e2e(transport: &str) {
     };
     let dbody = |attempt: &str, generation: u64, session: &str, extra: Value| {
         let mut v = json!({"assignment_id": "A1", "generation": generation,
-                           "attempt_id": attempt, "session_id": session, "prompt": "hi"});
+                           "attempt_id": attempt, "session_id": sid(session), "prompt": "hi"});
         for (k, x) in extra.as_object().expect("obj") {
             v[k] = x.clone();
         }
@@ -640,7 +656,12 @@ fn e2e(transport: &str) {
             t["session_id"].as_str(),
             t["evidence_level"].as_str()
         ),
-        (Some(d1_id.as_str()), Some(1), Some("s1"), Some("claim")),
+        (
+            Some(d1_id.as_str()),
+            Some(1),
+            Some(sid("s1").as_str()),
+            Some("claim")
+        ),
         "{t}"
     );
     assert_eq!(
@@ -783,8 +804,8 @@ fn e2e(transport: &str) {
         .find(|t| t["delivery_id"] == d3_id.as_str())
         .cloned()
         .expect("takeover of d3");
-    assert_eq!(t3["session_id"], "s1", "{t3}");
-    assert_eq!(d3["session_id"], "s9");
+    assert_eq!(t3["session_id"], sid("s1"), "{t3}");
+    assert_eq!(d3["session_id"], sid("s9"));
     assert_eq!(link(&ch, &d3_id)["taken_over"], true);
     // the last actual action is still the one of a1
     assert_eq!(
@@ -847,7 +868,7 @@ fn e2e(transport: &str) {
         vec![json!(d4_id)]
     );
     assert_eq!(ch1["takeovers"][0]["delivery_id"], d4_id.as_str());
-    assert_eq!(ch1["takeovers"][0]["session_id"], "s2");
+    assert_eq!(ch1["takeovers"][0]["session_id"], sid("s2"));
     assert_eq!(
         (
             ch1["first_actions"][0]["kind"].as_str(),

@@ -126,7 +126,7 @@ fn run() -> Result<(), String> {
                             wait.as_secs()
                         );
                     }
-                    let left = ieo_coord::delivery::wait_finishing(wait);
+                    let left = ieo_coord::delivery::wait_finishing_bounded();
                     if left > 0 {
                         eprintln!(
                             "ieo-coord: stopping with {left} run(s) not finished: their ledger \
@@ -164,7 +164,7 @@ fn run() -> Result<(), String> {
             }
             // review 4531772 L-4: a run started in the moment between the wait and the unblock is
             // still waited for here (its record; the role cannot report to a closed server)
-            let left = ieo_coord::delivery::wait_finishing(ieo_coord::delivery::shutdown_wait());
+            let left = ieo_coord::delivery::wait_finishing_bounded();
             if left > 0 {
                 eprintln!("ieo-coord: exiting with {left} run(s) not finished");
             }
