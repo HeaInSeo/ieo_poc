@@ -4,8 +4,8 @@
 | --- | --- |
 | 근거 | [사용자 결정 2026-11-17 단계 8 L01](../../../../User_Decisions_2026-11-17_step8-l01.md)(L01 값 승인, 실행안 요청, 묶음 승인), [단계 8 절차서](../step8-runbook-20261117/RUNBOOK.md), [예산 결정 2026-11-15](../../../../User_Decisions_2026-11-15_0205-x08.md) §2.1, [예비 결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md), [복구 결정 2026-11-16](../../../../User_Decisions_2026-11-16_recovery.md) |
 | 기준 | main 05cf16e(PR #85 병합). 실행은 이 실행안을 담은 PR의 병합 SHA(아래 **M**)의 빌드로 한다 |
-| 만든 방법 | 코드·문서와 원장 담당이 읽기 전용으로 확인한 사실(아래 “확인된 사실”)에서만 끌어냈다. 58090·55433·비밀·실행 기록은 보지 않았다. sprint 명세는 로컬 `ieo-spec check --executable`로 검사했고(§1.2), 실행에 쓰는 스크립트 전부([launcher/](launcher/): 역할 실행, 코디네이터 교체, 마이그레이션 예행, 회차 구동과 확인)를 시험 시스템에서만 처음부터 끝까지 예행했다: 778ee47 빌드의 “옛” 코디네이터와 고정 행 → 백업과 마이그레이션 예행 → 교체 → R1→R2→G1 → 멈춤 확인의 음성 시험 → 되돌리기(§4, 21개 확인 모두 통과) |
-| 개정 | v3: PR #86 검토 3e4e3d6 반영(§10). 개발 역할의 도구 제한을 supervisor가 강제(코드 750e904), 자동 되돌리기에서 DB 복원 제거와 마이그레이션 예행, 옛 프로세스의 인자·환경 캡처와 정확한 정지·기동 명령, 실제 회차 구동 스크립트 |
+| 만든 방법 | 코드·문서와 원장 담당이 읽기 전용으로 확인한 사실(아래 “확인된 사실”)에서만 끌어냈다. 58090·55433·비밀·실행 기록은 보지 않았다. sprint 명세는 로컬 `ieo-spec check --executable`로 검사했고(§1.2), 실행에 쓰는 스크립트 전부([launcher/](launcher/): 역할 실행, 코디네이터 교체, 마이그레이션 예행, 회차 구동과 확인)를 시험 시스템에서만 처음부터 끝까지 예행했다: 778ee47 빌드의 “옛” 코디네이터와 고정 행 (로그인 셸처럼 내보낸 두 줄 셸 함수와 상대 경로 인자를 지닌 채) → 캡처와 백업·마이그레이션 예행 → 교체 → R1→R2→G1 → 멈춤 확인의 음성 시험 → 되돌리기(§4, 23개 확인 모두 통과) |
+| 개정 | v4: PR #86 검토 a5f9402 반영(§10.2): 옛 프로세스의 환경을 NUL 경계·작업 디렉터리째 그대로 되살림(셸 함수 제외, 값은 어떤 명령줄에도 없음), 02-04에서 쓴 규칙 형식, 실제 바인딩·새 `tokens.json`으로 하는 예행, cgroup 확인, §5.2 순서. v3: PR #86 검토 3e4e3d6 반영(§10.1). 개발 역할의 도구 제한을 supervisor가 강제(코드 750e904), 자동 되돌리기에서 DB 복원 제거와 마이그레이션 예행, 옛 프로세스의 인자·환경 캡처와 정확한 정지·기동 명령, 실제 회차 구동 스크립트 |
 | 표기 | **[읽기]** 읽기만. **[변경]** 실 시스템을 바꿈. **[모델]** 모델 호출. “실행 시 확인”은 실행 첫 단계에서 읽기 전용으로 확인하고, 다르면 멈추고 보고한다 |
 | 승인 | §8의 묶음 하나를 사용자가 승인하면 그 안의 단계는 다시 묻지 않는다. 멈춤 조건(§6.3)에 걸리면 멈추고 보고한다. 예비는 묶음 밖이다(건별 승인) |
 
@@ -91,9 +91,9 @@ printf '%s' "$(cat s8-<name>.token)" | sha256sum | cut -d' ' -f1   # 이 digest�
 
 ## 3. 백업과 마이그레이션 예행 [변경: 파일 쓰기와 시험 DB만, 영속 DB는 읽기]
 
-DB 이름·사용자(`<db>`·`<user>`)는 §5.2 단계 2에서 캡처한 `IEO_DB_URL`의 `user`·`dbname` 필드에서 읽는다(암호는 출력하지 않음).
+DB 이름·사용자(`<db>`·`<user>`)는 §5.2 단계 1에서 캡처한 `IEO_DB_URL`의 `user`·`dbname` 필드에서 읽는다(암호는 출력하지 않음).
 
-**백업**(§5.2 단계 1). 위치 `/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/backups/<UTC 시각>-pre-step8/`(`/opt`, `/home` 아님):
+**백업**(§5.2 단계 2). 위치 `/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/backups/<UTC 시각>-pre-step8/`(`/opt`, `/home` 아님):
 ```
 B=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/backups/$(date -u +%Y%m%dT%H%M%SZ)-pre-step8; mkdir -p -m 700 "$B"
 df -h /opt
@@ -105,11 +105,12 @@ podman exec ieo-poc-db psql -U <user> -d <db> -At -c "SELECT relname FROM pg_cla
   | while read -r t; do echo "$t=$(podman exec ieo-poc-db psql -U <user> -d <db> -Atc "SELECT count(*) FROM \"$t\"")"; done > "$B/live-counts.txt"
 ```
 
-**마이그레이션 예행**(§5.2 단계 1b, 검토 3e4e3d6 M-2). 라이브를 바꾸기 전에 그 덤프와 새 빌드 M으로 시험 DB(55432 컨테이너)에서만:
+**마이그레이션 예행**(§5.2 단계 4, 검토 3e4e3d6 M-2). 라이브를 바꾸기 전에 그 덤프와 새 빌드 M으로 시험 DB(55432 컨테이너)에서만:
 ```
-TEST_DB_PASSWORD_FILE=<시험 DB 암호 파일> launcher/rehearse-migration.sh "$B/ieo.dump" <M의 ieo-coord> 58291
+TEST_DB_PASSWORD_FILE=<시험 DB 암호 파일> TOKENS_FILE=<새 tokens.json> BINDINGS_FILE=<캡처한 --bindings 파일(절대 경로)> \
+  launcher/rehearse-migration.sh "$B/ieo.dump" <M의 ieo-coord> 58291 "$B/live-counts.txt"
 ```
-덤프를 새 시험 데이터베이스에 `pg_restore --exit-on-error`로 복원(백업이 실제로 복원됨을 확인) → 모든 표의 행 수 → M의 `ieo-coord migrate` → 행 수 다시(있던 표는 모두 같아야 함) → 새 표 11개와 `evidence.kind`의 `branch_head` → M의 `serve`가 그 복사본으로 상태 조회 200, SIGTERM에 0으로 끝남 → 시험 데이터베이스 삭제. 예행의 복원된 행 수는 `$B/live-counts.txt`와도 같아야 한다. 하나라도 아니면 멈춘다(아직 라이브는 바뀌지 않음). 실제 바인딩·병합한 `tokens.json`으로도 보려면 `SERVE_ARGS="--bindings <파일> --tokens <파일>"`.
+덤프를 새 시험 데이터베이스에 `pg_restore --exit-on-error`로 복원(백업이 실제로 복원됨을 확인) → 모든 표의 행 수가 `live-counts.txt`(백업 때 라이브 행 수)와 같음(스크립트가 비교) → M의 `ieo-coord migrate` → 행 수 다시(있던 표는 모두 같아야 함) → 새 표 11개와 `evidence.kind`의 `branch_head` → M의 `serve`가 그 복사본으로, **새 `tokens.json`과 실제 바인딩 파일로** 상태 조회 200(병합한 주체와 `check_bindings`를 라이브 기동 전에 확인), SIGTERM에 0으로 끝남 → 시험 데이터베이스 삭제(검토 a5f9402 L-9). 하나라도 아니면 멈춘다(아직 라이브는 바뀌지 않음).
 
 **복원은 묶음 밖이다.** 마이그레이션은 한 문(`batch_execute(schema.sql)`)이라 PostgreSQL이 하나의 암묵 트랜잭션으로 돌린다: 실패하면 DB는 그대로다. 그리고 바뀐 것이 모두 추가라 778ee47은 마이그레이션된 DB에서도 돈다(예행에서 확인, §4). 그래서 자동 되돌리기는 DB를 건드리지 않는다(§5.4). 덤프에서 되살리는 것이 필요하면 **사용자의 별도 결정**으로, 지금 DB를 지우지 않고 **새 이름**의 DB에 복원한 뒤 바꾼다:
 ```
@@ -125,25 +126,26 @@ podman exec -i ieo-poc-db pg_restore -U <user> -d <db>_restore_<시각> --exit-o
 | 파일 | 하는 일 |
 | --- | --- |
 | [run-step8-roles.sh](launcher/run-step8-roles.sh) | 역할 컨테이너 둘. `checkpoint_central` → 코디네이터(supervisor `agent` 토큰), 예산 `02-05`(몫 없음), `QUOTA_GROUP_ID` 필수(두 역할 항목 모두), 대상 커밋 파일만(`git archive <SHA>`, `.git`·자격 없음)을 개발 `/state/work/ieo-poc-test`·Guardrail `/state/review/ieo-poc-test`에 **`:ro` 바인드 마운트**, 개발 역할은 supervisor의 읽기 전용 모드(`"tools": "read_only"`)와 설정의 `deny` 목록, 새 작업 디렉터리·볼륨만, 포트 58221/58222 |
-| [coord-switch.sh](launcher/coord-switch.sh) | 코디네이터 호스트 프로세스: `capture`(pid가 그 바이너리이고 `127.0.0.1:<port>`에 열려 있는지, 부모, 연결된 클라이언트 수, 인자·환경을 0600 파일로; 값은 출력 안 함), `stop`(SIGTERM, 기다림, 시간이 넘으면 SIGKILL), `start`(캡처한 환경과 인자 그대로 `setsid nohup`, `--tokens` 바꿈·`--roles` 더함, pid 파일, 로그, 상태 조회 200까지) |
+| [coord-switch.sh](launcher/coord-switch.sh) | 코디네이터 호스트 프로세스: `capture`(pid가 그 바이너리이고 `--listen 127.0.0.1:<port>`인지, 부모와 **cgroup**(systemd `*.service` 단위면 멈춤), 연결된 클라이언트 수, 경로 인자 `--tokens`·`--manifest`·`--profiles`·`--bindings`·`--policy`·`--roles`가 그 작업 디렉터리에서 있는지, `/proc`의 인자·환경을 **NUL 경계 그대로** `argv0`·`env0`로(소유자 읽기 전용)와 작업 디렉터리 `cwd`; 이름과 경로만 출력), `stop`(SIGTERM, 기다림, 시간이 넘으면 SIGKILL), `start`(지금 환경을 비우고 캡처한 환경을 셸 내장 `export`로만 되살림: **값이 어떤 프로세스의 명령줄에도 나오지 않음**, 내보낸 셸 함수 `BASH_FUNC_*`와 식별자가 아닌 이름은 버림; 캡처한 작업 디렉터리에서 `setsid nohup`, 인자는 캡처 그대로에 `--tokens` 바꿈·`--roles` 더함, pid 파일, 로그, 상태 조회 200까지) |
 | [rehearse-migration.sh](launcher/rehearse-migration.sh) | §3의 마이그레이션 예행(시험 DB만) |
 | [run-step8.sh](launcher/run-step8.sh) + [lib-step8.sh](launcher/lib-step8.sh) + [check-run.py](launcher/check-run.py) | 실제 회차 구동: `register` → (사용자 의미 검토) → `prepare`(검토 통과, 두 역할 도달·중앙 모드·유휴·quota 불일치 없음, 배정 둘, `branch_head`) → `runs`(관측 마감 → R1 → R2 → G1, 회차마다 §6.2의 모든 확인; 하나라도 어긋나면 `STOP`으로 끝나고 아무것도 더 보내지 않음) |
 | [dry-run-step8.sh](launcher/dry-run-step8.sh) | 위 전부를 시험 시스템에서 예행 |
 
-**개발 역할의 도구 제한(검토 3e4e3d6 M-1).** 02-04의 실제 CLI는 도구 옵션이 없으면 `Task`·`Bash`·`Write`·`WebFetch`·`Workflow`·`RemoteTrigger`·`SendMessage` 등을 내놓았다(02-04 D1 `init.tools`). 그래서 supervisor에 **읽기 전용 개발 모드**를 더했다(코드 750e904, 역할 설정 `"tools": "read_only"`): `--tools Read,Grep,Glob`(CLI가 다른 도구를 아예 내놓지 않음), `--allowedTools Read/Grep/Glob(//state/work/<repo>/**)`, `--disallowedTools Read(//run/ieo/**)·Read(//etc/ieo/**)·Read(//state/claude/**)·Read(//state/home/**)·Read(//proc/**)·Bash`, `--disable-slash-commands`. Guardrail이 02-04부터 쓰는 방식(`--tools`로 제한, G1의 `init.tools`가 정확히 그 목록이었음)과 같다. 옵션이 없는 개발 역할의 인자는 바뀌지 않는다(시험으로 고정). 설정의 `deny` 목록(위 도구 이름 전부와 같은 경로들)은 둘째 겹이다. 회차 뒤 `check-run.py`가 stream의 `init.tools`가 허용 집합 안이고(개발 `Read`·`Grep`·`Glob`, Guardrail에 `Write`·`Edit` 더함) 모든 `tool_use`가 `Read`·`Grep`·`Glob`인지 보고, 아니면 멈춘다. **실제 CLI에서 개발 역할의 `--tools`는 아직 관측되지 않았다**(가짜 `claude`는 받은 `--tools`를 그대로 내놓도록 해 supervisor가 옵션을 넘기는 것까지만 예행이 확인한다). R1의 `init.tools`가 첫 실제 관측이고, 다르면 R1 뒤에 멈춘다.
+**개발 역할의 도구 제한(검토 3e4e3d6 M-1).** 02-04의 실제 CLI는 도구 옵션이 없으면 `Task`·`Bash`·`Write`·`WebFetch`·`Workflow`·`RemoteTrigger`·`SendMessage` 등을 내놓았다(02-04 D1 `init.tools`). 그래서 supervisor에 **읽기 전용 개발 모드**를 더했다(코드 750e904·d0ad250, 역할 설정 `"tools": "read_only"`): `--tools Read,Grep,Glob`(CLI가 다른 도구를 아예 내놓지 않음), `--allowedTools Read(//state/work/<repo>/**) Grep Glob`(02-04가 이 CLI에 준 규칙 형식: 범위 지정 `Read(//…)`와 그냥 `Grep`·`Glob`, 검토 a5f9402 L-8), `--disallowedTools Read(//run/ieo/**)·Read(//etc/ieo/**)·Read(//state/claude/**)·Read(//state/home/**)·Read(//proc/**)·Bash`, `--disable-slash-commands`. Guardrail이 02-04부터 쓰는 방식(`--tools`로 제한, G1의 `init.tools`가 정확히 그 목록이었음)과 같다. 옵션이 없는 개발 역할의 인자는 바뀌지 않는다(시험으로 고정). 설정의 `allow`도 같은 형식이고 `deny` 목록(위 도구 이름 전부와 같은 경로들)은 둘째 겹이다. 회차 뒤 `check-run.py`가 stream의 `init.tools`가 허용 집합 안이고(개발 `Read`·`Grep`·`Glob`, Guardrail에 `Write`·`Edit` 더함) 모든 `tool_use`가 `Read`·`Grep`·`Glob`인지 보고, 아니면 멈춘다. **실제 CLI에서 개발 역할의 `--tools`는 아직 관측되지 않았다**(가짜 `claude`는 받은 `--tools`를 그대로 내놓도록 해 supervisor가 옵션을 넘기는 것까지만 예행이 확인한다). R1의 `init.tools`가 첫 실제 관측이고, 다르면 R1 뒤에 멈춘다.
 
 **네트워크 노출(검토 3e4e3d6 L-1).** 컨테이너 네트워크 `slirp4netns:allow_host_loopback=true`는 컨테이너에서 `10.0.2.2`로 **호스트 loopback의 모든 포트**에 닿게 한다(58090만이 아니라 55433·55432·58221/58222와 다른 로컬 서비스도; 검토자가 컨테이너에서 55432 연결을 확인함). 02-04의 그냥 `slirp4netns`보다 넓다. 이것이 필요한 것은 supervisor가 58090에 보고하기 때문이다. 모델 쪽 도구는 연결을 열 수 없고(셸·웹 도구 없음, 위), DB는 컨테이너에 없는 암호가 있어야 한다. 코디네이터 자신은 계속 `127.0.0.1`에만 열린다.
 
 **읽기 전용 대상(L-3).** 대상 파일은 역할 볼륨 밖에 풀고 `:ro`로 마운트한다(역할 UID가 볼륨을 소유하므로 파일 권한만으로는 막지 못함). 예행의 컨테이너는 이 마운트로 떴다. 실제 CLI를 쓰기 불가 cwd에서 돌린 적은 없다: 시작이 실패하면 계측된 결과 실패라 예비 경로다(§6.4).
 
-**예행(완료)**: `dry-run-step8.sh <M 바이너리 디렉터리> <778ee47 ieo-coord> <scratch>`, [evidence/dry-run.log](evidence/dry-run.log), **21개 확인 모두 통과**. 시험 PostgreSQL(55432)의 새 데이터베이스(끝나면 지움)에서:
-1. 778ee47 빌드 코디네이터를 호스트 프로세스로(`setsid`, pid 파일) 띄우고 그 API로 고정 행(draft sprint)을 만듦.
-2. `pg_dump -Fc`, `pg_restore --list`, **마이그레이션 예행 통과**(복원, 15개 표 행 수 그대로, 새 표 11개, `branch_head`, M이 복사본으로 서비스·SIGTERM에 0).
-3. 역할 컨테이너(실제 스크립트, 가짜 `claude`·자격).
-4. `coord-switch.sh capture`(인자 12개, 환경에 `IEO_DB_URL`, 0600) → `stop` → `start`(M, 새 `tokens.json`, `--roles`).
-5. `run-step8.sh register`(digest `a8d97f12…`) → 사람 주체의 의미 검토 → `prepare` → `runs`: R1 `no_checkpoint`→`start`, R2 `resume_allowed`→`reconnect`(R1 세션), G1 `start`, 회차마다 모든 확인 통과(개발 `init.tools` = `Glob, Grep, Read`, Guardrail = `Edit, Glob, Grep, Read, Write`, 사용 `Read`, 신호·환경·누적·대기 요청·quota·연결 조회). G1 지시문: 번호 붙은 주장 4개, 67바이트.
-6. 멈춤 확인의 음성 시험: R1 stream을 고친 사본에서 `check-run.py`가 overage 신호와 `Bash` 사용에 각각 멈춤.
-7. 되돌리기: M을 `stop`(정상 종료 기록) → 캡처한 인자·환경으로 778ee47 `start`가 **마이그레이션된 DB에서** 상태 조회 200, 단계 8 sprint를 읽음(200) → `stop`.
+**예행(완료)**: `dry-run-step8.sh <M 바이너리 디렉터리> <778ee47 ieo-coord> <scratch>`, [evidence/dry-run.log](evidence/dry-run.log)(최종 스크립트 커밋에서), **23개 확인 모두 통과**. 시험 PostgreSQL(55432)의 새 데이터베이스(끝나면 지움)에서:
+1. 778ee47 빌드 코디네이터를 호스트 프로세스로(`setsid`, pid 파일) 띄운다. 라이브처럼 따로 둔 작업 디렉터리에서 **상대 경로** `--tokens tokens-old.json --bindings bindings.json`, 환경에 **내보낸 두 줄 셸 함수**(`BASH_FUNC_…%%`, 이 호스트의 로그인 셸이 넣는 `which` 함수와 같은 모양; 검토 a5f9402 N-1). 그 API로 고정 행(draft sprint).
+2. `coord-switch.sh capture`: cgroup(세션 scope), 상대 경로 둘을 작업 디렉터리에서 확인, 인자 14개·환경 89개(셸 함수 1개, 값 출력 없음), `env0`가 NUL 경계 그대로(DB URL과 두 줄 함수가 온전함), 소유자 읽기 전용.
+3. 백업(`pg_dump -Fc`, `--list`, 라이브 행 수) → **마이그레이션 예행 통과**(복원 행 수 = 라이브 행 수, 15개 표 그대로, 새 표 11개, `branch_head`, M이 새 `tokens.json`·캡처한 바인딩으로 서비스, SIGTERM에 0).
+4. 역할 컨테이너(실제 스크립트, 가짜 `claude`·자격; 가짜는 받은 `--tools`를 그대로 내놓음).
+5. `stop` → `start`(M, 새 `tokens.json`, `--roles`): 새 프로세스의 환경에 DB URL이 있고 셸 함수가 없으며, 작업 디렉터리는 캡처한 곳, 바이너리는 M.
+6. `run-step8.sh register`(digest `a8d97f12…`) → 사람 주체의 의미 검토 → `prepare` → `runs`: R1 `no_checkpoint`→`start`, R2 `resume_allowed`→`reconnect`(R1 세션), G1 `start`, 회차마다 모든 확인 통과(개발 `init.tools` = `Glob, Grep, Read`, Guardrail = `Edit, Glob, Grep, Read, Write`, 사용 `Read`).
+7. 멈춤 확인의 음성 시험: 고친 사본에서 `check-run.py`가 overage 신호와 `Bash` 사용에 각각 멈춤.
+8. 되돌리기: M을 `stop`(정상 종료) → 캡처한 인자·환경·작업 디렉터리로 778ee47 `start`(**상대 경로 인자, 셸 함수가 있던 환경**)가 마이그레이션된 DB에서 상태 조회 200, 단계 8 sprint를 읽음(200) → `stop`.
 58090·55433·비밀·실행 기록·실제 `claude`는 쓰지 않았다. 컨테이너·시험 DB·scratch는 지웠다.
 
 **실행 때 빌드.** 이 실행안의 PR 병합 뒤 그 SHA(**M**)의 깨끗한 작업 트리에서 `cargo build --release -p ieo-coord -p ieo-supervisor`(대상 디렉터리는 `/home` 밖). 바이너리 SHA-256 기록.
@@ -170,44 +172,45 @@ podman exec -i ieo-poc-db pg_restore -U <user> -d <db>_restore_<시각> --exit-o
 
 | # | 단계(명령) | 예상 | 확인 [읽기] |
 | --- | --- | --- | --- |
-| 1 | 백업(§3) | 2~3분 | 덤프 목록, `live-counts.txt` |
-| 1b | 마이그레이션 예행(§3, 시험 DB만) | 1~2분 | `## rehearsal: PASS`, 복원 행 수 = `live-counts.txt` |
-| 2 | **캡처**: `$LAUNCH/coord-switch.sh capture $D/coord.pid $D/bin/ieo-coord 58090 $D/private/s8/coord-778ee47` | 수 초 | pid가 778ee47 `ieo-coord`이고 `127.0.0.1:58090`; 부모가 재시작기(systemd·감시 스크립트)가 아님(이면 멈추고 보고); 클라이언트 0; `argv`·`env` 0600(값 출력 없음) |
-| 3 | **정지**: `$LAUNCH/coord-switch.sh stop $D/coord.pid 30`. 778ee47은 신호 처리기가 없는 호스트 프로세스라 SIGTERM의 기본 동작으로 곧 끝난다. 그 뒤 `cp $D/bin/ieo-coord $D/bin/ieo-coord.778ee47`(보존) | 1분 | 프로세스 없음, 58090 닫힘 |
-| 4 | 새 파일: `$D/bin/ieo-coord` ← M, 새 `tokens.json`(§2.1, **새 경로**: 옛 파일은 되돌리기에 쓰므로 그대로 둠), `roles.json`(§5.3), `$D/ledger-0205/`(새 디렉터리, 0700) | 3분 | 파일·권한 |
-| 5 | **기동**: `$LAUNCH/coord-switch.sh start $D/bin/ieo-coord $D/private/s8/coord-778ee47 $D/coord.pid $D/logs/coord-M.log --tokens <새 tokens.json> -- --roles <roles.json>`(캡처한 환경 그대로, 인자는 옛 것 + `--roles`, `setsid nohup`, pid 파일 갱신). `migrate`가 기동 때 돈다 | 1분 | 상태 조회 200(스크립트가 기다림), `schema_version: ieo-coord-v0`, 새 표 11개, 로그에 바인딩 오류 없음 |
-| 6 | 역할 컨테이너: `QUOTA_GROUP_ID=<§9 Q2> SUP_DEV_TOKEN_FILE=$D/private/s8/s8-sup-dev.token SUP_GR_TOKEN_FILE=$D/private/s8/s8-sup-gr.token $LAUNCH/run-step8-roles.sh <M의 ieo-supervisor 디렉터리> /opt/rust/ieo_poc_runs/02-05-s8-<날짜>` | 3분 | 두 서비스 기동(스크립트가 확인) |
-| 7 | `COORD=http://127.0.0.1:58090 TOKDIR=$D/private/s8 OUT=<기록 디렉터리> LEDGER=$D/ledger-0205 ADAPTER_HEADER=<작업 디렉터리>/adapter.header $LAUNCH/run-step8.sh register` | 1분 | 201, digest = §1.2 |
-| 8 | **사용자의 의미 검토**(§2.2 2) | 사용자 | 201 `passed` |
-| 9 | `assignment_heads` 읽기 → `EXPECTED_CURRENT_DEV/GR` → 같은 환경으로 `run-step8.sh prepare` | 2분 | 검토 통과, 역할 도달·중앙·유휴·quota 일치, 배정 둘, `branch_head` |
-| 10 | `OBS_UNIX=1794698043 … run-step8.sh runs` | 약 15분 | §6 |
+| 1 | **캡처**[읽기]: `$LAUNCH/coord-switch.sh capture $D/coord.pid $D/bin/ieo-coord 58090 $D/private/s8/coord-778ee47` | 수 초 | pid가 778ee47 `ieo-coord`이고 `--listen 127.0.0.1:58090`; 부모와 cgroup 출력, systemd `*.service` 단위면 멈춤(그 단위로 멈춰야 하므로 보고); 클라이언트 0; 경로 인자가 모두 작업 디렉터리에서 있음; `argv0`·`env0`·`cwd`(값 출력 없음). DB 이름·사용자는 여기서 읽음(§3) |
+| 2 | 백업(§3) | 2~3분 | 덤프 목록, `live-counts.txt` |
+| 3 | 자격 파일과 새 `tokens.json`(§2.1, **새 경로**: 옛 파일은 되돌리기에 쓰므로 그대로 둠) | 3분 | 권한, digest만 |
+| 4 | 마이그레이션 예행(§3, 시험 DB만; 새 `tokens.json`과 단계 1이 출력한 `--bindings` 파일, `live-counts.txt` 비교) | 1~2분 | `## rehearsal: PASS` |
+| 5 | 역할 컨테이너: `QUOTA_GROUP_ID=<§9 Q2> SUP_DEV_TOKEN_FILE=$D/private/s8/s8-sup-dev.token SUP_GR_TOKEN_FILE=$D/private/s8/s8-sup-gr.token $LAUNCH/run-step8-roles.sh <M의 ieo-supervisor 디렉터리> /opt/rust/ieo_poc_runs/02-05-s8-<날짜>`(코디네이터는 아직 옛 것; 역할은 회차가 올 때까지 보고하지 않음) | 3분 | 두 서비스 기동, `roles-entry.json` |
+| 6 | `roles.json`(§5.3, 단계 5의 `roles-entry.json` + `budget_plan`), `$D/ledger-0205/`(0700), 관측 사본, M 바이너리를 `$D/bin/ieo-coord-M`에(옛 `$D/bin/ieo-coord`는 그대로) | 2분 | 파일·권한 |
+| 7 | **정지**: `$LAUNCH/coord-switch.sh stop $D/coord.pid 30`. 778ee47은 신호 처리기가 없는 호스트 프로세스라 SIGTERM의 기본 동작으로 곧 끝난다 | 1분 | 프로세스 없음, 58090 닫힘 |
+| 8 | **기동**: `$LAUNCH/coord-switch.sh start $D/bin/ieo-coord-M $D/private/s8/coord-778ee47 $D/coord.pid $D/logs/coord-M.log --tokens <새 tokens.json> -- --roles <roles.json>`(캡처한 환경·작업 디렉터리·인자 + `--roles`, `setsid nohup`, pid 파일 갱신). `migrate`가 기동 때 돈다 | 1분 | 상태 조회 200(스크립트가 기다림), 새 표 11개, 로그에 바인딩 오류 없음 |
+| 9 | `COORD=http://127.0.0.1:58090 TOKDIR=$D/private/s8 OUT=<기록 디렉터리> LEDGER=$D/ledger-0205 ADAPTER_HEADER=<작업 디렉터리>/adapter.header $LAUNCH/run-step8.sh register` | 1분 | 201, digest = §1.2 |
+| 10 | **사용자의 의미 검토**(§2.2 2) | 사용자 | 201 `passed` |
+| 11 | `assignment_heads` 읽기 → `EXPECTED_CURRENT_DEV/GR` → 같은 환경으로 `run-step8.sh prepare` | 2분 | 검토 통과, 역할 도달·중앙·유휴·quota 일치, 배정 둘, `branch_head` |
+| 12 | `OBS_UNIX=1794698043 … run-step8.sh runs` | 약 15분 | §6 |
 
-재배포 시간 창(1~6): 약 15분. 7~9는 사용자 검토 시간에 따름.
+라이브가 멈추는 시간(7~8): 약 2분. 1~6은 라이브를 바꾸지 않는다(5는 새 컨테이너만). 9~11은 사용자 검토 시간에 따름(검토 a5f9402 L-11: 역할 컨테이너가 `roles.json`과 기동보다 먼저).
 
 ### 5.3 설정
 
-- **코디네이터 `roles.json`**: 단계 6이 쓴 `<작업 디렉터리>/roles-entry.json`(두 역할 모두 `quota_group_id`, 검토 3e4e3d6 L-2)에 `budget_plan`을 더한 것:
+- **코디네이터 `roles.json`**: 단계 5가 쓴 `<작업 디렉터리>/roles-entry.json`(두 역할 모두 `quota_group_id`, 검토 3e4e3d6 L-2)에 `budget_plan`을 더한 것:
   ```json
   {"ieo-poc-test": {<roles-entry.json의 development·guardrail>,
     "budget_plan": {"budget": "02-05", "ledger_dir": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/ledger-0205",
                     "first_observation": {"stream": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/ledger-0205-obs/D6.jsonl", "observed_unix": 1794698043},
                     "roles": {"development": {"max_window_seconds": 600}, "guardrail": {"max_window_seconds": 600}}}}}
   ```
-  몫(`share`)은 쓰지 않는다(승인값). 역할 컨테이너는 단계 5 전에 띄워도 된다(코디네이터 주소만 알면 됨). 순서상 `roles.json`은 단계 6의 `roles-entry.json`이 필요하므로 단계 6을 단계 4 앞에 해도 된다(예행이 그렇게 함).
+  몫(`share`)은 쓰지 않는다(승인값).
 - **역할 컨테이너**: 기본값 실제 CLI `claude-2.1.322`, 자격 `/opt/rust/ieo_poc_secrets`, 네트워크 `slirp4netns:allow_host_loopback=true`(§4의 노출), 코디네이터 `http://10.0.2.2:58090`, 대상 `ieo_poc_test@2ab9d876…`(`:ro`), 기반 이미지 `golang@sha256:d9c68c2c…`, UID 20001/20002, `--cap-drop ALL`, `no-new-privileges`, `--stop-timeout 15`. GitHub 자격은 넣지 않는다. 대상 저장소는 호스트에서 공개 `git clone`으로 읽는다(쓰기 없음).
 
 ### 5.4 되돌리기와 판단 지점
 
 | 지점 | 실패 | 대응 |
 | --- | --- | --- |
-| 1·1b | 덤프·예행 실패 | 멈춤. 라이브는 바뀌지 않음. 보고 |
-| 2 | pid가 그 바이너리가 아님, 재시작기 있음, 클라이언트 있음 | 멈춤. 보고 |
-| 3 | 30초 뒤에도 남음 | SIGKILL(스크립트). 그래도 남으면 멈춤·보고 |
-| 5 | 기동 실패(바인딩 충돌, 마이그레이션 오류, 포트) | **되돌리기(자동, DB는 그대로)**: `coord-switch.sh stop $D/coord.pid 30`(M이 떠 있으면) → `cp $D/bin/ieo-coord.778ee47 $D/bin/ieo-coord` → `coord-switch.sh start $D/bin/ieo-coord $D/private/s8/coord-778ee47 $D/coord.pid $D/logs/coord-778ee47.log`(캡처한 인자 그대로, 옛 `tokens.json`) → 상태 조회 200. 마이그레이션이 실패했다면 DB는 바뀌지 않았고, 성공했다면 778ee47이 추가된 표를 무시하고 돈다(예행 확인). 로그와 함께 보고. **DB 복원은 하지 않는다**(§3, 별도 결정) |
-| 6 | 역할 서비스 실패 | 컨테이너만 지우고(볼륨은 둠) 보고. 코디네이터는 M으로 둠(778ee47로 되돌릴지는 사용자 결정) |
-| 7~9 | 등록·의미 검토·배정 거절 | 멈춤·보고 |
+| 1 | pid가 그 바이너리가 아님, systemd 단위, 클라이언트 있음, 경로 인자 없음 | 멈춤. 보고 |
+| 2·4 | 덤프·예행 실패(행 수 불일치 포함) | 멈춤. 라이브는 바뀌지 않음. 보고 |
+| 5 | 역할 컨테이너 실패 | 컨테이너만 지우고(볼륨은 둠) 보고. 코디네이터는 옛 것 그대로 |
+| 7 | 30초 뒤에도 남음 | SIGKILL(스크립트). 그래도 남으면 멈춤·보고 |
+| 8 | 기동 실패(바인딩 충돌, 마이그레이션 오류, 포트) | **되돌리기(자동, DB는 그대로)**: `coord-switch.sh stop $D/coord.pid 30`(M이 떠 있으면) → `coord-switch.sh start $D/bin/ieo-coord $D/private/s8/coord-778ee47 $D/coord.pid $D/logs/coord-778ee47.log`(옛 바이너리, 캡처한 인자·환경·작업 디렉터리 그대로, 옛 `tokens.json`) → 상태 조회 200. 마이그레이션이 실패했다면 DB는 바뀌지 않았고, 성공했다면 778ee47이 추가된 표를 무시하고 돈다(예행 확인). 로그와 함께 보고. **DB 복원은 하지 않는다**(§3, 별도 결정) |
+| 9~11 | 등록·의미 검토·배정 거절 | 멈춤·보고 |
 
-5 이후에는 새 기록(등록·배정·회차)이 생기므로 자동으로 되돌리지 않고 멈춰 보고한다.
+8 이후에는 새 기록(등록·배정·회차)이 생기므로 자동으로 되돌리지 않고 멈춰 보고한다.
 
 ## 6. 회차
 
@@ -221,7 +224,7 @@ podman exec -i ieo-poc-db pg_restore -U <user> -d <db>_restore_<시각> --exit-o
 | R2 | `resume_allowed` → `reconnect`(R1 세션, `github` 일치) | `accepted` |
 | G1 | Guardrail 첫 전달, 검토 대상 = 개발 `target_sha` → `start` | `accepted` |
 
-**같은 키로 다시 보내기는 재시도가 아니다**(검토 3e4e3d6 I-1). 답을 받지 못한 요청(연결 실패)만 같은 키·같은 본문 바이트로 다시 보내고(최대 3번), 그것은 저장된 답을 읽을 뿐 새 회차를 시작하지 않는다. 새 키로 다시 보내는 일은 없다.
+**같은 키로 다시 보내기는 재시도가 아니다**(검토 3e4e3d6 I-1). 답을 받지 못한 요청(연결 실패)만 같은 키·같은 본문 바이트로 다시 보내고(최대 3번), 그것은 저장된 답을 읽을 뿐 새 회차를 시작하지 않는다. 새 키로 다시 보내는 일은 없다. 멈춘 뒤 `runs`를 다시 돌리면 이미 기록된 회차는 같은 키로 저장된 답만 읽고 기다리지 않는다(검토 a5f9402 I-3); 이어서 할지는 멈춤 보고 뒤 사용자 결정이다.
 
 ### 6.2 회차마다 자동 확인 [읽기], `check-run.py`, 하나라도 어긋나면 `STOP`
 
@@ -253,7 +256,7 @@ R1 또는 R2가 실패하면 멈추고 보고한다: 실패 기록(사용량 계
 | 사전 확인 하나라도 아님 | 시작하지 않음 | 없음(바뀐 것 없음) | 항목과 근거 |
 | 백업·예행 실패 | 멈춤 | 없음 | 오류 |
 | 캡처 확인 실패(pid·재시작기·클라이언트) | 멈춤 | 없음 | 출력 |
-| 새 코디네이터 기동 실패 | §5.4 되돌리기(778ee47, DB 그대로) | 자동, DB 복원 없음 | 로그, 상태 조회 |
+| 새 코디네이터 기동 실패 | §5.4 되돌리기(778ee47을 캡처한 인자·환경·작업 디렉터리로, DB 그대로) | 자동, DB 복원 없음 | 로그, 상태 조회 |
 | 역할 컨테이너 실패 | 컨테이너 제거(볼륨 유지) | 코디네이터는 그대로 | 로그 |
 | 등록·검토·배정 거절 | 멈춤 | 없음 | 응답 본문 |
 | R1 `not_called`/`budget_refused` | 멈춤(모델 호출 없음) | 없음 | 판단 이유 |
@@ -272,12 +275,12 @@ R1 또는 R2가 실패하면 멈추고 보고한다: 실패 기록(사용량 계
 
 **포함:**
 1. **사전 확인**(§5.1, 읽기 전용): 55433 질의(새 표·sprint·바인딩·체크포인트), 02-04 장부·프로세스 확인, 58090의 다른 클라이언트 확인, D6 관측 stream 판정과 복사.
-2. **백업과 예행**(§3): `$D/backups/<시각>-pre-step8/`에 `pg_dump -Fc`와 행 수, 시험 DB(55432)에서 복원·M 마이그레이션·서비스 예행(끝나면 지움).
-3. **옛 코디네이터 정지**(§5.2 2·3): pid 확인과 **그 프로세스의 환경(DB 암호 포함)을 출력하지 않고 0600 파일로 읽어 둠**, SIGTERM(30초 뒤 필요하면 SIGKILL), 바이너리 보존.
-4. **새 빌드 기동과 마이그레이션**(§5.2 4·5): 바이너리 M, 새 `tokens.json`·`roles.json`·장부·관측 디렉터리, `setsid nohup`으로 기동(로그 `$D/logs/coord-M.log`, `coord.pid` 갱신), 기동 때 55433 마이그레이션(추가만, 한 트랜잭션). 실패하면 자동 되돌리기 = 778ee47을 캡처한 인자·환경으로 **DB 그대로** 다시 기동.
-5. **자격·설정 파일**(§2.1): 에이전트가 주체 토큰·헤더를 만들고(값 출력 없음) digest를 `tokens.json`에, OAuth 자격을 역할 볼륨으로 복사(값 출력 없음).
-6. **역할 컨테이너 둘**(§5.3): 새 작업 디렉터리·볼륨, 대상 저장소의 공개 `git clone`(읽기)과 `:ro` 사본, 개발 역할 읽기 전용 도구, `checkpoint_central` → 58090, 예산 02-05, **네트워크 `allow_host_loopback`(컨테이너에서 호스트 loopback 전체에 닿음, §4)**.
-7. **등록·배정·입력**: sprint `POC-S8-01` r1 등록(§1.2), 배정 둘, `branch_head` 입력.
+2. **캡처**(§5.2 1): pid·바이너리·리슨 주소·cgroup·클라이언트·경로 인자 확인, **그 프로세스의 인자·환경(DB 암호 포함)·작업 디렉터리를 출력하지 않고 소유자 전용 파일로 읽어 둠**.
+3. **백업과 예행**(§3, §5.2 2·4): `$D/backups/<시각>-pre-step8/`에 `pg_dump -Fc`와 라이브 행 수, 시험 DB(55432)에서 복원·행 수 비교·M 마이그레이션·새 `tokens.json`과 실제 바인딩으로 서비스 예행(끝나면 지움).
+4. **옛 코디네이터 정지와 새 빌드 기동**(§5.2 7·8): SIGTERM(30초 뒤 필요하면 SIGKILL), 옛 바이너리·`tokens.json`은 그대로 두고 M을 `$D/bin/ieo-coord-M`에서 캡처한 환경(셸 내장으로만 되살림, 값은 명령줄에 없음)·작업 디렉터리·인자 + 새 `tokens.json`·`--roles`로 `setsid nohup` 기동(로그 `$D/logs/coord-M.log`, `coord.pid` 갱신), 기동 때 55433 마이그레이션(추가만, 한 트랜잭션). 실패하면 자동 되돌리기 = 778ee47을 캡처한 그대로 **DB 그대로** 다시 기동.
+5. **자격·설정 파일**(§2.1, §5.2 3·6): 에이전트가 주체 토큰·헤더를 만들고(값 출력 없음) digest를 `tokens.json`에, OAuth 자격을 역할 볼륨으로 복사(값 출력 없음).
+6. **역할 컨테이너 둘**(§5.2 5, §5.3): 새 작업 디렉터리·볼륨, 대상 저장소의 공개 `git clone`(읽기)과 `:ro` 사본, 개발 역할 읽기 전용 도구, `checkpoint_central` → 58090, 예산 02-05, **네트워크 `allow_host_loopback`(컨테이너에서 호스트 loopback 전체에 닿음, §4)**.
+7. **등록·배정·입력**(§5.2 9·11): sprint `POC-S8-01` r1 등록(§1.2), 배정 둘, `branch_head` 입력.
 8. **실제 회차 R1, R2, G1**(§1.3, §6): `run-step8.sh runs`, 회차마다 §6.2 자동 확인, 어긋나면 멈춤.
 
 **제외(별도 승인 필요):** 예비 회차(건별, §6.4), 어떤 재시도·다시 하기, **DB 복원**(새 이름으로, §3), 실행 중 코디네이터 재시작(RUNBOOK §8), GitHub 쓰기(push·PR·댓글), 이 실행안 밖의 모든 것, 02-04·X-02 예산 사용, 추가 결제(USD 0).
@@ -298,7 +301,9 @@ R1 또는 R2가 실패하면 멈추고 보고한다: 실패 기록(사용량 계
 2. **`quota_group_id` 값과 두 자격의 계정.** 02-04 실제 회차에서는 설정되지 않아 `unknown`이었다(02-04 수용 보고). 그래서 옛 값이 없다. 개발·Guardrail 자격(`/opt/rust/ieo_poc_secrets/<역할>.token`)이 **같은 구독 계정**이면 두 역할에 같은 값을, 다르면 서로 다른 값을 정해 주십시오(형식 1~128자 `[A-Za-z0-9._:-]`). 제안: 같은 계정이면 `claude-sub-shared`. 이 값은 비밀이 아니다. **다른 계정이면** G1의 무추가청구 근거가 문제다: G1을 받아들이는 관측은 02-05 장부의 가장 새 기록(R2, 개발 자격의 stream)이라 Guardrail 계정에 대해서는 아무것도 말하지 않는다(검토 3e4e3d6 L-5). 그 경우 G1 전에 Guardrail 계정의 관측을 따로 얻을지, 실행 중 신호 멈춤만을 보호로 받아들일지 정해 주십시오.
 3. **관측 마감.** R1은 **2026-11-21T23:14Z(한국 2026-11-22 08:14) 전에** 받아들여져야 한다. 그 전에 실행하지 못하면 새 무추가청구 관측을 어떻게 얻을지 사용자가 정한다(실제 stream만이 출처다).
 
-## 10. 검토 반영(PR #86 검토 3e4e3d6)
+## 10. 검토 반영
+
+### 10.1 PR #86 검토 3e4e3d6
 
 | 항목 | 처분 |
 | --- | --- |
@@ -315,3 +320,17 @@ R1 또는 R2가 실패하면 멈추고 보고한다: 실패 기록(사용량 계
 | L-7(sprint 근거) | 교정: `sources`에 결정 둘, 새 digest `a8d97f12…`, `ieo-spec check` 201 |
 | I-1(같은 키 다시 보내기) | §6.1 문장 |
 | I-2(회차 중 코디네이터가 죽음) | §7 행 |
+
+### 10.2 PR #86 검토 a5f9402
+
+| 항목 | 처분 |
+| --- | --- |
+| **N-1**(되살린 환경이 깨지고 값이 명령줄에 나옴, 작업 디렉터리 없음) | **교정**(d0ad250·58819ea). `capture`는 `/proc/<pid>/cmdline`·`environ`을 NUL 경계 그대로 `argv0`·`env0`로 복사하고 `cwd`를 기록하며, 경로 인자를 그 작업 디렉터리에서 확인한다. `start`는 하위 셸에서 지금 환경을 비우고 `env0`를 `read -d ''`로 읽어 셸 내장 `export`로만 되살린다(`env -i VAR=…` 없음: 값이 어떤 프로세스의 명령줄에도 없다). `BASH_FUNC_*`와 식별자가 아닌 이름은 버리고(오류 문구로 값이 새지 않음), 캡처한 작업 디렉터리에서 `exec setsid nohup`. 예행: 내보낸 두 줄 셸 함수와 상대 `--tokens`/`--bindings`를 지닌 옛 프로세스에서 캡처 → M 기동(환경에 셸 함수 없음, 작업 디렉터리·바이너리 확인) → **되돌리기 기동 성공**(§4 예행 1·2·5·8) |
+| L-8(규칙 형식) | 교정: `Read(//state/work/<repo>/**)`와 그냥 `Grep`·`Glob`(인자·설정·시험). 변이 4/4 잡힘([evidence/mutants-readonly.txt](evidence/mutants-readonly.txt)) |
+| L-9(예행의 바인딩·주체, 행 수 비교) | 교정: `TOKENS_FILE`·`BINDINGS_FILE`, `live-counts.txt` 자동 비교. §5.2에서 새 `tokens.json`(3)을 예행(4) 앞에 둠 |
+| L-10(재시작기 판단) | 교정: cgroup 출력, `*.service` 단위(사용자 관리자 `user@<uid>.service` 제외)면 멈춤 |
+| L-11(§5.2 순서) | 교정: 캡처 → 백업 → 자격 → 예행 → 역할 컨테이너 → `roles.json`·파일 → 정지 → 기동 → 등록 → 검토 → 준비 → 회차 |
+| I-3(`runs` 다시 돌리기) | 교정: 장부에 이미 있는 회차는 기다리지 않음(§6.1) |
+| I-4(로그의 커밋) | 최종 스크립트 커밋 58819ea에서 다시 만든 [evidence/dry-run.log](evidence/dry-run.log)(23/23) |
+
+**시험(코드가 바뀌었으므로 전체):** `cargo test --workspace --locked` **412 통과, 0 실패**(커밋 58819ea, fmt·clippy `-D warnings` 통과), `docs/poc` 검사기 통과.

@@ -1,6 +1,6 @@
-# the read-only development option (code 750e904, PR #86 review 3e4e3d6 M-1): each applied alone, target `cargo test -p ieo-supervisor --test supervisor`, the file restored after each
+# the read-only development option (code 750e904, rule forms d0ad250; PR #86 reviews 3e4e3d6 M-1, a5f9402 L-8): each applied alone to the code of 58819ea, target `cargo test -p ieo-supervisor --test supervisor`, the file restored after each
 X1 | the read-only option is ignored in the argv | KILLED | role_arguments_use_edit_paths_and_session_id_only
 X2 | the config's "tools": "read_only" is ignored | KILLED | a_read_only_development_role_is_chosen_in_the_config
 X3 | the Guardrail config takes a tools value | KILLED | a_read_only_development_role_is_chosen_in_the_config
-X4 | the allowed reads are not scoped to the work tree | KILLED | role_arguments_use_edit_paths_and_session_id_only
-# 4 of 4 killed · ieo-supervisor package: 151 passed, 0 failed · fmt and clippy -D warnings clean
+X4 | the allowed Read is not scoped to the work tree | KILLED | role_arguments_use_edit_paths_and_session_id_only
+# 4 of 4 killed · workspace: 412 passed, 0 failed (fmt, clippy -D warnings clean)
