@@ -1,32 +1,56 @@
-# 02-05 step 8 dry run (fake claude, fake credentials, test coordinator on 55432/ieo_t_s8dry_2574586, no model call) · 2026-11-17T05:34:04Z
-# branch 05cf16e · supervisor bff0a2fc01a1 · coordinator cf3070174fc5
+# 02-05 step 8 dry run (fake claude, fake credentials, test PostgreSQL 55432/ieo_t_s8dry_2610351, test coordinator 127.0.0.1:58290, no model call) · 2026-11-17T05:55:44Z
+# branch 750e904 · new supervisor 15d0b9319a16 · new coordinator 1c12baea62ce · old coordinator (778ee47) bbe448879962
+PASS test database ieo_t_s8dry_2610351 created on 55432
+PASS old build: a fixture draft sprint registered (201)
+PASS pg_dump -Fc (37333 bytes)
+PASS pg_restore --list (15 tables with data)
+PASS migration rehearsal on a scratch copy
+    # migration rehearsal · dump ieo.dump (37333 bytes, sha256 375934602318) · new build 1c12baea62ce · 55432/ieo_t_s8rehearse_2610770
+    PASS scratch database created
+    PASS the dump restores (pg_restore --exit-on-error)
+    tables before: 15
+    PASS ieo-coord migrate of the new build
+    PASS every table that existed keeps its row count (15 tables)
+    PASS the 11 new tables exist
+    PASS evidence.kind takes branch_head
+    PASS the new build serves on the migrated copy (200)
+    PASS and stops on SIGTERM (exit 0)
+    ## rehearsal: PASS
 # role containers up: ieo-s8dry-ieo-poc-test-{development,guardrail} on 127.0.0.1:58221/58222 · image docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c · network slirp4netns:allow_host_loopback=true · coordinator http://10.0.2.2:58290
 # target https://github.com/HeaInSeo/ieo_poc_test @ 2ab9d8760012516f37674a9446ca2fb2699973c0 (read-only copies) · credentials: OAuth form (values not printed) · roles entry: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8dry/run/roles-entry.json
 PASS run-step8-roles.sh starts both role containers
-PASS test database ieo_t_s8dry_2574586 created on 55432
-PASS test coordinator healthy (200), coordinator listens on 127.0.0.1 only
-PASS sprint POC-S8-01 r1 registered (201)
-PASS semantic review by the user principal (201)
-PASS development assignment S8-DEV-A1 (201)
-PASS guardrail assignment S8-GR-A1 (201)
-PASS branch_head input (201)
-PASS s8-r1: ('no_checkpoint', 'start', 'accepted')
-PASS s8-r1: the role finished the run
-PASS s8-r1: ledger record written, no in-flight marker
-PASS s8-r2: ('resume_allowed', 'reconnect', 'accepted')
-PASS s8-r2: the role finished the run
-PASS s8-r2: ledger record written, no in-flight marker
-PASS s8-g1: ('no_checkpoint', 'start', 'accepted')
-PASS s8-g1: the role finished the run
-PASS s8-g1: ledger record written, no in-flight marker
-PASS three 02-05 ledger records
-PASS none asks for a person
-PASS every run measured
-PASS R2 resumed R1's session
-PASS both supervisors report to the coordinator (not local_only)
-PASS no pending external requests (safe_shutdown)
-PASS S8-DEV-A1 chain: 2 delivery(ies) taken over with a first action
-PASS S8-GR-A1 chain: 1 delivery(ies) taken over with a first action
-PASS the test coordinator stops on SIGTERM (exit 0)
-PASS coordinator log: stopped
+pid 2610600: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-778/debug/ieo-coord; parent 1 (systemd)
+established clients on :58290: 0
+captured 12 argv entries and 88 environment variables (IEO_DB_URL present; values not shown)
+PASS capture of the old process (argv, env: 0600, names only shown)
+pid 2610600 stopped
+PASS old coordinator stopped
+pid 2614032: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-x08/debug/ieo-coord healthy on 127.0.0.1:58290 (log /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8dry/out/coord-new.log)
+PASS new build started with the captured argv/env, new tokens, --roles
+PASS the captured environment holds the database URL, mode 0600
+registered POC-S8-01 r1 (201), digest a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7: the user's semantic review is next (EXECUTION_PLAN.md §2.2)
+PASS run-step8.sh register
+PASS the user principal's semantic review (201)
+roles ready: both reachable, central, idle, no quota mismatch
+prepared: S8-DEV-A1, S8-GR-A1, branch_head 2ab9d8760012516f37674a9446ca2fb2699973c0
+PASS run-step8.sh prepare
+s8-r1: ('no_checkpoint', 'start', 'accepted')
+s8-r1: measured, 1 s, billable 20, cache_read 20, tools offered ['Glob', 'Grep', 'Read'], used ['Read']; totals {'runs': 1, 'seconds': 1, 'billable': 20, 'cache_read': 20}
+s8-r2: ('resume_allowed', 'reconnect', 'accepted')
+s8-r2: measured, 1 s, billable 20, cache_read 20, tools offered ['Glob', 'Grep', 'Read'], used ['Read']; totals {'runs': 2, 'seconds': 2, 'billable': 40, 'cache_read': 40}
+G1 prompt: 4 numbered claims, 67 bytes
+s8-g1: ('no_checkpoint', 'start', 'accepted')
+s8-g1: measured, 1 s, billable 20, cache_read 20, tools offered ['Edit', 'Glob', 'Grep', 'Read', 'Write'], used ['Read']; totals {'runs': 3, 'seconds': 3, 'billable': 60, 'cache_read': 60}
+R1, R2 and G1 recorded and checked
+PASS run-step8.sh runs (R1 → R2 → G1, every §6.2 check)
+PASS check-run.py stops on a doctored run (overage): CHECK FAILED s8-r1: rate-limit signals not all allowed/rejected/false: [{'status': 'allowe
+PASS check-run.py stops on a doctored run (tool): CHECK FAILED s8-r1: tool uses beyond ['Glob', 'Grep', 'Read']: ['Bash']
+pid 2614032 stopped
+PASS new build stopped
+PASS new build log: stopped (graceful)
+pid 2614271: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/target-778/debug/ieo-coord healthy on 127.0.0.1:58290 (log /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8dry/out/coord-rollback.log)
+PASS rollback: the old build starts with the captured argv/env on the migrated database
+PASS rollback: the old build reads the step-8 sprint (200)
+pid 2614271 stopped
+PASS old build stopped
 ## result: 21 passed, 0 failed

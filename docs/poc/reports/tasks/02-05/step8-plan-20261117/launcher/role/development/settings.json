@@ -1,6 +1,13 @@
 {
   "autoMemoryEnabled": false,
   "permissions": {
-    "allow": ["Read", "Grep", "Glob"]
+    "allow": ["Read(//state/work/__REPO__/**)", "Grep(//state/work/__REPO__/**)", "Glob(//state/work/__REPO__/**)"],
+    "deny": [
+      "Task", "Agent", "Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch",
+      "Workflow", "RemoteTrigger", "CronCreate", "CronDelete", "ScheduleWakeup", "SendMessage",
+      "PushNotification", "EnterWorktree", "ExitWorktree", "Monitor", "Skill", "TaskStop", "ListAgents",
+      "DesignSync", "ReportFindings",
+      "Read(//run/ieo/**)", "Read(//etc/ieo/**)", "Read(//proc/**)", "Read(//state/claude/**)", "Read(//state/home/**)"
+    ]
   }
 }

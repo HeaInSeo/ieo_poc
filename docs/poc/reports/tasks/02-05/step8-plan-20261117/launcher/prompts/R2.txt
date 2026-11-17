@@ -1,0 +1,1 @@
+Continue in the same session. Use only the Read tool. Read .github/workflows/bootstrap.yml. Reply in exactly three lines: 1) the workflow name, 2) its trigger events, comma-separated, 3) its job ids, comma-separated. Then add one line that repeats your answer 2) from the previous turn. Do not modify any file and do not run any command.

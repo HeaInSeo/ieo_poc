@@ -69,6 +69,20 @@
    "revision": "2026-11-12",
    "digest": "d179dfd672784ede96c549d04b3a0ef435c54e055fb78f5500cefc9c1f5c21f0",
    "observed_at": null
+  },
+  {
+   "kind": "user_decision",
+   "ref": "User_Decisions_2026-11-15_0205-x08.md",
+   "revision": "2026-11-15",
+   "digest": "b41d380fed49618c89e19e68ba6ee11713eaa928dcc3ed8e2c8bd072b65355ef",
+   "observed_at": null
+  },
+  {
+   "kind": "user_decision",
+   "ref": "User_Decisions_2026-11-17_step8-l01.md",
+   "revision": "2026-11-17",
+   "digest": "d386e3f4fb5f48a269552942ebcdc1b6e64125bbf959a5ca425605e70ae0a7b7",
+   "observed_at": null
   }
  ],
  "unresolved_bindings": [],
@@ -113,5 +127,5 @@
   }
  ],
  "contract_revision": 4,
- "digest": "bbd2cfbd5d0d8388856ceb02ee21c455d650d522a6e5c0a661e01cc75d7d327c"
+ "digest": "a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7"
 }

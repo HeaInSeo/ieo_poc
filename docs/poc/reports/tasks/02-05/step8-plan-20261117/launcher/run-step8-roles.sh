@@ -2,8 +2,12 @@
 # 02-05 step 8: the two role containers (EXECUTION_PLAN.md §5.3), the 02-04 run-real.sh adapted to
 # the coordinator path: central checkpoints (`checkpoint_central` → the coordinator, a supervisor
 # agent token), the approved 02-05 budget without shares, an explicit quota_group_id, a read-only
-# copy of the target commit at /state/work/<repo> and /state/review/<repo>, Read/Grep/Glob only,
-# fresh volumes. No ieo-role-call plan: deliveries come from the coordinator only.
+# copy of the target commit bind-mounted :ro at /state/work/<repo> and /state/review/<repo>, the
+# development role in the supervisor's read-only mode ("tools": "read_only": the CLI offers Read,
+# Grep and Glob only) plus a settings deny list, fresh volumes. No ieo-role-call plan: deliveries
+# come from the coordinator only. Network: slirp4netns with allow_host_loopback, so the containers
+# reach EVERY host loopback port at 10.0.2.2 (not only the coordinator): the role tools cannot open
+# connections (no shell, no web tools), and the databases need passwords the containers do not hold.
 # Usage: run-step8-roles.sh <dir with ieo-supervisor> <fresh workdir outside the repositories>
 # Required env: QUOTA_GROUP_ID, SUP_DEV_TOKEN_FILE, SUP_GR_TOKEN_FILE (the supervisors' coordinator
 # tokens, `agent` principals with checkpoint:report). Never prints a credential or a token.
@@ -54,19 +58,21 @@ for r in development guardrail; do
   mkdir -p "$e/template" "$s" "$c"
   echo '{"autoMemoryEnabled": false}' > "$e/template/settings.json"
   echo '{"mcpServers": {}}' > "$e/mcp.json"
-  cp "$HERE/role/$r/settings.json" "$e/settings.json"
+  sed "s#__REPO__#$REPO_ID#g" "$HERE/role/$r/settings.json" > "$e/settings.json"
   cp "$HERE/role/$r/agents.json" "$e/agents.json"
-  printf '{"role":"%s","repo":"%s","state":"/state","etc":"/etc/ieo/role","cred":"/run/ieo/cred","claude":"/opt/claude/claude","budget":"02-05","quota_group_id":"%s","checkpoint_central":{"url":"%s","token_file":"/run/ieo/cred/coordinator_token","transport":"http"}}\n' \
-    "$r" "$REPO_ID" "$QUOTA_GROUP_ID" "$COORD_URL" > "$e/supervisor.json"
+  tools=""; [ "$r" = development ] && tools=',"tools":"read_only"'
+  printf '{"role":"%s","repo":"%s","state":"/state","etc":"/etc/ieo/role","cred":"/run/ieo/cred","claude":"/opt/claude/claude","budget":"02-05","quota_group_id":"%s","checkpoint_central":{"url":"%s","token_file":"/run/ieo/cred/coordinator_token","transport":"http"}%s}\n' \
+    "$r" "$REPO_ID" "$QUOTA_GROUP_ID" "$COORD_URL" "$tools" > "$e/supervisor.json"
   install -m 0400 "$SECRETS_DIR/$r.token" "$c/oauth_token"
   install -m 0400 "${SUPTOK[$r]}" "$c/coordinator_token"
   sha256sum < "$W/adapter.token" | cut -d' ' -f1 > "$c/adapter.sha256"; chmod 0400 "$c/adapter.sha256"; chmod 0500 "$c"
 done
-d="$W/development/state/work/$REPO_ID"; g="$W/guardrail/state"
-mkdir -p "$d" "$g/review/$REPO_ID" "$g/inputs" "$g/guardrail-scratch" "$g/guardrail-cwd"
-git -C "$src" archive "$TARGET_SHA" | tar -x -C "$d"
-git -C "$src" archive "$TARGET_SHA" | tar -x -C "$g/review/$REPO_ID"
-chmod -R a-w "$d" "$g/review/$REPO_ID"
+# the target files outside the role volumes, bind-mounted read-only over the mount points (review
+# 3e4e3d6 L-3: the role UID owns its volume, so mode bits alone are not read-only)
+t="$W/target/$REPO_ID"; mkdir -p "$t"; git -C "$src" archive "$TARGET_SHA" | tar -x -C "$t"; chmod -R a-w "$t"
+g="$W/guardrail/state"
+mkdir -p "$W/development/state/work/$REPO_ID" "$g/review/$REPO_ID" "$g/inputs" "$g/guardrail-scratch" "$g/guardrail-cwd"
+declare -A TMOUNT=([development]="/state/work/$REPO_ID" [guardrail]="/state/review/$REPO_ID")
 for r in development guardrail; do podman unshare chown -R "${UIDS[$r]}:${UIDS[$r]}" "$W/$r/state" "$W/$r/cred"; done
 run_role() { # role port
   local r=$1 port=$2 name="$NAME_PREFIX-$REPO_ID-$1"
@@ -75,7 +81,7 @@ run_role() { # role port
     --security-opt no-new-privileges --cap-drop ALL --stop-timeout 15 \
     --label "ieo.repo=$REPO_ID" --label "ieo.role=$r" --label "ieo.step=02-05-s8" \
     -v "$W/$r/state:/state:z" -v "$W/$r/etc:/etc/ieo/role:ro,z" -v "$W/$r/cred:/run/ieo/cred:ro,z" \
-    -v "$W/bin:/opt/ieo:ro,z" -v "$CLAUDE_BIN:/opt/claude/claude:ro,z" -p "127.0.0.1:$port:8080" \
+    -v "$W/bin:/opt/ieo:ro,z" -v "$CLAUDE_BIN:/opt/claude/claude:ro,z" -v "$t:${TMOUNT[$r]}:ro,z" -p "127.0.0.1:$port:8080" \
     "$IMG" /opt/ieo/ieo-supervisor serve --config /etc/ieo/role/supervisor.json --listen 0.0.0.0:8080 >/dev/null
   for _ in $(seq 1 50); do
     curl -s -o /dev/null -H @"$W/adapter.header" "http://127.0.0.1:$port/v0/role/status" && return
@@ -89,7 +95,7 @@ cat > "$W/roles-entry.json" <<JSON
                  "quota_group_id": "$QUOTA_GROUP_ID", "image_digest": "${IMG#*@}",
                  "profile_id": "s8-dev", "profile_revision": 1},
  "guardrail": {"url": "http://127.0.0.1:$PORT_GR", "adapter_token_file": "$W/adapter.token",
-               "image_digest": "${IMG#*@}", "profile_id": "s8-gr", "profile_revision": 1}}
+               "quota_group_id": "$QUOTA_GROUP_ID", "image_digest": "${IMG#*@}", "profile_id": "s8-gr", "profile_revision": 1}}
 JSON
 echo "# role containers up: $NAME_PREFIX-$REPO_ID-{development,guardrail} on 127.0.0.1:$PORT_DEV/$PORT_GR · image $IMG · network $NETWORK · coordinator $COORD_URL"
 echo "# target $REPO_SRC @ $TARGET_SHA (read-only copies) · credentials: OAuth form (values not printed) · roles entry: $W/roles-entry.json"
