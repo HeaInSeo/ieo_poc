@@ -4,7 +4,7 @@
 | --- | --- |
 | 근거 | [사용자 결정 2026-11-17 경고](../../../../User_Decisions_2026-11-17_warning.md) (다)의 §1 항목 4~6, [부록 A](#부록-a-한도-경고-판정의-근거-정책-전후-시험), [실행안](EXECUTION_PLAN.md) §12, [예산 결정 2026-11-15](../../../../User_Decisions_2026-11-15_0205-x08.md) §2.1, [예비 결정 2026-11-17](../../../../User_Decisions_2026-11-17_spare.md) |
 | 이 문서가 하는 일 | 한 번에 검토할 재개안이다. **승인을 대신하지 않는다.** 실제 회차, 실서버 재배포·재시작, 예비 사용, 정정 기록 추가는 아래 §6의 승인 뒤에만 한다 |
-| 상태 | **정책 교정**: 코드·계약·시험 완료, PR #89 병합(main 90ffef5; 근거·정책 전후·시험은 [부록 A](#부록-a-한도-경고-판정의-근거-정책-전후-시험)). **정산 형식**: 코드·시험 완료(정산 PR, 검토·병합 전; [부록 B](#부록-b-정산-형식ieo-role-run-settlementv0)). **사용자 결정**: [사용자 결정 2026-11-17 정산](../../../../User_Decisions_2026-11-17_r1-settlement.md)로 §2.1 (가)와 §3.1 (A)를 조건부 승인. **독립 검산**: 진행 중(별도 검토자). **실제 장부 정산·운영 변경·재시험**: 하지 않음(최종 묶음 승인 뒤) |
+| 상태 | **재개 묶음**: 스크립트·예행 완료(재개 PR, 검토·병합 전; §9). **정책 교정**: 코드·계약·시험 완료, PR #89 병합(main 90ffef5; 근거·정책 전후·시험은 [부록 A](#부록-a-한도-경고-판정의-근거-정책-전후-시험)). **정산 형식**: 코드·시험 완료(정산 PR, 검토·병합 전; [부록 B](#부록-b-정산-형식ieo-role-run-settlementv0)). **사용자 결정**: [사용자 결정 2026-11-17 정산](../../../../User_Decisions_2026-11-17_r1-settlement.md)로 §2.1 (가)와 §3.1 (A)를 조건부 승인. **독립 검산**: 진행 중(별도 검토자). **실제 장부 정산·운영 변경·재시험**: 하지 않음(최종 묶음 승인 뒤) |
 | 만든 방법 | 보관된 R1 증거만 읽었다: 02-05 장부(`records.jsonl`, `streams/s8-r1.jsonl`), 구동 기록(`s8-out/`), 역할 상태 볼륨의 세션 transcript(`state/claude/projects/…`; `cred/`는 읽지 않음). 58090·55433에 쓰지 않았고 모델 호출 없음. 숫자는 [evidence/r1-reconciliation.json](evidence/r1-reconciliation.json) |
 
 ## 1. R1에서 실제로 확인된 것과 아닌 것
@@ -99,6 +99,63 @@ R1을 대신할 개발 회차(아래 **R1b**)와 R2를 모두 하면 개발 회�
 
 보고는 다음을 따로 적는다: 정책 교정 완료(이 PR, 검토·병합 상태), R1의 확인된 연결과 도구 제한, 경고로 인한 R1 중단, R1 사용량(미계측, 정산 전·후), 미실행 R2·G1, 실제 재시험 완료 여부(재개 승인 뒤 별도).
 
+## 9. 최종 재개 묶음(사용자 결정 2026-11-17 정산 §2.5)
+
+이 절은 실제 정산 반영·운영 변경·모델 호출 **직전에 한 번에 승인받을 묶음**이다. 아래 명령은 모두 시험 시스템에서 처음부터 끝까지 예행했다([evidence/dry-run-resume.log](evidence/dry-run-resume.log), 34/34). 그 예행은 46799b0 바이너리로 2026-11-17의 R1 멈춤을 재현한 뒤 재개했다. `<SHA>`는 정산 PR과 재개 PR이 병합된 main의 SHA, `<SHA12>`는 그 앞 12자, `<SUMS>`·`<SUP>`는 A1이 출력하는 해시다. `$D` = `/opt/rust/src/github.com/HeaInSeo/ieo_poc-data`(규칙 명령에서는 글자 그대로 쓴다).
+
+### 9.1 근거와 수치
+
+| 항목 | 내용 |
+| --- | --- |
+| 독립 검산 | **CONFIRMED WITH CAVEAT**([evidence/r1-usage-verification.md](evidence/r1-usage-verification.md), SHA-256 `28b2f04e…9267`): billable 1,543, cache_read 3,223을 두 관점(메시지별 최종 사용량, `cost-state`)에서 그대로 재현. 단서: 기록된 요청 하나의 사용량이며, SIGTERM 직전에 보내졌으나 기록이 사라진 요청은 클라이언트 쪽에서 배제할 수 없고 공급자 쪽 청구는 보이지 않는다 |
+| 정산 후보 기록 | `ieo-role-run-settlement/v0`, `settles: s8-r1`, `source: transcript_exit_accounting`, `usage_run.tokens` input 2·output 130·cache_creation 1,411·cache_read 3,223, `evidence.sha256` `806746fd…dc68`(= 원본), `verification` API 요청 1·메시지 1·`uncovered: unlogged_in_flight_request_at_sigterm`, `independent_check`(보고서 경로, `28b2f04e…`, CONFIRMED WITH CAVEAT), `decision` 정산 결정. 장부 사본에서 `--dry-run`으로 만든 후보와 같다(아무것도 쓰지 않음). R1은 실패(“결과 사건 없음”)로 남는다 |
+| 남는 예산(정산 뒤) | 02-05 전체: 회차 3/4, 2,395초, billable 198,457, cache_read 1,996,777. 개발 몫: 2회, 1,795초, 148,457, 1,496,777. Guardrail 몫: 1회, 600초, 50,000, 500,000. 배정 `S8-DEV-A1`: 1,795초, 148,457. 추가 청구 USD 0 |
+| 회차 집계 | 실패 R1 + 예비 R1b + R2 + G1 = 4/4. 추가 예비·자동 재시도 없음. R1b·R2·G1 중 하나라도 멈추면 단계 8은 거기서 끝나고 보고한다 |
+| 특례 범위 | 가드가 당시 규칙의 경고로 멈춘 s8-r1 하나. 코드가 강제한다: 정산은 그런 회차만(현재 규칙으로 모든 신호 통과, 경고 하나 이상), 예비는 그 정산이 있을 때만 그 “결과 사건 없음”을 해제. 실제 거부·추가 과금 신호·시간·토큰 상한·다른 미계측 회차는 해당 없음(부록 B 시험) |
+| 관측 | 다음 호출의 관측은 R1 stream(새 규칙에서 경고로 통과). 7일 한도 **2026-11-24T12:19:49Z**(구동 스크립트는 10분 여유로 확인). 7일 창 재설정 2026-11-22T08:00:00Z: 그 전이면 R1b·R2도 경고를 받을 수 있다(기록·보고, 멈춤 아님). `rejected`가 되면 그 회차는 멈추고 미계측이 되며 단계 8은 끝난다(추가 사용은 거부 상태라 과금 없음) |
+
+### 9.2 코드와 바이너리
+
+| 항목 | 내용 |
+| --- | --- |
+| 코드 | 정산 PR(#90: 정산 형식, `ieo-role-call settle`)과 재개 PR(`ieo-role-call records`, `check-run.py`의 유효 기록, `restart-roles.sh`, `run-step8-resume.sh`, `make-resume-copies.sh`, `apply-perm-resume.py`, 예행)이 병합된 main `<SHA>`. 두 PR 모두 독립 검토·필수 CI·승인 head 병합·main CI 확인 뒤 |
+| 빌드(A0) | `<SHA>`에서 release 빌드(debuginfo 없음, 대상 디렉터리 하나, 루트 여유 8G 이상 확인) → `$D/bin/m-<SHA12>/`의 `ieo-coord`·`ieo-supervisor`·`ieo-role-call`, 각 SHA-256 기록. 옛 `bin/ieo-coord-M`(46799b0)·`bin/m-46799b0/`은 되돌리기용으로 그대로 |
+
+### 9.3 순서(A = 에이전트, U = 사용자)
+
+1. **A0** 빌드(위).
+2. **A1** 사본과 규칙: `bash <checkout>/docs/poc/reports/tasks/02-05/step8-plan-20261117/launcher/make-resume-copies.sh <SHA의 checkout> $D $D/bin/m-<SHA12> $D/private/s8/rules-resume.json`. 결과: `$D/step8-resume/`(커밋의 파일만, blob과 같음), `step8-ops/`의 `obs-check.sh`·`rate_limit_policy.py`, 새 `SHA256SUMS`(자기 해시 `<SUMS>`), 둘 다 쓰기 금지, 규칙 파일(옛 허용 28줄 빼기, 새 31줄 넣기). 옛 `step8-46799b0`은 증거로 둔다.
+3. **A2** `$D/private/s8/plan-0205.json`(장부·역할 URL·어댑터 토큰 파일 경로만, 비밀 없음): `{"budget": "02-05", "ledger_dir": "$D/ledger-0205", "first_observation": {"stream": "$D/ledger-0205-obs/D6.jsonl", "observed_unix": 1794698043}, "roles": {"development": {"url": "http://127.0.0.1:58221", "adapter_token_file": "/opt/rust/ieo_poc_runs/02-05-s8-20261118/adapter.token"}, "guardrail": {"url": "http://127.0.0.1:58222", "adapter_token_file": "/opt/rust/ieo_poc_runs/02-05-s8-20261118/adapter.token"}}}`(경로는 글자로).
+4. **U1** 허용 규칙 교체(사용자 터미널, 명령 하나): `python3 -I $D/step8-resume/launcher/apply-perm-resume.py $D/private/s8/rules-resume.json`. 백업을 만들고, 정확한 줄만 바꾸고, JSON을 확인한다. 예상 출력 `allow 28 -> 31 … new lines all present once: True`. 다시 실행하면 `already applied`. deny 7줄과 다른 설정은 그대로다.
+5. **A3** 사전 확인(읽기): 확인 줄 `cd $D && echo '<SUMS>  step8-ops/SHA256SUMS' | sha256sum --quiet --strict -c - && sha256sum --quiet --strict -c step8-ops/SHA256SUMS && find step8-resume step8-ops -perm /222 | wc -l | grep -qx 0 && echo "copies ok"`(아래 `<확인>`); 58090 연결 0, 02-05 장부에 `inflight.json` 없음, 두 역할 유휴, 루트 여유 8G 이상.
+6. **A4** 역할 바이너리 교체: `<확인> && bash $D/step8-resume/launcher/restart-roles.sh swap /opt/rust/ieo_poc_runs/02-05-s8-20261118 $D/bin/m-<SHA12>/ieo-supervisor <SUP>` → 두 역할 `up, idle, /opt/ieo/ieo-supervisor <SUP>`. 같은 컨테이너·볼륨(개발 역할의 s8-r1 `after_run` 체크포인트 유지), `cred/`는 건드리지 않는다. **되돌리기**: `<확인> && bash $D/step8-resume/launcher/restart-roles.sh rollback /opt/rust/ieo_poc_runs/02-05-s8-20261118`(보관한 `.prev`로).
+7. **A5** 코디네이터 교체(약 2분 멈춤): `<확인> && bash $D/step8-resume/launcher/coord-switch.sh stop $D/coord.pid 900 && bash $D/step8-resume/launcher/coord-switch.sh start $D/bin/m-<SHA12>/ieo-coord $D/private/s8/coord-778ee47 $D/coord.pid $D/logs/coord-<SHA12>.log --tokens $D/private/s8/tokens-s8.json -- --roles $D/private/s8/roles.json`. 별도 호출에서 생존 확인(health 200, pid·exe·수신자). **되돌리기**: `stop … 900` 뒤 `start $D/bin/ieo-coord-M …`(같은 캡처·인자, 로그 `coord-M-rollback.log`). 스키마 변경 없음(마이그레이션 없음).
+8. **A6** 정산(최종 승인 뒤): `PLAN`·`ROLE_CALL`·`TRANSCRIPT`·`ORIGINAL_PATH`·`ORIGINAL_SHA256`·`DECISION`·`CHECK_REPORT`·`CHECK_VERDICT`를 `export`한다. 먼저 `export DRY=1`과 함께 `run-step8-resume.sh settle` → `dry run: s8-r1 still unmeasured`(아무것도 쓰지 않음). 이어서 `DRY` 없이 `run-step8-resume.sh settle` → `s8-r1 counts: measured {… 'output': 130 …} stop_required True no result event | settlement guard_stop_on_old_rule_warning CONFIRMED WITH CAVEAT`. 원본 줄은 그대로이고 한 줄이 더해진다.
+9. **A7** `run-step8-resume.sh r1b-body` → `$D/s8-out/r1b-body.json`(새 세션, `new_session: true`, 예비 표식 `replaces: s8-r1`, 사유·근거)을 쓰고 **U2** 명령을 출력한다.
+10. **U2** R1b 전달(사용자 본인 토큰, 출력 없음): A7이 출력한 `curl … -H 'Idempotency-Key: s8-dlv-r1b-0001' -X POST http://127.0.0.1:58090/v0/repos/ieo-poc-test/roles/development/deliveries --data @$D/s8-out/r1b-body.json` → `http 201`, `resume_allowed start accepted`. 코디네이터가 사람(`kind: user`)과 시각을 표식에 적는다.
+11. **A8** `run-step8-resume.sh r1b-check` → 기다림, 장부 기록, 유효 기록으로 §6.2 모든 확인(s8-r1은 정산으로 센다), `s8-r1b spare: replaces s8-r1 by user heain`.
+12. **A9** `run-step8-resume.sh r2g1`(배경 실행): 관측 마감(R1 끝 + 7일) → R2(R1b 세션 `reconnect`) → G1(`start`), 회차마다 모든 확인. 끝 줄 `R1b, R2 and G1 recorded and checked`.
+13. **보고**(정책 교정·정산·재시험을 따로) 뒤 사용자가 단계 8 허용 규칙(새 31줄)을 지운다.
+
+모든 규칙 명령은 확인 줄(`<확인> &&`)로 시작한다. 규칙 명령은 그 단계에서만 실행하고, 끝났거나 멈춘 뒤에는 사용자의 명시 지시 없이 다시 실행하지 않는다. 허용된 명령이 막히면 멈추고 그 줄을 사용자에게 준다.
+
+### 9.4 되돌리기와 그 뒤의 상태
+
+| 시점 | 되돌리기 | 결과 |
+| --- | --- | --- |
+| A4 실패 | `restart-roles.sh rollback` | 옛 바이너리로 같은 컨테이너. 아무 기록도 바뀌지 않음 |
+| A5 실패(정산 전) | 코디네이터를 M으로 | 지금과 같은 상태(R1 미계측으로 막힘) |
+| A6 뒤에 M으로 되돌림 | 역할 `rollback` + 코디네이터 M | **M은 정산 형식을 모른다**: 정산 줄을 회차가 아닌 줄로 보고 R1을 원본대로 미계측으로 센다. 그래서 다음 전달을 409 `ASSIGNMENT_USAGE_UNMEASURED`로 거절하고 아무것도 시작하지 않는다(예행에서 확인, fail closed). 정산 줄과 경고 기록(`rate_limit_warnings`)은 장부에 남고, 새 빌드로 돌아오면 다시 확인되어 적용된다. 옛 역할 바이너리는 경고에서 다시 멈추므로 되돌린 채로 회차를 보내지 않는다 |
+| 회차 중 | 하지 않음 | 재시작·재시도는 묶음 밖. 코디네이터 정지는 진행 중 회차를 기다린다(900초) |
+
+### 9.5 사용자에게 요청할 최종 승인(한 번에)
+
+1. 두 PR의 병합 SHA와 빌드 해시.
+2. 허용 규칙 교체(U1).
+3. 역할 바이너리 교체(A4)와 코디네이터 교체(A5), 각 되돌리기.
+4. 정산 기록 추가(A6, 원본 보존).
+5. 사용자 본인의 R1b 전달(U2: 예비 표식)과 그 뒤 R2·G1(모델 호출 3회).
+
 ## 부록 A. 한도 경고 판정의 근거, 정책 전후, 시험
 
 ### A.1 근거 자료
@@ -176,5 +233,5 @@ R1을 대신할 개발 회차(아래 **R1b**)와 R2를 모두 하면 개발 회�
 | 거절(장부 사용 불가) | 사본 변조(해시 다름), 같은 회차의 둘째 정산, 없는·나중의 회차, 다른 세션·stream·사용량·요청 수, 결정·독립 검산 참조 없음, 검산 판정이 확인이 아님, 단서(`uncovered`·`residual`) 누락, 다른 출처·정책, 상대 경로, 정정된 회차의 정산과 정산된 회차의 정정, 정산 필드를 스스로 가진 회차 줄. 사본은 장부 안에만 둔다: `<장부의 정규 경로>/children/s8-r1/settlement-transcript.jsonl`과 검산 보고서 사본 `independent-check.md`(검토 7b904de N-1). 장부 디렉터리는 정규 경로로 비교해 별칭·`..`로 적은 계획도 같은 판정(N-2), 장부 안(`children`, `children/s8-r1`, 파일)의 심볼릭 링크는 거절(L-1, N-3). 읽을 때마다 `evidence.original_sha256` = `evidence.sha256` = 사본의 실제 해시, 보고서는 장부의 사본이 기록된 SHA-256과 같아야 하며(없거나 다르면 거절; 원래 경로는 출처 기록일 뿐 다시 읽지 않음), `decision`은 `docs/poc/User_Decisions_2026-11-17_r1-settlement.md`만(L-2) |
 | 예비 해제 범위 | `spare_releasable`: 가드가 멈춘 회차의 “결과 사건 없음”은 이 정책의 정산이 있을 때만 해제. 정산 없는 가드 멈춤, 실제 거부, 추가 과금, 상한, 다른 미계측은 계속 막음. 정산이 있어도 그 회차가 고정한 s8-r1이 아니면 해제하지 않는다 |
 | 쓰는 명령 | `ieo-role-call settle --plan <plan.json> --attempt s8-r1 --transcript $D/s8-evidence/s8-r1-transcript.jsonl --original-path <역할 볼륨의 원본 경로> --original-sha256 806746fd…dc68 --decision docs/poc/User_Decisions_2026-11-17_r1-settlement.md --independent-check docs/poc/reports/tasks/02-05/step8-plan-20261117/evidence/r1-usage-verification.md --independent-verdict "CONFIRMED WITH CAVEAT" [--dry-run]`(보고서 SHA-256은 명령이 계산해 기록). 장부 잠금 아래, 진행 중 호출 없음, 사본 해시가 원본과 같을 때만, 다시 읽어 적용될 때만 한 줄을 더한다. 어떤 거절에도, `--dry-run`에도 아무것도 쓰지 않는다(드라이런은 주어진 증거 사본을 직접 읽고 임시 파일도 만들지 않는다: L-3). 두 사본(전사·보고서)은 새로 만들 때만 쓰고(`create_new`, 0600), 그 경로나 그 위 디렉터리가 심볼릭 링크이거나 다른 파일이면 거절하며, 실패하면 만든 사본을 지운다. **실제 장부에는 아직 실행하지 않았다**(장부 사본에서 `--dry-run`만: 쓴 것 없음) |
-| 재개 스크립트에 남는 일 | `check-run.py`는 장부 줄을 그대로 읽어 R1 원본(미계측)을 실패로 센다. 재개 PR에서 정산을 적용한 기록(`ieo-role-call`의 읽기 또는 같은 규칙)으로 집계하게 한다 |
+| 재개 스크립트 | `check-run.py`는 `EFFECTIVE_RECORDS`(`ieo-role-call records`가 출력한 유효 기록)로 집계해 정산된 s8-r1을 정산으로 센다(장부 줄 그대로 읽으면 R1 원본을 미계측 실패로 센다: 예행에서 확인). 재개 순서와 명령은 §9. 정산 줄에는 `attempt_id`가 없으므로 장부 줄을 직접 읽는 곳(`check-run.py`, `dry-run-step8.sh`의 변조 사본)은 회차 줄(`format: ieo-role-run/v0`)만 센다(PR #90 검토 d971f59 L-5). 정산 줄에는 `attempt_id`가 없으므로 장부 줄을 직접 읽는 곳(`check-run.py`, `dry-run-step8.sh`의 변조 사본)은 회차 줄(`format: ieo-role-run/v0`)만 센다(PR #90 검토 d971f59 L-5) |
 | 시험 | `tests/settlement.rs`: 계산(중복 제거·종료 집계 불일치·요청 없음·다른 세션·side-chain·깨진 줄·숫자 아님), 정산 뒤 한 번 집계·실패 유지·예비 해제, 변조·중복·다른 시도·세션·stream·참조 누락·출처·사본 해시·상대 경로·요청 수, 근거 부족(아무것도 쓰지 않음), 특례 범위(실제 거부, 경고 뒤 거부, 추가 사용, 경고 없음, 시간·토큰·cache_read 상한, 가드 아님, 다른 사유, 계측됨, 결과 있음, 자식, 예비, 다른 stream: 정산 안 되고 예비도 해제 못함), CLI(드라이런·해시 다름·정상). PR #89 검토 L-1~L-3 보강(stream 단위 Rust=Python, 숫자 0/1, 나중 `allowed`가 경고 지움). 독립 검산 판정·SHA-256·근거 경로와 단서(`uncovered`·`residual`)가 없거나 바뀌면 거절. 전체 428 통과·0 실패, 변이 36개 중 35 죽음·1 동등(W02: 쓰기 전 원본 해시 확인은 `build`가 같은 조건을 다시 확인해 중복). 검토 d971f59 정정: 고정값(예산·시도·세션·stream 해시 각각 다르면 거절, 다른 시도·세션은 정산도 예비 해제도 안 됨), 사본 위치·심볼릭 링크(읽기와 쓰기), 사본·원본 해시 불일치, 보고서 변경·삭제, 다른 결정, 회차 한도 초과·한도 없음, 넘침, 바뀐 stream 파일, 드라이런이 장부에 아무것도 만들지 않음. 변이: 정정 10개 모두 죽음, 옮겨진 코드의 기존 변이 다시 실행해 죽음(V03·W02는 동등: 실제 파일 해시와 비교하므로 형식 검사·쓰기 전 해시 검사가 중복) |

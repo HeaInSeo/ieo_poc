@@ -1,0 +1,42 @@
+# 02-05 step 8 RESUME dry run (fake claude, test PostgreSQL 55432/ieo_t_s8res_3266701, test coordinator 127.0.0.1:58290, roles 58231/58232, no model call) · 2026-11-17T14:47:11Z
+# branch 662e952 · old (46799b0) supervisor 5fca01584a09 coordinator d6a742145ea1 · new supervisor 9f91a3d8d060 coordinator b605836b3520
+PASS test database ieo_t_s8res_3266701 created on 55432
+# role containers up: ieo-s8dry-ieo-poc-test-{development,guardrail} on 127.0.0.1:58231/58232 · image docker.io/library/golang@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c · network slirp4netns:allow_host_loopback=true · coordinator http://10.0.2.2:58290
+# target https://github.com/HeaInSeo/ieo_poc_test @ 2ab9d8760012516f37674a9446ca2fb2699973c0 (read-only copies) · credentials: OAuth form (values not printed) · roles entry: /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8res-dry/run/roles-entry.json
+PASS old (46799b0) role supervisors up (run-step8-roles.sh)
+PASS old build: register
+PASS semantic review (201)
+PASS old build: prepare
+PASS old build: R1 stops like 2026-11-17 (exit 3)
+   no result event; usage unmeasured: "stopped by the run guard (Overage(\"rate limit status \\\"allowed_warning\\\" (not allowed)\")), a result written after the 
+PASS s8-r1 recorded like the real one: guard stop on allowed_warning (old rule), unmeasured, no result
+PASS capture of the running old coordinator (like private/s8/coord-778ee47)
+PASS make-resume-copies.sh: # rules: remove 28 old allow lines, add 31 new ones -> /tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/s8res-dry/rules.json
+PASS the gate passes on the copies (self-hash, every file, read-only)
+PASS apply-perm-resume.py on a settings copy: allow 28 -> 31 (removed 28, added 31), deny 7; new lines all present once: True;
+PASS apply-perm-resume.py again: already applied, nothing changed
+PASS restart-roles.sh swap: 2 roles up and idle on the new binary
+PASS the development volume kept its local checkpoint (s8-r1 after_run)
+PASS old coordinator stopped
+PASS new coordinator started with the captured argv/env/cwd, --tokens, --roles
+PASS evidence copy of the R1 transcript equals the original in the volume
+PASS settle, dry run: nothing written (dry run: s8-r1 still unmeasured)
+PASS settle: s8-r1 counts: measured {'cache_creation': 10, 'cache_read': 20, 'input': 3, 'output': 30} stop_required True no result event | settlement gu
+PASS settle again: refused (already settled, nothing written)
+PASS r1b-body: the body and the user's command
+PASS the printed user command carries the R1b key and the user's token file
+PASS the user's R1b delivery (201)
+PASS r1b-check: s8-r1b: ('resume_allowed', 'start', 'accepted') · s8-r1b spare: replaces s8-r1 by user user-dry
+PASS R1b got the allowed_warning event: recorded and printed as a warning, not a stop
+PASS r2g1: R1b, R2 and G1 recorded and checked
+PASS check-run.py on the raw lines would fail on s8-r1's original line (why EFFECTIVE_RECORDS)
+PASS the same check on the effective records passes
+   billable over the 4 runs: 103 | R1 settled {'cache_creation': 10, 'cache_read': 20, 'input': 3, 'output': 30}
+PASS the budget counts 4 runs once each: s8-r1 settled (failed), s8-r1b spare, s8-r2 resumes s8-r1b, s8-g1
+PASS restart-roles.sh rollback: the old supervisor back in the same containers
+PASS new coordinator stopped
+PASS rollback: the old coordinator starts on the same ledger and database
+   old build answered: ['ASSIGNMENT_USAGE_UNMEASURED']  awaiting_human_decision
+PASS rollback: the old build does not know the settlement: it refuses the next call, nothing starts (fail closed)
+PASS old coordinator stopped
+## result: 34 passed, 0 failed
