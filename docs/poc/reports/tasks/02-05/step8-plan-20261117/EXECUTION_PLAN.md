@@ -117,7 +117,7 @@ podman exec -i ieo-poc-db pg_restore -U <user> -d <db> --exit-on-error < "$B/ieo
 
 ## 5. 재배포
 
-### 5.1 사전 확인 [읽기](약 10분)
+### 5.1 사전 확인 [읽기], 약 10분
 
 RUNBOOK §1을 그대로, 지금의 사실에 맞춰:
 1. 빌드 M이 main CI 성공. 바이너리가 M에서 만들어짐.
