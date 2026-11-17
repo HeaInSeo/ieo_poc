@@ -57,10 +57,9 @@ pub struct Plan {
 
 impl Plan {
     pub fn from_json(v: &Value) -> Result<Plan, String> {
-        let budget = match v["budget"].as_str() {
-            Some("02-04") => budget::BUDGET_0204,
-            Some("X-02") => budget::BUDGET_X02,
-            _ => return Err("plan.budget must be 02-04 or X-02".into()),
+        let budget = match v["budget"].as_str().and_then(budget::named) {
+            Some(b) => b,
+            None => return Err("plan.budget must be 02-04, X-02 or 02-05".into()),
         };
         let ledger_dir = v["ledger_dir"]
             .as_str()
@@ -80,11 +79,42 @@ impl Plan {
                     .filter(|x| *x > 0)
                     .ok_or(format!("roles.{name}.share.{k}"))
             };
-            let share = Share {
-                max_runs: f("max_runs")?,
-                total_seconds: f("total_seconds")?,
-                billable_tokens: f("billable_tokens")?,
-                cache_read_tokens: f("cache_read_tokens")?,
+            // a budget whose approval fixes the role shares (02-05): exactly those, never
+            // configured; a share given in the plan must equal them
+            let share = if budget.role_shares.is_empty() {
+                Share {
+                    max_runs: f("max_runs")?,
+                    total_seconds: f("total_seconds")?,
+                    billable_tokens: f("billable_tokens")?,
+                    cache_read_tokens: f("cache_read_tokens")?,
+                }
+            } else {
+                let a = budget.approved_share(name).ok_or(format!(
+                    "roles.{name}: the {} budget approves no share for this role",
+                    budget.name
+                ))?;
+                let approved = Share {
+                    max_runs: a.max_runs,
+                    total_seconds: a.total_seconds,
+                    billable_tokens: a.billable_tokens,
+                    cache_read_tokens: a.cache_read_tokens,
+                };
+                if !sh.is_null() {
+                    let given = Share {
+                        max_runs: f("max_runs")?,
+                        total_seconds: f("total_seconds")?,
+                        billable_tokens: f("billable_tokens")?,
+                        cache_read_tokens: f("cache_read_tokens")?,
+                    };
+                    if given != approved {
+                        return Err(format!(
+                            "roles.{name}.share differs from the {} budget's approved share \
+                             (omit it or give exactly the approved values)",
+                            budget.name
+                        ));
+                    }
+                }
+                approved
             };
             for (s, x) in sum.iter_mut().zip([
                 share.max_runs,
@@ -219,7 +249,22 @@ pub const CORRECTION_FORMAT: &str = "ieo-role-run-correction/v0";
 /// later run, a second correction of one run, a missing or changed file, or any difference
 /// makes the ledger unusable.
 pub fn records(plan: &Plan) -> Result<Vec<Value>, String> {
-    effective(raw_records(plan)?)
+    let recs = effective(raw_records(plan)?)?;
+    // one ledger belongs to one budget (02-05 budget PR): a record of another budget is never
+    // counted for, or charged to, this one; the ledger is refused instead (fail closed)
+    if let Some(other) = recs
+        .iter()
+        .filter_map(|r| r["budget"].as_str())
+        .find(|b| *b != plan.budget.name)
+    {
+        return Err(format!(
+            "the ledger {} holds records of the budget {other}, not {}: one ledger per budget \
+             (usage is never transferred)",
+            plan.ledger_dir.display(),
+            plan.budget.name
+        ));
+    }
+    Ok(recs)
 }
 
 fn effective(raw: Vec<Value>) -> Result<Vec<Value>, String> {
@@ -365,12 +410,33 @@ fn moved_hint(e: &std::io::Error) -> &'static str {
 
 /// A record that asks for a person stops every call until it is reconciled.
 fn asks_for_a_person(recs: &[Value]) -> Option<String> {
-    recs.iter().find(|r| r["stop_required"] == true).map(|r| {
-        format!(
-            "record {} asks for a person: {}",
-            r["attempt_id"], r["stop_reason"]
-        )
-    })
+    asks_for_a_person_but(recs, None)
+}
+
+/// [`asks_for_a_person`], where the failed run a spare replaces counts as answered: the spare
+/// marker (a reason and that attempt) is the person's recorded decision about it (02-05 budget,
+/// user decision 2026-11-17 (나)). A spare recorded earlier answers its run for every later
+/// call; `this_spare` is the one the call carries. Every other record that asks for a person
+/// still stops the call; an unmeasured run still stops the budget ([`budget::next`]).
+fn asks_for_a_person_but(recs: &[Value], this_spare: Option<&str>) -> Option<String> {
+    let answered: Vec<&str> = recs
+        .iter()
+        .filter_map(|r| r["spare"]["replaces"].as_str())
+        .chain(this_spare)
+        .collect();
+    recs.iter()
+        .filter(|r| {
+            r["attempt_id"]
+                .as_str()
+                .is_none_or(|a| !answered.contains(&a))
+        })
+        .find(|r| r["stop_required"] == true)
+        .map(|r| {
+            format!(
+                "record {} asks for a person: {}",
+                r["attempt_id"], r["stop_reason"]
+            )
+        })
 }
 
 /// The services' state before a call or a restart, for **every** role of the plan (`first`
@@ -619,7 +685,7 @@ pub fn call_with_extra(
     if c.op != "start" && c.op != "reconnect" {
         return Err(format!("op {} is not start or reconnect", c.op));
     }
-    let adm = match admit(plan, &c.role, &c.attempt_id, adapter)? {
+    let adm = match admit_with(plan, &c.role, &c.attempt_id, adapter, extra)? {
         Ok(a) => a,
         Err(why) => return Ok(Called::NotStarted(why)),
     };
@@ -651,6 +717,152 @@ pub struct Admission {
     recs: Vec<Value>,
     limits: Limits,
     before: Value,
+    /// The spare marker this call carries, checked (02-05 budget; written to its record).
+    spare: Option<Value>,
+}
+
+/// The spare gate of a budget that has one (user decision 2026-11-17 (나)): `Ok(None)` when the
+/// call is no spare, `Ok(Some(marker))` for an allowed spare, `Err(why)` otherwise (nothing
+/// starts). Without a marker the role runs at most its `planned_runs` (runs that are no spare);
+/// the spare needs `extra.spare = {reason, replaces, evidence_ref, by, approved_at}` (user
+/// decision 2026-11-17, addition): a person (`by.kind` "user") names the earlier failed run of
+/// this role and budget it replaces, a reason, and a reference to the cause report or evidence
+/// (the reason alone proves no environment defect). The replaced run's effective record is a
+/// failure (`stop_required`, or a result that is not a clean success), and its stop is one the
+/// marker may release: the run's result only ([`spare_releasable`]); unmeasured usage, a
+/// limit or overage signal, a failed cleanup or an environment that is not subscription-only
+/// keep blocking. The spare may redo either planned run (R1 or R2), so it need not be the
+/// third call. One spare only; a role without a spare never carries a marker. An unreadable or
+/// ambiguous record refuses.
+pub fn spare_gate(
+    plan: &Plan,
+    role: &str,
+    recs: &[Value],
+    raw: &[Value],
+    extra: &Value,
+) -> Result<Option<Value>, String> {
+    let marker = &extra["spare"];
+    let Some(rule) = plan.budget.spare.filter(|r| r.role == role) else {
+        if marker.is_null() {
+            return Ok(None);
+        }
+        return Err(format!(
+            "role {role} has no spare run in the {} budget",
+            plan.budget.name
+        ));
+    };
+    // the role's runs that are no spare (its planned runs)
+    let planned_used = recs
+        .iter()
+        .filter(|r| r["role"] == role && r["model_request"] == true && r["spare"].is_null())
+        .count() as u64;
+    if marker.is_null() {
+        if planned_used < rule.planned_runs {
+            return Ok(None);
+        }
+        return Err(format!(
+            "role {role}: its {} planned runs are used; the spare run needs a marker with a \
+             person's reason, evidence reference and the failed run it replaces (deliverAssignment \
+             `spare`, a user credential)",
+            rule.planned_runs
+        ));
+    }
+    if recs
+        .iter()
+        .any(|r| r["role"] == role && !r["spare"].is_null())
+    {
+        return Err(format!(
+            "role {role}: the spare run of the {} budget was used already",
+            plan.budget.name
+        ));
+    }
+    let reason = marker["reason"].as_str().filter(|r| !r.trim().is_empty());
+    let replaces = marker["replaces"].as_str().filter(|r| !r.is_empty());
+    let (Some(reason), Some(replaces)) = (reason, replaces) else {
+        return Err("the spare marker needs a reason and the attempt it replaces".into());
+    };
+    // the cause report or evidence the person states (user decision 2026-11-17, addition)
+    let Some(evidence_ref) = marker["evidence_ref"]
+        .as_str()
+        .filter(|r| !r.trim().is_empty())
+    else {
+        return Err("the spare marker needs an evidence_ref (the cause report or evidence)".into());
+    };
+    // who attached it and when (review b38e8df M-1): a person; the record keeps it
+    let by = &marker["by"];
+    if by["kind"] != "user" || by["name"].as_str().is_none_or(|n| n.trim().is_empty()) {
+        return Err("the spare marker is attached by a person (`by`: kind user, a name)".into());
+    }
+    let Some(approved_at) = marker["approved_at"].as_str().filter(|a| !a.is_empty()) else {
+        return Err("the spare marker has no approval time (`approved_at`)".into());
+    };
+    let found: Vec<&Value> = raw
+        .iter()
+        .filter(|r| r["format"] == RECORD_FORMAT && r["attempt_id"] == replaces)
+        .collect();
+    let [r] = found.as_slice() else {
+        return Err(format!(
+            "spare: the replaced attempt {replaces} is not one record of the ledger ({} found)",
+            found.len()
+        ));
+    };
+    // the raw line decides "one record"; the effective record (a correction applied) decides
+    // what the run was (review b38e8df L-1)
+    let _one = r;
+    let Some(r) = recs.iter().find(|e| e["attempt_id"] == replaces) else {
+        return Err(format!(
+            "spare: the replaced attempt {replaces} has no effective record"
+        ));
+    };
+    if r["role"] != role || r["model_request"] != true || r["budget"] != plan.budget.name {
+        return Err(format!(
+            "spare: the replaced attempt {replaces} is not a {role} run of the {} budget",
+            plan.budget.name
+        ));
+    }
+    let result = &r["outcome"]["result"];
+    let failed = r["stop_required"] == true
+        || !(result["subtype"] == "success" && result["is_error"] == false);
+    if !failed {
+        return Err(format!(
+            "spare: the replaced attempt {replaces} did not fail (a spare replaces a failed run)"
+        ));
+    }
+    if let Err(why) = spare_releasable(r) {
+        return Err(format!(
+            "spare: the stop of {replaces} is not one a spare releases: {why}"
+        ));
+    }
+    Ok(Some(
+        serde_json::json!({"reason": reason, "replaces": replaces,
+        "evidence_ref": evidence_ref, "by": by, "approved_at": approved_at}),
+    ))
+}
+
+/// Whether a spare marker may release the stop of the failed run it names (user decision
+/// 2026-11-17, addition, §3): only a stop for the run's own result ("result …", "no result
+/// event"), and only with its usage measured. Any other reason (unmeasured usage, a limit or
+/// overage signal, a failed process-group cleanup, an environment that is not
+/// subscription-only, an answer that was lost) keeps blocking. Fail-closed: a reason not on
+/// the list keeps blocking.
+pub fn spare_releasable(r: &Value) -> Result<(), String> {
+    if r["usage"]["run"]["state"] != "measured" {
+        return Err(format!("usage {}", r["usage"]["run"]["state"]));
+    }
+    if r["stop_required"] != true {
+        return Ok(());
+    }
+    let reason = r["stop_reason"].as_str().unwrap_or_default();
+    if reason.is_empty() {
+        return Err("a stop without a reason".into());
+    }
+    match reason
+        .split("; ")
+        .find(|p| !(p.starts_with("result ") || *p == "no result event"))
+    {
+        None => Ok(()),
+        Some(p) => Err(p.to_string()),
+    }
 }
 
 /// The ledger's effective records when no call of the budget is running (02-05 step 5): the
@@ -688,6 +900,17 @@ pub fn admit(
     attempt_id: &str,
     adapter: &dyn Adapter,
 ) -> Result<Result<Admission, String>, String> {
+    admit_with(plan, role, attempt_id, adapter, &json!({}))
+}
+
+/// [`admit`] for a call whose start carries `extra` (its spare marker is checked here).
+pub fn admit_with(
+    plan: &Plan,
+    role: &str,
+    attempt_id: &str,
+    adapter: &dyn Adapter,
+    extra: &Value,
+) -> Result<Result<Admission, String>, String> {
     plan.roles
         .get(role)
         .ok_or(format!("role {role} not in the plan"))?;
@@ -719,7 +942,14 @@ pub fn admit(
         )));
     }
     let recs = records(plan)?;
-    if let Some(why) = asks_for_a_person(&recs) {
+    // the spare gate first: a valid spare answers the failed run it replaces
+    let spare = match spare_gate(plan, role, &recs, &raw_records(plan)?, extra) {
+        Ok(s) => s,
+        Err(why) => return Ok(Err(why)),
+    };
+    if let Some(why) =
+        asks_for_a_person_but(&recs, spare.as_ref().and_then(|s| s["replaces"].as_str()))
+    {
         return Ok(Err(why));
     }
     if recs.iter().any(|r| r["attempt_id"] == attempt_id) {
@@ -741,6 +971,7 @@ pub fn admit(
         recs,
         limits,
         before,
+        spare,
     }))
 }
 
@@ -843,13 +1074,24 @@ impl Admission {
             .ok_or(format!("role {} not in the plan", c.role))?
             .clone();
         let mut body = self.body(c);
-        for (k, v) in extra.as_object().into_iter().flatten() {
+        // the spare marker is the budget check's, not the role service's (review b38e8df I-4)
+        for (k, v) in extra
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter(|(k, _)| *k != "spare")
+        {
             body[k] = v.clone();
         }
         let base_rec = json!({"format": RECORD_FORMAT, "task_id": c.task_id, "budget": plan.budget.name,
             "attempt_id": c.attempt_id, "command_id": format!("{}-{}", c.role, c.op), "role": c.role,
             "model_request": true, "started_at": ieo_evidence::time::now(),
             "started_unix": unix_now(), "limits": body["limits"]});
+        // the spare marker, as checked at admission (02-05 budget)
+        let mut base_rec = base_rec;
+        if let Some(s) = &self.spare {
+            base_rec["spare"] = s.clone();
+        }
         mark_inflight(plan, c)?;
         match adapter.send(&target, "POST", &format!("/v0/role/{}", c.op), Some(&body)) {
             Ok((202, answer)) => Ok(Sent::Accepted {
@@ -1402,6 +1644,7 @@ mod tests {
                 grace: Duration::from_secs(6),
             },
             before: Value::Null,
+            spare: None,
         }
     }
 

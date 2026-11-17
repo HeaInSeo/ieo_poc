@@ -1383,6 +1383,136 @@ fn e2e(transport: &str) {
         "{h6}"
     );
 
+    // 12b. review d336849 L-b: the run ends in an `error` checkpoint; a takeover over it is a
+    //      recovery as well
+    {
+        let mut cp = local_cp();
+        let seq = cp["seq"].as_u64().expect("seq") + 1;
+        cp["seq"] = json!(seq);
+        cp["phase"] = json!("error");
+        let raw = serde_json::to_string_pretty(&cp).expect("j");
+        let (st, b) = c(
+            "sup",
+            "POST",
+            "/v0/repos/repo-a/roles/development/checkpoints",
+            Some(&json!({"seq": seq, "checkpoint_json": raw})),
+        );
+        assert_eq!(st, 201, "{b}");
+        std::fs::write(&cp_path, &raw).expect("local");
+        std::fs::write(
+            state.join("checkpoints").join(format!("{seq:020}.json")),
+            &raw,
+        )
+        .expect("archive");
+    }
+    fixture("development", "D-e2e-err", "A1", "dev-profile");
+    let (st, b) = takeover("D-e2e-err", Value::Null);
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("RECOVERY_REQUIRED")),
+        "{b}"
+    );
+    // 12c. review d336849 L-a: a delivery whose use was recorded for another checkpoint (the
+    //      first crash's, approval `ry`) does not cover this one: refused
+    let ry_id = ry["recovery_id"].as_str().expect("id").to_string();
+    fixture("development", "D-e2e-bind", "A1", "dev-profile");
+    {
+        let mut c2 = cfg.clone();
+        c2.dbname(&dbname);
+        c2.connect(NoTls)
+            .expect("db")
+            .execute(
+                "INSERT INTO role_recovery_uses (recovery_id, delivery_id, repo_id, role,
+                     checkpoint_seq)
+                 VALUES ($1, 'D-e2e-bind', 'repo-a', 'development', $2)",
+                &[&ry_id, &crashed["seq"].as_i64().expect("seq")],
+            )
+            .expect("fixture use");
+    }
+    let (st, b) = takeover("D-e2e-bind", json!(ry_id));
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("RECOVERY_REQUIRED")),
+        "{b}"
+    );
+
+    // 12d. review d336849 L-a: the approval must be of the reported assignment and generation:
+    //      an approval of A1/0 does not cover a takeover under the new generation A1/1
+    let errcp = local_cp();
+    let (st, re) = approve(
+        "alice-ops",
+        "rec-key-0023",
+        &target(&errcp, "the run ended in an error"),
+    );
+    assert_eq!((st, re["state"].as_str()), (201, Some("approved")), "{re}");
+    assert_eq!(
+        assign(
+            "development",
+            1,
+            json!({"assignment_id": "A1", "generation": 0})
+        )
+        .0,
+        201
+    );
+    {
+        let mut c2 = cfg.clone();
+        c2.dbname(&dbname);
+        let mut d = c2.connect(NoTls).expect("db");
+        d.execute(
+            "INSERT INTO role_deliveries (delivery_id, repo_id, role, request_id, body,
+                 assignment_id, generation, attempt_id, session_id, logical_name,
+                 coordinator_record, target_sha, requested_by)
+             VALUES ('D-e2e-gen', 'repo-a', 'development', 'D-e2e-gen', '{}'::jsonb, 'A1', 1,
+                     'D-e2e-gen', 'f', 'f', $2, $1, 'test-fixture')",
+            &[
+                &SHA1,
+                &json!({"image_digest": "sha256:img", "profile_id": "dev-profile",
+                        "profile_revision": 1}),
+            ],
+        )
+        .expect("fixture delivery");
+        d.execute(
+            "INSERT INTO role_delivery_results (delivery_id, n, decision, reasons, op, outcome)
+             VALUES ('D-e2e-gen', 1, 'recovery_allowed', '[]'::jsonb, 'start', 'accepted')",
+            &[],
+        )
+        .expect("fixture result");
+        d.execute(
+            "INSERT INTO role_recovery_uses (recovery_id, delivery_id, repo_id, role,
+                 checkpoint_seq)
+             VALUES ($1, 'D-e2e-gen', 'repo-a', 'development', $2)",
+            &[
+                &re["recovery_id"].as_str().expect("id"),
+                &errcp["seq"].as_i64().expect("seq"),
+            ],
+        )
+        .expect("fixture use");
+    }
+    {
+        let mut cp = errcp.clone();
+        let seq = cp["seq"].as_u64().expect("seq") + 1;
+        cp["seq"] = json!(seq);
+        cp["phase"] = json!("takeover");
+        cp["generation"] = json!(1);
+        cp["session_id"] = json!("s-gen1");
+        cp["delivery_id"] = json!("D-e2e-gen");
+        cp["attempt_id"] = json!("D-e2e-gen");
+        cp["first_action"] = Value::Null;
+        cp["recovery_id"] = re["recovery_id"].clone();
+        let raw = serde_json::to_string_pretty(&cp).expect("j");
+        let (st, b) = c(
+            "sup",
+            "POST",
+            "/v0/repos/repo-a/roles/development/checkpoints",
+            Some(&json!({"seq": seq, "checkpoint_json": raw})),
+        );
+        assert_eq!(
+            (st, b["rejections"][0]["code"].as_str()),
+            (409, Some("RECOVERY_REQUIRED")),
+            "{b}"
+        );
+    }
+
     // 13. guardrail (review 185d12b L-3, M2): the same approval for the review role, judged on
     //     its review target instead of a GitHub head; a stale target is refused
     assert_eq!(assign("guardrail", 0, Value::Null).0, 201);

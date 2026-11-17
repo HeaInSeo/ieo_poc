@@ -39,7 +39,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
-const BODY_KEYS: [&str; 8] = [
+const BODY_KEYS: [&str; 9] = [
     "assignment_id",
     "generation",
     "attempt_id",
@@ -48,6 +48,7 @@ const BODY_KEYS: [&str; 8] = [
     "logical_name",
     "new_session",
     "recovery_id",
+    "spare",
 ];
 
 /// An id the supervisor accepts as a file name and CLI argument (its `safe_id`).
@@ -107,7 +108,39 @@ fn check_body(req: &Req) -> Result<Value, Resp> {
             "`recovery_id` is an approved recovery's id (R-…)",
         ));
     }
+    // the 02-05 budget's spare run (user decision 2026-11-17 (나)): a reason and the failed
+    // attempt it replaces; the shared budget check decides
+    if !body["spare"].is_null() {
+        let s = &body["spare"];
+        let text = |k: &str| {
+            s[k].as_str()
+                .is_some_and(|r| !r.trim().is_empty() && r.len() <= 2000)
+        };
+        let ok = s.as_object().is_some_and(|o| o.len() == 3)
+            && text("reason")
+            && text("evidence_ref")
+            && s["replaces"].as_str().is_some_and(safe_id);
+        if !ok {
+            return Err(bad(
+                "spare",
+                "`spare` is {reason, evidence_ref (each 1-2000 bytes), replaces (the failed \
+                 attempt id)}",
+            ));
+        }
+    }
     Ok(body)
+}
+
+/// The delivery's spare marker for the shared budget check, with the person who attached it
+/// (the record keeps it; review b38e8df M-1).
+fn spare_extra(spare: &Value, who: &Caller) -> Value {
+    if spare.is_null() {
+        return json!({});
+    }
+    let mut s = spare.clone();
+    s["by"] = json!({"name": who.name, "kind": "user", "via": "deliverAssignment"});
+    s["approved_at"] = json!(ieo_evidence::time::now());
+    json!({"spare": s})
 }
 
 /// The coordinator's configuration of this role: the supervisor and the image and profile it
@@ -432,6 +465,15 @@ pub fn deliver(
         need_compare(who, repo, role)?;
         let key = idem_key(req)?;
         let body = check_body(req)?;
+        // the spare marker answers a failed run that asks for a person: a person attaches it
+        // (review b38e8df M-1, as a recovery approval); nothing is recorded or called otherwise
+        if !body["spare"].is_null() && who.kind != crate::auth::Kind::User {
+            return Err(problem(
+                403,
+                "HUMAN_APPROVAL_REQUIRED",
+                "a spare run is attached by a person (a user credential), not a service",
+            ));
+        }
         let t = target(ctx, repo, role)?;
         Ok::<_, Resp>((key, body, t))
     })();
@@ -599,7 +641,13 @@ pub fn deliver(
             "profile_id": rec["profile_id"], "profile_revision": rec["profile_revision"]}),
     };
     let admitted = budget_plan(ctx, repo).and_then(|plan| {
-        let adm = caller::admit(&plan, role, &call.attempt_id, &caller::Http)??;
+        let adm = caller::admit_with(
+            &plan,
+            role,
+            &call.attempt_id,
+            &caller::Http,
+            &spare_extra(&body["spare"], who),
+        )??;
         Ok((plan, adm))
     });
     let (plan, mut adm) = match admitted {
@@ -982,5 +1030,30 @@ mod tests {
         ] {
             assert_eq!(checked_bounds(f, d), (120, 75), "{f:?} {d:?}");
         }
+    }
+
+    /// Review b38e8df M-1: the budget check gets the person who attached the spare.
+    #[test]
+    fn the_spare_names_the_person_who_attached_it() {
+        let who = Caller {
+            name: "alice-ops".into(),
+            kind: crate::auth::Kind::User,
+            scopes: Default::default(),
+            repos: Default::default(),
+            role: None,
+        };
+        assert_eq!(spare_extra(&Value::Null, &who), json!({}));
+        let mut got = spare_extra(
+            &json!({"reason": "env", "replaces": "a7", "evidence_ref": "rep#1"}),
+            &who,
+        );
+        let at = got["spare"]["approved_at"].take();
+        assert!(at.as_str().is_some_and(|a| a.ends_with('Z')), "{at}");
+        assert_eq!(
+            got,
+            json!({"spare": {"reason": "env", "replaces": "a7", "evidence_ref": "rep#1",
+                "by": {"name": "alice-ops", "kind": "user", "via": "deliverAssignment"},
+                "approved_at": null}})
+        );
     }
 }

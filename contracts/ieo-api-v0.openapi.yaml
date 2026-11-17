@@ -1,12 +1,28 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.16.0
+  version: 0.17.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
     0.6.0 (02-03, additive): health, semantic review, coordinator assignment/evidence/verdict/outbox endpoints,
     their codes, and the judgment policy pin (contracts/judgment-policy-v0.json, freeze item L07).
+    0.17.0 (02-05 budget PR, additive; user decisions 2026-11-15 (나) and 2026-11-17 (나) with its addition):
+    deliverAssignment takes an optional `spare` {reason, replaces, evidence_ref}: the 02-05 budget's one development
+    spare run. The shared budget check decides (outcome `budget_refused` with the reason otherwise): development runs
+    at most 2 runs without a marker; the 1 spare carries the marker and replaces an earlier failed development run of
+    the budget (R1 or R2, so it need not be the third call); one spare; none for the guardrail or another budget.
+    `evidence_ref` references the cause report or evidence the person states (a reason alone proves no environment
+    defect). Only a person attaches it: a `spare` from a non-`user` credential → 403 `HUMAN_APPROVAL_REQUIRED`, nothing
+    recorded or called. The marker releases only the named run's stop for its result; unmeasured usage, a limit or
+    overage signal, a failed cleanup, another record that asks for a person and every budget limit keep blocking. The
+    marker, with who approved it (`by`: name, kind) and when (`approved_at`, the coordinator's clock), is appended to
+    the spare run's budget ledger record; the failed run's record and usage stay. It is not forwarded to the role
+    service. This is the only path for a spare: the host caller `ieo-role-call` has no authenticated identity and
+    refuses spare flags.
+    0.16.1 (02-05 budget PR; PR #80 review d336849 L-a): reportCheckpoint's `RECOVERY_REQUIRED` check binds the use to
+    the checkpoint taken over: the delivery's use must be of that very checkpoint (the latest central sequence) and
+    its approval of the reported assignment and generation; a use of another checkpoint is refused (409).
     0.16.0 (02-05 step 7b; user decision 2026-11-16 (나), runtime contract revision 15 §18): the official recovery
     after a crash. approveRecovery (`POST /v0/repos/{repo_id}/roles/{role}/recoveries`, `Idempotency-Key`, HTTP
     only): a person (a `user` credential with `roles:control` for the repo; services 403 `HUMAN_APPROVAL_REQUIRED`,
@@ -688,7 +704,8 @@ paths:
         the coordinator is still recording the answer), `accepted` or `unknown`, and not taken over before;
         anything else → 409 `DELIVERY_MISMATCH`. 0.16.0 (02-05 step 7b): a `takeover` whose previous checkpoint is
         `takeover`/`error` (an unfinished run) is a recovery: its `recovery_id` must be the approval its delivery used
-        (role_recovery_uses), else 409 `RECOVERY_REQUIRED`. These checks follow every check above; the takeover row
+        (role_recovery_uses) recorded for that very checkpoint, with its approval of the reported assignment and
+        generation (0.16.1), else 409 `RECOVERY_REQUIRED`. These checks follow every check above; the takeover row
         (delivery, sequence, digest, session, applied revision and digest, received_at; a claim) is
         written in the same transaction as the checkpoint row, and a refusal leaves neither. A request
         alone is never a takeover. An `after_run`/`error` checkpoint whose `first_action` is an object
@@ -972,6 +989,20 @@ paths:
                 prompt: { type: string, minLength: 1, maxLength: 65536 }
                 logical_name: { type: string, minLength: 1, maxLength: 128 }
                 new_session: { type: boolean, default: false }
+                spare:
+                  description: |
+                    0.17.0 (02-05 budget PR, user decision 2026-11-17 (나) and its addition): the 02-05 budget's spare
+                    run — a reason, the attempt id of the earlier failed development run it replaces, and a reference
+                    to the cause report or evidence. Only a `user` credential (a person) may send it, else 403
+                    `HUMAN_APPROVAL_REQUIRED`; the ledger record keeps who approved it and when. The shared budget
+                    check decides; refused → `budget_refused`.
+                  type: object
+                  additionalProperties: false
+                  required: [reason, replaces, evidence_ref]
+                  properties:
+                    reason: { type: string, minLength: 1, maxLength: 2000 }
+                    evidence_ref: { type: string, minLength: 1, maxLength: 2000 }
+                    replaces: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$' }
                 recovery_id:
                   description: |
                     0.16.0 (02-05 step 7b): an approved recovery (approveRecovery). Checked again at use (the

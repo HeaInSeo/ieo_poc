@@ -12,6 +12,8 @@ ieo-spec = { path = "../ieo-spec" }
 ieo-report = { path = "../ieo-report" }
 # 02-05 step 3: the shared budget check of the delivery path (the 02-04 caller's code)
 ieo-supervisor = { path = "../ieo-supervisor" }
+# 02-05 budget: the spare approval time (UTC RFC 3339, the evidence clock)
+ieo-evidence = { path = "../ieo-evidence" }
 hex = "0.4.3"
 postgres = { version = "0.19", features = ["with-serde_json-1"] }
 serde_json = "1.0.154"

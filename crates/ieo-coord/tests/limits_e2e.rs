@@ -1231,6 +1231,61 @@ fn e2e(transport: &str) {
     // A1/1 (tokens, then missing/other ledger), A1/2 (tokens), A1/4 (time), A1/5 (missing),
     // A1/6 (unmeasured)
     assert_eq!(n[4], 6, "{n:?}");
+
+    // 10. the 02-05 budget (its own ledger, the approved shares, none configured): an
+    //     assignment whose runs were settled from the 02-04 ledger is refused, never continued
+    //     or transferred; its usage stays where it was (02-05 budget PR)
+    std::fs::write(
+        dir.join("roles.json"),
+        json!({"repo-a": {
+            "development": {"url": format!("http://127.0.0.1:{}", role.port),
+                            "adapter_token_file": dir.join("adapter_token"),
+                            "quota_group_id": "anthropic-shared-0104",
+                            "image_digest": "sha256:img", "profile_id": "dev-profile",
+                            "profile_revision": 1},
+            "guardrail": {"url": format!("http://127.0.0.1:{}", guard.port),
+                          "adapter_token_file": dir.join("adapter_token"),
+                          "image_digest": "sha256:img", "profile_id": "guard-profile",
+                          "profile_revision": 1},
+            "budget_plan": {"budget": "02-05", "ledger_dir": dir.join("ledger-0205"),
+                "first_observation": {"stream": first, "observed_unix": unix_now()},
+                "roles": {"development": {}, "guardrail": {}}}}})
+        .to_string(),
+    )
+    .expect("roles");
+    coord.stop();
+    coord.start();
+    let before = chain("A1", 6)["usage"].clone();
+    let (st, b) = deliver("lim-key-0012", &dbody("A1", 6, "a12", "s10", json!({})));
+    assert_eq!(
+        (st, b["rejections"][0]["code"].as_str()),
+        (409, Some("ASSIGNMENT_USAGE_UNMEASURED")),
+        "{b}"
+    );
+    let after = chain("A1", 6)["usage"].clone();
+    assert_eq!(
+        (
+            after["ledger_mismatch"].as_bool(),
+            after["total_tokens"].clone(),
+            after["runs"].clone()
+        ),
+        (
+            Some(true),
+            before["total_tokens"].clone(),
+            before["runs"].clone()
+        ),
+        "{after}"
+    );
+    assert!(
+        after["ledgers"].as_array().is_some_and(|l| l
+            .iter()
+            .all(|x| x.as_str().is_some_and(|x| x.starts_with("02-04@")))),
+        "{after}"
+    );
+    assert!(
+        !dir.join("ledger-0205/records.jsonl").exists(),
+        "nothing was charged to the 02-05 ledger"
+    );
     coord.stop();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = admin.batch_execute(&format!("DROP DATABASE IF EXISTS {dbname} WITH (FORCE)"));

@@ -1,9 +1,11 @@
 //! `ieo-role-call --plan <plan.json> --task <id> --role <role> --op start|reconnect
-//!  --attempt <id> --session <id> --prompt-file <f> --coordinator-file <f> [--recovery-id <id>]`
+//!  --attempt <id> --session <id> --prompt-file <f> --coordinator-file <f> [--recovery-id <id>]
+//!  [--spare-reason <text> --replaces <attempt>]`
 //!
 //! One budgeted call to a role service (see `ieo_supervisor::caller`). `--recovery-id`: a start
 //! over a run that did not finish carries a person's recovery id (02-05 step 7b; the service
-//! refuses such a start without one). Prints a summary
+//! refuses such a start without one). `--spare-reason`/`--replaces`: the 02-05 budget's spare
+//! run (user decision 2026-11-17 (나)), both or neither; the shared budget check decides. Prints a summary
 //! without secrets. Exit 0: recorded, nothing to look at; 2: nothing started (refused or held);
 //! 3: recorded with `stop_required`; 1: an error (bad arguments, or a failure the caller could
 //! not record — its in-flight marker then blocks every further call). **Anything but 0 or 2
@@ -36,6 +38,22 @@ fn main() {
 
 fn run() -> Result<i32, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // a spare run (02-05 budget) is attached only by a person with an authenticated user
+    // credential, through the coordinator's deliverAssignment (user decision 2026-11-17 and its
+    // addition §2; review b38e8df M-1). This host caller has no authenticated identity, so a
+    // self-declared approver is no `kind: user` person: any spare flag is refused before
+    // anything is read or started.
+    if let Some(k) = args.iter().find(|a| {
+        matches!(
+            a.as_str(),
+            "--spare-reason" | "--replaces" | "--evidence-ref" | "--approver"
+        )
+    }) {
+        return Err(format!(
+            "{k}: a spare run is attached only by a person with a user credential through \
+             deliverAssignment; ieo-role-call has no authenticated identity"
+        ));
+    }
     let get = |k: &str| {
         args.iter()
             .position(|a| a == k)

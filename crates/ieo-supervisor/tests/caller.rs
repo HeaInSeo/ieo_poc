@@ -169,6 +169,14 @@ fn rate(overage: &str) -> String {
     .to_string()
 }
 
+/// A spare marker as a person attaches it (user decision 2026-11-17 and its addition): the
+/// reason, the replaced attempt, the cause report reference, who approved it and when.
+fn spare_marker(reason: &str, replaces: &str) -> Value {
+    json!({"spare": {"reason": reason, "replaces": replaces, "evidence_ref": "cause-report#1",
+                     "by": {"kind": "user", "name": "alice-ops"},
+                     "approved_at": "2026-11-17T00:00:00Z"}})
+}
+
 fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -709,6 +717,55 @@ fn the_caller_talks_to_the_service_over_http() {
     assert!(out.contains("recovery_id"), "{out}");
     let (code, out) = cli("d3", "s3", Some("../x"));
     assert_eq!(code, Some(1), "{out}");
+    // the spare flags: the host caller refuses every one of them (a spare is attached only by
+    // a person with a user credential through deliverAssignment; user decision 2026-11-17
+    // addition §2), before anything is read or started
+    let spare_cli = |args: &[&str]| {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"))
+            .arg("--plan")
+            .arg(t.0.join("plan.json"))
+            .args(["--task", "02-04", "--role", "development", "--op", "start"])
+            .args([
+                "--attempt",
+                "d3",
+                "--session",
+                "s3",
+                "--recovery-id",
+                "R-cli-1",
+            ])
+            .arg("--prompt-file")
+            .arg(t.0.join("prompt.txt"))
+            .arg("--coordinator-file")
+            .arg(t.0.join("coordinator.json"))
+            .args(args)
+            .output()
+            .expect("ieo-role-call");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout).to_string()
+                + &String::from_utf8_lossy(&out.stderr),
+        )
+    };
+    for args in [
+        &["--spare-reason", "env"][..],
+        &["--replaces", "d1"],
+        &["--evidence-ref", "rep#1"],
+        &["--approver", "alice"],
+        &[
+            "--spare-reason",
+            "env",
+            "--replaces",
+            "d1",
+            "--evidence-ref",
+            "rep#1",
+            "--approver",
+            "alice",
+        ],
+    ] {
+        let (code, out) = spare_cli(args);
+        assert_eq!(code, Some(1), "{args:?}: {out}");
+        assert!(out.contains("only by a person"), "{args:?}: {out}");
+    }
     let (code, out) = cli("d3", "s3", Some("R-cli-1"));
     assert_eq!(code, Some(0), "{out}");
     let cp: Value = serde_json::from_slice(&std::fs::read(&cp_path).expect("cp")).expect("j");
@@ -2135,4 +2192,801 @@ fn a_refused_correction_removes_the_copies_it_made() {
     std::fs::remove_file(dir.join("agent-c2.jsonl")).expect("rm");
     caller::reevaluate(&p, "d2", &tr, "x").expect("correct");
     assert!(dir.join("agent-c1.jsonl").exists() && dir.join("agent-c2.jsonl").exists());
+}
+
+// --- 02-05 budget (user decision 2026-11-15 (나), §2.1) ---
+
+/// A role service of the 02-05 budget: no share configured, the approved one applies.
+fn service_0205(root: &Path, role: &str) -> Arc<Service> {
+    let r = root.join(role);
+    let etc = r.join("etc");
+    std::fs::create_dir_all(etc.join("template")).expect("etc");
+    std::fs::write(
+        etc.join("template/settings.json"),
+        r#"{"autoMemoryEnabled": false}"#,
+    )
+    .expect("template");
+    let cred = r.join("cred");
+    std::fs::create_dir_all(&cred).expect("cred");
+    std::fs::write(cred.join("oauth_token"), "fake-oauth-token\n").expect("token");
+    std::fs::write(
+        cred.join("adapter.sha256"),
+        hex::encode(Sha256::digest(TOKEN.as_bytes())),
+    )
+    .expect("adapter");
+    let v = json!({"role": role, "repo": "sori", "state": r.join("state"), "etc": etc,
+        "cred": cred, "claude": fake_claude(root), "quota_group_id": "test-shared",
+        "checkpoint_central": "local_only", "budget": "02-05"});
+    Arc::new(Service::new(Config::from_json(&v).expect("config")))
+}
+
+#[test]
+fn the_0205_budget_fixes_the_role_shares_and_never_retries_the_guardrail() {
+    let _serial = serial();
+    let t = Tmp::new("b0205");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let plan_v = |roles: Value| {
+        json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+               "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+               "roles": roles})
+    };
+    let role = |url: &str, share: Value| {
+        let mut r = json!({"url": url, "adapter_token_file": t.0.join("adapter.token")});
+        if !share.is_null() {
+            r["share"] = share;
+        }
+        r
+    };
+    // the approved shares: omitted, or given exactly; anything else is refused
+    let p = Plan::from_json(&plan_v(json!({
+        "development": role("dev", Value::Null), "guardrail": role("gr", Value::Null)})))
+    .expect("plan");
+    let dev = p.roles["development"].share;
+    let gr = p.roles["guardrail"].share;
+    assert_eq!(
+        (
+            dev.max_runs,
+            dev.total_seconds,
+            dev.billable_tokens,
+            dev.cache_read_tokens
+        ),
+        (3, 1_800, 150_000, 1_500_000)
+    );
+    assert_eq!(
+        (
+            gr.max_runs,
+            gr.total_seconds,
+            gr.billable_tokens,
+            gr.cache_read_tokens
+        ),
+        (1, 600, 50_000, 500_000)
+    );
+    let exact = json!({"max_runs": 3, "total_seconds": 1_800, "billable_tokens": 150_000,
+                       "cache_read_tokens": 1_500_000});
+    assert!(Plan::from_json(&plan_v(json!({"development": role("dev", exact.clone())}))).is_ok());
+    for (k, v) in [
+        ("max_runs", 4),
+        ("total_seconds", 2_400),
+        ("billable_tokens", 150_001),
+        ("cache_read_tokens", 1),
+    ] {
+        let mut more = exact.clone();
+        more[k] = json!(v);
+        let e = Plan::from_json(&plan_v(json!({"development": role("dev", more)})))
+            .expect_err("a share other than the approved one");
+        assert!(e.contains("approved share"), "{k}: {e}");
+    }
+    // the guardrail may not take the development share
+    let e = Plan::from_json(&plan_v(json!({"guardrail": role("gr", exact.clone())})))
+        .expect_err("guardrail with the development share");
+    assert!(e.contains("approved share"), "{e}");
+    // the role services take the approved share too; a configured other one is refused
+    let e = Config::from_json(&json!({"role": "guardrail", "repo": "sori",
+        "state": t.0.join("x"), "etc": t.0.join("x"), "cred": t.0.join("x"), "claude": "x",
+        "quota_group_id": "q", "checkpoint_central": "local_only", "budget": "02-05",
+        "share": {"max_runs": 2, "total_seconds": 600, "billable_tokens": 50_000,
+                  "cache_read_tokens": 500_000}}))
+    .expect_err("a guardrail share of 2 runs");
+    assert!(e.contains("approved share"), "{e}");
+    // the per-run window (timeout + grace) is 600 s; the rooms are the role's shares
+    let l = caller::limits_for(&p, "development", &[]).expect("limits");
+    assert_eq!(
+        (
+            (l.timeout + l.grace).as_secs(),
+            l.billable_room,
+            l.cache_read_room
+        ),
+        (600, 150_000, 1_500_000)
+    );
+    let l = caller::limits_for(&p, "guardrail", &[]).expect("limits");
+    assert_eq!(
+        (
+            (l.timeout + l.grace).as_secs(),
+            l.billable_room,
+            l.cache_read_room
+        ),
+        (600, 50_000, 500_000)
+    );
+    // runs: development its 2 planned runs, then without a spare marker no 3rd (user decision
+    // 2026-11-17 (나)); the guardrail 1, never retried
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = InProc(m);
+    for (i, attempt) in ["d1", "d2"].iter().enumerate() {
+        let r = recorded(
+            caller::call(
+                &p,
+                &call_of("development", "start", attempt, &format!("s{i}"), "hi"),
+                &a,
+                POLL,
+            )
+            .expect("call"),
+        );
+        assert_eq!(r["budget"], "02-05", "{r}");
+    }
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("development", "start", "d3", "s3", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert!(why.contains("planned runs are used"), "{why}");
+    recorded(
+        caller::call(
+            &p,
+            &call_of("guardrail", "start", "g1", "g1", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    let why = not_started(
+        caller::call(
+            &p,
+            &call_of("guardrail", "start", "g2", "g2", "hi"),
+            &a,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert!(why.contains("guardrail: 1 of 1 runs"), "{why}");
+    // the guardrail's own share: one run, never retried, with budget runs left (a fresh ledger)
+    let t2 = Tmp::new("b0205-gr");
+    std::fs::write(t2.0.join("adapter.token"), TOKEN).expect("tok");
+    let mut v = plan_v(json!({"guardrail": role("gr", Value::Null)}));
+    v["ledger_dir"] = json!(t2.0.join("ledger"));
+    v["roles"]["guardrail"]["adapter_token_file"] = json!(t2.0.join("adapter.token"));
+    let p2 = Plan::from_json(&v).expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("gr".to_string(), service_0205(&t2.0, "guardrail"));
+    let a2 = InProc(m);
+    recorded(
+        caller::call(
+            &p2,
+            &call_of("guardrail", "start", "g1", "g1", "hi"),
+            &a2,
+            POLL,
+        )
+        .expect("call"),
+    );
+    let why = not_started(
+        caller::call(
+            &p2,
+            &call_of("guardrail", "start", "g2", "g2", "hi"),
+            &a2,
+            POLL,
+        )
+        .expect("call"),
+    );
+    assert!(why.contains("guardrail: 1 of 1 runs"), "{why}");
+}
+
+#[test]
+fn a_ledger_belongs_to_one_budget() {
+    let _serial = serial();
+    let t = Tmp::new("ledger-budget");
+    let p = plan(&t.0, &[("development", "dev")], Some(&rate("rejected")));
+    // a record of another budget in this budget's ledger: refused, never counted or charged
+    std::fs::create_dir_all(t.0.join("ledger")).expect("ledger");
+    std::fs::write(
+        t.0.join("ledger/records.jsonl"),
+        format!(
+            "{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "x1", "role": "development",
+                   "budget": "02-05", "model_request": true, "duration_ms": 1000,
+                   "usage": {"run": {"state": "measured", "tokens": {"input": 1, "output": 1,
+                             "cache_creation": 1, "cache_read": 1}}}})
+        ),
+    )
+    .expect("record");
+    let e = caller::records(&p).expect_err("another budget's record");
+    assert!(e.contains("one ledger per budget"), "{e}");
+}
+
+/// The 02-05 spare run (user decision 2026-11-17 (나)): a marker with a reason and the replaced
+/// attempt, which must be an earlier failed development run of this budget; one spare only;
+/// never for the guardrail; the marker is written to the run's record.
+#[test]
+fn the_0205_spare_run_needs_a_marker_and_a_failed_development_run() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = InProc(m);
+    let spare = spare_marker;
+    let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    // R1 succeeds; a spare that replaces it is refused (it did not fail)
+    recorded(call("development", "d1", "hi", json!({})));
+    let why = not_started(call("development", "x1", "hi", spare("env", "d1")));
+    assert!(why.contains("did not fail"), "{why}");
+    // G1; the guardrail has no spare
+    recorded(call("guardrail", "g1", "hi", json!({})));
+    let why = not_started(call("guardrail", "x2", "hi", spare("env", "d1")));
+    assert!(why.contains("has no spare"), "{why}");
+    // R2 fails (an error result: a record that asks for a person)
+    let r2 = recorded(call("development", "d2", "AUTHFAIL", json!({})));
+    assert_eq!(r2["stop_required"], true, "{r2}");
+    // no marker: development stops at its 2 planned runs
+    let why = not_started(call("development", "x3", "hi", json!({})));
+    assert!(why.contains("planned runs are used"), "{why}");
+    // a marker naming the guardrail's run, an unknown attempt, or without a reason: refused
+    for (extra, want) in [
+        (spare("env", "g1"), "is not a development run"),
+        (spare("env", "nope"), "0 found"),
+        (
+            json!({"spare": {"reason": " ", "replaces": "d2"}}),
+            "needs a reason",
+        ),
+        (json!({"spare": {"reason": "env"}}), "needs a reason"),
+    ] {
+        let why = not_started(call("development", "x4", "hi", extra.clone()));
+        assert!(why.contains(want), "{extra}: {why}");
+    }
+    // the cause report reference, a person and the approval time are required (user decision
+    // 2026-11-17, addition; review b38e8df M-1): a reason alone proves nothing
+    let without = |path: &[&str], v: Value| {
+        let mut m = spare_marker("env", "d2");
+        let mut x = &mut m["spare"];
+        for k in &path[..path.len() - 1] {
+            x = &mut x[*k];
+        }
+        x[path[path.len() - 1]] = v;
+        m
+    };
+    for (extra, want) in [
+        (
+            without(&["evidence_ref"], Value::Null),
+            "needs an evidence_ref",
+        ),
+        (
+            without(&["evidence_ref"], json!("  ")),
+            "needs an evidence_ref",
+        ),
+        (without(&["by"], Value::Null), "attached by a person"),
+        (
+            without(&["by", "kind"], json!("service")),
+            "attached by a person",
+        ),
+        (
+            without(&["by", "kind"], json!("host_operator")),
+            "attached by a person",
+        ),
+        (without(&["by", "name"], json!(" ")), "attached by a person"),
+        (without(&["approved_at"], Value::Null), "no approval time"),
+    ] {
+        let why = not_started(call("development", "x4", "hi", extra.clone()));
+        assert!(why.contains(want), "{extra}: {why}");
+    }
+    // the spare: replaces the failed R2 with a reason; recorded with its marker; R2's record no
+    // longer stops the budget (the marker is the person's decision about it)
+    let r3 = recorded(call(
+        "development",
+        "d3",
+        "hi",
+        spare("execution environment defect, cause reported", "d2"),
+    ));
+    assert_eq!(
+        r3["spare"],
+        spare_marker("execution environment defect, cause reported", "d2")["spare"],
+        "{r3}"
+    );
+    // the failed run's record and usage stay as they were (appended, nothing reset)
+    let d2: Vec<Value> = std::fs::read_to_string(t.0.join("ledger/records.jsonl"))
+        .expect("ledger")
+        .lines()
+        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .filter(|r| r["attempt_id"] == "d2")
+        .collect();
+    assert_eq!(d2.len(), 1);
+    assert_eq!(d2[0], r2, "R2's record is kept");
+    let ledger = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
+    assert!(
+        ledger.contains("execution environment defect, cause reported"),
+        "the marker is in the ledger"
+    );
+    // one spare only (also the budget's 4 runs are used now)
+    let why = not_started(call("development", "x5", "hi", spare("again", "d2")));
+    assert!(why.contains("used already"), "{why}");
+    // the same request again (a duplicate) starts no extra run
+    let n = std::fs::read_to_string(t.0.join("ledger/records.jsonl"))
+        .expect("ledger")
+        .lines()
+        .count();
+    let why = not_started(call(
+        "development",
+        "d3",
+        "hi",
+        spare("execution environment defect, cause reported", "d2"),
+    ));
+    assert!(why.contains("used already"), "{why}");
+    let n2 = std::fs::read_to_string(t.0.join("ledger/records.jsonl"))
+        .expect("ledger")
+        .lines()
+        .count();
+    assert_eq!(n, n2, "no record for a refused duplicate");
+    let why = not_started(call("development", "x6", "hi", json!({})));
+    assert!(why.contains("planned runs are used"), "{why}");
+}
+
+/// The spare may redo R1 too (the run after a failure, not only the third), and R2 then runs
+/// without a marker: 2 planned + 1 spare.
+#[test]
+fn the_0205_spare_may_redo_the_first_planned_run() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare1");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    let a = InProc(m);
+    let call = |attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of("development", "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    recorded(call("d1", "AUTHFAIL", json!({})));
+    // R1's failure asks for a person: nothing runs without the spare marker
+    let why = not_started(call("x1", "hi", json!({})));
+    assert!(why.contains("asks for a person"), "{why}");
+    recorded(call("d1b", "hi", spare_marker("env defect", "d1")));
+    recorded(call("d2", "hi", json!({})));
+    let why = not_started(call("d3", "hi", json!({})));
+    assert!(why.contains("planned runs are used"), "{why}");
+}
+
+/// The spare gate fails closed on an ambiguous ledger: two records of the replaced attempt, or
+/// a replaced record of another budget, refuse (user decision 2026-11-17 (나)).
+#[test]
+fn the_spare_gate_refuses_ambiguous_records() {
+    let t = Tmp::new("spare-gate");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let run = |attempt: &str, budget: &str, failed: bool| {
+        let mut r = json!({"format": "ieo-role-run/v0", "attempt_id": attempt,
+               "role": "development", "budget": budget, "model_request": true,
+               "stop_required": failed, "usage": {"run": {"state": "measured"}},
+               "outcome": {"result": {"subtype": "success", "is_error": failed}}});
+        if failed {
+            r["stop_reason"] = json!("result \"success\" (is_error true)");
+        }
+        r
+    };
+    let recs = vec![run("d1", "02-05", false), run("d2", "02-05", true)];
+    let marker = spare_marker("env", "d2");
+    assert_eq!(
+        caller::spare_gate(&p, "development", &recs, &recs, &marker),
+        Ok(Some(marker["spare"].clone()))
+    );
+    // user decision 2026-11-17 addition §3: the marker releases only a stop for the run's
+    // result; any other reason of the named run keeps blocking (fail-closed)
+    for (reason, unmeasured, want) in [
+        ("no result event", false, None),
+        (
+            "result \"error_during_execution\" (is_error true); no result event",
+            false,
+            None,
+        ),
+        ("result \"success\" (is_error true)", true, Some("usage")),
+        (
+            "this run's signal: overageStatus allowed",
+            false,
+            Some("overageStatus"),
+        ),
+        (
+            "result \"success\" (is_error true); this run's signal: overageStatus allowed",
+            false,
+            Some("overageStatus"),
+        ),
+        ("process-group cleanup failed", false, Some("cleanup")),
+        (
+            "environment not subscription-only: [\"ANTHROPIC_API_KEY\"]",
+            false,
+            Some("subscription-only"),
+        ),
+        (
+            "start sent but its answer was lost (eof)",
+            false,
+            Some("answer was lost"),
+        ),
+        ("", false, Some("without a reason")),
+    ] {
+        let mut d2 = run("d2", "02-05", true);
+        d2["stop_reason"] = json!(reason);
+        if unmeasured {
+            d2["usage"]["run"]["state"] = json!("unmeasured");
+        }
+        let rs = vec![run("d1", "02-05", false), d2];
+        let got = caller::spare_gate(&p, "development", &rs, &rs, &marker);
+        match want {
+            None => assert!(got.is_ok(), "{reason}: {got:?}"),
+            Some(w) => {
+                let e = got.expect_err(reason);
+                assert!(
+                    e.contains("not one a spare releases") && e.contains(w),
+                    "{e}"
+                );
+            }
+        }
+    }
+    // review b38e8df L-1: a run corrected to a clean success (the effective record) is no
+    // failure, although its raw line asked for a person
+    let mut corrected = run("d2", "02-05", false);
+    corrected["corrected_by"] = json!({"decision": "D-1"});
+    let eff = vec![run("d1", "02-05", false), corrected];
+    let raw0 = vec![run("d1", "02-05", false), run("d2", "02-05", true)];
+    let e = caller::spare_gate(&p, "development", &eff, &raw0, &marker).expect_err("corrected");
+    assert!(e.contains("did not fail"), "{e}");
+    // two records of the replaced attempt
+    let raw = vec![
+        run("d1", "02-05", false),
+        run("d2", "02-05", true),
+        run("d2", "02-05", true),
+    ];
+    let e = caller::spare_gate(&p, "development", &recs, &raw, &marker).expect_err("ambiguous");
+    assert!(e.contains("2 found"), "{e}");
+    // a replaced run of another budget
+    let raw = vec![run("d1", "02-05", false), run("d2", "02-04", true)];
+    let e = caller::spare_gate(&p, "development", &raw, &raw, &marker).expect_err("budget");
+    assert!(e.contains("of the 02-05 budget"), "{e}");
+    // a failure is a non-success result even without stop_required
+    let mut soft = run("d2", "02-05", false);
+    soft["outcome"]["result"]["subtype"] = json!("error_max_turns");
+    let raw = vec![run("d1", "02-05", false), soft];
+    assert!(caller::spare_gate(&p, "development", &raw, &raw, &marker).is_ok());
+    // a missing result is no clean success either
+    let mut none = run("d2", "02-05", false);
+    none["outcome"]["result"] = Value::Null;
+    let raw = vec![run("d1", "02-05", false), none];
+    assert!(caller::spare_gate(&p, "development", &raw, &raw, &marker).is_ok());
+}
+
+/// Review b38e8df L-2 (H3): a spare that fails stops again — its own failure asks for a person,
+/// so R2, G1 and a second spare do not start.
+#[test]
+fn a_failed_spare_stops_the_budget_again() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare-fail");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = Seen(InProc(m), std::sync::Mutex::new(Vec::new()));
+    let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    let marker = |replaces: &str| spare_marker("env defect", replaces);
+    recorded(call("development", "d1", "AUTHFAIL", json!({})));
+    let s1 = recorded(call("development", "d1b", "AUTHFAIL", marker("d1")));
+    assert_eq!(s1["stop_required"], true, "{s1}");
+    for (role, attempt, extra) in [
+        ("development", "d2", json!({})),
+        ("guardrail", "g1", json!({})),
+    ] {
+        let why = not_started(call(role, attempt, "hi", extra));
+        assert!(why.contains("asks for a person"), "{role}: {why}");
+    }
+    let why = not_started(call("development", "d3", "hi", marker("d1b")));
+    assert!(why.contains("used already"), "{why}");
+    // the marker stays with the budget check: no body to the role service carries it (I-4)
+    let bodies = a.1.lock().expect("seen");
+    assert!(
+        bodies.iter().any(|b| b["attempt_id"] == "d1b"),
+        "{bodies:?}"
+    );
+    assert!(
+        bodies.iter().all(|b| b.get("spare").is_none()),
+        "{bodies:?}"
+    );
+}
+
+/// An adapter that keeps every body it forwards.
+struct Seen(InProc, std::sync::Mutex<Vec<Value>>);
+impl Adapter for Seen {
+    fn send(
+        &self,
+        role: &RoleTarget,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+    ) -> Result<(u16, Value), String> {
+        if let Some(b) = body {
+            self.1.lock().expect("seen").push(b.clone());
+        }
+        self.0.send(role, method, path, body)
+    }
+}
+
+/// User decision 2026-11-17 addition §2 (replaces the review b38e8df L-2 H4 mapping test): on a
+/// 02-05 plan with a failed R1, `ieo-role-call` refuses the spare flags — it has no
+/// authenticated identity — and no spare reaches the ledger through the host path; R1's stop
+/// stays.
+#[test]
+fn ieo_role_call_refuses_a_spare_marker() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-cli");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let svc = service_0205(&t.0, "development");
+    drop(svc);
+    let r = t.0.join("development");
+    let cfg = Config::from_json(&json!({"role": "development", "repo": "sori",
+        "state": r.join("state"), "etc": r.join("etc"), "cred": r.join("cred"),
+        "claude": t.0.join("fake-claude"), "quota_group_id": "test-shared",
+        "checkpoint_central": "local_only", "budget": "02-05"}))
+    .expect("cfg");
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|l| l.local_addr())
+        .expect("port")
+        .port();
+    std::thread::spawn(move || ieo_supervisor::serve::serve(cfg, &format!("127.0.0.1:{port}")));
+    let t0 = std::time::Instant::now();
+    while std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+        assert!(t0.elapsed() < Duration::from_secs(10), "serve");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    std::fs::write(
+        t.0.join("plan.json"),
+        json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+               "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+               "roles": {"development": {"url": format!("http://127.0.0.1:{port}"),
+                                         "adapter_token_file": t.0.join("adapter.token")}}})
+        .to_string(),
+    )
+    .expect("plan");
+    std::fs::write(
+        t.0.join("coordinator.json"),
+        call_of("development", "start", "x", "x", "x")
+            .coordinator
+            .to_string(),
+    )
+    .expect("coordinator");
+    let cli = |attempt: &str, prompt: &str, spare: &[&str]| {
+        std::fs::write(t.0.join("prompt.txt"), prompt).expect("prompt");
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"))
+            .arg("--plan")
+            .arg(t.0.join("plan.json"))
+            .args(["--task", "02-05", "--role", "development", "--op", "start"])
+            .args(["--attempt", attempt, "--session", attempt])
+            .arg("--prompt-file")
+            .arg(t.0.join("prompt.txt"))
+            .arg("--coordinator-file")
+            .arg(t.0.join("coordinator.json"))
+            .args(spare)
+            .env("USER", "host-op")
+            .output()
+            .expect("ieo-role-call");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout).to_string()
+                + &String::from_utf8_lossy(&out.stderr),
+        )
+    };
+    let (code, out) = cli("d1", "AUTHFAIL", &[]);
+    assert_eq!(code, Some(3), "{out}");
+    let before = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
+    let (code, out) = cli(
+        "d2",
+        "hi",
+        &[
+            "--spare-reason",
+            "env defect",
+            "--replaces",
+            "d1",
+            "--evidence-ref",
+            "cause-report#7",
+            "--approver",
+            "alice",
+        ],
+    );
+    assert_eq!(code, Some(1), "{out}");
+    assert!(out.contains("deliverAssignment"), "{out}");
+    let after = std::fs::read_to_string(t.0.join("ledger/records.jsonl")).expect("ledger");
+    assert_eq!(before, after, "nothing recorded");
+    assert!(!after.contains("\"spare\":{"), "no spare in the ledger");
+    // without the flags R1's failure still asks for a person
+    let (code, out) = cli("d2", "hi", &[]);
+    assert_eq!(code, Some(2), "{out}");
+    assert!(out.contains("asks for a person"), "{out}");
+}
+
+/// User decision 2026-11-17, addition §3: a marker releases only the named run's stop for its
+/// result. A named run stopped by an overage signal (unmeasured) is not released, and a valid
+/// marker does not pass another record that asks for a person or an unmeasured run.
+#[test]
+fn a_spare_marker_releases_nothing_else() {
+    let _serial = serial();
+    let t = Tmp::new("b0205-spare-scope");
+    std::fs::write(t.0.join("adapter.token"), TOKEN).expect("tok");
+    let obs = t.0.join("first-observation.jsonl");
+    std::fs::write(&obs, format!("{}\n", rate("rejected"))).expect("obs");
+    let p = Plan::from_json(&json!({"budget": "02-05", "ledger_dir": t.0.join("ledger"),
+        "first_observation": {"stream": obs, "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let mut m = BTreeMap::new();
+    m.insert("dev".to_string(), service_0205(&t.0, "development"));
+    m.insert("gr".to_string(), service_0205(&t.0, "guardrail"));
+    let a = InProc(m);
+    let call = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    // R1 stopped by an overage signal: unmeasured; a spare naming it is refused
+    let r1 = recorded(call("development", "d1", "OVERAGE", json!({})));
+    assert_eq!(r1["usage"]["run"]["state"], "unmeasured", "{r1}");
+    let why = not_started(call("development", "x1", "hi", spare_marker("env", "d1")));
+    assert!(why.contains("not one a spare releases"), "{why}");
+    // a second ledger: R1 fails for its result (releasable), G1 asks for a person
+    let t2 = Tmp::new("b0205-spare-scope2");
+    std::fs::write(t2.0.join("adapter.token"), TOKEN).expect("tok");
+    let p2 = Plan::from_json(
+        &json!({"budget": "02-05", "ledger_dir": t2.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first-observation.jsonl"),
+                              "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t2.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t2.0.join("adapter.token")}}}),
+    )
+    .expect("plan");
+    let mut m2 = BTreeMap::new();
+    m2.insert("dev".to_string(), service_0205(&t2.0, "development"));
+    m2.insert("gr".to_string(), service_0205(&t2.0, "guardrail"));
+    let a2 = InProc(m2);
+    let call2 = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p2,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a2,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    recorded(call2("development", "d1", "AUTHFAIL", json!({})));
+    // G1's record that asks for a person (written as the ledger would hold it)
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(t2.0.join("ledger/records.jsonl"))
+        .expect("ledger");
+    std::io::Write::write_all(
+        &mut f,
+        format!(
+            "{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "g1", "role": "guardrail",
+                   "budget": "02-05", "model_request": true, "duration_ms": 1000,
+                   "stop_required": true, "stop_reason": "process-group cleanup failed",
+                   "usage": {"run": {"state": "measured", "tokens": {"input": 1, "output": 1,
+                             "cache_creation": 1, "cache_read": 1}}}})
+        )
+        .as_bytes(),
+    )
+    .expect("append");
+    let why = not_started(call2("development", "x2", "hi", spare_marker("env", "d1")));
+    assert!(why.contains("record \"g1\" asks for a person"), "{why}");
+    // an unmeasured run elsewhere in the ledger keeps the budget stopped, marker or not
+    let t3 = Tmp::new("b0205-spare-scope3");
+    std::fs::write(t3.0.join("adapter.token"), TOKEN).expect("tok");
+    let p3 = Plan::from_json(
+        &json!({"budget": "02-05", "ledger_dir": t3.0.join("ledger"),
+        "first_observation": {"stream": t.0.join("first-observation.jsonl"),
+                              "observed_unix": now() - 3600},
+        "roles": {"development": {"url": "dev", "adapter_token_file": t3.0.join("adapter.token")},
+                  "guardrail": {"url": "gr", "adapter_token_file": t3.0.join("adapter.token")}}}),
+    )
+    .expect("plan");
+    let mut m3 = BTreeMap::new();
+    m3.insert("dev".to_string(), service_0205(&t3.0, "development"));
+    m3.insert("gr".to_string(), service_0205(&t3.0, "guardrail"));
+    let a3 = InProc(m3);
+    let call3 = |role: &str, attempt: &str, prompt: &str, extra: Value| {
+        caller::call_with_extra(
+            &p3,
+            &call_of(role, "start", attempt, attempt, prompt),
+            &a3,
+            POLL,
+            Duration::from_secs(60),
+            &extra,
+        )
+        .expect("call")
+    };
+    recorded(call3("development", "d1", "AUTHFAIL", json!({})));
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(t3.0.join("ledger/records.jsonl"))
+        .expect("ledger");
+    std::io::Write::write_all(
+        &mut f,
+        format!(
+            "{}\n",
+            json!({"format": "ieo-role-run/v0", "attempt_id": "u1", "role": "guardrail",
+                   "budget": "02-05", "model_request": true, "stop_required": false,
+                   "usage": {"run": {"state": "unmeasured", "reason": "test"}}})
+        )
+        .as_bytes(),
+    )
+    .expect("append");
+    let why = not_started(call3("development", "x3", "hi", spare_marker("env", "d1")));
+    assert!(why.contains("unmeasured run(s)"), "{why}");
 }
