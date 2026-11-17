@@ -1,0 +1,4 @@
+# 02-05 pre-step-8d mutants (PR #84 review b291d7c I-3): each applied alone to the code of 149f82f, then the named target (RUST_TEST_THREADS=4); the file was restored after each (git status clean afterwards). The other mutants of the pre-step-8c list (mutants-pre8c.txt) are in code this PR does not change. Columns: id | mutation | result | target: failing tests
+G1 | the gRPC stop waits for open connections again (no bound) | KILLED | ieo-coord --test recovery_e2e: a_person_approves_one_new_session_over_an_unfinished_checkpoint_over_grpc
+G2 | the gRPC stop grace is shorter than a call deadline | KILLED | ieo-coord --test grpc: a_call_in_progress_is_answered_across_the_stop
+# 2 of 2 killed

@@ -2,6 +2,7 @@
 //! request in progress is answered first. Uses `IEO_TEST_DB_URL` (key=value form) like the other
 //! coordinator tests; skipped without it outside CI.
 
+mod common;
 use postgres::NoTls;
 use std::io::{Read, Write};
 use std::time::{Duration, Instant};
@@ -48,10 +49,7 @@ fn sigterm_stops_the_coordinator_with_exit_zero() {
     let tokens = dir.join("tokens.json");
     std::fs::write(&tokens, r#"{"principals": []}"#).expect("tokens");
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-    let port = std::net::TcpListener::bind("127.0.0.1:0")
-        .and_then(|l| l.local_addr())
-        .expect("port")
-        .port();
+    let port = common::free_port();
     let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-coord"))
         .args([
             "serve",
@@ -164,10 +162,7 @@ fn a_binding_on_an_imported_test_id_stops_the_start() {
             format!(r#"{{"repo-a": {{"sprint_id": "{sprint}"}}}}"#),
         )
         .expect("bindings");
-        let port = std::net::TcpListener::bind("127.0.0.1:0")
-            .and_then(|l| l.local_addr())
-            .expect("port")
-            .port();
+        let port = common::free_port();
         let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-coord"))
             .args(["serve", "--listen", &format!("127.0.0.1:{port}")])
             .arg("--tokens")

@@ -656,3 +656,23 @@ pub fn ensure_delivery(e: &Env, raw: &[u8]) {
         )
         .expect("test delivery");
 }
+
+/// A free port **below the ephemeral range**, for a coordinator child that binds it itself.
+/// A port from binding port 0 is released before the child binds it, and another `bind(0)` in
+/// the same test process (a role service's `tiny_http`, the second port, the parallel variant)
+/// can take it in between (PR #84 review b291d7c L-1: an outgoing connection is unlikely, since
+/// Linux ≥ 4.6 gives `connect()` and `bind(0)` ports of opposite parity). With the default
+/// `ip_local_port_range` (32768-60999) no `bind(0)` and no outgoing connection gets a port from
+/// 20000-32767. The pick is spread by process and call and checked by binding.
+pub fn free_port() -> u16 {
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    for _ in 0..1000 {
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let p = 20_000 + (std::process::id().wrapping_mul(7919).wrapping_add(n * 131)) % 12_768;
+        let p = u16::try_from(p).expect("port");
+        if std::net::TcpListener::bind(("127.0.0.1", p)).is_ok() {
+            return p;
+        }
+    }
+    panic!("no free port below the ephemeral range");
+}

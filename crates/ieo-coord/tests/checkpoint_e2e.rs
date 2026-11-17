@@ -4,6 +4,7 @@
 //! checkpoint and the current assignment, and judges resumption — across restarts of the
 //! coordinator and of the role service. Skipped without `IEO_TEST_DB_URL` outside CI.
 
+mod common;
 use ieo_supervisor::serve::{Config, Service};
 use postgres::NoTls;
 use serde_json::{Value, json};
@@ -243,14 +244,8 @@ fn e2e(transport: &str) {
     std::fs::write(root.join("cred/coordinator_token"), tok("sup")).expect("c");
     std::fs::write(dir.join("adapter_token"), ADAPTER).expect("at");
     let claude = fake_claude(&dir);
-    let port = std::net::TcpListener::bind("127.0.0.1:0")
-        .and_then(|l| l.local_addr())
-        .expect("port")
-        .port();
-    let grpc_port = std::net::TcpListener::bind("127.0.0.1:0")
-        .and_then(|l| l.local_addr())
-        .expect("port")
-        .port();
+    let port = common::free_port();
+    let grpc_port = common::free_port();
     let central_port = if transport == "grpc" { grpc_port } else { port };
     let role_cfg = || {
         Config::from_json(&json!({"role": "development", "repo": "repo-a",

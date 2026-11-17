@@ -2347,3 +2347,44 @@ fn the_client_pre_check_refusal_is_the_front_end_answer() {
     let r = ieo_coord::http::body_too_large();
     assert_eq!((r.status, r.body), (400, ieo_proto::body_too_large_json()));
 }
+
+/// 02-05 pre-step-8c (PR #84 review b291d7c I-3, mutation G2): a call in progress when the server
+/// stops still gets its answer within its deadline (`stop_grace`); only then are open connections
+/// dropped.
+#[test]
+fn a_call_in_progress_is_answered_across_the_stop() {
+    let Some(e) = start() else { return };
+    let mut g = grpc_with(
+        &e,
+        GrpcConfig {
+            workers: 1,
+            max_deadline: Duration::from_secs(4),
+            health_interval: Duration::from_secs(5),
+        },
+    );
+    let digest = ready_for_checkpoints(&e);
+    let c1 = cp(1, cp_raw(1, 0, &digest, json!({"phase": "takeover"})));
+    let lock = hold_checkpoint_lock(&e);
+    let server = g.server.take().expect("server");
+    let g = &g;
+    let (answer, stopped) = std::thread::scope(|s| {
+        let call = s.spawn(|| g.call(&e, Some("sup-dev-a"), &c1));
+        // the call waits for the lock; the server is told to stop while it waits
+        std::thread::sleep(Duration::from_millis(500));
+        let t0 = Instant::now();
+        let stop = s.spawn(move || {
+            server.stop();
+            t0.elapsed()
+        });
+        // the lock is released 2.5 s after the stop: past a 1 s grace, inside the call's 4 s
+        std::thread::sleep(Duration::from_millis(2_500));
+        release(lock);
+        (call.join().expect("call"), stop.join().expect("stop"))
+    });
+    assert_eq!(answer.0, 201, "answered across the stop: {answer:?}");
+    assert_eq!(checkpoints(&e), 1);
+    assert!(
+        stopped < ieo_coord::grpc::stop_grace(Duration::from_secs(4)) + Duration::from_secs(2),
+        "the stop ends within the grace: {stopped:?}"
+    );
+}

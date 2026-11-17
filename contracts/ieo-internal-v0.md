@@ -201,6 +201,10 @@ gRPC는 같은 입력에 같은 답을 내도록 이렇게 한다.
 - gRPC는 표준 `grpc.health.v1.Health/Check`를 쓴다. 서비스 이름 `""`과 `ieo.internal.v0.SupervisorService`. 자격 없이 답한다. 구현(`tonic-health` 0.14.9)은 호출마다 읽지 않고 서버가 기록한 상태를 돌려준다. 그래서 서버가 같은 읽기(`schema_meta`, HTTP `/v0/health`와 같은 처리)를 작업자 풀에서 주기적으로(5초, X-04 확정) 하고, 성공하면 `SERVING`, 실패하면 `NOT_SERVING`으로 기록한다. 첫 읽기는 서비스를 열기 전에 한다. 상태는 최대 그 주기만큼 늦다. 작업자가 모두 바쁘면 읽기가 늦어질 수 있고, 주기 안에 답이 없으면 `NOT_SERVING`이다. 등록하지 않은 서비스 이름은 `NOT_FOUND`다. 스키마 버전과 정책 digest는 HTTP `/v0/health`에서 읽는다.
 - 표준 헬스 서비스 구현은 X-04에서 `tonic-health` 0.14.9로 확인했다. 이 패키지에 헬스 RPC를 더하지 않는다.
 
+### 7.3a 멈춤
+
+- 코디네이터가 멈출 때(SIGTERM/SIGINT) gRPC 쪽은 새 연결을 받지 않고, **진행 중인 호출**에 가장 긴 호출 마감(`max_deadline` + `TRANSPORT_SLACK`, 기본 15 + 1 = 16초)까지 답할 시간을 준 뒤 내려간다. 그 뒤에도 열린 연결이나 스트림(예: `Health/Watch`)은 기다리지 않고 끊는다(02-05 단계 8 전 PR feat/0205-pre8c, 시험 `grpc.rs` `a_call_in_progress_is_answered_across_the_stop`, `recovery_e2e`의 재시작). 서버 자신의 호출 시간 제한이 같은 값이라 그보다 긴 호출은 없다.
+
 ### 7.4 전송 보안
 
 PoC의 같은 호스트·kind 시험은 평문 HTTP/2를 쓴다. 평문 위의 Bearer 토큰은 시험 환경에서만 허용한다. 실제 다중 서버 배치의 TLS·상호 인증은 정식 설계의 몫이다(§9).
