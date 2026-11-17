@@ -40,18 +40,63 @@ use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
-/// Runs an accepted delivery started and whose record is still being finished by a thread of
-/// this process (review 63fefc1 M-1 (a)): the shutdown waits for them, bounded.
+/// Deliveries in progress and runs an accepted delivery started whose record is still being
+/// finished by a thread of this process (review 63fefc1 M-1 (a)): the shutdown waits for them,
+/// bounded.
 static FINISHING: AtomicUsize = AtomicUsize::new(0);
 
-/// One run being finished; dropped (also on a panic) when its thread ends.
+/// The latest time by which every counted delivery or run should be done (its own bound); the
+/// shutdown waits at least until then (review 4531772 L-3).
+static LATEST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
+/// The caller's finishing margin: `After::finish` waits the run window plus this, and after a
+/// stop it sent, this again.
+pub const FINISH_MARGIN_SECS: u64 = 60;
+
+/// Slack after the caller's waits for fetching the stream and transcripts and writing the record.
+pub const FINISH_SLACK_SECS: u64 = 60;
+
+/// The shutdown wait without a counted run (review 4531772 L-3): the 02-05 run window (600 s =
+/// timeout + grace) + 2 × the finishing margin + the slack = 780 s. A counted run with a longer
+/// window (02-04: 1,800 s, X-02: 3,600 s) extends it to its own bound ([`shutdown_wait`]).
+pub const SHUTDOWN_WAIT_DEFAULT_SECS: u64 = 600 + 2 * FINISH_MARGIN_SECS + FINISH_SLACK_SECS;
+
+/// How long a run with this window (timeout + grace) may take to be finished and recorded.
+pub fn finish_bound(window: Duration) -> Duration {
+    window + Duration::from_secs(2 * FINISH_MARGIN_SECS + FINISH_SLACK_SECS)
+}
+
+/// One delivery in progress or one run being finished; dropped (also on a panic) when it ends.
 struct Finishing;
 
 impl Finishing {
-    fn start() -> Finishing {
+    /// Counted from now; `within` is how long it may take.
+    fn start(within: Duration) -> Finishing {
         FINISHING.fetch_add(1, Ordering::SeqCst);
+        let until = std::time::Instant::now() + within;
+        let mut l = LATEST.lock().unwrap_or_else(|e| e.into_inner());
+        if l.is_none_or(|t| t < until) {
+            *l = Some(until);
+        }
         Finishing
     }
+}
+
+/// The shutdown wait: `IEO_COORD_SHUTDOWN_WAIT_SECS` when set, else the longer of
+/// [`SHUTDOWN_WAIT_DEFAULT_SECS`] and the time left until the latest counted bound.
+pub fn shutdown_wait() -> Duration {
+    if let Some(s) = std::env::var("IEO_COORD_SHUTDOWN_WAIT_SECS")
+        .ok()
+        .and_then(|w| w.parse().ok())
+    {
+        return Duration::from_secs(s);
+    }
+    let left = LATEST
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .map(|t| t.saturating_duration_since(std::time::Instant::now()))
+        .unwrap_or_default();
+    left.max(Duration::from_secs(SHUTDOWN_WAIT_DEFAULT_SECS))
 }
 
 impl Drop for Finishing {
@@ -64,7 +109,9 @@ impl Drop for Finishing {
 static STOPPING: AtomicBool = AtomicBool::new(false);
 
 /// The process is stopping (SIGTERM/SIGINT): new deliveries are refused with 503
-/// `COORDINATOR_STOPPING` while the runs already accepted are finished (review 63fefc1 M-1 (a)).
+/// `COORDINATOR_STOPPING` while the deliveries in progress and the runs already accepted are
+/// finished (review 63fefc1 M-1 (a)). A delivery is counted **before** it reads this flag, so
+/// one that passed the check is waited for (review 4531772 L-4).
 pub fn begin_stop() {
     STOPPING.store(true, Ordering::SeqCst);
 }
@@ -72,6 +119,46 @@ pub fn begin_stop() {
 /// How many accepted runs are still being finished in this process.
 pub fn finishing() -> usize {
     FINISHING.load(Ordering::SeqCst)
+}
+
+/// Wait until nothing is being finished, re-reading the bound while it waits (PR #83 review
+/// 67b5cae L-1: a run counted during the wait extends it): with `IEO_COORD_SHUTDOWN_WAIT_SECS`
+/// set, that long; else at least [`SHUTDOWN_WAIT_DEFAULT_SECS`] and until the latest counted
+/// bound. The number still being finished when it returns (0: all records written).
+pub fn wait_finishing_bounded() -> usize {
+    let t0 = std::time::Instant::now();
+    let fixed = std::env::var("IEO_COORD_SHUTDOWN_WAIT_SECS")
+        .ok()
+        .and_then(|w| w.parse::<u64>().ok())
+        .map(Duration::from_secs);
+    loop {
+        let n = finishing();
+        if n == 0 {
+            return 0;
+        }
+        let latest = *LATEST.lock().unwrap_or_else(|e| e.into_inner());
+        if bound_reached(t0.elapsed(), fixed, latest, std::time::Instant::now()) {
+            return n;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// Whether a shutdown wait that began `elapsed` ago is over: the fixed bound when one is set,
+/// else at least the default and not before the latest counted bound.
+fn bound_reached(
+    elapsed: Duration,
+    fixed: Option<Duration>,
+    latest: Option<std::time::Instant>,
+    now: std::time::Instant,
+) -> bool {
+    match fixed {
+        Some(f) => elapsed >= f,
+        None => {
+            elapsed >= Duration::from_secs(SHUTDOWN_WAIT_DEFAULT_SECS)
+                && latest.is_none_or(|l| now >= l)
+        }
+    }
 }
 
 /// Wait until no accepted run is being finished, at most `limit`; the number still being
@@ -98,6 +185,16 @@ const BODY_KEYS: [&str; 9] = [
     "recovery_id",
     "spare",
 ];
+
+/// A lowercase UUID in its 8-4-4-4-12 form: the only session id `claude --session-id` takes
+/// (runtime contract evidence `claude-help.txt`).
+fn session_uuid(s: &str) -> bool {
+    s.len() == 36
+        && s.char_indices().all(|(i, c)| match i {
+            8 | 13 | 18 | 23 => c == '-',
+            _ => c.is_ascii_digit() || ('a'..='f').contains(&c),
+        })
+}
 
 /// An id the supervisor accepts as a file name and CLI argument (its `safe_id`).
 fn safe_id(s: &str) -> bool {
@@ -516,6 +613,10 @@ pub fn deliver(
     req: &Req,
     guard: &dyn TxGuard,
 ) -> Result<Resp, Abort> {
+    // counted before the stop check (review 4531772 L-4): a shutdown that starts after the check
+    // waits for this delivery, and a run it starts is counted by its own guard before this one
+    // is dropped. Its bound: the in-flight window of a delivery
+    let _delivery = Finishing::start(Duration::from_secs(bounds().0));
     let pre = (|| {
         need_compare(who, repo, role)?;
         // stopping: the runs already accepted are being finished; nothing new starts and nothing
@@ -685,6 +786,16 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     };
+    // a start becomes `claude --session-id <session_id>`, which takes a UUID only: anything else
+    // fails at once and would spend a budgeted run (PR #83 review 67b5cae M-1). Nothing is called
+    if op == "start" && !session_uuid(d["session_id"].as_str().unwrap_or_default()) {
+        let mut o = base("not_called");
+        o.reasons =
+            json!(["a start's session_id must be a new lowercase UUID (claude --session-id)"]);
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
+    }
     let budget_refused = |why: String| {
         let mut o = base("budget_refused");
         o.reasons = json!([why]);
@@ -848,6 +959,16 @@ pub fn deliver(
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
+    // the stop again, right before the call (PR #83 review 67b5cae L-1): a delivery that passed the
+    // first check before the signal starts nothing once the coordinator is stopping
+    if STOPPING.load(Ordering::SeqCst) {
+        drop(adm);
+        let mut o = base("not_called");
+        o.reasons = json!(["the coordinator is stopping: nothing was called"]);
+        return run_tx(db, guard, &|tx| {
+            record_result(tx, repo, role, &id, &o, 201, None)
+        });
+    }
     let mut o = base("unknown");
     o.github = github.clone();
     o.limits = Some(sent["limits"].clone());
@@ -858,14 +979,18 @@ pub fn deliver(
             o.supervisor = Some((202, answer));
             // the run is finished, measured and charged by the same library; the ledger lock
             // stays held until its record is written. The shutdown waits for it (bounded)
-            let g = Finishing::start();
+            let window = Duration::from_millis(
+                sent["limits"]["timeout_ms"].as_u64().unwrap_or_default()
+                    + sent["limits"]["grace_ms"].as_u64().unwrap_or_default(),
+            );
+            let g = Finishing::start(finish_bound(window));
             std::thread::spawn(move || {
                 let _g = g;
                 let a = running.attempt_id().to_string();
                 match running.finish(
                     &caller::Http,
                     Duration::from_millis(250),
-                    Duration::from_secs(60),
+                    Duration::from_secs(FINISH_MARGIN_SECS),
                 ) {
                     Ok(r) => eprintln!(
                         "ieo-coord: delivery attempt {a} recorded (stop_required {})",
@@ -1130,10 +1255,64 @@ mod tests {
         assert_eq!(got["spare"]["by"]["kind"], "service");
     }
 
+    /// PR #83 review 67b5cae M-1: a start's session id is a lowercase UUID.
+    #[test]
+    fn a_start_session_is_a_lowercase_uuid() {
+        assert!(session_uuid("0f8fad5b-d9cb-469f-a165-70867728950e"));
+        for bad in [
+            "s1",
+            "0F8FAD5B-D9CB-469F-A165-70867728950E",
+            "0f8fad5bd9cb469fa16570867728950e",
+            "0f8fad5b-d9cb-469f-a165-70867728950",
+            "0f8fad5b-d9cb-469f-a165-70867728950g",
+            "0f8fad5b_d9cb-469f-a165-70867728950e",
+        ] {
+            assert!(!session_uuid(bad), "{bad}");
+        }
+    }
+
     /// Review 63fefc1 M-1 (a): the shutdown waits for the runs being finished, bounded.
     #[test]
     fn the_shutdown_waits_for_the_runs_being_finished() {
-        let g = Finishing::start();
+        // review 4531772 L-3: 600 s window + 2 × 60 s margin + 60 s slack
+        assert_eq!(SHUTDOWN_WAIT_DEFAULT_SECS, 780);
+        assert_eq!(
+            finish_bound(Duration::from_secs(600)),
+            Duration::from_secs(SHUTDOWN_WAIT_DEFAULT_SECS)
+        );
+        // a counted run with a longer bound extends the wait to it
+        let long = Finishing::start(Duration::from_secs(5_000));
+        assert!(shutdown_wait() >= Duration::from_secs(4_990));
+        // PR #83 review 67b5cae mutation A: a shorter run counted later keeps the latest bound
+        let short = Finishing::start(Duration::from_secs(1));
+        assert!(shutdown_wait() >= Duration::from_secs(4_990));
+        drop((long, short));
+        // review 67b5cae L-1: the bound is re-read while waiting
+        let now = std::time::Instant::now();
+        let d = SHUTDOWN_WAIT_DEFAULT_SECS;
+        assert!(!bound_reached(Duration::from_secs(d - 1), None, None, now));
+        assert!(bound_reached(Duration::from_secs(d), None, None, now));
+        let later = now + Duration::from_secs(100);
+        assert!(!bound_reached(
+            Duration::from_secs(d),
+            None,
+            Some(later),
+            now
+        ));
+        assert!(bound_reached(Duration::from_secs(d), None, Some(now), now));
+        assert!(bound_reached(
+            Duration::from_secs(5),
+            Some(Duration::from_secs(5)),
+            Some(later),
+            now
+        ));
+        assert!(!bound_reached(
+            Duration::from_secs(4),
+            Some(Duration::from_secs(5)),
+            None,
+            now
+        ));
+        let g = Finishing::start(Duration::from_secs(1));
         assert!(finishing() >= 1);
         let t0 = std::time::Instant::now();
         assert!(wait_finishing(Duration::from_millis(200)) >= 1, "bounded");

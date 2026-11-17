@@ -238,6 +238,22 @@ fn unix_now() -> u64 {
         .as_secs()
 }
 
+/// A delivery's session id as a lowercase UUID (a start's `claude --session-id` takes only a
+/// UUID; PR #83 review 67b5cae M-1): the test's short name, fixed per name.
+fn sid(name: &str) -> String {
+    let h = name.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+    });
+    format!(
+        "{:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}",
+        h >> 32,
+        (h >> 16) & 0xffff,
+        h & 0xfff,
+        (h >> 4) & 0xfff,
+        h & 0xffff_ffff_ffff
+    )
+}
+
 /// R1 fails → a service's spare is refused (403) → a person's spare re-runs R1 as the second
 /// call and its ledger record carries who approved it, when and the evidence reference → the
 /// same request again starts nothing → a second spare is refused → R2 runs as the third call
@@ -385,7 +401,7 @@ fn a_person_attaches_the_0205_spare_through_deliver_assignment() {
     };
     let dbody = |attempt: &str, session: &str, prompt: &str, extra: Value| {
         let mut v = json!({"assignment_id": "A1", "generation": 0,
-                           "attempt_id": attempt, "session_id": session, "prompt": prompt});
+                           "attempt_id": attempt, "session_id": sid(session), "prompt": prompt});
         for (k, x) in extra.as_object().expect("obj") {
             v[k] = x.clone();
         }
@@ -440,6 +456,18 @@ fn a_person_attaches_the_0205_spare_through_deliver_assignment() {
     );
     assert_eq!(st, 201, "{b}");
 
+    // 0. PR #83 review 67b5cae M-1: a start whose session id is not a lowercase UUID calls
+    //    nothing (`claude --session-id` would fail at once and spend a run)
+    let mut bad = dbody("r0", "s0", "hi", json!({}));
+    bad["session_id"] = json!("s0");
+    let (st, d) = deliver("operator", "sp-key-0000", &bad);
+    assert_eq!(
+        (st, outcome(&d).as_deref()),
+        (201, Some("not_called")),
+        "{d}"
+    );
+    assert!(reason(&d).contains("UUID"), "{d}");
+    assert!(records().is_empty(), "no run, no ledger record");
     // 1. R1 fails (an error result): its record asks for a person
     let (st, d) = deliver(
         "operator",

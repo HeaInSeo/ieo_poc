@@ -276,6 +276,22 @@ fn spec() -> Value {
     s
 }
 
+/// A delivery's session id as a lowercase UUID (a start's `claude --session-id` takes only a
+/// UUID; PR #83 review 67b5cae M-1): the test's short name, fixed per name.
+fn sid(name: &str) -> String {
+    let h = name.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+    });
+    format!(
+        "{:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}",
+        h >> 32,
+        (h >> 16) & 0xffff,
+        h & 0xfff,
+        (h >> 4) & 0xfff,
+        h & 0xffff_ffff_ffff
+    )
+}
+
 #[test]
 fn a_person_approves_one_new_session_over_an_unfinished_checkpoint() {
     e2e("http");
@@ -498,7 +514,7 @@ fn e2e(transport: &str) {
     };
     let dbody = |attempt: &str, generation: u64, session: &str, extra: Value| {
         let mut v = json!({"assignment_id": "A1", "generation": generation,
-                           "attempt_id": attempt, "session_id": session, "prompt": "hi"});
+                           "attempt_id": attempt, "session_id": sid(session), "prompt": "hi"});
         for (k, x) in extra.as_object().expect("obj") {
             v[k] = x.clone();
         }
@@ -545,7 +561,12 @@ fn e2e(transport: &str) {
     );
     for bad in [
         dbody("-a1", 0, "s1", json!({})),
-        dbody("a1", 0, "s/1", json!({})),
+        {
+            // a session id that is not a safe id (the helper maps names to UUIDs)
+            let mut b = dbody("a1", 0, "s1", json!({}));
+            b["session_id"] = json!("s/1");
+            b
+        },
         dbody("a1", 0, "s1", json!({"coordinator": {}})),
         dbody("a1", 0, "s1", json!({"new_session": "yes"})),
     ] {
@@ -1177,7 +1198,7 @@ fn e2e(transport: &str) {
             d6["result"]["supervisor"]["body"]["accepted"]["session_id"].as_str(),
             d6["result"]["supervisor"]["body"]["accepted"]["mode"].as_str()
         ),
-        (Some("s6"), Some("new")),
+        (Some(sid("s6").as_str()), Some("new")),
         "{d6}"
     );
     assert_eq!(d6["recovery"]["recovery_id"], rid.as_str(), "{d6}");
@@ -1202,7 +1223,11 @@ fn e2e(transport: &str) {
             after["session_id"].as_str(),
             after["recovery_id"].as_str()
         ),
-        (Some("after_run"), Some("s6"), Some(rid.as_str())),
+        (
+            Some("after_run"),
+            Some(sid("s6").as_str()),
+            Some(rid.as_str())
+        ),
         "{after}"
     );
     // the crashed checkpoint was consumed by an accepted use: it is no longer the latest, a new

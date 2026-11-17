@@ -257,6 +257,22 @@ fn spec() -> Value {
     s
 }
 
+/// A delivery's session id as a lowercase UUID (a start's `claude --session-id` takes only a
+/// UUID; PR #83 review 67b5cae M-1): the test's short name, fixed per name.
+fn sid(name: &str) -> String {
+    let h = name.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+    });
+    format!(
+        "{:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}",
+        h >> 32,
+        (h >> 16) & 0xffff,
+        h & 0xfff,
+        (h >> 4) & 0xfff,
+        h & 0xffff_ffff_ffff
+    )
+}
+
 #[test]
 fn deliveries_go_through_compare_budget_and_the_supervisor() {
     e2e("http");
@@ -476,7 +492,7 @@ fn e2e(transport: &str) {
     };
     let dbody = |attempt: &str, generation: u64, session: &str, extra: Value| {
         let mut v = json!({"assignment_id": "A1", "generation": generation,
-                           "attempt_id": attempt, "session_id": session, "prompt": "hi"});
+                           "attempt_id": attempt, "session_id": sid(session), "prompt": "hi"});
         for (k, x) in extra.as_object().expect("obj") {
             v[k] = x.clone();
         }
@@ -523,7 +539,12 @@ fn e2e(transport: &str) {
     );
     for bad in [
         dbody("-a1", 0, "s1", json!({})),
-        dbody("a1", 0, "s/1", json!({})),
+        {
+            // a session id that is not a safe id (the helper maps names to UUIDs)
+            let mut b = dbody("a1", 0, "s1", json!({}));
+            b["session_id"] = json!("s/1");
+            b
+        },
         dbody("a1", 0, "s1", json!({"coordinator": {}})),
         dbody("a1", 0, "s1", json!({"new_session": "yes"})),
     ] {
@@ -633,7 +654,7 @@ fn e2e(transport: &str) {
     let accepted = &d1["result"]["supervisor"]["body"]["accepted"];
     assert_eq!(
         (accepted["session_id"].as_str(), accepted["mode"].as_str()),
-        (Some("s1"), Some("new"))
+        (Some(sid("s1").as_str()), Some("new"))
     );
     role.wait("a1");
     let r1 = settled("a1");
@@ -766,7 +787,7 @@ fn e2e(transport: &str) {
     let accepted = &d2["result"]["supervisor"]["body"]["accepted"];
     assert_eq!(
         (accepted["session_id"].as_str(), accepted["mode"].as_str()),
-        (Some("s1"), Some("resume")),
+        (Some(sid("s1").as_str()), Some("resume")),
         "{d2}"
     );
     assert_eq!(d2["logical_name"], "renamed");
@@ -849,7 +870,8 @@ fn e2e(transport: &str) {
         "{st} {d3}"
     );
     assert_eq!(
-        d3["result"]["supervisor"]["body"]["accepted"]["session_id"], "s9",
+        d3["result"]["supervisor"]["body"]["accepted"]["session_id"],
+        sid("s9"),
         "{d3}"
     );
     assert_eq!(
@@ -1075,7 +1097,7 @@ fn e2e(transport: &str) {
     );
     assert_eq!(
         d["result"]["supervisor"]["body"]["accepted"]["session_id"],
-        "s2"
+        sid("s2")
     );
     role.wait("a6");
     settled("a6");

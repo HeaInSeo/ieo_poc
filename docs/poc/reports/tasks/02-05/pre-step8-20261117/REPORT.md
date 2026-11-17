@@ -18,7 +18,7 @@
 | **N-3** `approved_at`의 뜻 | 계약에 “사람이 보낸 `deliverAssignment` 요청을 코디네이터가 처리한 시각(별도의 승인 시각이 아님)”으로 적었다 | 코드 변경 없음 | — | — |
 | **I-8**(PR #75 검토 debf413) 직접 첫 행동 보고의 조건을 채움과 같게 | `recordFirstAction`은 지금까지 “그 세션의 takeover 체크포인트가 그 배정·세대로 저장됨”만 봤다. 이제 채움과 같이 “그 세션의 takeover가 그 배정·세대로 저장됐고 **그 시도를 부른 전달에 연결됨**”을 본다. 아니면 409 `CHECKPOINT_MISMATCH`(문구: “…is linked to the delivery that called this attempt”), 행 없음. 두 경로가 함수 하나(`takeover_linked`)를 쓴다 | `crates/ieo-coord/src/api.rs`: `takeover_linked`(옛 `taken_over` 대신), `record_first_action`, `fill_first_action` | `grpc.rs` `supervisor_operations_answer_the_assignment_and_store_claims`: 전달이 부르지 않은 시도 → 409, 전달된 시도 → 201, R4(다른 세션) → 409, 새 세대 뒤 같은 세션의 두 번째 전달(seq 3)의 시도 → 201 `current_assignment: false`. `a_record_stored_over_one_transport_replays_over_the_other`: 전달된 시도로 | P2~P4 |
 
-| **검토 63fefc1 M-1 (a)** 실행 중 코디네이터를 멈추면 회차 기록이 사라짐 | 받아들인 회차는 코디네이터 프로세스 안의 스레드가 끝내고 계측해 02-05 장부에 쓴다. 지금까지 SIGTERM은 HTTP 작업자만 풀고 그 스레드를 기다리지 않아, 재배포·재시작 중인 회차는 `inflight.json`만 남기고 기록이 없었다(예산이 멈추고 예비로 풀 수 없음). 또 역할의 after_run 체크포인트 보고가 닫힌 코디네이터에 닿지 못해 다음 전달이 “local checkpoint … is not yet recorded”로 외부 대조가 됐다(시험으로 확인). 이제 신호를 받으면 새 전달을 503 `COORDINATOR_STOPPING`(기록 없음)으로 거절하고, 받아들인 회차가 모두 끝나 기록될 때까지(한도 `IEO_COORD_SHUTDOWN_WAIT_SECS`, 기본 720초 = 회당 창 600초 + 멈춤 유예 + 호출자 여유) **계속 서비스한 뒤** 작업자를 푼다. 한도를 넘으면 남은 회차 수를 기록하고 멈춘다(그 기록은 없다: 사람이 대조) | `delivery.rs`: `FINISHING`·`Finishing`·`finishing`·`wait_finishing`, `STOPPING`·`begin_stop`, 전달의 503. `bin/ieo-coord.rs`: 신호 스레드 | `spare_e2e` 7단계: R2 실행 중 SIGTERM → 새 전달 503·기록 없음 → 코디네이터가 끝난 뒤 장부에 R2 기록, `inflight.json` 없음 → 재시작 뒤 다음 전달이 정상 판단(“planned runs are used”). `delivery.rs` 단위 `the_shutdown_waits_for_the_runs_being_finished` | Q1~Q3, Q6 |
+| **검토 63fefc1 M-1 (a)** 실행 중 코디네이터를 멈추면 회차 기록이 사라짐 | 받아들인 회차는 코디네이터 프로세스 안의 스레드가 끝내고 계측해 02-05 장부에 쓴다. 지금까지 SIGTERM은 HTTP 작업자만 풀고 그 스레드를 기다리지 않아, 재배포·재시작 중인 회차는 `inflight.json`만 남기고 기록이 없었다(예산이 멈추고 예비로 풀 수 없음). 또 역할의 after_run 체크포인트 보고가 닫힌 코디네이터에 닿지 못해 다음 전달이 “local checkpoint … is not yet recorded”로 외부 대조가 됐다(시험으로 확인). 이제 신호를 받으면 새 전달을 503 `COORDINATOR_STOPPING`(기록 없음)으로 거절하고, 받아들인 회차가 모두 끝나 기록될 때까지(한도 `IEO_COORD_SHUTDOWN_WAIT_SECS`, 기본 720초(병합 뒤 780초로 정정, §11) = 회당 창 600초 + 멈춤 유예 + 호출자 여유) **계속 서비스한 뒤** 작업자를 푼다. 한도를 넘으면 남은 회차 수를 기록하고 멈춘다(그 기록은 없다: 사람이 대조) | `delivery.rs`: `FINISHING`·`Finishing`·`finishing`·`wait_finishing`, `STOPPING`·`begin_stop`, 전달의 503. `bin/ieo-coord.rs`: 신호 스레드 | `spare_e2e` 7단계: R2 실행 중 SIGTERM → 새 전달 503·기록 없음 → 코디네이터가 끝난 뒤 장부에 R2 기록, `inflight.json` 없음 → 재시작 뒤 다음 전달이 정상 판단(“planned runs are used”). `delivery.rs` 단위 `the_shutdown_waits_for_the_runs_being_finished` | Q1~Q3, Q6 |
 | **검토 63fefc1 I-1** 관문의 사람 검사를 독립 검사로 | `spare_extra`가 `by.kind`를 늘 `user`로 쓰던 것을 호출자의 실제 종류로 쓴다. 그래서 전달의 403 뒤에 관문의 `kind == "user"` 검사가 따로 한 번 더 막는다 | `delivery.rs` `spare_extra` | `delivery.rs` 단위(서비스 자격 → `kind: service`) | Q4 |
 | **검토 63fefc1 L-1** 세대 불일치 | 새 세대 뒤 세대 0에서 전달된 시도를 세대 1로 보고 → 409(코드는 이미 맞음, 시험 보강) | — | `grpc.rs` `supervisor_operations…` | Q5(검토의 R82-B) |
 
@@ -38,7 +38,7 @@
 
 1. **recordFirstAction(02-05 단계 2, 수용)** — 검토 debf413 I-8. 직접 보고는 그 세션의 takeover가 **그 시도를 부른 전달에 연결돼 있을 때만** 받는다. 지금까지는 그 세션의 takeover가 그 배정·세대에 하나라도 있으면 어떤 `attempt_id`든 받았다(201). 이제 그런 보고는 409 `CHECKPOINT_MISMATCH`이고 행을 남기지 않는다. 정상 경로(코디네이터 전달이 부른 시도를 supervisor가 보고)는 같다: supervisor는 전달의 `attempt_id`로 회차를 돌리고 그 값을 보고한다. 같은 세션의 두 번째 회차도 그 회차의 전달이 takeover로 연결되면 받는다. 채움(`source: checkpoint`)은 이미 이 조건이었다.
 2. **멈춤 사유 문구(02-04 호출자·공유 예산 검사, 수용)** — N-2. 결과 사유가 아닌 사유 안의 `"; "`는 `", "`로 바뀌고, 결과 사유처럼 시작하는 사유에는 `other: `가 붙는다. 지금의 사유 중 결과 사유처럼 시작하는 것은 없다. `"; "`가 들어갈 수 있는 것은 외부 문자열을 품는 사유(미계측 이유, 이 회차의 신호, 답을 잃은 호출의 오류)뿐이다. 그 경우 `stop_reason`의 한 사유가 더는 여러 조각으로 나뉘지 않는다(예: 재계측의 “미계측 하나뿐” 판단이 그 사유를 하나로 본다). 이미 쓰인 기록은 바뀌지 않는다. 멈춤 여부(`stop_required`)는 같다.
-3. **코디네이터의 멈춤(SIGTERM/SIGINT, 02-04 수용: “받기를 멈추고 진행 중인 요청을 끝내고 exit 0”)** — 검토 63fefc1 M-1 (a). 이제 받아들인 회차가 끝나 기록될 때까지 **계속 서비스하고**(한도 기본 720초) 그동안 `deliverAssignment`는 503 `COORDINATOR_STOPPING`(기록 없음)이다. 다른 요청(체크포인트 보고 등)은 그동안 그대로 받는다. 진행 중인 회차가 없으면 지금처럼 곧 멈춘다. 멈춤에 걸리는 시간이 길어질 수 있으므로 컨테이너의 정지 유예(`podman stop -t` 등)가 짧으면 그 전에 강제 종료된다(§6 항목 11).
+3. **코디네이터의 멈춤(SIGTERM/SIGINT, 02-04 수용: “받기를 멈추고 진행 중인 요청을 끝내고 exit 0”)** — 검토 63fefc1 M-1 (a). 이제 받아들인 회차가 끝나 기록될 때까지 **계속 서비스하고**(한도 기본 780초 = 회당 창 600초 + 호출자 여유 60초 × 2 + 60초, 그보다 긴 창의 회차가 진행 중이면 그 회차의 한도까지. 2026-11-17 정정, §11) 그동안 `deliverAssignment`는 503 `COORDINATOR_STOPPING`(기록 없음)이다. 다른 요청(체크포인트 보고 등)은 그동안 그대로 받는다. 진행 중인 회차가 없으면 지금처럼 곧 멈춘다. 멈춤에 걸리는 시간이 길어질 수 있으므로 컨테이너의 정지 유예(`podman stop -t` 등)가 짧으면 그 전에 강제 종료된다(§6 항목 11).
 4. 추가만: 시험(`spare_e2e`), 계약 문구. 예비 표식의 `by.kind`는 호출자의 실제 종류다(받아들인 표식은 늘 `user`이므로 기록은 같다).
 
 ## 4. 시험
@@ -97,8 +97,8 @@
 | 8 | **GitHub head 입력.** R2(개발 재개)는 배정 브랜치의 GitHub head가 체크포인트의 push SHA(없으면 배정 `target_sha`)와 같아야 `resume_allowed`다. 단계 8은 GitHub 쓰기·push가 없으므로 그 비교 대상은 `target_sha`이고, `evidence:ingest`가 `branch_head`(그 브랜치, `target_sha`)를 넣어 둬야 한다(신뢰 입력, 실제 수집 아님) | 단계 7 보고, `api.rs` `branch_head` | 단계 8 절차서에 `branch_head` 입력을 적는다 |
 | 9 | **Guardrail 대상.** G1은 검토 대상 SHA가 현재 개발 배정의 `target_sha`일 때만 실행한다(아니면 `stale_target`) | `api.rs` `stale_target` | 배정 순서를 절차서에 적는다 |
 | 10 | **추가 청구 USD 0, 02-04 예비 5회 미사용.** 02-04·X-02 장부는 쓰지 않는다 | 결정 2026-11-15·2026-11-17 | 계획·설정의 장부 경로 |
-| 11 | **(a) 회차 중에는 코디네이터를 재시작·재배포하지 않는다.** 받아들인 회차는 코디네이터 프로세스 안의 스레드가 끝내고 계측해 장부에 쓴다(`delivery.rs:859-876`). 이 PR부터 SIGTERM/SIGINT는 새 전달을 503으로 막고 그 회차가 끝날 때까지(기본 720초) 서비스한 뒤 멈춘다(`bin/ieo-coord.rs:110-141`). 그러나 정지 유예가 그보다 짧은 강제 종료(`podman stop`의 기본 10초, SIGKILL, 호스트 재시작)는 여전히 `inflight.json`만 남기고 기록을 잃는다. 그러면 예산이 멈추고(미계측), 배정은 다음 전달을 `ASSIGNMENT_USAGE_UNMEASURED`로 거절하며, 예비로 풀 수 없다(`spare_releasable`) | `delivery.rs:859-876`, `bin/ieo-coord.rs:110-141`, `caller.rs` `records_when_idle`·`inflight` | **재시작 전 진행 중 회차가 없는지 확인(읽기 전용):** (1) 02-05 장부 디렉터리에 `inflight.json`이 없다. (2) 장부 잠금(`caller.lock`)을 쥔 프로세스가 없다(`records_when_idle`가 `Some`). (3) 두 역할 서비스의 `GET /v0/role/status`(어댑터 자격)가 `running: null`. (4) 최근 전달의 결과가 `accepted`인데 장부에 그 시도의 기록이 없는 것이 없다(연결 조회 `GET …/chain`). 넷 모두 참일 때만 멈춘다. 멈출 때는 정지 유예를 720초 이상으로 준다(`podman stop -t 720`) |
-| 12 | **(b) 예비의 모양.** 예비를 붙이기 전에 사람이 R1 실패의 **단계**를 먼저 본다(R1 기록의 `stop_reason`·`outcome`, 중앙 최신 체크포인트의 `phase`). 아래 “예비” 줄 | `delivery.rs:898-911` `choose_op`, `serve.rs:1225-1240`(after_run·error 체크포인트), `api.rs` `judge_resume` | 연결 조회(`GET /v0/coordinator/assignments/{aid}/generations/{g}/chain`)의 체크포인트 `phase`, 장부의 R1 기록 |
+| 11 | **(a) 회차 중에는 코디네이터를 재시작·재배포하지 않는다.** (2026-11-17 병합 뒤 정정, §11) 받아들인 회차는 코디네이터 프로세스 안의 스레드가 끝내고 계측해 장부에 쓴다(`delivery.rs` `deliver`의 `Sent::Accepted`). SIGTERM/SIGINT는 새 전달을 503으로 막고, 진행 중인 전달과 그 회차가 끝날 때까지 서비스한 뒤 멈춘다. 한도는 기본 780초(회당 창 600초 + 호출자 여유 60초 × 2 + 60초)이고, 더 긴 창의 회차가 진행 중이면 그 회차의 한도까지다(`delivery::shutdown_wait`, `IEO_COORD_SHUTDOWN_WAIT_SECS`로 덮어씀). 정지 유예가 그보다 짧은 강제 종료(`podman stop`의 기본 10초, SIGKILL, 호스트 재시작)는 여전히 `inflight.json`만 남기고 기록을 잃는다. 그러면 예산이 멈추고(미계측), 배정은 다음 전달을 `ASSIGNMENT_USAGE_UNMEASURED`로 거절하며, 예비로 풀 수 없다(`spare_releasable`) | `delivery.rs`(`Finishing`, `shutdown_wait`, `SHUTDOWN_WAIT_DEFAULT_SECS`), `bin/ieo-coord.rs`(신호 스레드, `serve` 뒤의 두 번째 기다림) | **재시작 전 진행 중 회차가 없는지 확인(읽기 전용):** (1) 02-05 장부 디렉터리에 `inflight.json`이 없다. (2) 장부 잠금 파일(`caller.lock`)을 연 프로세스가 없다(`fuser`·`lsof`로 보기만 한다. `flock`으로 잠그지 않는다). (3) 두 역할 서비스의 `GET /v0/role/status`(어댑터 자격)가 `running: null`. (4) 최근 전달의 결과가 `accepted`인데 장부에 그 시도의 기록이 없는 것이 없다(연결 조회 `GET …/chain`). 넷 모두 참일 때만 멈춘다. 멈출 때는 정지 유예를 **900초 이상**으로 준다(`podman stop -t 900`: 기다림 780초 + 전달의 진행 창 120초. PR #83 검토 67b5cae L-1) |
+| 12 | **(b) 예비의 모양과 전제.** (2026-11-17 병합 뒤 정정, §11) 예비를 붙이기 전에 사람이 실패한 회차를 먼저 본다. **관문이 실제로 보는 전제**(`caller::spare_gate`·`spare_releasable`): 대체할 회차가 이 예산의 개발 회차로 장부에 기록이 하나뿐이고, 그 유효 기록이 실패(`stop_required`, 또는 깨끗한 성공이 아닌 결과)이며, **사용량이 계측돼 있고**(`usage.run.state == "measured"`) **멈춤 사유가 회차 자신의 결과뿐**(`result …`, `no result event`)이어야 한다. 예비가 아직 쓰이지 않았고 예산·몫이 남아 있어야 한다. 이 전제가 아니면 예비는 불가능하다: 사람은 보고하고 사용자가 정한다 | `caller.rs` `spare_gate`·`spare_releasable`, `delivery.rs` `choose_op`, `serve.rs`(after_run·error 체크포인트) | 장부의 실패 회차 기록(`usage.run.state`, `stop_reason`, `outcome.result`), 연결 조회의 체크포인트 `phase` |
 | 13 | **(c) 경로·신선도·한도.** `first_observation`은 R1 시점에 7일 이내여야 한다(아니면 그 호출은 보류). `ledger_dir`와 관측 stream은 코디네이터 프로세스가 읽고 쓸 수 있고 재배포 뒤에도 남는 경로여야 한다(컨테이너 안 임시 경로이면 재배포 때 장부가 사라진다). 개발 배정은 `branch_ref`가 있어야 R2가 GitHub head를 대조한다. sprint revision·배정의 `limits`(`elapsed_seconds`·`total_tokens`)가 600초·150,000 계획을 덮을 만큼 남아야 한다(아니면 회차 창이나 토큰 방이 잘려 가드 멈춤 → 미계측 또는 한도 멈춤, 예비로 풀 수 없음). 계획의 `max_window_seconds`는 600 이하. R1·R2 지시는 짧게(가드 멈춤은 예비가 풀지 못한다) | `budget.rs:148,291`(`OBSERVATION_MAX_AGE_SECONDS`), `caller.rs:616`(`max_window_seconds`), `api.rs:4599`(`branch_ref` 없음 → 대조 불가), `limits.rs`(배정 한도), `run.rs:662` `charge_reported`(가드 멈춤 → 미계측) | `roles.json`의 `budget_plan`(`ledger_dir`, `first_observation.observed_unix`, `max_window_seconds`)과 코디네이터 컨테이너의 마운트, 배정 요청의 `branch_ref`·`limits`, sprint revision의 `limits` |
 | 14 | **(d) 코디네이터가 유일한 시작 경로.** 두 역할 서비스 모두 `checkpoint_central`이 코디네이터여야 한다(`local_only`가 아님). 중앙 체크포인트 모드에서는 전달 없는 start의 takeover가 거절돼 아무것도 실행되지 않는다(`serve.rs:1192-1199`). `local_only`이면 어댑터 토큰을 가진 누구든(자기 계획·장부를 쓴 `ieo-role-call` 포함) 두 번째 장부로 02-05 회차를 시작할 수 있고 예비 규칙도 우회된다(볼륨의 보조 상한만 남음) | `serve.rs:1192-1199`, `serve.rs:494`(`local_only` 표시), 런타임 계약 §15 항목 16 | 두 역할 서비스 설정의 `checkpoint_central`(값이 URL·자격 파일), 상태 응답의 중앙 비교 표시(`central checkpoint comparison off (local_only)`가 없음). 코디네이터 `tokens.json`에 두 supervisor의 `agent` 주체(`checkpoint:report`, 그 역할)가 있는지, `roles:control` 보유 주체 목록(이름·종류만), 단계 8 동안 이 서비스들에 `ieo-role-call`을 쓰지 않는다 |
 | 15 | **(e) 새 표가 미리 있지 않다.** `migrate`는 `CREATE TABLE IF NOT EXISTS`라 main이 아닌 빌드가 만든 같은 이름의 표가 있으면 그 모양을 그대로 둔다 | `schema.sql:291`(`role_checkpoints`)~`:581`(`role_recovery_uses`), 항목 2의 11개 표 | 재배포 **전** 영속 DB(55433)에서 읽기 전용으로 `SELECT table_name FROM information_schema.tables WHERE table_name IN ('role_checkpoints','role_tamper_events','role_first_actions','role_session_status','role_deliveries','role_delivery_results','role_takeovers','assignment_run_usage','assignment_limit_events','role_recoveries','role_recovery_uses')` → 0행이어야 한다. 있으면 그 열 정의를 schema.sql과 대조하고 사람이 정한다 |
@@ -107,11 +107,11 @@
 - **R1(개발).** 중앙 체크포인트 없음 → `no_checkpoint` → 새 세션 **start**. 역할 서비스가 takeover 체크포인트(그 `delivery_id`·`attempt_id`)를 보고하고 첫 행동을 `recordFirstAction`으로 보고하며(이 PR의 조건: 그 전달에 연결된 takeover), 끝에 after_run.
 - **R2(개발).** after_run이 최신이고 GitHub head가 맞으면 `resume_allowed` → **reconnect**(같은 세션 재개, `github` 포함). R1이 실패했으면 R2는 시작하지 않는다(“asks for a person”). 그 경우 사람이 원인 보고 뒤 예비를 붙일 수 있다(§6 항목 7).
 - **G1(Guardrail).** Guardrail 배정의 첫 전달 → **start**(대상 SHA가 현재 개발 `target_sha`). G1은 실패해도 다시 하지 않는다.
-- **예비(개발, R1 또는 R2가 실패했을 때만, 사람 자격으로).** 사람이 원인 보고·증거 참조를 남기고, 실패한 회차의 단계를 먼저 본다(항목 12). 본문은 위 키에 `spare {reason, replaces, evidence_ref}`를 더한다. 어느 연산이 되는지는 재개 판단이 정한다(`choose_op`):
-  - **최신 체크포인트가 `after_run`이고 실패한 회차의 세션이 실제로 있었다**(stream에 그 세션의 `system`/`init`) → 표식만 단 전달은 **reconnect**로 그 세션을 이어 간다(본문의 `session_id`는 쓰이지 않는다). 세션을 새로 시작하려면 `new_session: true`(**start**). 실행 환경 결함으로 실패한 회차를 다시 하는 예비는 원칙적으로 `new_session: true`를 권한다.
-  - **최신 체크포인트가 `after_run`이지만 세션이 생기기 전에 실패했다**(인증·환경 결함으로 `init`이 없음) → 반드시 `new_session: true`. 표식만이면 reconnect의 `--resume`이 없는 세션을 찾다 실패해 예비가 쓰인다.
-  - **최신 체크포인트가 `error`(또는 `takeover`)** → 재개 판단이 `resume_allowed`가 아니어서 표식만이면 `not_called`(예비는 쓰이지 않는다). 사람이 먼저 복구를 승인하고(`approveRecovery`, 사람 자격) 전달에 `recovery_id`와 표식을 함께 단다(새 세션 **start**). `new_session`만으로는 시작하지 않는다.
-  - 예비는 한 번뿐이다. 어느 경우든 같은 멱등 키로 다시 보내면 저장된 답이 오고 새 회차는 없다.
+- **예비(개발, R1 또는 R2가 실패했을 때만, 사람 자격으로).** (2026-11-17 병합 뒤 정정, §11) 사람이 원인 보고·증거 참조를 남기고 항목 12의 전제를 먼저 본다. 본문은 위 키에 `spare {reason, replaces, evidence_ref}`를 더한다. 어느 연산이 되는지는 재개 판단이 정한다(`choose_op`):
+  - **전제를 채우고 최신 체크포인트가 `after_run`, 실패한 회차의 세션이 실제로 있었다**(stream에 그 세션의 `system`/`init`) → 표식만 단 전달은 **reconnect**로 그 세션을 이어 간다(본문의 `session_id`는 쓰이지 않는다). 세션을 새로 시작하려면 `new_session: true`(**start**). 실행 환경 결함으로 실패한 회차를 다시 하는 예비는 원칙적으로 `new_session: true`를 권한다.
+  - **전제를 채우고 최신 체크포인트가 `after_run`이지만 세션이 생기기 전에 실패했다**(`init`이 없음) → 반드시 `new_session: true`. 표식만이면 reconnect의 `--resume`이 없는 세션을 찾다 실패해 예비가 쓰인다.
+  - **전제를 채우지 못한다** — 최신 체크포인트가 `error`·`takeover`인 회차(실행이 실패하거나 중간에 끊긴 회차: 호출자가 답을 잃은 기록으로 쓰므로 사용량이 미계측), 가드가 멈춘 회차(시간·토큰 상한, overage: 미계측), 정리 실패나 구독 전용이 아닌 환경으로 멈춘 회차 → **예비를 쓸 수 없다.** 예산은 멈춘 채이고(미계측 회차는 모든 호출을 멈춘다), 사람이 보고하고 사용자가 정한다. 복구 승인(`recovery_id`)을 더해도 관문이 거절한다(복구는 소비되지 않지만 쓸모가 없다).
+  - 예비는 한 번뿐이다. 같은 멱등 키로 다시 보내면 저장된 답이 오고 새 회차는 없다.
 
 ## 7. 한계와 넘기는 것
 
@@ -121,8 +121,8 @@
 | 동등 변이 P7 | 정리 실패 문구가 가드를 지나지 않아도 결과는 같다(§5) | — |
 | 이월 I-9(PR #75 검토 debf413) | 바이트가 같은 복사 start가 `refused`로 기록되는 것은 그대로(신뢰 경계 안, 기존 기록) | 기존 기록 그대로 |
 | 사용 뒤 풀리지 않는 체크포인트(검토 d336849 L-c) | 그대로. 해제 경로는 단계 9 | 02-05 단계 9 |
-| 강제 종료 때 회차 기록(검토 63fefc1 M-1 (a)) | 이 PR은 정상 멈춤(SIGTERM/SIGINT)에서 받아들인 회차를 기다린다(기본 720초). 그보다 짧은 정지 유예, SIGKILL, 호스트·컨테이너 강제 종료에서는 여전히 기록이 없다. 끝내는 스레드가 프로세스 안에 있는 구조는 그대로다(회차 기록을 프로세스 밖에서 이어 쓰는 방법은 없다) | 운영: 단계 8 절차서(§6 항목 11). 구조: 02-05 단계 9(실행 중 회차의 인계·대조) |
-| 예비 + `recovery_id` 종단 | `error` 체크포인트 뒤의 예비(복구 승인 + 표식)는 caller·복구 시험이 각각 다루지만 둘을 함께 쓴 종단 시험은 없다 | 단계 8 전 필요하면 추가 |
+| 강제 종료 때 회차 기록(검토 63fefc1 M-1 (a)) | 이 PR은 정상 멈춤(SIGTERM/SIGINT)에서 받아들인 회차를 기다린다(기본 720초(병합 뒤 780초로 정정, §11)). 그보다 짧은 정지 유예, SIGKILL, 호스트·컨테이너 강제 종료에서는 여전히 기록이 없다. 끝내는 스레드가 프로세스 안에 있는 구조는 그대로다(회차 기록을 프로세스 밖에서 이어 쓰는 방법은 없다) | 운영: 단계 8 절차서(§6 항목 11). 구조: 02-05 단계 9(실행 중 회차의 인계·대조) |
+| 예비 + `recovery_id` 종단 | `error` 체크포인트 뒤의 예비(복구 승인 + 표식)는 caller·복구 시험이 각각 다루지만 둘을 함께 쓴 종단 시험은 없다 **(병합 뒤 정정: 불가능, §11. 그런 회차는 미계측이라 관문이 거절하므로 시험할 경로가 아니다)** | — |
 | 영속 DB | 스키마 변경 없음(이 PR) | — |
 
 ## 8. 검토 잔여 처리
@@ -144,12 +144,37 @@
 | 항목 | 처분 |
 | --- | --- |
 | **M-1**(점검표가 회차를 망치거나 예비를 태우는 조건을 빠뜨림) | §6 항목 11~15와 “예비” 줄을 더했다. 각 항목에 근거(파일:줄)와 읽기 전용 확인 방법을 적었다 |
-| M-1 (a)(실행 중 재시작 → 기록 없음) | 점검표 항목 11(재시작 전 진행 중 회차가 없음을 확인하는 절차). **코드도 교정**(e2dd5f3): 멈춤 신호에 새 전달을 503으로 막고, 받아들인 회차가 끝나 기록될 때까지 서비스한 뒤 멈춘다(한도 기본 720초). 시험 `spare_e2e` 7단계·`delivery.rs` 단위, 변이 Q1~Q3·Q6. 강제 종료는 §7(운영: 절차서, 구조: 02-05 단계 9). 동작 변경 §3 항목 3 |
-| M-1 (b)(예비의 모양) | §6 항목 12와 “예비” 줄: after_run이고 세션이 있으면 reconnect 또는 `new_session: true`, 세션이 생기기 전 실패면 `new_session: true`, error·takeover면 복구 승인 + `recovery_id` |
+| M-1 (a)(실행 중 재시작 → 기록 없음) | 점검표 항목 11(재시작 전 진행 중 회차가 없음을 확인하는 절차). **코드도 교정**(e2dd5f3): 멈춤 신호에 새 전달을 503으로 막고, 받아들인 회차가 끝나 기록될 때까지 서비스한 뒤 멈춘다(한도 기본 720초(병합 뒤 780초로 정정, §11)). 시험 `spare_e2e` 7단계·`delivery.rs` 단위, 변이 Q1~Q3·Q6. 강제 종료는 §7(운영: 절차서, 구조: 02-05 단계 9). 동작 변경 §3 항목 3 |
+| M-1 (b)(예비의 모양) | §6 항목 12와 “예비” 줄: after_run이고 세션이 있으면 reconnect 또는 `new_session: true`, 세션이 생기기 전 실패면 `new_session: true`, error·takeover면 복구 승인 + `recovery_id` **(병합 뒤 정정: 불가능, §11. error·takeover 회차는 미계측이라 예비를 쓸 수 없다)** |
 | M-1 (c)(경로·신선도·한도) | §6 항목 13 |
 | M-1 (d)(코디네이터가 유일한 시작 경로) | §6 항목 14 |
 | M-1 (e)(새 표가 미리 있음) | §6 항목 15(읽기 전용 질의) |
 | L-1(세대 불일치 R82-B 생존) | 교정. `grpc.rs` 단언. 변이 Q5 |
 | I-1(`spare_extra`가 `kind: user` 고정) | 교정. 호출자의 실제 종류. 변이 Q4 |
 | I-2(N-2 가드는 규약) | 기록. 사유 목록은 `Vec<String>`이라 가드를 거치지 않은 사유를 막는 타입은 없다. 거치지 않은 사유는 결과 사유처럼 시작하지 않는 한 닫는 쪽이다(목록 밖은 막음). 새 사유를 더하는 변경의 검토 항목으로 남긴다 |
-| I-3(예비 start·R2 실패 경로의 종단 시험 없음) | 기록. 호출자 수준 시험이 결정 §4.4를 채운다(`caller.rs`). §7의 예비 + `recovery_id` 행 |
+| I-3(예비 start·R2 실패 경로의 종단 시험 없음) | 기록. 호출자 수준 시험이 결정 §4.4를 채운다(`caller.rs`). §7의 예비 + `recovery_id` 행 **(병합 뒤 정정: 그 경로는 불가능, §11)** |
+
+## 11. 병합 뒤 정정(PR #82 검토 4531772)
+
+PR #82 병합(5d69102) 뒤 검토 4531772가 찾은 것을 반영했다. 코드는 후속 PR(feat/0205-pre8b, 1999494·6a19059)이고, 이 보고의 §3 항목 3, §6 항목 11·12와 “예비” 줄은 이 정정에 맞춰 그 자리에서 고쳤고 각 곳에 “(2026-11-17 병합 뒤 정정, §11)”을 달았다. 단계 8의 절차는 [단계 8 절차서](../step8-runbook-20261117/RUNBOOK.md)에 모았다.
+
+| 항목 | 처분 |
+| --- | --- |
+| **L-2**(§6 “예비” 줄의 셋째 경우가 동작하지 않음) | **정정.** 병합된 §6은 “최신 체크포인트가 `error`(또는 `takeover`)면 복구를 승인하고 `recovery_id`와 표식을 함께 단다”고 적었다. 그런 회차는 호출자가 답을 잃은 기록(`record_lost`)으로 써서 사용량이 미계측이다. 그래서 관문(`spare_releasable`)이 거절하고 예산은 미계측 회차로 멈춘다(`budget::next`). 재계측도 해당하지 않는다. 그 경우는 “예비를 쓸 수 없음, 사람이 보고하고 사용자가 정함”으로 고쳤다. 항목 12에 관문이 실제로 보는 전제(계측됨, 결과 사유뿐)를 적었다. 닫는 쪽이라 비용은 없었다(복구는 소비되지 않음) |
+| **L-3**(720초 기본값이 늦게 끝나는 회차를 놓침) | **교정**(1999494). `After::finish`는 창 + 여유(60초)를 기다리고, 멈춤을 보낸 뒤 여유를 한 번 더 기다린다. 그 뒤에 stream·자식 기록을 읽고 기록을 쓴다. 그래서 기본값을 **780초** = 600 + 2 × 60 + 60으로 올렸다(`SHUTDOWN_WAIT_DEFAULT_SECS`). 진행 중인 회차마다 자기 한도(창 + 2 × 여유 + 60초)를 세고, 더 긴 창(02-04 1,800초, X-02 3,600초)의 회차가 있으면 그 한도까지 기다린다(`shutdown_wait`). 항목 11의 `podman stop -t`는 780 이상. 시험: `delivery.rs` 단위(780의 산술, 긴 한도가 기다림을 늘림). 변이 R1~R3 |
+| **L-4**(멈춤 검사를 지난 전달이 세지지 않음) | **교정**(1999494). 전달은 멈춤 표시를 읽기 **전에** 세진다(`Finishing`). 받아들인 회차는 그 전달의 셈이 풀리기 전에 자기 셈을 시작한다. 또 `main`이 작업자가 끝난 뒤 한 번 더 기다린다. 변이 R4(전달 셈 제거)는 살아남는다: 경쟁 구간을 결정적으로 만들 수 없고, `main`의 두 번째 기다림이 같은 회차의 기록을 지키려 한다(완전하지는 않다: 멈춤 검사를 지난 전달이 시작 마감 75초 뒤에 회차를 시작하면 기록이 `-t`를 넘길 수 있었다. 검토 67b5cae L-1, §11.1에서 호출 직전 다시 보기와 `-t 900`으로 좁힘). 검토자 탐침대로 닫는 쪽이다(`inflight.json`, 예산 멈춤) |
+| I-4(항목 11 확인 (2)가 명령이 아님) | 정정. `fuser`·`lsof`로 보기만 하고 `flock`으로 잠그지 않는다 |
+
+시험: `cargo test --workspace --locked` 408 통과, 0 실패([증거](../step8-runbook-20261117/evidence/test.log), 커밋 1999494). 변이 8개 중 7개가 잡혔다(R4는 위 이유, [증거](../step8-runbook-20261117/evidence/mutants.txt)).
+
+### 11.1 PR #83 검토 67b5cae 반영
+
+| 항목 | 처분 |
+| --- | --- |
+| M-1(start의 `session_id`가 UUID가 아니면 회차가 곧 실패하고 예비를 태움) | **교정**(072d99e). 판단이 `start`를 고른 전달의 `session_id`가 소문자 UUID가 아니면 `not_called`(이유 기록), 아무것도 부르지 않는다(`claude --session-id`는 UUID만 받는다). 판단 뒤라 전달 행은 남는다. 절차서 §5·§6은 회차마다 새 소문자 UUID를 요구한다. 시험 `spare_e2e` 0단계, `delivery.rs` 단위 `a_start_session_is_a_lowercase_uuid`, 종단 시험의 세션 이름은 고정 UUID로(`sid`). 변이 U1·U2. 호스트 경로(`ieo-role-call`)와 supervisor는 검사하지 않는다(단계 8은 코디네이터 경로만 쓴다) |
+| L-1(멈춤 검사 한 번, 기다림 한 번 계산) | **교정**(072d99e). supervisor 호출 직전에 멈춤을 다시 보고 `not_called`로 끝낸다. 기다림은 기다리는 동안 한도를 다시 읽는다(`wait_finishing_bounded`). 가장 늦은 한도는 최댓값으로 남는다(검토자 변이 A, U5). 절차서의 `podman stop -t`는 900(780 + 전달의 진행 창 120). 변이 U3(다시 보기 제거)는 살아남는다: 신호가 첫 검사와 호출 사이에 와야 해 결정적이지 않다. 닫는 쪽이다 |
+| L-2(남은 옛 문장) | 정정. §7·§10의 `recovery_id` 예비 문장에 “병합 뒤 정정: 불가능” 표시, §6 항목 11·12와 “예비” 줄에 정정 표시, “위 A의 글” 문구 |
+
+**동작 변경(수용된 작업, §3에 더함).** (1) `deliverAssignment`: 판단이 `start`인데 `session_id`가 소문자 UUID가 아니면 `not_called`이다(지금까지는 supervisor를 불렀고 `claude`가 곧 실패했다). 재개(`reconnect`)는 그대로다. (2) 멈추는 코디네이터에서 이미 받은 전달도 supervisor 호출 직전에 멈춤을 보면 `not_called`이다.
+
+시험: `cargo test --workspace --locked` 409 통과, 0 실패([증거](../step8-runbook-20261117/evidence/test.log), 커밋 5d1ca18). 변이 13개 중 11개가 잡혔다(R4·U3은 경쟁 구간, [증거](../step8-runbook-20261117/evidence/mutants.txt)).
