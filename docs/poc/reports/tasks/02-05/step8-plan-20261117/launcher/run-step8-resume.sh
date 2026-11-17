@@ -1,0 +1,135 @@
+#!/bin/bash
+# 02-05 step 8 resume (RESUME_PLAN.md §9; user decision 2026-11-17 r1-settlement (가)/(A)):
+#   run-step8-resume.sh settle      append the settlement of s8-r1 (ieo-role-call settle; DRY=1: --dry-run)
+#   run-step8-resume.sh r1b-body    write the R1b delivery body (new session, the spare marker) and
+#                                   print the command the USER runs with their own token
+#   run-step8-resume.sh r1b-check   after the user's delivery: its answer, the wait, every §6.2 check
+#   run-step8-resume.sh r2g1        observation deadline (s8-r1's end + 7 d) → R2 (R1b's session) → G1
+# Any failed check is a hard stop (exit 3, "STOP: <reason>"): nothing further is sent, no retry, no
+# second spare. The checks count the ledger's EFFECTIVE records (`ieo-role-call records`), so the
+# settled s8-r1 counts as settled. Tokens come from header files and are never printed.
+# Env: COORD, TOKDIR, OUT, LEDGER, ADAPTER_HEADER (as run-step8.sh), PLAN (the 02-05 plan for
+# ieo-role-call), ROLE_CALL (the new ieo-role-call); settle: TRANSCRIPT, ORIGINAL_PATH,
+# ORIGINAL_SHA256, DECISION, CHECK_REPORT, CHECK_VERDICT; r2g1: OBS_UNIX (default s8-r1's end).
+set -uo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+. "$HERE/lib-step8.sh"
+PHASE=${1:?settle|r1b-body|r1b-check|r2g1}
+COORD=${COORD:-http://127.0.0.1:58090}
+: "${TOKDIR:?}" "${OUT:?}" "${LEDGER:?}" "${ADAPTER_HEADER:?}" "${PLAN:?}" "${ROLE_CALL:?}"
+REPO_ID=${REPO_ID:-ieo-poc-test}
+PORT_DEV=${PORT_DEV:-58221}; PORT_GR=${PORT_GR:-58222}; PROMPTS=${PROMPTS:-$HERE/prompts}
+R1_END=1794917989   # s8-r1 ended_unix (2026-11-17T12:19:49Z): its stream is the observation now
+mkdir -p "$OUT"
+export R1_ATTEMPT=s8-r1b SETTLED=s8-r1 EFFECTIVE_RECORDS="$OUT/effective-records.jsonl"
+effective() { "$ROLE_CALL" records --plan "$PLAN" > "$EFFECTIVE_RECORDS.tmp" && mv -f "$EFFECTIVE_RECORDS.tmp" "$EFFECTIVE_RECORDS"; }
+# after a delivery was accepted: wait, settle, the answers, every check (run-step8.sh run_one's tail)
+after() { # tag role assignment attempt port
+  local tag=$1 role=$2 aid=$3 att=$4 port=$5
+  if [ -f "$LEDGER/records.jsonl" ] && grep -q "\"attempt_id\":\"$att\"" "$LEDGER/records.jsonl"; then
+    role_status "$port" "status-$att"
+  else
+    role_wait "$port" "$att" || stop "$att: the role did not finish"
+  fi
+  settled "$att" || stop "$att: no ledger record, or the in-flight marker stays"
+  req "roles-$att" s8-operator GET "/v0/repos/$REPO_ID/roles" >/dev/null
+  req "chain-$aid-$att" s8-operator GET "/v0/coordinator/assignments/$aid/generations/0/chain" >/dev/null
+  effective || stop "$att: the ledger's effective records do not read"
+  python3 -I "$HERE/check-run.py" "$LEDGER" "$OUT" "$att" "$role" "$aid" || stop "$att: a run check failed (above)"
+}
+run_one() { # tag role assignment attempt key port decision op prompt-file
+  local tag=$1 role=$2 aid=$3 att=$4 key=$5 port=$6 dec=$7 op=$8 pf=$9 sid st got
+  if [ -e "$OUT/$tag-body.json" ]; then sid=$(python3 -I -c "import json,sys; print(json.load(open(sys.argv[1]))['session_id'])" "$OUT/$tag-body.json")
+  else sid=$(cat /proc/sys/kernel/random/uuid); fi
+  [[ "$sid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || stop "$att: session id is not a lowercase UUID"
+  [ -e "$OUT/$tag-body.json" ] || python3 -I -c "import json,sys; a=sys.argv; json.dump({'assignment_id': a[1], 'generation': 0, 'attempt_id': a[2], 'session_id': a[3], 'prompt': open(a[4]).read().strip()}, open(a[5], 'w'))" \
+    "$aid" "$att" "$sid" "$pf" "$OUT/$tag-body.json"
+  st=$(req "$tag" s8-operator POST "/v0/repos/$REPO_ID/roles/$role/deliveries" "$OUT/$tag-body.json" "$key")
+  got=$(j "$tag" "(d['result']['decision'], d['result']['op'], d['result']['outcome'])" 2>/dev/null)
+  { [ "$st" = 201 ] || [ "$st" = 200 ]; } && [ "$got" = "('$dec', '$op', 'accepted')" ] || stop "$att: delivery answered $st $got: $(head -c 600 "$OUT/$tag.json")"
+  echo "$att: $got"
+  after "$tag" "$role" "$aid" "$att" "$port"
+}
+case "$PHASE" in
+settle)
+  extra=(); [ "${DRY:-0}" = 1 ] && extra=(--dry-run)
+  out=$("$ROLE_CALL" settle --plan "$PLAN" --attempt s8-r1 --transcript "${TRANSCRIPT:?}" \
+    --original-path "${ORIGINAL_PATH:?}" --original-sha256 "${ORIGINAL_SHA256:?}" --decision "${DECISION:?}" \
+    --independent-check "${CHECK_REPORT:?}" --independent-verdict "${CHECK_VERDICT:?}" "${extra[@]}") \
+    || stop "the settlement was refused (nothing written)"
+  printf '%s\n' "$out" | head -1
+  effective || stop "the ledger's effective records do not read"
+  python3 -I - "$EFFECTIVE_RECORDS" "${DRY:-0}" <<'PY' || stop "s8-r1 does not count through its settlement"
+import json, sys
+recs = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+r = [x for x in recs if x.get("attempt_id") == "s8-r1"][0]
+s = r.get("settlement") or {}
+if sys.argv[2] == "1":
+    print("dry run: s8-r1 still", r["usage"]["run"]["state"]); sys.exit(0)
+t = r["usage"]["run"].get("tokens") or {}
+print("s8-r1 counts:", r["usage"]["run"]["state"], t, "stop_required", r["stop_required"], r["stop_reason"],
+      "| settlement", s.get("policy"), s.get("independent_check", {}).get("verdict"))
+sys.exit(0 if s.get("policy") == "guard_stop_on_old_rule_warning" and r["usage"]["run"]["state"] == "measured"
+         and r["stop_required"] is True and r["stop_reason"] == "no result event" else 1)
+PY
+  ;;
+r1b-body)
+  effective || stop "the ledger's effective records do not read"
+  python3 -I - "$EFFECTIVE_RECORDS" <<'PY' || stop "s8-r1 is not settled: the spare cannot replace it"
+import json, sys
+r = [x for x in (json.loads(l) for l in open(sys.argv[1]) if l.strip()) if x.get("attempt_id") == "s8-r1"][0]
+sys.exit(0 if (r.get("settlement") or {}).get("policy") == "guard_stop_on_old_rule_warning" else 1)
+PY
+  if [ ! -e "$OUT/r1b-body.json" ]; then
+    sid=$(cat /proc/sys/kernel/random/uuid)
+    python3 -I - "$sid" "$PROMPTS/R1.txt" "$OUT/r1b-body.json" <<'PY'
+import json, sys
+sid, pf, out = sys.argv[1:4]
+json.dump({"assignment_id": "S8-DEV-A1", "generation": 0, "attempt_id": "s8-r1b", "session_id": sid,
+           "prompt": open(pf).read().strip(), "new_session": True,
+           "spare": {"reason": "s8-r1 was stopped by the run guard on allowed_warning under the rule before "
+                               "runtime contract rev 19; settled from its session transcript (independent check "
+                               "CONFIRMED WITH CAVEAT); rerun as a new session (user decision 2026-11-17 "
+                               "r1-settlement (A), special case for s8-r1 only)",
+                     "replaces": "s8-r1",
+                     "evidence_ref": "docs/poc/User_Decisions_2026-11-17_r1-settlement.md; "
+                                     "docs/poc/reports/tasks/02-05/step8-plan-20261117/RESUME_PLAN.md; "
+                                     "docs/poc/reports/tasks/02-05/step8-plan-20261117/evidence/r1-usage-verification.md"}},
+          open(out, "w"))
+PY
+  fi
+  echo "R1b body: $OUT/r1b-body.json (session $(python3 -I -c "import json,sys; print(json.load(open(sys.argv[1]))['session_id'])" "$OUT/r1b-body.json"), new_session, spare replaces s8-r1)"
+  cat <<CMD
+# the USER runs (own token, never printed; the coordinator records the person and the time):
+T=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/private/user/heain.token
+curl -sS --max-time 150 -o $OUT/r1b.json -w 'http %{http_code}\n' \\
+  -H @<(printf 'Authorization: Bearer %s\n' "\$(cat "\$T")") -H 'Content-Type: application/json' -H 'Idempotency-Key: s8-dlv-r1b-0001' \\
+  -X POST $COORD/v0/repos/$REPO_ID/roles/development/deliveries --data @$OUT/r1b-body.json
+python3 -I -c 'import json; d=json.load(open("$OUT/r1b.json")); r=d.get("result") or {}; print(r.get("decision"), r.get("op"), r.get("outcome"), d.get("code"), d.get("message"))'
+# expected: "http 201" (or 200 for the same request again), then "resume_allowed start accepted None None"
+CMD
+  ;;
+r1b-check)
+  [ -s "$OUT/r1b.json" ] || stop "no answer of the user's R1b delivery in $OUT/r1b.json"
+  got=$(j r1b "(d['result']['decision'], d['result']['op'], d['result']['outcome'])" 2>/dev/null)
+  [ "$got" = "('resume_allowed', 'start', 'accepted')" ] || stop "s8-r1b: the delivery answered $got: $(head -c 600 "$OUT/r1b.json")"
+  echo "s8-r1b: $got"
+  after r1b development S8-DEV-A1 s8-r1b "$PORT_DEV"
+  python3 -I - "$EFFECTIVE_RECORDS" <<'PY' || stop "s8-r1b is not the spare replacing s8-r1"
+import json, sys
+r = [x for x in (json.loads(l) for l in open(sys.argv[1]) if l.strip()) if x.get("attempt_id") == "s8-r1b"][0]
+s = r.get("spare") or {}
+print("s8-r1b spare: replaces", s.get("replaces"), "by", (s.get("by") or {}).get("kind"), (s.get("by") or {}).get("name"))
+sys.exit(0 if s.get("replaces") == "s8-r1" and (s.get("by") or {}).get("kind") == "user" else 1)
+PY
+  ;;
+r2g1)
+  OBS_UNIX=${OBS_UNIX:-$R1_END}
+  [ "$(date +%s)" -lt $((OBS_UNIX + 604800 - 600)) ] || stop "the observation (s8-r1's stream) is too old (deadline $(date -u -d @$((OBS_UNIX + 604800)) +%FT%TZ))"
+  run_one r2 development S8-DEV-A1 s8-r2 s8-dlv-r2-0001 "$PORT_DEV" resume_allowed reconnect "$PROMPTS/R2.txt"
+  python3 -I "$HERE/check-run.py" --g1-prompt "$LEDGER" "$PROMPTS/G1-head.txt" "$OUT/G1.txt" || stop "G1 prompt (above)"
+  run_one g1 guardrail S8-GR-A1 s8-g1 s8-dlv-g1-0001 "$PORT_GR" no_checkpoint start "$OUT/G1.txt"
+  echo "R1b, R2 and G1 recorded and checked"
+  ;;
+*) stop "unknown phase $PHASE";;
+esac
