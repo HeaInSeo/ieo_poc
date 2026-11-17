@@ -204,7 +204,8 @@ python3 -I - "$OUT/x.json" "$LEDGER/records.jsonl" <<'PY'; ok $? "rollback: the 
 import json, sys
 d = json.load(open(sys.argv[1])); r = d.get("result") or {}
 n = sum(1 for l in open(sys.argv[2]) if '"attempt_id":"s8-x"' in l)
-print("   old build answered:", r.get("outcome"), r.get("decision"), (r.get("reasons") or d.get("code") or "")[:2] if isinstance(r.get("reasons") or d.get("code"), list) else (d.get("code") or r.get("reasons")))
+print("   old build answered:", [x.get("code") for x in d.get("rejections") or []] or d.get("code"),
+      {k: r.get(k) for k in ("decision", "op", "outcome")} if r else "", d.get("operational_state") or "")
 sys.exit(0 if r.get("outcome") != "accepted" and n == 0 else 1)
 PY
 bash "$L/coord-switch.sh" stop "$W/coord.pid" 900 >/dev/null; ok $? "old coordinator stopped"

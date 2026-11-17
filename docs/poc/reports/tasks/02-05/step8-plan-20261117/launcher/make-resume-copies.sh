@@ -19,9 +19,15 @@ for b in ieo-coord ieo-supervisor ieo-role-call; do [ -x "$BIN/$b" ] || { echo "
 [ -e "$D/step8-resume" ] && { echo "STOP: $D/step8-resume exists"; exit 3; }
 SHA=$(git -C "$SRC" rev-parse HEAD)
 mkdir -p "$D/step8-resume/evidence"
-cp -a "$P/launcher" "$D/step8-resume/launcher"
-cp -p "$P/sprint-POC-S8-01-r1.json" "$P/EXECUTION_PLAN.md" "$P/RESUME_PLAN.md" "$P/MANUAL_STEPS.md" "$D/step8-resume/"
-cp -p "$P/evidence/r1-usage-verification.md" "$D/step8-resume/evidence/"
+# only what the commit holds (never an untracked file such as a __pycache__), from its blobs
+R=docs/poc/reports/tasks/02-05/step8-plan-20261117
+{ git -C "$SRC" ls-files -s -- "$R/launcher"
+  git -C "$SRC" ls-files -s -- "$R/sprint-POC-S8-01-r1.json" "$R/EXECUTION_PLAN.md" "$R/RESUME_PLAN.md" \
+    "$R/MANUAL_STEPS.md" "$R/evidence/r1-usage-verification.md"; } | while read -r mode _ _ path; do
+  to="$D/step8-resume/${path#"$R"/}"; mkdir -p "$(dirname "$to")"
+  git -C "$SRC" show "HEAD:$path" > "$to"
+  if [ "$mode" = 100755 ]; then chmod 0755 "$to"; else chmod 0644 "$to"; fi
+done
 # every copied file equals the commit's blob
 ( cd "$D/step8-resume" && find . -type f | sort ) | while read -r f; do
   rel=${f#./}; case "$rel" in evidence/*) src="evidence/${rel#evidence/}";; *) src="$rel";; esac
