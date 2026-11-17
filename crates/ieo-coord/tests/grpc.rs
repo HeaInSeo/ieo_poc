@@ -502,6 +502,12 @@ fn fa_msg(aid: &str, generation: u64, attempt: &str, session: &str) -> RecordFir
     }
 }
 
+/// The attempt the fixture delivery of the takeover at `seq` (A1/0) called: a first action is
+/// linked to the delivery that called its attempt (review debf413 I-8).
+fn att(seq: u64) -> String {
+    format!("D-t-repo-a-development-A1-0-{seq}")
+}
+
 fn fa(aid: &str, generation: u64, attempt: &str, session: &str) -> Call {
     Call::FirstAction(fa_msg(aid, generation, attempt, session))
 }
@@ -1678,7 +1684,7 @@ fn a_record_stored_over_one_transport_replays_over_the_other() {
     assert_ne!(a.1["checkpoint_sha256"], b.1["checkpoint_sha256"]);
     // 02-05 step 2: first actions (typed fields, the same JSON value) and session statuses
     // (the status bytes, the Idempotency-Key)
-    stored_then_replayed(false, "sup-dev-a", fa("A1", 0, "att-1", "s1"), 201);
+    stored_then_replayed(false, "sup-dev-a", fa("A1", 0, &att(1), "s1"), 201);
     stored_then_replayed(
         true,
         "sup-dev-a",
@@ -1777,12 +1783,16 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
     let state = |e: &Env| e.get("alice", "/v0/sprints/POC-01/state").1;
     let before = (state(&e), e.counts());
     // no takeover of s1 stored yet: refused
-    let (st, r) = write(&fa("A1", 0, "att-1", "s1"));
+    let (st, r) = write(&fa("A1", 0, &att(1), "s1"));
     assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
     // the takeover of s1, then its first action and a status
     let c1 = cp(1, cp_raw(1, 0, &digest, json!({"phase": "takeover"})));
     assert_eq!(over_http(&e, Some("sup-dev-a"), &c1).0, 201);
+    // review debf413 I-8: an attempt the takeover's delivery did not call is refused, as the
+    // fill refuses it
     let (st, r) = write(&fa("A1", 0, "att-1", "s1"));
+    assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
+    let (st, r) = write(&fa("A1", 0, &att(1), "s1"));
     assert_eq!(
         (st, r["evidence_level"].as_str()),
         (201, Some("claim")),
@@ -1791,7 +1801,7 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
     assert_eq!(r["current_assignment"], true);
     let other = Call::FirstAction(RecordFirstActionRequest {
         event_offset: 9,
-        ..fa_msg("A1", 0, "att-1", "s1")
+        ..fa_msg("A1", 0, &att(1), "s1")
     });
     let (st, r) = write(&other);
     assert_eq!(
@@ -1845,10 +1855,6 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
             "{when} {r}"
         );
     }
-    // R4: a takeover of another session under the same assignment and generation is not this
-    // session's takeover
-    let (st, r) = write(&fa("A1", 0, "att-2", "s2"));
-    assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
     // claims only: no event, no sprint state change, no judgment input
     let mut db = e.db();
     let levels: Vec<String> = db
@@ -1882,6 +1888,16 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
             "role_takeovers"
         ]
     );
+    // the run ends and the same session takes over a second delivery (seq 3) before the new
+    // generation
+    let c2 = cp(2, cp_raw(2, 0, &digest, json!({"phase": "after_run"})));
+    assert_eq!(over_http(&e, Some("sup-dev-a"), &c2).0, 201);
+    let c3 = cp(3, cp_raw(3, 0, &digest, json!({"phase": "takeover"})));
+    assert_eq!(over_http(&e, Some("sup-dev-a"), &c3).0, 201);
+    // R4: a takeover of another session under the same assignment and generation is not this
+    // session's takeover (the delivered attempt's takeover is s1's)
+    let (st, r) = write(&fa("A1", 0, &att(3), "s2"));
+    assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
     // a new generation: the own assignment follows the head; the old run's facts stay, not current
     assign_ok(
         &e,
@@ -1897,15 +1913,17 @@ fn supervisor_operations_answer_the_assignment_and_store_claims() {
         (&json!(1), &json!(SHA2), &json!(2)),
         "{a}"
     );
-    let (st, r) = write(&fa("A1", 0, "att-1", "s1"));
+    let (st, r) = write(&fa("A1", 0, &att(1), "s1"));
     assert_eq!(
         (st, &r["current_assignment"]),
         (200, &json!(true)),
         "stored value"
     );
-    let c2 = cp(2, cp_raw(2, 0, &digest, json!({"phase": "after_run"})));
-    assert_eq!(over_http(&e, Some("sup-dev-a"), &c2).0, 201);
-    let (st, r) = write(&fa("A1", 0, "att-1b", "s1"));
+    // review 63fefc1 L-1: the attempt delivered under generation 0 is not linked under
+    // generation 1
+    let (st, r) = write(&fa("A1", 1, &att(1), "s1"));
+    assert_eq!((st, code(&r).as_str()), (409, "CHECKPOINT_MISMATCH"), "{r}");
+    let (st, r) = write(&fa("A1", 0, &att(3), "s1"));
     assert_eq!((st, &r["current_assignment"]), (201, &json!(false)), "{r}");
     let late = status(
         "st-000003",

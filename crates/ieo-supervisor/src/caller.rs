@@ -839,6 +839,28 @@ pub fn spare_gate(
     ))
 }
 
+/// The stop reasons of a run's own result (`result <subtype> (is_error …)`, `no result event`):
+/// the only reasons a spare marker releases ([`spare_releasable`]).
+const RESULT_STOP_REASON: &str = "result ";
+const NO_RESULT_STOP_REASON: &str = "no result event";
+
+fn is_result_stop_reason(p: &str) -> bool {
+    p.starts_with(RESULT_STOP_REASON) || p == NO_RESULT_STOP_REASON
+}
+
+/// Every stop reason that is **not** the run's own result goes through here (PR #81 review
+/// 291a9b0 N-2): it never contains the separator `"; "` and never reads as a result reason, so a
+/// new reason added later cannot become releasable by its wording. A record's `stop_reason` is
+/// its reasons joined with `"; "`.
+pub fn other_stop_reason(reason: impl Into<String>) -> String {
+    let s = reason.into().replace("; ", ", ");
+    if is_result_stop_reason(&s) {
+        format!("other: {s}")
+    } else {
+        s
+    }
+}
+
 /// Whether a spare marker may release the stop of the failed run it names (user decision
 /// 2026-11-17, addition, §3): only a stop for the run's own result ("result …", "no result
 /// event"), and only with its usage measured. Any other reason (unmeasured usage, a limit or
@@ -856,10 +878,7 @@ pub fn spare_releasable(r: &Value) -> Result<(), String> {
     if reason.is_empty() {
         return Err("a stop without a reason".into());
     }
-    match reason
-        .split("; ")
-        .find(|p| !(p.starts_with("result ") || *p == "no result event"))
-    {
+    match reason.split("; ").find(|p| !is_result_stop_reason(p)) {
         None => Ok(()),
         Some(p) => Err(p.to_string()),
     }
@@ -1142,7 +1161,7 @@ fn record_lost(plan: &Plan, base_rec: &Value, reason: String) -> Result<Value, S
     let mut r = base_rec.clone();
     r["usage"] = json!({"run": {"state": "unmeasured", "reason": reason}});
     r["stop_required"] = json!(true);
-    r["stop_reason"] = json!(reason);
+    r["stop_reason"] = json!(other_stop_reason(reason));
     append(plan, &r)?;
     clear_inflight(plan)?;
     Ok(r)
@@ -1349,7 +1368,7 @@ impl After<'_> {
         // reasons a person must look before the next call
         let mut reasons = Vec::new();
         if last["cleanup_failed"] == true {
-            reasons.push("process-group cleanup failed".to_string());
+            reasons.push(other_stop_reason("process-group cleanup failed"));
         }
         // the role environment as the run reported it (fixed by env::build's allow-list)
         let env: Vec<&str> = last["env_names"]
@@ -1359,7 +1378,9 @@ impl After<'_> {
         if !env.contains(&"CLAUDE_CODE_OAUTH_TOKEN")
             || env.iter().any(|n| n.starts_with("ANTHROPIC_"))
         {
-            reasons.push(format!("environment not subscription-only: {env:?}"));
+            reasons.push(other_stop_reason(format!(
+                "environment not subscription-only: {env:?}"
+            )));
         }
         // the run's result: an authentication or other failure must not read as success
         let result = stream
@@ -1369,15 +1390,22 @@ impl After<'_> {
             .find(|v| v["type"] == "result");
         match &result {
             Some(r) if r["subtype"] == "success" && r["is_error"] == false => {}
-            Some(r) => reasons.push(format!(
-                "result {} (is_error {})",
-                r["subtype"], r["is_error"]
-            )),
-            None => reasons.push("no result event".into()),
+            // the run's own result: the only reasons a spare releases (no "; " inside)
+            Some(r) => reasons.push(
+                format!(
+                    "{RESULT_STOP_REASON}{} (is_error {})",
+                    r["subtype"], r["is_error"]
+                )
+                .replace("; ", ", "),
+            ),
+            None => reasons.push(NO_RESULT_STOP_REASON.into()),
         }
         // an unmeasured run stops the budget anyway; the record says so at once (review f90f5b5)
         if usage["run"]["state"] != "measured" {
-            reasons.push(format!("usage unmeasured: {}", usage["run"]["reason"]));
+            reasons.push(other_stop_reason(format!(
+                "usage unmeasured: {}",
+                usage["run"]["reason"]
+            )));
         }
         let mut notes = Vec::new();
         if stop_sent {
@@ -1391,11 +1419,11 @@ impl After<'_> {
             Ok(evs) => {
                 for e in &evs {
                     if let Err(why) = budget::overage_check(e) {
-                        reasons.push(format!("this run's signal: {why}"));
+                        reasons.push(other_stop_reason(format!("this run's signal: {why}")));
                     }
                 }
             }
-            Err(e) => reasons.push(format!("this run's signal: {e}")),
+            Err(e) => reasons.push(other_stop_reason(format!("this run's signal: {e}"))),
         }
         let mut r = base_rec;
         r["ended_at"] = json!(ieo_evidence::time::now());

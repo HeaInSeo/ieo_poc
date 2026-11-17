@@ -37,7 +37,55 @@ use ieo_supervisor::caller::{self, Call, Plan, Sent};
 use postgres::{Client, Transaction};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
+
+/// Runs an accepted delivery started and whose record is still being finished by a thread of
+/// this process (review 63fefc1 M-1 (a)): the shutdown waits for them, bounded.
+static FINISHING: AtomicUsize = AtomicUsize::new(0);
+
+/// One run being finished; dropped (also on a panic) when its thread ends.
+struct Finishing;
+
+impl Finishing {
+    fn start() -> Finishing {
+        FINISHING.fetch_add(1, Ordering::SeqCst);
+        Finishing
+    }
+}
+
+impl Drop for Finishing {
+    fn drop(&mut self) {
+        FINISHING.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Set when the process is stopping: deliverAssignment starts nothing new (503).
+static STOPPING: AtomicBool = AtomicBool::new(false);
+
+/// The process is stopping (SIGTERM/SIGINT): new deliveries are refused with 503
+/// `COORDINATOR_STOPPING` while the runs already accepted are finished (review 63fefc1 M-1 (a)).
+pub fn begin_stop() {
+    STOPPING.store(true, Ordering::SeqCst);
+}
+
+/// How many accepted runs are still being finished in this process.
+pub fn finishing() -> usize {
+    FINISHING.load(Ordering::SeqCst)
+}
+
+/// Wait until no accepted run is being finished, at most `limit`; the number still being
+/// finished when it returns (0: all records written).
+pub fn wait_finishing(limit: Duration) -> usize {
+    let t0 = std::time::Instant::now();
+    loop {
+        let n = finishing();
+        if n == 0 || t0.elapsed() >= limit {
+            return n;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
 
 const BODY_KEYS: [&str; 9] = [
     "assignment_id",
@@ -138,7 +186,14 @@ fn spare_extra(spare: &Value, who: &Caller) -> Value {
         return json!({});
     }
     let mut s = spare.clone();
-    s["by"] = json!({"name": who.name, "kind": "user", "via": "deliverAssignment"});
+    // the caller's own kind (review 63fefc1 I-1): the budget gate's `kind == "user"` check is a
+    // second, independent check behind the 403 of deliverAssignment
+    let kind = match who.kind {
+        crate::auth::Kind::User => "user",
+        crate::auth::Kind::Service => "service",
+        crate::auth::Kind::Agent => "agent",
+    };
+    s["by"] = json!({"name": who.name, "kind": kind, "via": "deliverAssignment"});
     s["approved_at"] = json!(ieo_evidence::time::now());
     json!({"spare": s})
 }
@@ -463,6 +518,15 @@ pub fn deliver(
 ) -> Result<Resp, Abort> {
     let pre = (|| {
         need_compare(who, repo, role)?;
+        // stopping: the runs already accepted are being finished; nothing new starts and nothing
+        // is recorded (review 63fefc1 M-1 (a))
+        if STOPPING.load(Ordering::SeqCst) {
+            return Err(problem(
+                503,
+                "COORDINATOR_STOPPING",
+                "the coordinator is stopping; deliver again after it restarts",
+            ));
+        }
         let key = idem_key(req)?;
         let body = check_body(req)?;
         // the spare marker answers a failed run that asks for a person: a person attaches it
@@ -793,8 +857,10 @@ pub fn deliver(
             o.outcome = "accepted";
             o.supervisor = Some((202, answer));
             // the run is finished, measured and charged by the same library; the ledger lock
-            // stays held until its record is written
+            // stays held until its record is written. The shutdown waits for it (bounded)
+            let g = Finishing::start();
             std::thread::spawn(move || {
+                let _g = g;
                 let a = running.attempt_id().to_string();
                 match running.finish(
                     &caller::Http,
@@ -1055,5 +1121,28 @@ mod tests {
                 "by": {"name": "alice-ops", "kind": "user", "via": "deliverAssignment"},
                 "approved_at": null}})
         );
+        // a service's kind is written as it is: the gate refuses it on its own
+        let svc = Caller {
+            kind: crate::auth::Kind::Service,
+            ..who.clone()
+        };
+        let got = spare_extra(&json!({"reason": "env"}), &svc);
+        assert_eq!(got["spare"]["by"]["kind"], "service");
+    }
+
+    /// Review 63fefc1 M-1 (a): the shutdown waits for the runs being finished, bounded.
+    #[test]
+    fn the_shutdown_waits_for_the_runs_being_finished() {
+        let g = Finishing::start();
+        assert!(finishing() >= 1);
+        let t0 = std::time::Instant::now();
+        assert!(wait_finishing(Duration::from_millis(200)) >= 1, "bounded");
+        assert!(t0.elapsed() >= Duration::from_millis(200));
+        let h = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            drop(g);
+        });
+        assert_eq!(wait_finishing(Duration::from_secs(10)), 0);
+        h.join().expect("join");
     }
 }
