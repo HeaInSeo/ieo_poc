@@ -23,13 +23,15 @@
 | 자료 | 내용 |
 | --- | --- |
 | 보관 stream(7행) | `assistant` 두 줄은 **한 메시지**(`msg_011Ch8VK…`)의 스트리밍 중간값이다(output 16). `result` 사건 없음 → 하한만 나온다: input 2 + cache_creation 1,411 + output 16 = 1,429, cache_read 3,223 |
-| 세션 transcript(25항목, 49,297바이트, SHA-256 `806746fd…dc68`) | 같은 메시지의 **최종** 사용량: input 2, output **130**, cache_creation 1,411, cache_read 3,223. `api-request` 항목은 **하나**(12:19:47.084Z). 끝부분의 종료 기록(`last-prompt`·`custom-title`·`agent-name`·`atis-latch`·`cost-state`)에 CLI의 세션 집계 `cost-state.modelUsage`가 있고 값이 위와 같다(input 2, output 130, cache_read 3,223, cache_creation 1,411; `totalAPIDuration` 1,756 ms, 보고 금액 0.00727 USD는 환산값). 마지막 시각 항목 12:19:48.855Z, 파일 수정 12:19:48.95Z(KST 21:19:48.95), 프로세스 종료 12:19:49.66Z |
+| 세션 transcript(25항목, 49,297바이트, SHA-256 `806746fd…dc68`) | 같은 메시지의 **최종** 사용량: input 2, output **130**, cache_creation 1,411, cache_read 3,223. `assistant` 16·18행은 그 한 메시지의 **내용 블록별 항목**이다(`apiBlockIndex` 0·1, 도구 사용 하나씩, 둘 다 같은 최종 사용량; 스트리밍 중간값이 아님). `api-request` 항목은 **하나**(14행, 12:19:47.084Z)이고 그 `id`(`36a2d590…`)가 두 `assistant` 항목의 `requestRef`와 같다(요청 1 : 메시지 1). 끝부분의 종료 기록(`last-prompt`·`custom-title`·`agent-name`·`atis-latch`·`cost-state`)에 CLI의 세션 집계 `cost-state.modelUsage`가 있고 값이 위와 같다(input 2, output 130, cache_read 3,223, cache_creation 1,411; `totalAPIDuration` 1,756 ms, 보고 금액 0.00727 USD는 환산값). 그 뒤 24행 둘째 도구 결과(12:19:48.852Z), 25행 `prompt_snapshot` 첨부(12:19:48.855Z: CLI가 다음 요청을 조립할 때 쓰는 항목, 11행에서는 21 ms 뒤 `api-request`가 따랐다). 그 뒤 `api-request`는 없다. 파일 마지막 쓰기 12:19:48.953Z, 장부 끝 12:19:49.763Z(SIGTERM, exit 143, 4,119 ms) |
 | 판단 | 두 번째 요청은 기록되지 않았다: 요청마다 남는 `api-request` 항목이 하나뿐이고, 종료 때 쓴 CLI의 집계가 그 한 요청의 최종값과 같다. **CLI 자신의 종료 집계로는 billable 1,543(2 + 130 + 1,411), cache_read 3,223이다.** 관측 하한(1,429)보다 114 많다. 이 값의 이름은 **“CLI 종료 집계(클라이언트 쪽)”**이다. 공급자 쪽 청구가 아니다. 남는 불확실성(PR #89 검토 91e87ce L-5): transcript의 순서가 종료 기록(19~23행, 23행 `cost-state`, 시각 없음) → 둘째 도구 결과(24행, 12:19:48.852Z) → 첨부(25행, 12:19:48.855Z)다. 즉 CLI의 반복은 종료 집계를 쓴 뒤에도 이어졌고, 도구 결과 다음의 자연스러운 단계는 둘째 요청이다. 그 요청이 항목이 쓰이기 전에 보내졌다가 끊겼다면 클라이언트 쪽 자료로는 볼 수 없다(구독 사용량일 뿐 추가 청구 USD 0에는 영향 없음). 14행 뒤에 `api-request` 항목이 없으므로 기록된 요청은 하나다. 0이라고 증명하지는 못한다 |
 | 지금 코드로 정정할 수 있나 | 기존 정정(`ieo-role-run-correction/v0`, `reevaluate`)으로는 없다: **보관 stream의 결과 사건**으로 다시 계측하는데 R1 stream에는 결과 사건이 없다. 가드가 멈춘 회차는 멈춘 뒤의 결과를 믿지 않는다는 규칙은 그대로다. 그래서 정산 PR이 별도 형식 `ieo-role-run-settlement/v0`를 더했다([부록 B](#부록-b-정산-형식ieo-role-run-settlementv0)) |
 
 ### 2.1 정산 결정: (가) 조건부 승인([사용자 결정 2026-11-17 정산](../../../../User_Decisions_2026-11-17_r1-settlement.md))
 
 사용자는 (가)를 조건부로 승인했다. 조건: 별도 검토자의 **독립 검산**(같은 해시의 사본으로 세션·시도 일치, 같은 `message.id` 중복 제거, 네 토큰, API 요청 기록 수, `cost-state` 전후 항목과 시각)이 먼저이고, 검산 대상 값 billable 1,543·cache_read 3,223은 아직 확정값이 아니다. 근거가 부족하면 미계측을 유지한다. 원본 기록은 어떤 경우에도 그대로 두고, 정산은 최종 묶음 승인 뒤에만 추가 기록으로 쓴다. 독립 검산용 사본: `$D/s8-evidence/s8-r1-transcript.jsonl`(0400, 저장소 밖, SHA-256 `806746fd…dc68`, 원본과 같음, `MANIFEST.txt`).
+
+**독립 검산 결과: CONFIRMED WITH CAVEAT**([evidence/r1-usage-verification.md](evidence/r1-usage-verification.md), 전사 본문 없음). 별도 검토자가 사본·원본 해시, 세션·시도·시간 창, 메시지별 최종 사용량과 `cost-state`(두 관점)에서 billable 1,543·cache_read 3,223을 그대로 재현했다. 단서: 이 값은 **기록된 요청 하나**의 사용량이다. 25행의 `prompt_snapshot`은 다음 요청이 준비되고 있었음을 보이며, SIGTERM 직전에 보내졌으나 기록이 남지 않은 요청은 클라이언트 쪽 자료로 배제할 수 없다. 공급자 쪽 청구는 보이지 않는다. 그래서 정산 기록은 이 단서를 `verification.uncovered: unlogged_in_flight_request_at_sigterm`과 `residual` 문장으로 함께 싣는다(부록 B).
 
 | 선택 | 내용 | 남는 예산(02-05 전체 / 개발 몫) | 결과 |
 | --- | --- | --- | --- |
@@ -80,7 +82,7 @@ R1을 대신할 개발 회차(아래 **R1b**)와 R2를 모두 하면 개발 회�
 
 ## 6. 필요한 승인(한 번에 검토)
 
-1. §2.1 (가)와 §3.1 (A)는 조건부 승인됨. 남은 조건: 독립 검산 결과, 정산 형식 PR의 검토·병합·main CI.
+1. §2.1 (가)와 §3.1 (A)는 조건부 승인됨. 독립 검산: CONFIRMED WITH CAVEAT(§2.1). 남은 조건: 정산 형식 PR의 검토·병합·main CI.
 2. 최종 묶음에서: 정산 기록을 실제 장부에 쓰는 것(`ieo-role-call settle`, 부록 B), 사람이 R1b에 예비 표식을 붙이는 것.
 3. 경고 정책 PR(이것)과 정산 PR의 병합, 그 SHA로 빌드.
 4. 실서버 변경: 58090 재시작(새 빌드), 역할 컨테이너 바이너리 교체·재시작, 허용 규칙 교체.
@@ -167,12 +169,12 @@ R1을 대신할 개발 회차(아래 **R1b**)와 R2를 모두 하면 개발 회�
 
 | 항목 | 내용 |
 | --- | --- |
-| 기록 | `format`, `settles`(대상 시도), `source: transcript_exit_accounting`, `policy: guard_stop_on_old_rule_warning`, `budget`·`role`·`session_id`, `original_stream_sha256`, `evidence`(장부 안 사본 `children/<시도>/settlement-transcript.jsonl`의 절대 경로·SHA-256·크기, 원본 경로·원본 SHA-256), `verification`(API 요청 수, 메시지 수, 항목 수, 종료 집계 일치, 현재 규칙으로 다시 판정한 신호, 남는 불확실성), `usage_run`, `lower_bound_not_used`(가드 하한, 쓰지 않음), `rule`, `decision`, `independent_check`, `settled_at`. `model_request: false`(회차가 아님) |
+| 기록 | `format`, `settles`(대상 시도), `source: transcript_exit_accounting`, `policy: guard_stop_on_old_rule_warning`, `budget`·`role`·`session_id`, `original_stream_sha256`, `evidence`(장부 안 사본 `children/<시도>/settlement-transcript.jsonl`의 절대 경로·SHA-256·크기, 원본 경로·원본 SHA-256), `verification`(API 요청 수, 메시지 수, 항목 수, 종료 집계 일치, 현재 규칙으로 다시 판정한 신호, `uncovered: unlogged_in_flight_request_at_sigterm`과 `residual`: “transcript로 정산; 기록된 api-request 하나(requestRef = api-request id, 메시지와 1:1); 끝에 다음 요청의 prompt_snapshot이 있고 그 뒤 api-request 없음; SIGTERM 직전에 보내졌으나 기록이 사라진 요청은 클라이언트 쪽에서 배제할 수 없음; 공급자 쪽 청구는 보이지 않음”), `usage_run`, `lower_bound_not_used`(가드 하한, 쓰지 않음), `rule`, `decision`, `independent_check`(`{evidence, sha256, verdict}`: 검산 보고서 경로·SHA-256·판정, 판정은 `CONFIRMED` 또는 `CONFIRMED WITH CAVEAT`만), `settled_at`. `model_request: false`(회차가 아님) |
 | 대상 조건(이번 s8-r1 같은 경우만) | 장부의 모델 회차, 가드가 한도 신호(`Overage`)로 멈춤, 미계측, 결과 사건 없음, 자식 회차 없음, 예비 아님, 멈춤 사유가 “결과 사건 없음”·“사용량 미계측”·“이 회차의 신호”뿐, 보관 stream의 SHA-256이 기록과 같고 그 안의 한도 사건이 **현재 규칙으로 모두 통과**하며 하나 이상이 경고. 실제 `rejected`, 추가 사용, 시간·토큰·cache_read 상한, 답 유실, 정리 실패, 다른 사유는 정산되지 않는다 |
 | 사용량 계산(`transcript_accounting`) | 모든 줄이 JSON이고 같은 세션, 자식(side-chain) 항목 없음, 같은 `message.id`는 마지막 항목 하나로(중복 제거), 서로 다른 메시지 수 = `api-request` 항목 수(1 이상), 마지막 `cost-state`의 `modelUsage` 합이 메시지 합과 네 항목 모두 같음. 가드의 관측 하한보다 작으면 거절(하한은 쓰지 않음) |
 | 적용 결과 | 회차는 **한 번** 센다(정산 줄은 회차가 아님). `usage.run`은 계산값(`measured`, `source`), 이전 값은 `before_settlement`. `stop_required`는 그대로 true, 사유는 “결과 사건 없음”만(R1은 실패로 남음) |
-| 거절(장부 사용 불가) | 사본 변조(해시 다름), 같은 회차의 둘째 정산, 없는·나중의 회차, 다른 세션·stream·사용량·요청 수, 결정·독립 검산 참조 없음, 다른 출처·정책, 상대 경로, 정정된 회차의 정산과 정산된 회차의 정정, 정산 필드를 스스로 가진 회차 줄 |
+| 거절(장부 사용 불가) | 사본 변조(해시 다름), 같은 회차의 둘째 정산, 없는·나중의 회차, 다른 세션·stream·사용량·요청 수, 결정·독립 검산 참조 없음, 검산 판정이 확인이 아님, 단서(`uncovered`·`residual`) 누락, 다른 출처·정책, 상대 경로, 정정된 회차의 정산과 정산된 회차의 정정, 정산 필드를 스스로 가진 회차 줄 |
 | 예비 해제 범위 | `spare_releasable`: 가드가 멈춘 회차의 “결과 사건 없음”은 이 정책의 정산이 있을 때만 해제. 정산 없는 가드 멈춤, 실제 거부, 추가 과금, 상한, 다른 미계측은 계속 막음 |
-| 쓰는 명령 | `ieo-role-call settle --plan <plan.json> --attempt s8-r1 --transcript $D/s8-evidence/s8-r1-transcript.jsonl --original-path <역할 볼륨의 원본 경로> --original-sha256 806746fd…dc68 --decision docs/poc/User_Decisions_2026-11-17_r1-settlement.md --independent-check <독립 검산 참조> [--dry-run]`. 장부 잠금 아래, 진행 중 호출 없음, 사본 해시가 원본과 같을 때만, 다시 읽어 적용될 때만 한 줄을 더한다. 어떤 거절에도, `--dry-run`에도 아무것도 쓰지 않는다. **실제 장부에는 아직 실행하지 않았다**(장부 사본에서 `--dry-run`만: 쓴 것 없음) |
+| 쓰는 명령 | `ieo-role-call settle --plan <plan.json> --attempt s8-r1 --transcript $D/s8-evidence/s8-r1-transcript.jsonl --original-path <역할 볼륨의 원본 경로> --original-sha256 806746fd…dc68 --decision docs/poc/User_Decisions_2026-11-17_r1-settlement.md --independent-check docs/poc/reports/tasks/02-05/step8-plan-20261117/evidence/r1-usage-verification.md --independent-verdict "CONFIRMED WITH CAVEAT" [--dry-run]`(보고서 SHA-256은 명령이 계산해 기록). 장부 잠금 아래, 진행 중 호출 없음, 사본 해시가 원본과 같을 때만, 다시 읽어 적용될 때만 한 줄을 더한다. 어떤 거절에도, `--dry-run`에도 아무것도 쓰지 않는다. **실제 장부에는 아직 실행하지 않았다**(장부 사본에서 `--dry-run`만: 쓴 것 없음) |
 | 재개 스크립트에 남는 일 | `check-run.py`는 장부 줄을 그대로 읽어 R1 원본(미계측)을 실패로 센다. 재개 PR에서 정산을 적용한 기록(`ieo-role-call`의 읽기 또는 같은 규칙)으로 집계하게 한다 |
 | 시험 | `tests/settlement.rs`: 계산(중복 제거·종료 집계 불일치·요청 없음·다른 세션·side-chain·깨진 줄·숫자 아님), 정산 뒤 한 번 집계·실패 유지·예비 해제, 변조·중복·다른 시도·세션·stream·참조 누락·출처·사본 해시·상대 경로·요청 수, 근거 부족(아무것도 쓰지 않음), 특례 범위(실제 거부, 경고 뒤 거부, 추가 사용, 경고 없음, 시간·토큰·cache_read 상한, 가드 아님, 다른 사유, 계측됨, 결과 있음, 자식, 예비, 다른 stream: 정산 안 되고 예비도 해제 못함), CLI(드라이런·해시 다름·정상). PR #89 검토 L-1~L-3 보강(stream 단위 Rust=Python, 숫자 0/1, 나중 `allowed`가 경고 지움). 전체 428 통과·0 실패, 변이 32개 중 31 죽음·1 동등(W02: 쓰기 전 원본 해시 확인은 `build`가 같은 조건을 다시 확인해 중복) |

@@ -41,6 +41,38 @@ pub const SOURCE: &str = "transcript_exit_accounting";
 /// "no result event" only for it.
 pub const POLICY: &str = "guard_stop_on_old_rule_warning";
 const NO_RESULT: &str = "no result event";
+/// The verdicts of an independent check a settlement may follow (decision §2.1).
+pub const VERDICTS: [&str; 2] = ["CONFIRMED", "CONFIRMED WITH CAVEAT"];
+/// What client-side evidence never covers (independent verification of s8-r1, its caveat).
+pub const UNCOVERED: &str = "unlogged_in_flight_request_at_sigterm";
+pub const RESIDUAL: &str = "settled from the session transcript; one api-request logged \
+    (requestRef = api-request id, 1:1 with the one message); a prompt_snapshot for a next \
+    request was written at its end with no api-request after it; a request sent just before \
+    SIGTERM whose log write was lost cannot be ruled out client-side; provider-side billing is \
+    not visible";
+
+/// The independent check a settlement follows: `{evidence, sha256, verdict}` with a 64-hex
+/// SHA-256 of the evidence file and a verdict of [`VERDICTS`].
+pub fn independent_check_ok(c: &Value) -> Result<(), String> {
+    if c["evidence"].as_str().is_none_or(|e| e.trim().is_empty()) {
+        return Err("independent_check.evidence missing".into());
+    }
+    if c["sha256"].as_str().is_none_or(|h| {
+        h.len() != 64
+            || !h
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    }) {
+        return Err("independent_check.sha256 is not a SHA-256".into());
+    }
+    if !c["verdict"].as_str().is_some_and(|v| VERDICTS.contains(&v)) {
+        return Err(format!(
+            "independent_check.verdict {} is not one of {VERDICTS:?}",
+            c["verdict"]
+        ));
+    }
+    Ok(())
+}
 
 /// What a session transcript says about its usage (no content kept).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -280,10 +312,17 @@ pub fn apply(run: &Value, s: &Value, stream: &str) -> Result<Value, String> {
     if s["source"] != SOURCE || s["policy"] != POLICY || s["model_request"] != false {
         return Err(format!("settlement of {a}: unknown source or policy"));
     }
-    for k in ["decision", "independent_check", "settled_at"] {
+    for k in ["decision", "settled_at"] {
         if s[k].as_str().is_none_or(|v| v.trim().is_empty()) {
             return Err(format!("settlement of {a}: {k} missing"));
         }
+    }
+    independent_check_ok(&s["independent_check"]).map_err(|e| format!("settlement of {a}: {e}"))?;
+    // the caveat travels with the settlement (it is never dropped)
+    if s["verification"]["uncovered"] != UNCOVERED || s["verification"]["residual"] != RESIDUAL {
+        return Err(format!(
+            "settlement of {a}: the uncovered residual is missing"
+        ));
     }
     if s["original_stream_sha256"] != run["stream"]["sha256"]
         || s["session_id"] != run["session"]["session_id"]
@@ -341,9 +380,10 @@ pub fn build(
     original_path: &str,
     original_sha256: &str,
     decision: &str,
-    independent_check: &str,
+    independent_check: &Value,
 ) -> Result<Value, String> {
     let a = run["attempt_id"].as_str().unwrap_or("?");
+    independent_check_ok(independent_check)?;
     eligible(run, stream)?;
     let b = std::fs::read(ledger_copy).map_err(|e| format!("{}: {e}", ledger_copy.display()))?;
     let sid = run["session"]["session_id"].as_str().unwrap_or_default();
@@ -371,8 +411,7 @@ pub fn build(
         "verification": {"api_requests": acc.api_requests, "messages": acc.messages,
             "entries": acc.entries, "exit_accounting_equals_messages": true,
             "signals_under_current_rule": signals,
-            "residual": "a request sent after the guard's stop and never written to the \
-                transcript cannot be seen on the client side"},
+            "uncovered": UNCOVERED, "residual": RESIDUAL},
         "usage_run": {"state": "measured", "tokens": acc.tokens_json(), "source": SOURCE},
         "lower_bound_not_used": run["outcome"]["observed"],
         "rule": "runtime contract rev 19 §20 item 31; rev 20 §21 item 32",

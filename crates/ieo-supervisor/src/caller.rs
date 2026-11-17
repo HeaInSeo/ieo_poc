@@ -1726,12 +1726,13 @@ pub fn settle(
     original_path: &str,
     original_sha256: &str,
     decision: &str,
-    independent_check: &str,
+    independent_check: &Value,
     dry_run: bool,
 ) -> Result<Value, String> {
-    if decision.trim().is_empty() || independent_check.trim().is_empty() {
-        return Err("a settlement needs the decision and the independent check it follows".into());
+    if decision.trim().is_empty() {
+        return Err("a settlement needs the decision it follows".into());
     }
+    crate::settlement::independent_check_ok(independent_check)?;
     let lock = std::fs::OpenOptions::new()
         .create(true)
         .truncate(false)

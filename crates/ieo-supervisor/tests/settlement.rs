@@ -164,9 +164,15 @@ fn settle(l: &Ledger, dry: bool) -> Result<Value, String> {
         "/role-volume/transcript.jsonl",
         &l.copy_sha,
         "docs/poc/User_Decisions_2026-11-17_r1-settlement.md",
-        "independent check #1",
+        &check(),
         dry,
     )
+}
+
+/// The independent check a settlement follows (verdict as the s8-r1 verification gave it).
+fn check() -> Value {
+    json!({"evidence": "docs/poc/reports/tasks/02-05/step8-plan-20261117/evidence/r1-usage-verification.md",
+           "sha256": "a".repeat(64), "verdict": "CONFIRMED WITH CAVEAT"})
 }
 
 fn lines(l: &Ledger) -> Vec<Value> {
@@ -252,6 +258,14 @@ fn a_settled_r1_counts_once_with_the_transcript_usage_and_stays_failed() {
     let s = settle(&l, false).expect("settle");
     assert_eq!(s["format"], settlement::SETTLEMENT_FORMAT);
     assert_eq!(s["source"], "transcript_exit_accounting");
+    // the verifier's caveat travels with the record
+    assert_eq!(s["verification"]["uncovered"], settlement::UNCOVERED);
+    assert!(
+        s["verification"]["residual"]
+            .as_str()
+            .is_some_and(|r| r.contains("SIGTERM"))
+    );
+    assert_eq!(s["independent_check"]["verdict"], "CONFIRMED WITH CAVEAT");
     assert_eq!(s["evidence"]["sha256"], l.copy_sha.as_str());
     assert_eq!(s["verification"]["api_requests"], 1);
     // the original line is untouched; one line is added
@@ -345,6 +359,15 @@ fn a_changed_or_repeated_or_misdirected_settlement_makes_the_ledger_unusable() {
         ("no independent check", &|s: &mut Value| {
             s["independent_check"] = Value::Null
         }),
+        ("a verdict that does not confirm", &|s: &mut Value| {
+            s["independent_check"]["verdict"] = json!("REFUTED")
+        }),
+        ("the caveat dropped", &|s: &mut Value| {
+            s["verification"]["uncovered"] = Value::Null
+        }),
+        ("the residual text changed", &|s: &mut Value| {
+            s["verification"]["residual"] = json!("none")
+        }),
         ("another source", &|s: &mut Value| {
             s["source"] = json!("observed_lower_bound")
         }),
@@ -406,7 +429,7 @@ fn not_enough_evidence_writes_nothing() {
                 "/x",
                 &"0".repeat(64),
                 "d",
-                "c",
+                &check(),
                 false,
             )
         };
@@ -454,9 +477,48 @@ fn not_enough_evidence_writes_nothing() {
             .contains("corrected already")
     );
     let l = r1_ledger("noargs");
-    assert!(caller::settle(&l.p, "s8-r1", &l.copy, "/x", &l.copy_sha, "", "c", false).is_err());
-    assert!(caller::settle(&l.p, "s8-r1", &l.copy, "/x", &l.copy_sha, "d", " ", false).is_err());
-    assert!(caller::settle(&l.p, "s8-r9", &l.copy, "/x", &l.copy_sha, "d", "c", false).is_err());
+    assert!(
+        caller::settle(
+            &l.p,
+            "s8-r1",
+            &l.copy,
+            "/x",
+            &l.copy_sha,
+            "",
+            &check(),
+            false
+        )
+        .is_err()
+    );
+    // an independent check needs its evidence, a SHA-256 and a confirming verdict
+    for bad in [
+        json!({"evidence": "", "sha256": "a".repeat(64), "verdict": "CONFIRMED"}),
+        json!({"evidence": "r.md", "sha256": "abc", "verdict": "CONFIRMED"}),
+        json!({"evidence": "r.md", "sha256": "A".repeat(64), "verdict": "CONFIRMED"}),
+        json!({"evidence": "r.md", "sha256": "a".repeat(64), "verdict": "NOT CONFIRMED"}),
+        json!({"evidence": "r.md", "sha256": "a".repeat(64)}),
+        json!("independent check #1"),
+    ] {
+        assert!(
+            caller::settle(&l.p, "s8-r1", &l.copy, "/x", &l.copy_sha, "d", &bad, false).is_err(),
+            "{bad}"
+        );
+    }
+    let ok = json!({"evidence": "r.md", "sha256": "a".repeat(64), "verdict": "CONFIRMED"});
+    assert!(caller::settle(&l.p, "s8-r1", &l.copy, "/x", &l.copy_sha, "d", &ok, true).is_ok());
+    assert!(
+        caller::settle(
+            &l.p,
+            "s8-r9",
+            &l.copy,
+            "/x",
+            &l.copy_sha,
+            "d",
+            &check(),
+            false
+        )
+        .is_err()
+    );
     // a call in flight
     std::fs::write(l.t.0.join("ledger/inflight.json"), "{}").expect("w");
     assert!(
@@ -581,6 +643,8 @@ fn the_settle_command_writes_only_when_everything_holds() {
     std::fs::write(&plan_file, json!({"budget": "02-05", "ledger_dir": l.t.0.join("ledger"),
         "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}}).to_string())
         .expect("plan");
+    let report = l.t.0.join("verification.md");
+    std::fs::write(&report, "# report\n").expect("report");
     let run = |extra: &[&str], sha: &str| {
         let mut c = std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"));
         c.args(["settle", "--plan"])
@@ -595,8 +659,9 @@ fn the_settle_command_writes_only_when_everything_holds() {
                 "--decision",
                 "d",
                 "--independent-check",
-                "c",
             ])
+            .arg(&report)
+            .args(["--independent-verdict", "CONFIRMED WITH CAVEAT"])
             .args(extra);
         c.output().expect("run")
     };

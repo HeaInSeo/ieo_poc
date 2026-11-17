@@ -17,8 +17,9 @@
 //! consistent (exit 0); otherwise nothing is written (exit 1).
 //!
 //! `ieo-role-call settle --plan <plan.json> --attempt <id> --transcript <evidence copy>
-//!  --original-path <path> --original-sha256 <hex> --decision <ref> --independent-check <ref>
-//!  [--dry-run]`: settle a run the guard stopped on the old rule's warning from its session
+//!  --original-path <path> --original-sha256 <hex> --decision <ref> --independent-check <report>
+//!  --independent-verdict "CONFIRMED"|"CONFIRMED WITH CAVEAT" [--dry-run]`: (the report's path is
+//!  recorded as given, with its SHA-256) settle a run the guard stopped on the old rule's warning from its session
 //! transcript (`caller::settle`, user decision 2026-11-17 r1-settlement): nothing is changed in
 //! the run's record; one settlement line is appended (exit 0) only when everything holds,
 //! otherwise nothing is written (exit 1). `--dry-run` writes nothing and prints the line.
@@ -87,6 +88,12 @@ fn run() -> Result<i32, String> {
         });
     }
     if args.first().map(String::as_str) == Some("settle") {
+        // the independent check: its report file (digest taken here) and its verdict
+        let report = get("--independent-check")?;
+        let bytes = std::fs::read(&report).map_err(|e| format!("{report}: {e}"))?;
+        use sha2::Digest;
+        let check = json!({"evidence": report, "sha256": hex::encode(sha2::Sha256::digest(&bytes)),
+                           "verdict": get("--independent-verdict")?});
         let s = caller::settle(
             &plan,
             &get("--attempt")?,
@@ -94,7 +101,7 @@ fn run() -> Result<i32, String> {
             &get("--original-path")?,
             &get("--original-sha256")?,
             &get("--decision")?,
-            &get("--independent-check")?,
+            &check,
             args.iter().any(|a| a == "--dry-run"),
         )?;
         let dry = args.iter().any(|a| a == "--dry-run");
