@@ -5,7 +5,7 @@
 | 근거 | 사용자 승인: 병합된 [실행안](EXECUTION_PLAN.md)(main 46799b0, main CI 44033234326 success)의 §8 묶음, id는 계획대로, 예산·멈춤 규칙 그대로. 예비·DB 복원·회차 중 재시작은 묶음 밖. 자동 되돌리기 = 옛 바이너리를 DB 그대로 |
 | 나눔 | 사용자 결정: **사용자는 세 가지만** 한다. ① 본인 토큰 생성과 digest(덮어쓰기 없음) ② 등록 뒤 독립 의미 검토 ③ 자격 계정이 같은지 답. 나머지는 모두 에이전트가 한다. 민감한 경로(`/opt/rust/ieo_poc_secrets`, `/opt/rust/ieo_poc_runs`, `/proc/<pid>/environ`, 캡처한 `env0`)를 건드리는 일은 아래 [권한 설정](#권한-설정사용자-시작-전-한-번)의 **글자 그대로 맞는** 허용 규칙(와일드카드 없음)의 명령으로만 한다 |
 | 표기 | **U**n = 사용자 단계(명령을 그대로 붙여 넣음), **A**n = 에이전트 단계(에이전트가 Bash 도구로 그대로 실행). 어떤 명령도 비밀 값(토큰, OAuth 자격, DB 암호)을 출력하지 않는다. 출력되는 것은 개수, True/False, 이름, 경로, 비밀이 아닌 것의 SHA-256뿐이다 |
-| 실행본 | 46799b0의 스크립트·명세 사본 `$D/step8-46799b0/`(16개 파일, 46799b0과 SHA-256이 같음을 확인), 도우미 `$D/step8-ops/obs-check.sh`(이 브랜치의 [launcher/obs-check.sh](launcher/obs-check.sh)와 같음), 목록 `$D/step8-ops/SHA256SUMS`. 둘 다 쓰기 금지(`chmod -R a-w`). 새 빌드 M(46799b0, release)은 `$D/bin/ieo-coord-M`과 `$D/bin/m-46799b0/`, 옛 `$D/bin/ieo-coord`(778ee47)는 그대로 |
+| 실행본 | 46799b0의 스크립트·명세 사본 `$D/step8-46799b0/`(16개 파일; 15개는 46799b0과 SHA-256이 같고, `sprint-POC-S8-01-r1.json` 하나만 수용 프로파일 r6 판으로 바꿈: [실행안 §11](EXECUTION_PLAN.md#11-변경-이력--명세의-수용-프로파일-r7--r6사용자-결정-2026-11-17-선택-가)), 도우미 `$D/step8-ops/obs-check.sh`(이 브랜치의 [launcher/obs-check.sh](launcher/obs-check.sh)와 같음), 목록 `$D/step8-ops/SHA256SUMS`. 둘 다 쓰기 금지(`chmod -R a-w`). 새 빌드 M(46799b0, release)은 `$D/bin/ieo-coord-M`과 `$D/bin/m-46799b0/`, 옛 `$D/bin/ieo-coord`(778ee47)는 그대로 |
 | 역할 작업 디렉터리 | **`/opt/rust/ieo_poc_runs/02-05-s8-20261118`**로 고정(규칙이 글자를 맞추므로). A4를 다른 날(UTC) 하게 되면 사용자가 규칙과 이 문서의 A4 명령 둘 다에서 날짜를 바꾼다 |
 | 마감 | **R1은 2026-11-21T23:14Z(한국 2026-11-22 08:14) 전에** 받아들여져야 한다(첫 관측 D6의 7일 한도, 구동 스크립트가 10분 여유를 두고 확인) |
 
@@ -19,7 +19,7 @@
   "permissions": {
     "allow": [
       "Bash(cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-data)",
-      "Bash(echo 'd91de4245b3da246a390dacc5311d4304df39f5a27c84c9593fc0b26c2d50fa0  step8-ops/SHA256SUMS')",
+      "Bash(echo '50507966bb33407e822736439762084a42849d06a007d7d09c99ad886b68fc3e  step8-ops/SHA256SUMS')",
       "Bash(sha256sum --quiet --strict -c -)",
       "Bash(sha256sum --quiet --strict -c step8-ops/SHA256SUMS)",
       "Bash(find step8-46799b0 step8-ops -perm /222)",
@@ -59,6 +59,7 @@
   }
 }
 ```
+- **변경(명세 r6, [실행안 §11](EXECUTION_PLAN.md#11-변경-이력--명세의-수용-프로파일-r7--r6사용자-결정-2026-11-17-선택-가)):** 실행본의 명세를 바꿔 목록 파일의 해시가 바뀌었으므로 둘째 줄만 바뀌었다. 옛 `Bash(echo 'd91de4245b3da246a390dacc5311d4304df39f5a27c84c9593fc0b26c2d50fa0  step8-ops/SHA256SUMS')` → 새 `Bash(echo '50507966bb33407e822736439762084a42849d06a007d7d09c99ad886b68fc3e  step8-ops/SHA256SUMS')`. 이미 옛 규칙을 넣었다면 그 한 줄만 바꾼다(다른 줄은 그대로).
 - 처음 여덟 줄은 [실행본 확인](#실행본-확인에이전트-규칙에-걸리는-명령마다) 한 줄의 하위 명령이다(모두 읽기 전용). 부정(`!`) 없이 `find … | wc -l | grep -qx 0`으로 쓴다: 파이프라인의 종료 상태는 `grep`의 것이라 쓰기 가능한 항목이 0개일 때만 성공한다. 그래도 그 줄이 확인 창을 띄우면 사용자가 승인한다(읽기만 함).
 - `export QUOTA_GROUP_ID=claude-sub-shared`는 **U2에서 “같다”고 답했을 때만** 넣는다. “다르다”면 이 줄을 넣지 않는다. A4 전에 멈추고, 실행안 §9 Q2의 결정 뒤 그 값의 `export` 한 줄로 바꾼다. `obs-check.sh` [4]도 두 역할이 `claude-sub-shared`인지 확인하므로, 그때는 도우미·목록·이 문서의 해시도 새로 고쳐 검토를 받는다.
 - `EXPECTED_CURRENT_DEV/GR`은 `null`만 규칙에 둔다. `ieo-poc-test`는 단계 8에서 처음 쓰는 repo라 `assignment_heads`가 비어 있어야 한다. 값이 있으면(앞선 `prepare`가 일부 진행됐거나 계획에 없는 배정) A8.1에서 멈추고 보고한다. 그래서 값이 있는 `export`를 승인할 일은 없다.
@@ -80,7 +81,7 @@
 
 규칙에 걸리는 명령(A1·A2·A4·A5·A6·A7·A8)을 실행하는 Bash 호출은 언제나 이 줄로 시작하고 `&&`로 잇는다. 목록 파일의 해시를 문서의 값과 비교하고, 목록의 17개 파일을 확인하고, 쓰기 가능한 항목이 있으면 실패한다. 실패하면 뒤의 명령은 실행되지 않는다.
 ```
-cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-data && echo 'd91de4245b3da246a390dacc5311d4304df39f5a27c84c9593fc0b26c2d50fa0  step8-ops/SHA256SUMS' | sha256sum --quiet --strict -c - && sha256sum --quiet --strict -c step8-ops/SHA256SUMS && find step8-46799b0 step8-ops -perm /222 | wc -l | grep -qx 0 && echo "copies ok"
+cd /opt/rust/src/github.com/HeaInSeo/ieo_poc-data && echo '50507966bb33407e822736439762084a42849d06a007d7d09c99ad886b68fc3e  step8-ops/SHA256SUMS' | sha256sum --quiet --strict -c - && sha256sum --quiet --strict -c step8-ops/SHA256SUMS && find step8-46799b0 step8-ops -perm /222 | wc -l | grep -qx 0 && echo "copies ok"
 ```
 아래에서 이 줄을 `<확인> &&`로 줄여 적는다. 실제 호출에는 줄 전체를 쓴다. 예상 출력: `copies ok`. 그 밖의 출력이 나오면 멈추고 보고한다. 목록의 17개 중 규칙 명령에 쓰는 넷:
 
@@ -191,20 +192,23 @@ U1의 digest(`<UDIG>`)를 받은 뒤 한다. 모두 규칙 밖이라 확인 창�
    PY
    ```
    그다음 읽기 전용 요약(digest 없이): `python3 -I -c 'import json,sys; [print(p["name"], p["kind"], p["scopes"], p.get("repo_ids"), p.get("role")) for p in json.load(open(sys.argv[1]))["principals"]]' $D/private/s8/tokens-s8.json`. 예상: 옛 주체들(A2의 `--tokens` 파일과 같은 이름·종류·범위) 뒤에 위 일곱 줄.
-4. **manifest·profiles 비교**(실행안 §1.2 끝 “실행 시 확인”): 58090이 쓰는 파일과 46799b0 저장소의 manifest(`docs/poc/Console_Coordinator_Sprints_v0.json`, SHA-256 `ae5c1e7f230b0101ccfa759ccd1050868d218cced28653a7b84c48a51bfe4e85`)를 비교하고, 효과 manifest(manifest + profiles)에 명세의 수용 프로파일이 있는지 본다(`--profiles`가 없으면 둘째 인자를 `-`로).
+4. **효과 manifest로 명세 검사**(실행안 §1.2 끝 “실행 시 확인”, §11): A2가 출력한 `--manifest`·`--profiles`가 §11에 적힌 라이브 파일과 같은지 보고, 코디네이터와 같은 방식(`--profiles` 배열을 `inspection_profiles` 뒤에 붙임)으로 효과 manifest를 만들어 46799b0의 `ieo-spec`(`$D/targets/m-46799b0/release/ieo-spec`, 이미 빌드함)으로 명세를 검사한다.
    ```
-   python3 -I - <MANIFEST> <PROFILES 또는 -> <<'PY'
-   import hashlib, json, sys
-   m, p = sys.argv[1], sys.argv[2]
+   mkdir -p -m 700 /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-check && python3 -I - <MANIFEST> <PROFILES> /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-check/eff-manifest.json <<'PY'
+   import hashlib, json, os, sys
+   m, p, out = sys.argv[1:4]
    h = lambda f: hashlib.sha256(open(f, "rb").read()).hexdigest()
-   print("manifest", h(m), "equals 46799b0:", h(m) == "ae5c1e7f230b0101ccfa759ccd1050868d218cced28653a7b84c48a51bfe4e85")
-   ps = json.load(open(m)).get("inspection_profiles", []) + (json.load(open(p)) if p != "-" else [])
-   if p != "-": print("profiles", h(p))
-   print("profiles in effect:", [(x["profile_id"], x["revision"]) for x in ps])
-   print("poc-acceptance-v1.3.3 r7 with 02-05.accept:", any(x["profile_id"] == "poc-acceptance-v1.3.3" and x["revision"] == 7 and "02-05.accept" in x["items"] for x in ps))
+   print("manifest", h(m), "as recorded:", h(m) == "45d78f28486013d0d7ac9348427267124f9e56c14d4cd84358251240a247c287")
+   print("profiles", h(p), "as recorded:", h(p) == "6eb8ff33bb436be572b1b694cc445953f19cf6ced1dd2a3805dce7c013e0a560")
+   d = json.load(open(m)); d.setdefault("inspection_profiles", []).extend(json.load(open(p)))
+   with os.fdopen(os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f: json.dump(d, f, ensure_ascii=False)
+   print("profiles in effect:", [(x["profile_id"], x["revision"]) for x in d["inspection_profiles"]])
    PY
    ```
-   예상: `equals 46799b0: True`, 마지막 줄 `True`. manifest가 다르면 에이전트가 46799b0에서 `ieo-spec`을 빌드해(`cargo build --release --locked -p ieo-spec`, 대상 디렉터리 `$D/targets/m-46799b0`) 효과 manifest로 `ieo-spec check $D/step8-46799b0/sprint-POC-S8-01-r1.json --manifest <효과 manifest> --executable`를 돌려 `201 ACCEPTED_FOR_SEMANTIC_REVIEW`와 digest `a8d97f12…7bb7`을 확인한다. 아니면 멈춘다.
+   ```
+   /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/targets/m-46799b0/release/ieo-spec check /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/step8-46799b0/sprint-POC-S8-01-r1.json --manifest /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-check/eff-manifest.json --executable
+   ```
+   예상: `as recorded: True` 두 줄, `profiles in effect: [('poc-acceptance-v1.3.3', 4), ('poc-acceptance-v1.3.3', 5), ('poc-acceptance-v1.3.3', 6), ('x01-notion-import-test', 1)]`, 검사 `"http_status": 201`, `"state": "ACCEPTED_FOR_SEMANTIC_REVIEW"`, `"computed_digest": "0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124"`. 파일 해시가 다르면 검사 결과를 함께 보고하고 멈춘다(사람이 판단). 검사가 201이 아니면 멈춘다.
 5. **55433 읽기 전용 질의**(`podman exec ieo-poc-db psql -U <user> -d <db> -Atc …`): 새 표 11개(`role_checkpoints` … `role_recovery_uses`, rehearse-migration.sh의 목록) 중 있는 것 0, `SELECT count(*) FROM sprint_revisions WHERE sprint_id = 'POC-S8-01'` = 0, `SELECT count(*) FROM notion_imports WHERE test_id = 'POC-S8-01'` = 0, `<BINDINGS>`에 `ieo-poc-test`가 없고 같은 `sprint_id`를 두 repo가 쓰지 않음, `SELECT role, assignment_id, generation FROM assignment_heads WHERE repo_id = 'ieo-poc-test'` = 행 없음.
 6. **백업**(실행안 §3의 명령 그대로, `<user>`·`<db>`를 넣어): `$D/backups/<UTC>-pre-step8/`에 `ieo.dump`(`pg_dump -Fc`), `ieo.dump.sha256`, `ieo.dump.list`(`pg_restore --list`), `live-counts.txt`.
 7. **시험 DB(55432) 마이그레이션 예행**(실행안 §3): 시험 DB 암호 파일은 `/tmp/claude-1001/-opt-rust-src-github-com-HeaInSeo-ieo-poc/48619655-6edf-4b63-83bc-01e6dfc724e5/scratchpad/pgpw`(0600, 출력 안 함).
@@ -281,7 +285,7 @@ U2가 “같다”일 때만 한다(실행안 §5.2 단계 5, §5.3). 스크립�
 ```
 <확인> && export COORD=http://127.0.0.1:58090 && export TOKDIR=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/private/s8 && export OUT=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/s8-out && export LEDGER=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/ledger-0205 && export ADAPTER_HEADER=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data/private/s8/adapter.header && bash /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/step8-46799b0/launcher/run-step8.sh register
 ```
-예상 출력: `copies ok`, `registered POC-S8-01 r1 (201), digest a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7: the user's semantic review is next …`. 에이전트가 사용자에게 알림: sprint `POC-S8-01`, revision `1`, digest **`a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7`**(명세 파일과 같음을 스크립트가 확인), 명세 파일 `$D/step8-46799b0/sprint-POC-S8-01-r1.json`.
+예상 출력: `copies ok`, `registered POC-S8-01 r1 (201), digest 0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124: the user's semantic review is next …`. 에이전트가 사용자에게 알림: sprint `POC-S8-01`, revision `1`, digest **`0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124`**(명세 파일과 같음을 스크립트가 확인), 명세 파일 `$D/step8-46799b0/sprint-POC-S8-01-r1.json`.
 
 ## U3 · 독립 의미 검토(사용자 본인)
 
@@ -289,7 +293,7 @@ U2가 “같다”일 때만 한다(실행안 §5.2 단계 5, §5.3). 스크립�
 ```
 D=/opt/rust/src/github.com/HeaInSeo/ieo_poc-data; T=$D/private/user/heain.token
 REASON='<명세를 읽고 쓴 이유: 예) 대상·한도·작업이 단계 8 결정과 맞음>'
-DIG=a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7
+DIG=0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124
 python3 -I -c 'import json,sys; print(json.dumps({"decision": "passed", "reason": sys.argv[1], "digest": sys.argv[2]}))' "$REASON" "$DIG" > /tmp/s8-review.json
 curl -sS --max-time 30 -o /tmp/s8-review-answer.json -w 'http %{http_code}\n' \
   -H @<(printf 'Authorization: Bearer %s\n' "$(cat "$T")") -H 'Content-Type: application/json' \

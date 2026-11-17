@@ -1,0 +1,57 @@
+# 02-05 step 8 spec fix: profile r7 → r6 (ieo-spec of 46799b0, release, sha256 0bb64c3cb8340cf4bc195801033005bbaa9d6d494682a0dcfdcd020bdca6abdb)
+# live 58090 manifest: /opt/rust/src/github.com/HeaInSeo/ieo_poc-c12/docs/poc/Console_Coordinator_Sprints_v0.json sha256 45d78f28486013d0d7ac9348427267124f9e56c14d4cd84358251240a247c287
+# live 58090 --profiles: /opt/rust/src/github.com/HeaInSeo/ieo_poc-data/private/profiles.json sha256 6eb8ff33bb436be572b1b694cc445953f19cf6ced1dd2a3805dce7c013e0a560
+# effective manifest = manifest with --profiles appended to inspection_profiles (as ieo-coord serve): sha256 d1415f0f7c573c256a1a72fcc3cc42c4346a48829cf1d6e79026be2a5fdd5158; profiles poc-acceptance-v1.3.3 r4 r5 r6, x01-notion-import-test r1
+
+## old spec (profile r7) against the effective live manifest
+{
+  "http_status": 422,
+  "outcome": {
+    "computed_digest": "a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7",
+    "rejections": [
+      {
+        "code": "UNKNOWN_PROFILE_ITEM",
+        "correction": "승인된 프로파일 ID·revision을 쓰세요. 새 기준은 정책 소유자 승인 뒤 프로파일에 추가됩니다.",
+        "field": "tasks[0].acceptance.profile_id",
+        "message": "승인 프로파일 poc-acceptance-v1.3.3 revision 7이(가) 없습니다.",
+        "retryable_after_edit": true
+      }
+    ],
+    "state": "REJECTED"
+  }
+}
+
+## new spec (profile r6) against the effective live manifest
+{
+  "http_status": 201,
+  "outcome": {
+    "computed_digest": "0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124",
+    "rejections": [],
+    "state": "ACCEPTED_FOR_SEMANTIC_REVIEW"
+  }
+}
+
+## new spec (profile r6) against the repo manifest (fafa5a9 = 46799b0 docs/poc/Console_Coordinator_Sprints_v0.json)
+{
+  "http_status": 201,
+  "outcome": {
+    "computed_digest": "0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124",
+    "rejections": [],
+    "state": "ACCEPTED_FOR_SEMANTIC_REVIEW"
+  }
+}
+
+## 02-05.accept in r6 and r7 (repo manifest r4..r7; live r6 equals repo r6 as a whole)
+live r6 == repo r6 (whole profile): True
+02-05.accept r6 == r7: True
+items that differ between r6 and r7: ['02-08.accept', '04-11.accept', '07-05.accept']
+
+## spec diff (r7 file → r6 file)
+108c108
+<     "profile_revision": 7,
+---
+>     "profile_revision": 6,
+130c130
+<  "digest": "a8d97f129dca590e5d93fb8ddb6d9aa1fbf2fcaa14d72b152e384ca3a71a7bb7"
+---
+>  "digest": "0e4d471dc996dd9f7dfea269975bc5cf2491eaf85f6e6836e1526a1d961d0124"
