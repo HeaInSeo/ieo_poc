@@ -892,14 +892,29 @@ fn only_the_pinned_run_with_its_evidence_in_place_is_settled() {
             .contains("not the original")
     );
     std::fs::write(&rec, format!("{}\n{}\n", raw[0], raw[1])).expect("w");
+    // N-1: the report is checked in the ledger; its original may change or go away
     std::fs::write(&l.report, "# changed\n").expect("w");
+    std::fs::remove_file(&l.report).expect("rm");
+    assert!(
+        caller::records(&l.p).is_ok(),
+        "the original report is provenance only"
+    );
+    let rcopy = l.t.0.join("ledger/children/s8-r1/independent-check.md");
+    assert_eq!(
+        raw[1]["independent_check"]["ledger_copy"],
+        json!(std::fs::canonicalize(&rcopy).expect("c"))
+    );
+    let kept = std::fs::read(&rcopy).expect("report copy");
+    std::fs::write(&rcopy, "# changed\n").expect("w");
     assert!(
         caller::records(&l.p)
             .expect_err("report")
-            .contains("independent_check")
+            .contains("SHA-256")
     );
-    std::fs::remove_file(&l.report).expect("rm");
-    assert!(caller::records(&l.p).is_err(), "a report that is gone");
+    std::fs::remove_file(&rcopy).expect("rm");
+    assert!(caller::records(&l.p).expect_err("gone").contains("missing"));
+    std::fs::write(&rcopy, &kept).expect("w");
+    assert!(caller::records(&l.p).is_ok());
     // the writer never writes through a symlink at the copy path
     let l = r1_ledger("wsym");
     std::fs::create_dir_all(l.t.0.join("ledger/children/s8-r1")).expect("dir");
@@ -931,4 +946,72 @@ fn only_the_pinned_run_with_its_evidence_in_place_is_settled() {
     let l = r1_ledger("dry");
     settle(&l, true).expect("dry");
     assert!(!l.t.0.join("ledger/children").exists());
+}
+
+/// PR #90 review 7b904de N-2/N-3: the ledger directory is taken by its canonical path (the CLI
+/// and the coordinator agree however their plans spell it), and nothing inside the ledger may be
+/// a symlink (`children`, `children/<attempt>`, the files).
+#[test]
+fn the_ledger_is_one_place_however_it_is_spelled_and_has_no_symlink_inside() {
+    // settled through an alias of the ledger directory, read through the real path, and back
+    let l = r1_ledger("alias");
+    let alias = l.t.0.join("ledger-alias");
+    std::os::unix::fs::symlink(l.t.0.join("ledger"), &alias).expect("alias");
+    let p_alias = caller::Plan::from_json(&json!({"budget": "02-05", "ledger_dir": alias,
+        "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}}))
+    .expect("plan");
+    let p_dots = caller::Plan::from_json(&json!({"budget": "02-05",
+        "ledger_dir": l.t.0.join("ledger/../ledger"),
+        "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}}))
+    .expect("plan");
+    caller::settle(
+        &p_alias,
+        "s8-r1",
+        &l.copy,
+        "/x",
+        &l.copy_sha,
+        DECISION,
+        &check(&l),
+        false,
+    )
+    .expect("settle through the alias");
+    for (why, p) in [("real path", &l.p), ("alias", &p_alias), ("dots", &p_dots)] {
+        let r = caller::records(p).expect(why);
+        assert_eq!(r[0]["settlement"]["policy"], settlement::POLICY, "{why}");
+    }
+    // N-3: children/s8-r1 moved out of the ledger and linked back: refused
+    let attempt_dir = l.t.0.join("ledger/children/s8-r1");
+    let outside = l.t.0.join("outside-s8-r1");
+    std::fs::rename(&attempt_dir, &outside).expect("mv");
+    std::os::unix::fs::symlink(&outside, &attempt_dir).expect("link");
+    assert!(
+        caller::records(&l.p)
+            .expect_err("attempt dir")
+            .contains("symlink")
+    );
+    std::fs::remove_file(&attempt_dir).expect("rm");
+    std::fs::rename(&outside, &attempt_dir).expect("mv back");
+    assert!(caller::records(&l.p).is_ok());
+    // children itself linked from outside: refused
+    let children = l.t.0.join("ledger/children");
+    let outside = l.t.0.join("outside-children");
+    std::fs::rename(&children, &outside).expect("mv");
+    std::os::unix::fs::symlink(&outside, &children).expect("link");
+    assert!(
+        caller::records(&l.p)
+            .expect_err("children")
+            .contains("symlink")
+    );
+    std::fs::remove_file(&children).expect("rm");
+    std::fs::rename(&outside, &children).expect("mv back");
+    assert!(caller::records(&l.p).is_ok());
+    // the writer refuses a symlinked children/<attempt> too, and writes nothing through it
+    let l = r1_ledger("wdir");
+    let outside = l.t.0.join("elsewhere");
+    std::fs::create_dir_all(&outside).expect("dir");
+    std::fs::create_dir_all(l.t.0.join("ledger/children")).expect("dir");
+    std::os::unix::fs::symlink(&outside, l.t.0.join("ledger/children/s8-r1")).expect("link");
+    assert!(settle(&l, false).is_err());
+    assert_eq!(std::fs::read_dir(&outside).expect("ls").count(), 0);
+    assert_eq!(lines(&l).len(), 1);
 }

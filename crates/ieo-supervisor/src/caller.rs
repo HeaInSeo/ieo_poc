@@ -1783,13 +1783,16 @@ pub fn settle(
             transcript.display()
         ));
     }
-    let to = crate::settlement::copy_path(&plan.ledger_dir, attempt)?;
+    // the independent check's report, read once here; the ledger keeps a copy (review 7b904de N-1)
+    let rp = independent_check["evidence"].as_str().unwrap_or_default();
+    let report = std::fs::read(rp).map_err(|e| format!("independent check report {rp}: {e}"))?;
     if dry_run {
-        // measured from the given file's bytes; nothing is written anywhere (review d971f59 L-3)
+        // measured from the given files' bytes; nothing is written anywhere (review d971f59 L-3)
         return crate::settlement::build(
             r,
             &stream,
             &b,
+            &report,
             &plan.ledger_dir,
             false,
             original_path,
@@ -1798,53 +1801,37 @@ pub fn settle(
             independent_check,
         );
     }
-    // the copy: created new (never through an existing file or a symlink: review d971f59 L-1);
-    // an existing regular file must be the same bytes
-    let created = match std::fs::symlink_metadata(&to) {
-        Ok(m) if !m.file_type().is_file() => {
-            return Err(format!("{} exists and is not a regular file", to.display()));
+    // the copies: created new in the ledger, never through a symlink; an existing regular file
+    // must be the same bytes (reviews d971f59 L-1, 7b904de N-1)
+    let mut created: Vec<PathBuf> = Vec::new();
+    let mut keep = |name: &str, bytes: &[u8]| -> Result<(), String> {
+        let (p, new) = crate::settlement::write_in_ledger(&plan.ledger_dir, attempt, name, bytes)?;
+        if new {
+            created.push(p);
         }
-        Ok(_) if std::fs::read(&to).map_err(|e| e.to_string())? != b => {
-            return Err(format!("{} already holds a different file", to.display()));
-        }
-        Ok(_) => false,
-        Err(_) => {
-            use std::io::Write;
-            use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-            if let Some(d) = to.parent() {
-                std::fs::DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(d)
-                    .map_err(|e| format!("settlement copy: {e}"))?;
-            }
-            let mut f = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&to)
-                .map_err(|e| format!("settlement copy: {e}"))?;
-            f.write_all(&b)
-                .and_then(|()| f.sync_all())
-                .map_err(|e| format!("settlement copy: {e}"))?;
-            true
-        }
+        Ok(())
     };
-    let s = match crate::settlement::build(
-        r,
-        &stream,
-        &b,
-        &plan.ledger_dir,
-        true,
-        original_path,
-        original_sha256,
-        decision,
-        independent_check,
-    ) {
+    let kept = keep(crate::settlement::COPY_NAME, &b)
+        .and_then(|()| keep(crate::settlement::REPORT_NAME, &report));
+    let s = kept.and_then(|()| {
+        crate::settlement::build(
+            r,
+            &stream,
+            &b,
+            &report,
+            &plan.ledger_dir,
+            true,
+            original_path,
+            original_sha256,
+            decision,
+            independent_check,
+        )
+    });
+    let s = match s {
         Ok(s) => s,
         Err(e) => {
-            if created {
-                let _ = std::fs::remove_file(&to);
+            for p in &created {
+                let _ = std::fs::remove_file(p);
             }
             return Err(e);
         }

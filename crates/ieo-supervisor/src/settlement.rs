@@ -382,57 +382,129 @@ pub fn eligible(r: &Value, stream: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Where a settlement's transcript copy lives: `<ledger dir>/children/<attempt>/settlement-transcript.jsonl`
-/// (PR #90 review d971f59 L-1). Absolute, never a symlink anywhere on its way.
-pub fn copy_path(ledger_dir: &Path, attempt: &str) -> Result<PathBuf, String> {
-    std::path::absolute(
-        ledger_dir
-            .join("children")
-            .join(attempt)
-            .join("settlement-transcript.jsonl"),
-    )
-    .map_err(|e| format!("ledger path: {e}"))
+/// The settlement's files kept in the ledger (`<ledger dir>/children/<attempt>/`): the
+/// transcript copy and the independent check's report copy (PR #90 review 7b904de N-1).
+pub const COPY_NAME: &str = "settlement-transcript.jsonl";
+pub const REPORT_NAME: &str = "independent-check.md";
+
+/// Where a settlement file lives: `<canonical ledger dir>/children/<attempt>/<name>`. The ledger
+/// directory is taken by its canonical path, so the writer and every reader (CLI, coordinator)
+/// agree however the plan spells it, an alias of the ledger directory included (review 7b904de
+/// N-2). Inside the ledger nothing may be a symlink: `children`, `children/<attempt>` and the
+/// file are checked with `symlink_metadata` (reviews d971f59 L-1, 7b904de N-3).
+pub fn child_path(ledger_dir: &Path, attempt: &str, name: &str) -> Result<PathBuf, String> {
+    let base = std::fs::canonicalize(ledger_dir).map_err(|e| format!("ledger dir: {e}"))?;
+    Ok(base.join("children").join(attempt).join(name))
 }
 
-/// The kept transcript copy of a settlement: exactly at [`copy_path`], a regular file reached
-/// without a symlink, with the recorded digest.
-fn read_copy(s: &Value, ledger_dir: &Path, attempt: &str) -> Result<Vec<u8>, String> {
-    let want = copy_path(ledger_dir, attempt)?;
-    let p = s["evidence"]["ledger_copy"]
+/// No symlink inside the ledger on the way to `file` (`children`, `children/<attempt>`), and
+/// `file` itself, when it exists, a regular file. `Ok(false)` when `file` does not exist.
+fn no_symlink_in_ledger(file: &Path) -> Result<bool, String> {
+    let attempt_dir = file.parent().ok_or("settlement path without a directory")?;
+    let children = attempt_dir
+        .parent()
+        .ok_or("settlement path without children/")?;
+    for d in [children, attempt_dir] {
+        match std::fs::symlink_metadata(d) {
+            Ok(m) if m.file_type().is_dir() => {}
+            Ok(_) => {
+                return Err(format!(
+                    "{} is not a directory of the ledger (a symlink?)",
+                    d.display()
+                ));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(format!("{}: {e}", d.display())),
+        }
+    }
+    match std::fs::symlink_metadata(file) {
+        Ok(m) if m.file_type().is_file() => Ok(true),
+        Ok(_) => Err(format!(
+            "{} is not a regular file (a symlink?)",
+            file.display()
+        )),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(format!("{}: {e}", file.display())),
+    }
+}
+
+/// Read a settlement file kept in the ledger: the recorded path must lead (canonically) to
+/// [`child_path`], with no symlink inside the ledger, and the bytes must have the recorded
+/// SHA-256. The one check every reader uses.
+pub fn read_in_ledger(
+    ledger_dir: &Path,
+    attempt: &str,
+    name: &str,
+    recorded: &Value,
+    sha256: &Value,
+) -> Result<Vec<u8>, String> {
+    let want = child_path(ledger_dir, attempt, name)?;
+    let p = recorded
         .as_str()
-        .ok_or("settlement without evidence.ledger_copy")?;
-    if Path::new(p) != want {
+        .ok_or(format!("settlement without the path of its {name}"))?;
+    if !Path::new(p).is_absolute() {
+        return Err(format!("settlement file {p} is not an absolute path"));
+    }
+    if !no_symlink_in_ledger(&want)? {
+        return Err(format!("settlement file {} is missing", want.display()));
+    }
+    let canon = std::fs::canonicalize(p).map_err(|e| format!("settlement file {p}: {e}"))?;
+    if canon != want {
         return Err(format!(
-            "settlement copy {p} is not {} (the copy lives in the ledger)",
+            "settlement file {p} is not the ledger's {} (the copy lives in the ledger)",
             want.display()
         ));
     }
-    let meta = std::fs::symlink_metadata(&want).map_err(|e| format!("settlement copy {p}: {e}"))?;
-    let canon_dir = std::fs::canonicalize(ledger_dir).map_err(|e| format!("ledger dir: {e}"))?;
-    let canon = std::fs::canonicalize(&want).map_err(|e| format!("settlement copy {p}: {e}"))?;
-    if !meta.file_type().is_file()
-        || canon
-            != canon_dir
-                .join("children")
-                .join(attempt)
-                .join("settlement-transcript.jsonl")
-    {
+    let b = std::fs::read(&want).map_err(|e| format!("settlement file {p}: {e}"))?;
+    if *sha256 != hex::encode(Sha256::digest(&b)).as_str() {
         return Err(format!(
-            "settlement copy {p} is not a regular file inside the ledger (symlink?)"
-        ));
-    }
-    let b = std::fs::read(&want).map_err(|e| format!("settlement copy {p}: {e}"))?;
-    if s["evidence"]["sha256"] != hex::encode(Sha256::digest(&b)).as_str() {
-        return Err(format!(
-            "settlement copy {p} differs from its recorded SHA-256"
+            "settlement file {p} differs from its recorded SHA-256"
         ));
     }
     Ok(b)
 }
 
-/// The independent check's report, read again: an absolute path to a readable regular file
-/// whose SHA-256 is the recorded one (PR #90 review d971f59 L-2).
-fn check_report(c: &Value) -> Result<(), String> {
+/// Keep `bytes` as the ledger's settlement file `name`: created new (0600, directories 0700),
+/// never through a symlink; an existing regular file must hold the same bytes. Returns the path
+/// and whether it was created (the caller removes what it created when the settlement fails).
+pub fn write_in_ledger(
+    ledger_dir: &Path,
+    attempt: &str,
+    name: &str,
+    bytes: &[u8],
+) -> Result<(PathBuf, bool), String> {
+    use std::io::Write;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    let to = child_path(ledger_dir, attempt, name)?;
+    let dir = to.parent().ok_or("settlement path without a directory")?;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)
+        .map_err(|e| format!("settlement copy: {e}"))?;
+    if no_symlink_in_ledger(&to)? {
+        let old = std::fs::read(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+        if old != bytes {
+            return Err(format!("{} already holds a different file", to.display()));
+        }
+        return Ok((to, false));
+    }
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&to)
+        .map_err(|e| format!("settlement copy {}: {e}", to.display()))?;
+    f.write_all(bytes)
+        .and_then(|()| f.sync_all())
+        .map_err(|e| format!("settlement copy: {e}"))?;
+    Ok((to, true))
+}
+
+/// The independent check's report as given (`bytes`) against the record: its SHA-256 is the
+/// recorded one, and the original path is absolute (provenance; it is never read again: every
+/// read checks the ledger's copy, review 7b904de N-1).
+fn check_report(c: &Value, bytes: &[u8]) -> Result<(), String> {
     independent_check_ok(c)?;
     let p = c["evidence"].as_str().unwrap_or_default();
     if !Path::new(p).is_absolute() {
@@ -440,10 +512,9 @@ fn check_report(c: &Value) -> Result<(), String> {
             "independent_check.evidence {p} is not an absolute path"
         ));
     }
-    let b = std::fs::read(p).map_err(|e| format!("independent_check.evidence {p}: {e}"))?;
-    if c["sha256"] != hex::encode(Sha256::digest(&b)).as_str() {
+    if c["sha256"] != hex::encode(Sha256::digest(bytes)).as_str() {
         return Err(format!(
-            "independent_check.evidence {p} differs from its recorded SHA-256"
+            "independent_check report differs from its recorded SHA-256 ({p})"
         ));
     }
     Ok(())
@@ -453,13 +524,32 @@ fn check_report(c: &Value) -> Result<(), String> {
 /// it counts. `stream` is the run's kept stream text; `ledger_dir` the ledger it is read from.
 pub fn apply(run: &Value, s: &Value, stream: &str, ledger_dir: &Path) -> Result<Value, String> {
     let a = run["attempt_id"].as_str().unwrap_or("?").to_owned();
-    let copy = read_copy(s, ledger_dir, &a)?;
-    apply_bytes(run, s, stream, &copy)
+    let copy = read_in_ledger(
+        ledger_dir,
+        &a,
+        COPY_NAME,
+        &s["evidence"]["ledger_copy"],
+        &s["evidence"]["sha256"],
+    )?;
+    let report = read_in_ledger(
+        ledger_dir,
+        &a,
+        REPORT_NAME,
+        &s["independent_check"]["ledger_copy"],
+        &s["independent_check"]["sha256"],
+    )?;
+    apply_bytes(run, s, stream, &copy, &report)
 }
 
 /// [`apply`] with the transcript copy's bytes given (a dry run reads them from the evidence
 /// copy, writing nothing).
-fn apply_bytes(run: &Value, s: &Value, stream: &str, copy: &[u8]) -> Result<Value, String> {
+fn apply_bytes(
+    run: &Value,
+    s: &Value,
+    stream: &str,
+    copy: &[u8],
+    report: &[u8],
+) -> Result<Value, String> {
     let a = run["attempt_id"].as_str().unwrap_or("?");
     if s["source"] != SOURCE || s["policy"] != POLICY || s["model_request"] != false {
         return Err(format!("settlement of {a}: unknown source or policy"));
@@ -473,7 +563,7 @@ fn apply_bytes(run: &Value, s: &Value, stream: &str, copy: &[u8]) -> Result<Valu
             s["decision"]
         ));
     }
-    check_report(&s["independent_check"]).map_err(|e| format!("settlement of {a}: {e}"))?;
+    check_report(&s["independent_check"], report).map_err(|e| format!("settlement of {a}: {e}"))?;
     // the caveat travels with the settlement (it is never dropped)
     if s["verification"]["uncovered"] != UNCOVERED || s["verification"]["residual"] != RESIDUAL {
         return Err(format!(
@@ -548,15 +638,17 @@ fn apply_bytes(run: &Value, s: &Value, stream: &str, copy: &[u8]) -> Result<Valu
     Ok(r)
 }
 
-/// The settlement line for `run`: the transcript `bytes` (the verified evidence copy), the copy
-/// path in the ledger it is (or would be) written to, and its provenance. Checked like a read
-/// before it is returned: against the file at `ledger_copy` when `on_disk` (the real write,
-/// after the copy), against `bytes` otherwise (a dry run writes nothing).
+/// The settlement line for `run`: the transcript `bytes` (the verified evidence copy) and the
+/// independent check's `report` bytes, the paths in the ledger they are (or would be) kept at,
+/// and their provenance. Checked like a read before it is returned: against the ledger's files
+/// when `on_disk` (the real write, after the copies), against the given bytes otherwise (a dry
+/// run writes nothing).
 #[allow(clippy::too_many_arguments)]
 pub fn build(
     run: &Value,
     stream: &str,
     bytes: &[u8],
+    report: &[u8],
     ledger_dir: &Path,
     on_disk: bool,
     original_path: &str,
@@ -565,7 +657,7 @@ pub fn build(
     independent_check: &Value,
 ) -> Result<Value, String> {
     let a = run["attempt_id"].as_str().unwrap_or("?");
-    check_report(independent_check)?;
+    check_report(independent_check, report)?;
     eligible(run, stream)?;
     let sid = run["session"]["session_id"].as_str().unwrap_or_default();
     let acc = transcript_accounting(bytes, sid)?;
@@ -575,7 +667,10 @@ pub fn build(
             acc.sha256
         ));
     }
-    let ledger_copy = copy_path(ledger_dir, a)?;
+    let ledger_copy = child_path(ledger_dir, a, COPY_NAME)?;
+    // the report's original path and digest stay as provenance; reads check the ledger's copy
+    let mut check = independent_check.clone();
+    check["ledger_copy"] = json!(child_path(ledger_dir, a, REPORT_NAME)?);
     let signals: Vec<Value> = budget::rate_limit_events(stream)?
         .iter()
         .map(|e| match budget::rate_limit_verdict(e) {
@@ -597,12 +692,12 @@ pub fn build(
         "usage_run": {"state": "measured", "tokens": acc.tokens_json(), "source": SOURCE},
         "lower_bound_not_used": run["outcome"]["observed"],
         "rule": "runtime contract rev 19 §20 item 31; rev 20 §21 item 32",
-        "decision": decision, "independent_check": independent_check,
+        "decision": decision, "independent_check": check,
         "settled_at": ieo_evidence::time::now()});
     if on_disk {
         apply(run, &s, stream, ledger_dir)?;
     } else {
-        apply_bytes(run, &s, stream, bytes)?;
+        apply_bytes(run, &s, stream, bytes, report)?;
     }
     Ok(s)
 }
