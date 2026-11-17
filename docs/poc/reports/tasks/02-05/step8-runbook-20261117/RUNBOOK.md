@@ -60,7 +60,7 @@
 3. **역할 서비스(개발·Guardrail) 설정** [실 시스템 변경: 새 컨테이너·볼륨]. 둘 다 `"budget": "02-05"`(몫 없음), 새 볼륨, `"checkpoint_central": {"url": "<58090>", "token_file": "<그 supervisor의 agent 자격 파일>", "transport": "http"}`(**`local_only`가 아님**: 중앙 모드에서만 전달 없는 start가 실행되지 않는다), 병합 SHA 이미지, 구독 자격만(`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_*` 없음).
 4. **시작 경로는 코디네이터 하나** [읽기]. 두 역할 서비스의 `GET /v0/role/status`에서 `central_checkpoint.mode`가 `local_only`가 아니고, `capability_gaps`에 `central checkpoint comparison off (local_only)`가 없다. 단계 8 동안 이 서비스들에 `ieo-role-call`을 쓰지 않는다(예비도 거절한다).
 5. **재배포 뒤 중앙 체크포인트** [읽기]. §1 항목 5의 질의 → 0행.
-6. **자격** [읽기](값을 출력하지 않고 `tokens.json`의 주체 이름·종류·범위만): §1A 항목 2의 주체가 모두 있다. `roles:control` 보유 주체 목록(이름·종류)을 보고에 적는다. 예비용 사람 주체를 쓸 사람이 정해져 있다(§10 항목 5).
+6. **자격** **[읽기]**(값을 출력하지 않고 `tokens.json`의 주체 이름·종류·범위만): §1A 항목 2의 주체가 모두 있다. `roles:control` 보유 주체 목록(이름·종류)을 보고에 적는다. 예비용 사람 주체를 쓸 사람이 정해져 있다(§10 항목 5).
 
 ## 4. 배정과 입력 **[실 시스템 변경 — 55433에 기록]**
 
