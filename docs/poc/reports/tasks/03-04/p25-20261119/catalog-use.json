@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.2.1",
   "profile": {
     "id": "poc-acceptance-v1.3.3",
     "revision": 4
@@ -7,7 +7,7 @@
   "items": [
     {
       "id": "CAT-ROLE",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "scope": "common",
       "roles": [
         "development",
@@ -18,8 +18,17 @@
       "acceptance": "03-02.accept",
       "detail": "docs/poc/reports/tasks/03-02/common-policy-20261118/COMMON_POLICY.md",
       "purpose": "역할 책임과 현재 SHA 인계를 검증",
-      "applies_when": "승인된 역할에 작업 배정",
-      "excludes_when": "다른 역할·환경의 자격",
+      "applies_when": {
+        "stacks": [
+          "go",
+          "rust"
+        ],
+        "repository": null
+      },
+      "excludes_when": [
+        "other_stack",
+        "unassigned_role"
+      ],
       "tools": "Runtime Contract rev 20",
       "environment": "분리된 역할 작업공간과 정본",
       "permissions": "배정의 기존 역할 범위",
@@ -45,7 +54,7 @@
     },
     {
       "id": "CAT-RECOVERY",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "scope": "common",
       "roles": [
         "development",
@@ -56,8 +65,17 @@
       "acceptance": "03-02.accept",
       "detail": "docs/poc/reports/tasks/03-02/common-policy-20261118/COMMON_POLICY.md",
       "purpose": "실패·불충분·재개의 증거를 구분",
-      "applies_when": "해당 승인 범위의 검증·회수",
-      "excludes_when": "운영 조치와 자동 재전송",
+      "applies_when": {
+        "stacks": [
+          "go",
+          "rust"
+        ],
+        "repository": null
+      },
+      "excludes_when": [
+        "other_stack",
+        "unassigned_role"
+      ],
       "tools": "ieo-evidence 02-01 검수본 및 역할 계약 rev 20",
       "environment": "기록과 격리 DB",
       "permissions": "필요 증거 읽기",
@@ -83,7 +101,7 @@
     },
     {
       "id": "CAT-GO",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "scope": "go",
       "roles": [
         "development",
@@ -91,10 +109,18 @@
       ],
       "requirement": "POC-REQ-03-03",
       "acceptance": "03-03.accept",
-      "detail": "docs/poc/reports/tasks/03-03/go-rust-20261118/GO_POLICY.md",
+      "detail": "docs/poc/reports/tasks/03-04/p25-20261119/GO_POLICY.md",
       "purpose": "Go 형식·정적 분석·기능과 조건부 동시성 검증",
-      "applies_when": "Go 모듈 및 승인된 조건",
-      "excludes_when": "Rust 및 비대상 환경",
+      "applies_when": {
+        "stacks": [
+          "go"
+        ],
+        "repository": null
+      },
+      "excludes_when": [
+        "other_stack",
+        "unassigned_role"
+      ],
       "tools": "Go 1.26.10; GCC 8",
       "environment": "linux/amd64, cgo, 네트워크 격리",
       "permissions": "소스 읽기, 임시 쓰기",
@@ -121,12 +147,12 @@
         "docs/poc/reports/tasks/03-03/go-rust-20261118/ACCEPTANCE.md"
       ],
       "title": "Go 검사 상세",
-      "detail_revision": "0.2.0",
+      "detail_revision": "0.2.1",
       "readiness": "draft"
     },
     {
       "id": "CAT-RUST",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "scope": "rust",
       "roles": [
         "development",
@@ -134,10 +160,18 @@
       ],
       "requirement": "POC-REQ-03-03",
       "acceptance": "03-03.accept",
-      "detail": "docs/poc/reports/tasks/03-03/go-rust-20261118/RUST_POLICY.md",
+      "detail": "docs/poc/reports/tasks/03-04/p25-20261119/RUST_POLICY.md",
       "purpose": "Rust 형식·경고·실제 실행 검증",
-      "applies_when": "Rust 패키지 및 승인 target·feature",
-      "excludes_when": "Go 또는 제외된 target",
+      "applies_when": {
+        "stacks": [
+          "rust"
+        ],
+        "repository": null
+      },
+      "excludes_when": [
+        "other_stack",
+        "unassigned_role"
+      ],
       "tools": "Rust/Cargo 1.99.1; rustfmt 1.10.0-stable; Clippy 0.1.99",
       "environment": "linux/amd64, 네트워크 격리",
       "permissions": "소스 읽기, 임시 쓰기",
@@ -162,12 +196,12 @@
         "rust-toolchain.toml"
       ],
       "title": "Rust 검사 상세",
-      "detail_revision": "0.2.0",
+      "detail_revision": "0.2.1",
       "readiness": "draft"
     },
     {
       "id": "CAT-GITHUB-IEO-POC",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "scope": "repository",
       "roles": [
         "development",
@@ -178,8 +212,18 @@
       "acceptance": "03-02.accept",
       "detail": "docs/poc/reports/tasks/03-02/common-policy-20261118/IEO_POC_GITHUB_PROFILE.md",
       "purpose": "워크플로 선언과 보호 관측을 대조",
-      "applies_when": "HeaInSeo/ieo_poc main과 해당 PR",
-      "excludes_when": "다른 저장소 정책",
+      "applies_when": {
+        "stacks": [
+          "go",
+          "rust"
+        ],
+        "repository": "HeaInSeo/ieo_poc"
+      },
+      "excludes_when": [
+        "other_stack",
+        "unassigned_role",
+        "other_repo"
+      ],
       "tools": "GitHub Actions 및 gh 읽기 관측; rust-toolchain.toml",
       "environment": "고정 workflow 및 저장소 설정 snapshot",
       "permissions": "읽기 관측, 승인된 자만 병합",

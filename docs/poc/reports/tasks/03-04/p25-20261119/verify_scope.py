@@ -9,6 +9,8 @@ ROOT = HERE.parents[5]
 DOCS = "docs/poc/reports/tasks/"
 COMMON = DOCS + "03-02/common-policy-20261118/"
 STACKS = DOCS + "03-03/go-rust-20261118/"
+VALIDATION = DOCS + "03-04/p25-20261119/"
+HISTORIC_CATALOG = DOCS + "03-01/catalog-contract-20261118/catalog.json"
 ROLES = {"development", "reviewer", "coordinator"}
 REPOSITORY = "HeaInSeo/ieo_poc"
 PROFILE = {"id": "poc-acceptance-v1.3.3", "revision": 4}
@@ -17,8 +19,8 @@ PROFILE = {"id": "poc-acceptance-v1.3.3", "revision": 4}
 ITEMS = {
     "CAT-ROLE": ("common", "03-02", COMMON + "COMMON_POLICY.md", "0.1.0", ROLES),
     "CAT-RECOVERY": ("common", "03-02", COMMON + "COMMON_POLICY.md", "0.1.0", ROLES),
-    "CAT-GO": ("go", "03-03", STACKS + "GO_POLICY.md", "0.2.0", {"development", "reviewer"}),
-    "CAT-RUST": ("rust", "03-03", STACKS + "RUST_POLICY.md", "0.2.0", {"development", "reviewer"}),
+    "CAT-GO": ("go", "03-03", VALIDATION + "GO_POLICY.md", "0.2.1", {"development", "reviewer"}),
+    "CAT-RUST": ("rust", "03-03", VALIDATION + "RUST_POLICY.md", "0.2.1", {"development", "reviewer"}),
     "CAT-GITHUB-IEO-POC": (
         "repository", "03-02", COMMON + "IEO_POC_GITHUB_PROFILE.md", "0.1.0", ROLES
     ),
@@ -38,11 +40,25 @@ COMMANDS = {
     },
 }
 TOOLS = {
-    "CAT-GO": ("Go 1.26.10", "GCC 8"),
-    "CAT-RUST": ("Rust/Cargo 1.99.1", "rustfmt 1.10.0-stable", "Clippy 0.1.99"),
+    "CAT-GO": "Go 1.26.10; GCC 8",
+    "CAT-RUST": "Rust/Cargo 1.99.1; rustfmt 1.10.0-stable; Clippy 0.1.99",
+}
+PERMISSIONS = {
+    "CAT-ROLE": "배정의 기존 역할 범위",
+    "CAT-RECOVERY": "필요 증거 읽기",
+    "CAT-GO": "소스 읽기, 임시 쓰기",
+    "CAT-RUST": "소스 읽기, 임시 쓰기",
+    "CAT-GITHUB-IEO-POC": "읽기 관측, 승인된 자만 병합",
+}
+SOURCES = {
+    "CAT-ROLE": {HISTORIC_CATALOG, COMMON + "ACCEPTANCE.md"},
+    "CAT-RECOVERY": {HISTORIC_CATALOG, DOCS + "02-01/collector-20261112/REPORT.md"},
+    "CAT-GO": {HISTORIC_CATALOG, STACKS + "ACCEPTANCE.md"},
+    "CAT-RUST": {HISTORIC_CATALOG, "rust-toolchain.toml"},
+    "CAT-GITHUB-IEO-POC": {".github/workflows/ci.yml", COMMON + "github-main-observation.json"},
 }
 TEXT = (
-    "title", "purpose", "applies_when", "excludes_when", "tools", "environment", "permissions",
+    "title", "purpose", "tools", "environment", "permissions",
     "expected_evidence", "evidence_limits", "cost_basis",
 )
 VERDICTS = {"pass", "fail", "inconclusive", "not_applicable"}
@@ -62,7 +78,7 @@ def link(path, name):
 
 
 def verify(catalog, manifest):
-    assert_input(catalog["version"] == "0.2.0" and catalog["profile"] == PROFILE, "version/profile")
+    assert_input(catalog["version"] == "0.2.1" and catalog["profile"] == PROFILE, "version/profile")
     plan_tasks = {t["task_id"]: t for sprint in manifest["sprints"] for t in sprint["tasks"]}
     entries = {e["id"]: e for e in catalog["items"]}
     assert_input(len(entries) == len(catalog["items"]) and set(entries) == ITEMS.keys(),
@@ -70,7 +86,14 @@ def verify(catalog, manifest):
     for name, (scope, task_id, detail_path, revision, roles) in ITEMS.items():
         e = entries[name]
         assert_input(all(isinstance(e.get(f), str) and e[f].strip() for f in TEXT), f"{name}: required field")
-        assert_input(e["version"] == "0.2.0" and e["readiness"] == "draft", f"{name}: version")
+        assert_input(e["permissions"] == PERMISSIONS[name], f"{name}: role permission authority")
+        permitted_stack = [scope] if scope in ("go", "rust") else ["go", "rust"]
+        repo = REPOSITORY if scope == "repository" else None
+        assert_input(e["applies_when"] == {"stacks": permitted_stack, "repository": repo},
+                     f"{name}: uncertified applicability")
+        exclusions = {"other_stack", "unassigned_role"} | ({"other_repo"} if repo else set())
+        assert_input(set(e["excludes_when"]) == exclusions, f"{name}: uncertified exclusion")
+        assert_input(e["version"] == "0.2.1" and e["readiness"] == "draft", f"{name}: version")
         assert_input(e["scope"] == scope and set(e["roles"]) == roles, f"{name}: scope/role")
         assert_input(e.get("repository") == (REPOSITORY if scope == "repository" else None),
                      f"{name}: repository binding")
@@ -83,23 +106,33 @@ def verify(catalog, manifest):
         detail = link(e["detail"], name)
         assert_input(e["detail"] == detail_path and e["detail_revision"] == revision
                      and revision in detail.read_text().splitlines()[0], f"{name}: detail version/subject")
-        assert_input(e["sources"], f"{name}: missing source")
+        assert_input(set(e["sources"]) == SOURCES[name], f"{name}: wrong source binding")
         for source in e["sources"]:
             link(source, name)
+        cost_dir = STACKS if scope in ("go", "rust") else COMMON
+        assert_input(e["cost_basis"] == cost_dir + "REPORT.md", f"{name}: wrong cost evidence")
         link(e["cost_basis"], name)
         assert_input(e["verdicts"].keys() == VERDICTS and all(e["verdicts"].values()), f"{name}: verdict fields")
         if name in COMMANDS:
             assert_input(set(e["method"]["commands"]) == COMMANDS[name], f"{name}: incorrect command/options")
-            assert_input(all(tool in e["tools"] for tool in TOOLS[name]), f"{name}: wrong tool version")
+            assert_input(e["tools"] == TOOLS[name], f"{name}: wrong tool version")
         else:
             assert_input(e["method"]["procedure"].strip(), f"{name}: missing procedure")
     return len(entries), len(TEXT) * len(entries)
 
 
 def select(catalog, stack, repo, role):
-    return tuple(sorted(e["id"] for e in catalog["items"] if role in e["roles"]
-                        and (e["scope"] in ("common", stack)
-                             or e["scope"] == "repository" and e["repository"] == repo)))
+    selected = []
+    for entry in catalog["items"]:
+        applies = entry["applies_when"]
+        if stack not in applies["stacks"] and "other_stack" in entry["excludes_when"]:
+            continue
+        if repo != applies["repository"] and "other_repo" in entry["excludes_when"]:
+            continue
+        if role not in entry["roles"] and "unassigned_role" in entry["excludes_when"]:
+            continue
+        selected.append(entry["id"])
+    return tuple(sorted(selected))
 
 
 def negative_controls(catalog, manifest):
@@ -116,6 +149,17 @@ def negative_controls(catalog, manifest):
         ("wrong stack", lambda c: c["items"][2].__setitem__("scope", "rust"), "scope/role"),
         ("wrong repository", lambda c: c["items"][4].__setitem__("repository", "HeaInSeo/notion-projection-guard"),
          "repository binding"),
+        ("development granted reviewer authority", lambda c: c["items"][0].__setitem__(
+            "permissions", "개발이 Guardrail 검토를 승인"), "role permission authority"),
+        ("unrelated source", lambda c: c["items"][0].__setitem__("sources", ["Cargo.lock"]),
+         "wrong source binding"),
+        ("unrelated cost", lambda c: c["items"][0].__setitem__("cost_basis", "Cargo.lock"), "wrong cost evidence"),
+        ("version prefix collision", lambda c: c["items"][2].__setitem__("tools", "Go 1.26.100; GCC 8"),
+         "wrong tool version"),
+        ("non-applicable scope changed", lambda c: c["items"][2]["applies_when"].__setitem__("stacks", []),
+         "uncertified applicability"),
+        ("role exclusion removed", lambda c: c["items"][2]["excludes_when"].remove("unassigned_role"),
+         "uncertified exclusion"),
     ]
     for name, mutate, reason in controls:
         changed = deepcopy(catalog)
