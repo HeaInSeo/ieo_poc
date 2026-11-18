@@ -31,9 +31,22 @@ USED = {"development": {"Read", "Grep", "Glob"}, "guardrail": {"Read", "Grep", "
 G1_CAP = 2048
 
 
+# The step-8 resume (RESUME_PLAN.md): the records are the ledger's EFFECTIVE records, printed by
+# `ieo-role-call records` into the file EFFECTIVE_RECORDS (a settled run counts as settled, never
+# as its original line); R1_ATTEMPT is the developer run R2 resumes and G1 reviews (s8-r1b);
+# SETTLED names runs that must count through their settlement (s8-r1).
+EFFECTIVE = os.environ.get("EFFECTIVE_RECORDS")
+R1_ATTEMPT = os.environ.get("R1_ATTEMPT", "s8-r1")
+SETTLED = [a for a in os.environ.get("SETTLED", "").split(",") if a]
+SETTLEMENT_POLICY = "guard_stop_on_old_rule_warning"
+
+
 def records(ledger):
-    with open(os.path.join(ledger, "records.jsonl")) as f:
-        return [json.loads(l) for l in f if l.strip()]
+    p = EFFECTIVE or os.path.join(ledger, "records.jsonl")
+    with open(p) as f:
+        recs = [json.loads(l) for l in f if l.strip()]
+    # never a raw settlement line or correction line as a run
+    return [r for r in recs if r.get("format") == "ieo-role-run/v0"]
 
 
 def events(path):
@@ -56,7 +69,7 @@ def result_text(rec):
 def g1_prompt(ledger, head, out):
     by = {r["attempt_id"]: r for r in records(ledger)}
     lines = []
-    for a in ("s8-r1", "s8-r2"):
+    for a in (R1_ATTEMPT, "s8-r2"):
         t = result_text(by[a]) if a in by else None
         lines += [l.strip() for l in (t or "").splitlines() if l.strip()]
     claims = "\n".join(f"{i}. {l}" for i, l in enumerate(lines, 1))
@@ -124,9 +137,14 @@ def check(ledger, out, att, role, aid):
     if set(used) - USED[role]:
         bad.append(f"tool uses beyond {sorted(USED[role])}: {used}")
     if att == "s8-r2":
-        s1 = (by.get("s8-r1") or {}).get("session", {}).get("session_id")
+        s1 = (by.get(R1_ATTEMPT) or {}).get("session", {}).get("session_id")
         if r.get("session", {}).get("mode") != "resume" or r.get("session", {}).get("session_id") != s1:
-            bad.append(f"R2 did not resume R1's session: {r.get('session')}")
+            bad.append(f"R2 did not resume {R1_ATTEMPT}'s session: {r.get('session')}")
+    for a in SETTLED:
+        x = by.get(a) or {}
+        st_ = x.get("settlement") or {}
+        if st_.get("policy") != SETTLEMENT_POLICY or x.get("usage", {}).get("run", {}).get("state") != "measured":
+            bad.append(f"{a} does not count through its settlement (records not effective, or not settled): {st_}")
     total = {"runs": 0, "seconds": 0, "billable": 0, "cache_read": 0}
     per = {k: dict.fromkeys(total, 0) for k in SHARES}
     for x in recs:
@@ -151,8 +169,10 @@ def check(ledger, out, att, role, aid):
     if st.get("central_checkpoint", {}).get("mode") == "local_only":
         bad.append("supervisor in local_only mode")
     rs = json.load(open(os.path.join(out, f"roles-{att}.json")))
-    if rs.get("quota_groups", {}).get("mismatches"):
-        bad.append(f"quota group mismatch: {rs['quota_groups']['mismatches']}")
+    quota_groups = rs.get("quota_groups") if isinstance(rs, dict) else None
+    mismatches = quota_groups.get("mismatches") if isinstance(quota_groups, dict) else None
+    if mismatches != []:
+        bad.append(f"quota group mismatches must be an empty list: {mismatches!r}")
     ch = json.load(open(os.path.join(out, f"chain-{aid}-{att}.json")))
     link = [l for l in ch.get("links", []) if l.get("attempt_id") == att]
     if not link or not link[0].get("taken_over") or not link[0].get("first_action"):

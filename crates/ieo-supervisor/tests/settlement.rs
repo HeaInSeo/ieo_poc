@@ -463,6 +463,8 @@ fn not_enough_evidence_writes_nothing() {
                 .exists(),
             "{name}"
         );
+        // review 758ac03 O-1: no empty directory is left behind either
+        assert!(!l.t.0.join("ledger/children").exists(), "{name}");
         assert_eq!(
             caller::records(&l.p).expect("records")[0]["usage"]["run"]["state"],
             "unmeasured",
@@ -1013,5 +1015,156 @@ fn the_ledger_is_one_place_however_it_is_spelled_and_has_no_symlink_inside() {
     std::os::unix::fs::symlink(&outside, l.t.0.join("ledger/children/s8-r1")).expect("link");
     assert!(settle(&l, false).is_err());
     assert_eq!(std::fs::read_dir(&outside).expect("ls").count(), 0);
+    assert_eq!(lines(&l).len(), 1);
+}
+
+/// `ieo-role-call records`: the effective records (the settled run as it counts), read only;
+/// exit 2 while a call is in flight.
+#[test]
+fn the_records_command_prints_the_settled_run() {
+    let l = r1_ledger("records");
+    let plan_file = l.t.0.join("plan.json");
+    std::fs::write(
+        &plan_file,
+        json!({"budget": "02-05", "ledger_dir": l.t.0.join("ledger"),
+        "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}})
+        .to_string(),
+    )
+    .expect("plan");
+    let records = || {
+        std::process::Command::new(env!("CARGO_BIN_EXE_ieo-role-call"))
+            .args(["records", "--plan"])
+            .arg(&plan_file)
+            .env("IEO_SETTLEMENT_TEST_PINS", &l.pin)
+            .output()
+            .expect("run")
+    };
+    let first = |o: &std::process::Output| -> Value {
+        serde_json::from_slice(o.stdout.split(|b| *b == b'\n').next().unwrap_or(b"{}"))
+            .expect("record")
+    };
+    let o = records();
+    assert!(o.status.success());
+    assert_eq!(first(&o)["usage"]["run"]["state"], "unmeasured");
+    settle(&l, false).expect("settle");
+    let o = records();
+    assert!(o.status.success());
+    let out = String::from_utf8_lossy(&o.stdout);
+    assert_eq!(
+        out.lines().count(),
+        1,
+        "the settlement line is no record of its own"
+    );
+    let r = first(&o);
+    assert_eq!(r["usage"]["run"]["state"], "measured");
+    assert_eq!(r["settlement"]["policy"], settlement::POLICY);
+    std::fs::write(l.t.0.join("ledger/inflight.json"), "{}").expect("w");
+    assert_eq!(records().status.code(), Some(2));
+}
+
+/// PR #90 review 758ac03 O-1: the writer checks `children` and `children/<attempt>` before it
+/// creates anything; a refused settlement leaves no directory, in the ledger or through a
+/// symlink outside it.
+#[test]
+fn a_refused_settlement_creates_no_directory_anywhere() {
+    // a symlinked children: refused before anything is created, nothing appears outside
+    let l = r1_ledger("o1-children");
+    let outside = l.t.0.join("outside-children");
+    std::fs::create_dir_all(&outside).expect("dir");
+    std::os::unix::fs::symlink(&outside, l.t.0.join("ledger/children")).expect("link");
+    assert!(
+        settle(&l, false)
+            .expect_err("children")
+            .contains("nothing created")
+    );
+    assert_eq!(
+        std::fs::read_dir(&outside).expect("ls").count(),
+        0,
+        "no s8-r1 created outside"
+    );
+    assert_eq!(lines(&l).len(), 1);
+    // a refusal after the directories were made (the report copy is a different file): both
+    // the created copy and the created directories are removed again
+    let l = r1_ledger("o1-cleanup");
+    std::fs::create_dir_all(l.t.0.join("ledger/children/s8-r1")).expect("dir");
+    std::fs::write(
+        l.t.0.join("ledger/children/s8-r1/independent-check.md"),
+        "other",
+    )
+    .expect("w");
+    assert!(settle(&l, false).is_err());
+    assert!(
+        !l.t.0
+            .join("ledger/children/s8-r1/settlement-transcript.jsonl")
+            .exists()
+    );
+    assert!(
+        l.t.0.join("ledger/children/s8-r1").exists(),
+        "directories it did not create stay"
+    );
+    std::fs::remove_dir_all(l.t.0.join("ledger/children")).expect("rm");
+    let l2 = ledger("o1-late", WARN, &transcript(Some(EXIT), 1), |r| {
+        r["limits"]["billable_room"] = json!(1500)
+    });
+    assert!(settle(&l2, false).is_err());
+    assert!(
+        !l2.t.0.join("ledger/children").exists(),
+        "created directories removed"
+    );
+}
+
+/// PR #91 review 4b427c5 F-4: a copy whose write fails (here the file size limit, as a full disk
+/// would) leaves no partial file and no directory; nothing is appended.
+#[test]
+fn a_failed_copy_write_leaves_nothing() {
+    // a transcript larger than the 1 KiB file size limit below
+    let mut tr = transcript(Some(EXIT), 1);
+    for _ in 0..40 {
+        tr = format!(
+            "{}\n{tr}",
+            json!({"type": "custom-title", "sessionId": SID})
+        );
+    }
+    assert!(tr.len() > 2048);
+    let l = ledger("enospc", WARN, &tr, |_| {});
+    let plan_file = l.t.0.join("plan.json");
+    std::fs::write(
+        &plan_file,
+        json!({"budget": "02-05", "ledger_dir": l.t.0.join("ledger"),
+        "roles": {"development": {"url": "dev", "adapter_token_file": l.t.0.join("adapter.token")}}})
+        .to_string(),
+    )
+    .expect("plan");
+    let o = std::process::Command::new("bash")
+        .args(["-c", "trap '' XFSZ; ulimit -f 1; exec \"$0\" \"$@\""])
+        .arg(env!("CARGO_BIN_EXE_ieo-role-call"))
+        .args(["settle", "--plan"])
+        .arg(&plan_file)
+        .args(["--attempt", "s8-r1", "--transcript"])
+        .arg(&l.copy)
+        .args([
+            "--original-path",
+            "/role/x.jsonl",
+            "--original-sha256",
+            &l.copy_sha,
+        ])
+        .args(["--decision", DECISION, "--independent-check"])
+        .arg(&l.report)
+        .args(["--independent-verdict", "CONFIRMED WITH CAVEAT"])
+        .env("IEO_SETTLEMENT_TEST_PINS", &l.pin)
+        .output()
+        .expect("run");
+    assert_eq!(
+        o.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&o.stderr).contains("partial file removed"),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(!l.t.0.join("ledger/children").exists());
     assert_eq!(lines(&l).len(), 1);
 }

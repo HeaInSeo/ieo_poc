@@ -19,10 +19,19 @@
 //! `ieo-role-call settle --plan <plan.json> --attempt <id> --transcript <evidence copy>
 //!  --original-path <path> --original-sha256 <hex> --decision <ref> --independent-check <report>
 //!  --independent-verdict "CONFIRMED"|"CONFIRMED WITH CAVEAT" [--dry-run]`: (the report's path is
-//!  recorded as given, with its SHA-256) settle a run the guard stopped on the old rule's warning from its session
+//!  recorded as absolute, with its SHA-256; the ledger keeps a copy) settle the run the decision
+//! names (02-05 s8-r1, stopped by the guard on the old rule's warning) from its session
 //! transcript (`caller::settle`, user decision 2026-11-17 r1-settlement): nothing is changed in
 //! the run's record; one settlement line is appended (exit 0) only when everything holds,
-//! otherwise nothing is written (exit 1). `--dry-run` writes nothing and prints the line.
+//! otherwise nothing is written (exit 1): no file content and no directory is left behind
+//! (`children` and `children/<attempt>` are checked before anything is created). `--dry-run`
+//! writes nothing and prints the line.
+//!
+//! `ieo-role-call records --plan <plan.json>`: the ledger's effective records (every correction
+//! and settlement checked again and applied: `caller::records_when_idle`), one JSON object per
+//! line, read only. Exit 0; 2 when a call holds the ledger or one is in flight (nothing can be
+//! said yet); 1 when the ledger does not read. The post-run check (`check-run.py`) counts these,
+//! so a settled run counts as settled and never as its original line (02-05 step 8 resume).
 //!
 //! `ieo-role-call check --plan <plan.json>`: the guards of a call without a call, read only
 //! (`caller::check`): no call in flight, the ledger reads with every correction measured
@@ -84,6 +93,20 @@ fn run() -> Result<i32, String> {
             Some(why) => {
                 println!("{}", json!({"clear": false, "reason": why}));
                 2
+            }
+        });
+    }
+    if args.first().map(String::as_str) == Some("records") {
+        return Ok(match caller::records_when_idle(&plan)? {
+            None => {
+                eprintln!("ieo-role-call: a call holds the ledger or is in flight");
+                2
+            }
+            Some(recs) => {
+                for r in recs {
+                    println!("{r}");
+                }
+                0
             }
         });
     }

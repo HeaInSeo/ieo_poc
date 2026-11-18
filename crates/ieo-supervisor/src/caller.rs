@@ -1803,6 +1803,8 @@ pub fn settle(
     }
     // the copies: created new in the ledger, never through a symlink; an existing regular file
     // must be the same bytes (reviews d971f59 L-1, 7b904de N-1)
+    // the directories first, each checked before anything is created (review 758ac03 O-1)
+    let made_dirs = crate::settlement::prepare_dirs(&plan.ledger_dir, attempt)?;
     let mut created: Vec<PathBuf> = Vec::new();
     let mut keep = |name: &str, bytes: &[u8]| -> Result<(), String> {
         let (p, new) = crate::settlement::write_in_ledger(&plan.ledger_dir, attempt, name, bytes)?;
@@ -1833,20 +1835,30 @@ pub fn settle(
             for p in &created {
                 let _ = std::fs::remove_file(p);
             }
+            crate::settlement::remove_made(&made_dirs);
             return Err(e);
         }
     };
-    append(plan, &s)?;
-    // the ledger must read back with the settlement applied
-    let recs = records(plan)?;
+    // An append error can occur after bytes reach the ledger. Keep the evidence copies
+    // and tell the operator to inspect the ledger before doing anything further.
+    append(plan, &s).map_err(|e| format!("settlement append uncertain: {e}"))?;
+    // the ledger must read back with the settlement applied; a failure here is after the append
+    // (PR #91 review 4b427c5 F-6): the line stays and the ledger refuses until a person looks
+    let after_append = |why: String| {
+        format!(
+            "the settlement line was appended, but the ledger does not read back with it: {why}; \
+             the ledger now refuses every call until a person inspects records.jsonl"
+        )
+    };
+    let recs = records(plan).map_err(after_append)?;
     if recs
         .iter()
         .find(|x| x["attempt_id"] == attempt)
         .is_none_or(|x| x["settlement"]["policy"] != crate::settlement::POLICY)
     {
-        return Err(format!(
-            "{attempt}: the settlement did not apply on reading back"
-        ));
+        return Err(after_append(format!(
+            "{attempt}: the settlement did not apply"
+        )));
     }
     drop(lock);
     Ok(s)

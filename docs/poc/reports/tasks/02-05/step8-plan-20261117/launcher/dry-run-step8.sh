@@ -71,7 +71,7 @@ echo "{\"principals\": [$(pr s8-registrant service '["sprints:register", "sprint
 DBURL="host=127.0.0.1 port=$PGPORT user=ieo dbname=$DB password=$(cat "$TEST_DB_PASSWORD_FILE")"
 # 1. the old coordinator as a host process (like 58090: setsid, pid file), fixture rows through its API
 podman exec "$PGC" createdb -U ieo "$DB"; ok $? "test database $DB created on $PGPORT"
-( cd "$W/oldcwd"; export IEO_DB_URL="$DBURL"
+( cd "$W/oldcwd" || exit 1; export IEO_DB_URL="$DBURL"
   s8dry_fn() { echo one
     echo two; }
   export -f s8dry_fn   # an exported two-line function: BASH_FUNC_s8dry_fn%% in the environment
@@ -130,7 +130,8 @@ import json, sys
 d, ledger, case = sys.argv[1:]
 recs = [json.loads(l) for l in open(d + "/records.jsonl")]
 for r in recs:
-    if r["attempt_id"] == "s8-r1":
+    # a settlement or correction line has no attempt_id (PR #90 review d971f59 L-5): runs only
+    if r.get("format") == "ieo-role-run/v0" and r.get("attempt_id") == "s8-r1":
         lines = open(r["stream"]["path"]).read().splitlines()
         if case == "overage":
             lines = [l.replace('"overageStatus":"rejected"', '"overageStatus":"allowed"') for l in lines]

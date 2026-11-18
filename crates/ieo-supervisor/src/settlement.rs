@@ -464,8 +464,51 @@ pub fn read_in_ledger(
     Ok(b)
 }
 
-/// Keep `bytes` as the ledger's settlement file `name`: created new (0600, directories 0700),
-/// never through a symlink; an existing regular file must hold the same bytes. Returns the path
+/// The ledger's `children` and `children/<attempt>` for a settlement, each checked with
+/// `symlink_metadata` **before** anything is created (PR #90 review 758ac03 O-1): an existing one
+/// must be a real directory, a missing one is created (0700, one level at a time). Returns the
+/// directories it created, so a failed settlement removes them again (it leaves no empty
+/// directory behind and creates nothing through a symlink).
+pub fn prepare_dirs(ledger_dir: &Path, attempt: &str) -> Result<Vec<PathBuf>, String> {
+    use std::os::unix::fs::DirBuilderExt;
+    let base = std::fs::canonicalize(ledger_dir).map_err(|e| format!("ledger dir: {e}"))?;
+    let children = base.join("children");
+    let dirs = [children.clone(), children.join(attempt)];
+    for d in &dirs {
+        match std::fs::symlink_metadata(d) {
+            Ok(m) if m.file_type().is_dir() => {}
+            Ok(_) => {
+                return Err(format!(
+                    "{} is not a directory of the ledger (a symlink?): nothing created",
+                    d.display()
+                ));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("{}: {e}", d.display())),
+        }
+    }
+    let mut made = Vec::new();
+    for d in &dirs {
+        if std::fs::symlink_metadata(d).is_err() {
+            if let Err(e) = std::fs::DirBuilder::new().mode(0o700).create(d) {
+                remove_made(&made);
+                return Err(format!("{}: {e}", d.display()));
+            }
+            made.push(d.clone());
+        }
+    }
+    Ok(made)
+}
+
+/// Remove directories [`prepare_dirs`] created (only when empty), the deepest first.
+pub fn remove_made(made: &[PathBuf]) {
+    for d in made.iter().rev() {
+        let _ = std::fs::remove_dir(d);
+    }
+}
+
+/// Keep `bytes` as the ledger's settlement file `name` (its directories from [`prepare_dirs`]):
+/// created new (0600), never through a symlink; an existing regular file must hold the same bytes. Returns the path
 /// and whether it was created (the caller removes what it created when the settlement fails).
 pub fn write_in_ledger(
     ledger_dir: &Path,
@@ -474,14 +517,9 @@ pub fn write_in_ledger(
     bytes: &[u8],
 ) -> Result<(PathBuf, bool), String> {
     use std::io::Write;
-    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    use std::os::unix::fs::OpenOptionsExt;
     let to = child_path(ledger_dir, attempt, name)?;
-    let dir = to.parent().ok_or("settlement path without a directory")?;
-    std::fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(dir)
-        .map_err(|e| format!("settlement copy: {e}"))?;
+    // the directories come from prepare_dirs (checked before anything is created)
     if no_symlink_in_ledger(&to)? {
         let old = std::fs::read(&to).map_err(|e| format!("{}: {e}", to.display()))?;
         if old != bytes {
@@ -495,9 +533,15 @@ pub fn write_in_ledger(
         .mode(0o600)
         .open(&to)
         .map_err(|e| format!("settlement copy {}: {e}", to.display()))?;
-    f.write_all(bytes)
-        .and_then(|()| f.sync_all())
-        .map_err(|e| format!("settlement copy: {e}"))?;
+    if let Err(e) = f.write_all(bytes).and_then(|()| f.sync_all()) {
+        // a partial file is never left behind (PR #91 review 4b427c5 F-4)
+        drop(f);
+        let _ = std::fs::remove_file(&to);
+        return Err(format!(
+            "settlement copy {}: {e} (partial file removed)",
+            to.display()
+        ));
+    }
     Ok((to, true))
 }
 
