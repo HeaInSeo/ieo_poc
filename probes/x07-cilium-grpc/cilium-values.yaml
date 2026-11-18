@@ -1,0 +1,15 @@
+ipam:
+  mode: kubernetes
+kubeProxyReplacement: true
+socketLB:
+  hostNamespaceOnly: true
+envoy:
+  enabled: true
+loadBalancer:
+  l7:
+    backend: envoy
+    algorithm: round_robin
+operator:
+  replicas: 1
+hubble:
+  enabled: false

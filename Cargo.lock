@@ -847,6 +847,7 @@ dependencies = [
 name = "ieo-x05-probe"
 version = "0.1.0"
 dependencies = [
+ "hyper-util",
  "prost",
  "protox",
  "serde_json",
@@ -855,6 +856,7 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+ "tower",
 ]
 
 [[package]]
