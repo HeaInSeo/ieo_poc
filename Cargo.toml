@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/ieo-spec", "crates/ieo-report", "crates/ieo-evidence", "crates/ieo-coord", "crates/ieo-notion", "crates/ieo-supervisor", "crates/ieo-proto"]
+members = ["crates/ieo-spec", "crates/ieo-report", "crates/ieo-evidence", "crates/ieo-coord", "crates/ieo-notion", "crates/ieo-supervisor", "crates/ieo-proto", "probes/x05-kind-grpc"]
 
 [workspace.package]
 edition = "2024"

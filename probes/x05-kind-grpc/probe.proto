@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package x05.probe.v1;
+
+service Probe {
+  rpc Read(ReadRequest) returns (Reading);
+  rpc Watch(WatchRequest) returns (stream Reading);
+}
+
+message ReadRequest {
+  string request_id = 1;
+  bool hold_before_reply = 2;
+}
+
+message WatchRequest {
+  string request_id = 1;
+  uint64 after_seq = 2;
+}
+
+message Reading {
+  string request_id = 1;
+  string pod = 2;
+  string uid = 3;
+  string revision = 4;
+  string value = 5;
+  uint64 seq = 6;
+}

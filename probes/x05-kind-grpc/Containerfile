@@ -1,0 +1,4 @@
+FROM gcr.io/distroless/cc-debian13@sha256:de02e95a878d4662f7a0f93bffb3799e08e04cc5a53f6a9c0593a20eaf4dc80e
+COPY ieo-x05-probe /ieo-x05-probe
+USER 65532:65532
+ENTRYPOINT ["/ieo-x05-probe"]
