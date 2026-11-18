@@ -285,6 +285,9 @@ fn quota(adapter: &dyn Adapter, now: u64, history: &mut Value) -> Quota {
         }
         if o.observed_at == previous && history["status"] != label {
             history["status"] = json!("unknown");
+            if history["exhausted_at"] == o.observed_at {
+                history["exhausted_at"] = Value::Null;
+            }
             return Quota::Unknown;
         }
     }
@@ -411,7 +414,8 @@ pub fn advance(
             Resolution::NotSent => ("not_sent", None),
         };
         last["result"] = json!(result);
-        last["model_request"] = json!(usage.is_some());
+        let usage_was_sent = usage.is_some();
+        last["model_request"] = json!(usage_was_sent);
         if let Some(usage) = usage {
             last["duration_ms"] = json!(usage.duration_ms);
             last["cost_microusd"] = json!(usage.cost_microusd);
@@ -421,6 +425,9 @@ pub fn advance(
             }}});
         }
         state["checkpoint"] = checkpoint_value(&checkpoint);
+        if usage_was_sent {
+            state["waiting"] = json!(false);
+        }
         persist(dir, &state)?;
     }
 
@@ -479,7 +486,12 @@ pub fn advance(
             .ok_or_else(invalid)?;
         Ok::<_, std::io::Error>(quota(adapter, now, last))
     };
-    let selection = match observe(primary, observations)? {
+    let primary_quota = observe(primary, observations)?;
+    let waiting = waiting
+        && observations
+            .values()
+            .all(|history| history["exhausted_at"].is_u64());
+    let selection = match primary_quota {
         Quota::Available
             if no_effect.is_some_and(|sent| {
                 observations[adapters[primary].runner().runtime.name()]["exhausted_at"]
@@ -500,9 +512,14 @@ pub fn advance(
             Quota::Unknown => Err(Decision::QuotaUnknown),
         },
     };
-    if selection == Err(Decision::WaitingForQuota) {
-        state["waiting"] = json!(true);
-    }
+    state["waiting"] = json!(
+        (waiting || selection == Err(Decision::WaitingForQuota))
+            && state["quota"]
+                .as_object()
+                .ok_or_else(invalid)?
+                .values()
+                .all(|history| history["exhausted_at"].is_u64())
+    );
     persist(dir, &state)?;
     let index = match selection {
         Ok(index) => index,
@@ -524,7 +541,6 @@ pub fn advance(
         json!({"id": attempt, "runtime": runtime.name(), "remaining": remaining,
         "stage": dispatch.stage, "session": dispatch.new_session, "result": null, "submitted_at": now}),
     );
-    state["waiting"] = json!(false);
     persist(dir, &state)?;
     if !authority.submit_if_permitted(
         plan,

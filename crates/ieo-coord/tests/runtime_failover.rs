@@ -512,3 +512,37 @@ fn verified_not_sent_does_not_consume_the_only_run() {
     assert_eq!(world.sends[0].attempt, 2);
     assert_eq!(world.sends[0].seconds, 30);
 }
+
+#[test]
+fn a_verified_no_send_preserves_recovery_when_only_the_alternate_is_fresh() {
+    let mut s = Scenario::new(Runtime::Claude);
+    s.plan.ceiling.runs = 1;
+    s.exhaust_both();
+    assert_eq!(s.advance(), Decision::WaitingForQuota);
+    s.now += 601;
+    s.codex.status = "available";
+    s.codex.observed_at = s.now;
+    s.codex.crash_before_send = true;
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| s.advance())).is_err());
+    assert_eq!(s.advance(), Decision::AwaitingReconciliation);
+    assert!(s.world.lock().unwrap().sends.is_empty());
+    s.codex.crash_before_send = false;
+    s.world.lock().unwrap().proof_not_sent = true;
+    assert_eq!(s.advance(), Decision::Dispatched(Runtime::Codex));
+    assert_eq!(s.world.lock().unwrap().sends.len(), 1);
+}
+
+#[test]
+fn a_conflict_cancels_exhaustion_as_proof_of_same_runtime_recovery() {
+    let mut s = Scenario::new(Runtime::Claude);
+    s.world.lock().unwrap().apply_effect = false;
+    assert_eq!(s.advance(), Decision::Dispatched(Runtime::Claude));
+    s.exhaust_both();
+    assert_eq!(s.advance(), Decision::WaitingForQuota);
+    s.claude.status = "allowed";
+    assert_eq!(s.advance(), Decision::QuotaUnknown);
+    s.now += 1;
+    s.claude.observed_at = s.now;
+    assert_eq!(s.advance(), Decision::AwaitingQuotaRecovery);
+    assert_eq!(s.world.lock().unwrap().sends.len(), 1);
+}
