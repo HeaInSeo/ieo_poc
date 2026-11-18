@@ -11,6 +11,7 @@ COMMON = DOCS + "03-02/common-policy-20261118/"
 STACKS = DOCS + "03-03/go-rust-20261118/"
 VALIDATION = DOCS + "03-04/p25-20261119/"
 HISTORIC_CATALOG = DOCS + "03-01/catalog-contract-20261118/catalog.json"
+RUNTIME = DOCS + "01-02/runtime-contract-20261112/Runtime_Contract_v0.md"
 ROLES = {"development", "reviewer", "coordinator"}
 REPOSITORY = "HeaInSeo/ieo_poc"
 PROFILE = {"id": "poc-acceptance-v1.3.3", "revision": 4}
@@ -40,6 +41,9 @@ COMMANDS = {
     },
 }
 TOOLS = {
+    "CAT-ROLE": "Runtime Contract rev 20",
+    "CAT-RECOVERY": "ieo-evidence 02-01 검수본 및 역할 계약 rev 20",
+    "CAT-GITHUB-IEO-POC": "GitHub Actions 및 gh 읽기 관측; rust-toolchain.toml",
     "CAT-GO": "Go 1.26.10; GCC 8",
     "CAT-RUST": "Rust/Cargo 1.99.1; rustfmt 1.10.0-stable; Clippy 0.1.99",
 }
@@ -51,8 +55,8 @@ PERMISSIONS = {
     "CAT-GITHUB-IEO-POC": "읽기 관측, 승인된 자만 병합",
 }
 SOURCES = {
-    "CAT-ROLE": {HISTORIC_CATALOG, COMMON + "ACCEPTANCE.md"},
-    "CAT-RECOVERY": {HISTORIC_CATALOG, DOCS + "02-01/collector-20261112/REPORT.md"},
+    "CAT-ROLE": {HISTORIC_CATALOG, COMMON + "ACCEPTANCE.md", RUNTIME},
+    "CAT-RECOVERY": {HISTORIC_CATALOG, DOCS + "02-01/collector-20261112/REPORT.md", RUNTIME},
     "CAT-GO": {HISTORIC_CATALOG, STACKS + "ACCEPTANCE.md"},
     "CAT-RUST": {HISTORIC_CATALOG, "rust-toolchain.toml"},
     "CAT-GITHUB-IEO-POC": {".github/workflows/ci.yml", COMMON + "github-main-observation.json"},
@@ -61,7 +65,29 @@ TEXT = (
     "title", "purpose", "tools", "environment", "permissions",
     "expected_evidence", "evidence_limits", "cost_basis",
 )
-VERDICTS = {"pass", "fail", "inconclusive", "not_applicable"}
+VERDICTS = {
+    "pass": "required_evidence_matched",
+    "fail": "observed_violation_or_required_skip",
+    "inconclusive": "required_evidence_unobserved",
+    "not_applicable": "approved_scope_exclusion",
+}
+PROCEDURES = {
+    "CAT-ROLE": (
+        ("submit_change_and_evidence", "development"),
+        ("independent_approval_at_head", "reviewer"),
+        ("confirm_current_assignment_and_head", "coordinator"),
+    ),
+    "CAT-RECOVERY": (
+        ("preserve_failure_and_attempt_id", "development"),
+        ("confirm_expected_failure_and_scope", "reviewer"),
+        ("reconcile_retained_result_and_effect", "coordinator"),
+    ),
+    "CAT-GITHUB-IEO-POC": (
+        ("submit_pr_checks_and_head", "development"),
+        ("independently_approve_head", "reviewer"),
+        ("compare_required_checks_and_confirm_merge_sha", "coordinator"),
+    ),
+}
 
 
 def assert_input(condition, message):
@@ -78,8 +104,10 @@ def link(path, name):
 
 
 def verify(catalog, manifest):
-    assert_input(catalog["version"] == "0.2.1" and catalog["profile"] == PROFILE, "version/profile")
+    assert_input(catalog["version"] == "0.2.2" and catalog["profile"] == PROFILE, "version/profile")
     plan_tasks = {t["task_id"]: t for sprint in manifest["sprints"] for t in sprint["tasks"]}
+    assert_input("**revision 20**" in link(RUNTIME, "common runtime").read_text(),
+                 "approved runtime version unavailable")
     entries = {e["id"]: e for e in catalog["items"]}
     assert_input(len(entries) == len(catalog["items"]) and set(entries) == ITEMS.keys(),
                  "missing/extra/duplicate item")
@@ -93,7 +121,7 @@ def verify(catalog, manifest):
                      f"{name}: uncertified applicability")
         exclusions = {"other_stack", "unassigned_role"} | ({"other_repo"} if repo else set())
         assert_input(set(e["excludes_when"]) == exclusions, f"{name}: uncertified exclusion")
-        assert_input(e["version"] == "0.2.1" and e["readiness"] == "draft", f"{name}: version")
+        assert_input(e["version"] == "0.2.2" and e["readiness"] == "draft", f"{name}: version")
         assert_input(e["scope"] == scope and set(e["roles"]) == roles, f"{name}: scope/role")
         assert_input(e.get("repository") == (REPOSITORY if scope == "repository" else None),
                      f"{name}: repository binding")
@@ -112,12 +140,13 @@ def verify(catalog, manifest):
         cost_dir = STACKS if scope in ("go", "rust") else COMMON
         assert_input(e["cost_basis"] == cost_dir + "REPORT.md", f"{name}: wrong cost evidence")
         link(e["cost_basis"], name)
-        assert_input(e["verdicts"].keys() == VERDICTS and all(e["verdicts"].values()), f"{name}: verdict fields")
+        assert_input(e["verdicts"] == VERDICTS, f"{name}: wrong verdict rules")
+        assert_input(e["tools"] == TOOLS[name], f"{name}: wrong tool version")
         if name in COMMANDS:
             assert_input(set(e["method"]["commands"]) == COMMANDS[name], f"{name}: incorrect command/options")
-            assert_input(e["tools"] == TOOLS[name], f"{name}: wrong tool version")
         else:
-            assert_input(e["method"]["procedure"].strip(), f"{name}: missing procedure")
+            procedure = tuple((step["action"], step["role"]) for step in e["method"]["procedure"])
+            assert_input(procedure == PROCEDURES[name], f"{name}: invalid procedure authority")
     return len(entries), len(TEXT) * len(entries)
 
 
@@ -160,6 +189,12 @@ def negative_controls(catalog, manifest):
          "uncertified applicability"),
         ("role exclusion removed", lambda c: c["items"][2]["excludes_when"].remove("unassigned_role"),
          "uncertified exclusion"),
+        ("procedure grants approval to development", lambda c: c["items"][0]["method"]["procedure"][1].__setitem__(
+            "role", "development"), "invalid procedure authority"),
+        ("required skip downgraded to unobserved", lambda c: c["items"][2]["verdicts"].__setitem__(
+            "fail", "required_evidence_unobserved"), "wrong verdict rules"),
+        ("unapproved common runtime revision", lambda c: c["items"][0].__setitem__("tools", "Runtime Contract rev 21"),
+         "wrong tool version"),
     ]
     for name, mutate, reason in controls:
         changed = deepcopy(catalog)
