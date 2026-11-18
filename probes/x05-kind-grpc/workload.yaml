@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: x05-probe
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: probe
+  namespace: x05-probe
+spec:
+  clusterIP: None
+  ipFamilies: [IPv4]
+  selector:
+    app: x05-grpc-server
+  ports:
+    - name: grpc
+      port: 50051
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probe
+  namespace: x05-probe
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: x05-grpc-server
+  template:
+    metadata:
+      labels:
+        app: x05-grpc-server
+        revision: v1
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 5
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: x05-grpc-server
+              matchLabelKeys: [pod-template-hash]
+              topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: x05-grpc-server
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: probe
+          image: localhost/ieo-x05:fixture
+          imagePullPolicy: Never
+          args: ["server"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: PROBE_REVISION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['revision']
+          ports:
+            - name: grpc
+              containerPort: 50051
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 1
+          resources:
+            requests:
+              cpu: 10m
+              memory: 8Mi
+            limits:
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client
+  namespace: x05-probe
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: client
+      image: localhost/ieo-x05:fixture
+      imagePullPolicy: Never
+      args: ["idle"]
+      env:
+        - name: PROBE_SERVICE
+          value: probe.x05-probe.svc.cluster.local.
+      resources:
+        requests:
+          cpu: 10m
+          memory: 8Mi
+        limits:
+          memory: 64Mi
