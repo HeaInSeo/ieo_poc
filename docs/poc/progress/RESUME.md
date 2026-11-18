@@ -1,14 +1,14 @@
 # 중단·재개 기록
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0059-03-01` · 원장 SHA-256 `94863253c422b6c7f236fd18e603c7f3f2d20200fe86cfa2355d994b3b48106d`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0059-03-01-r2` · 원장 SHA-256 `a768797cd216c9fb25f2c3bc4649b5a514de68d08bb42b5ba0dd59f3654ffad0`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
 | 항목 | 기록 |
 | --- | --- |
-| last_verified_stage | 03-01 산출물 기준 6개 항목·9개 원본·표적 시험 10/10 |
+| last_verified_stage | 03-01 교정: 6개 항목·9개 원본·표적 시험 12/12 |
 | workspace | /opt/rust/src/github.com/HeaInSeo/ieo_poc-0301 |
-| branch_sha | task/0301-catalog-contract · 산출물 33f4503634f54c6e7d4b61dd54db115fd22431c6 |
+| branch_sha | task/0301-catalog-contract · 교정 산출물 ea2b777411b48bcd3a2fc7ba0595f91142a6e32b |
 | plan_and_spec | v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 18(단계 8 전 PR, 이 PR) · OpenAPI 0.17.1(이 PR) |
 | running | 이 작업 트리의 모델 요청·운영 서비스 변경 없음 |
 | unresolved_external_effects | [] |
@@ -17,7 +17,7 @@
 | next_action | 03-01 정확한 head 독립 검토와 필수 검사 → SHA 조건 병합 → 병합 SHA main CI → 03-02 준비 |
 | resume_check | git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다. |
 | current_work | 03-01 독립 검토 및 CI. X-05 별도 작업 트리와 병행 |
-| blocking | X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 단계 8: L01 값 미결(단계 8 sprint 한도 값 사용자 결정 필요), RUNBOOK [실 시스템 변경] 단계마다 사용자 승인 · 단계 8 L01 값은 승인됨(2026-11-17), 남은 차단: 실행안 묶음 승인, R1 관측 기한 2026-11-21T23:14Z · 최신 재개 조건은 02-05 RESUME_PLAN.md §9. 02-06은 02-05 검수 완료가 선행. 이번 실제 failover 시험만 WAITING_FOR_PREREQUISITE. 03-01 병행. |
+| blocking | X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다. 02-06은 02-05 검수 완료가 선행. 실제 failover 첫 시험은 WAITING_FOR_PREREQUISITE. 03-01을 병행한다. |
 | budget | 02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 검수 완료와 X-02 남은 조건 뒤에만 · 02-05 실제 회차 예산(사용자 결정 2026-11-15 (나)): 계획 3회(개발 R1·R2, Guardrail G1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, USD 0, 예산 검사는 컨테이너 밖. 단계 8에만, X-08 검수 완료와 예산 코드 PR 뒤 · 02-05 예산 코드(BUDGET_0205)와 예비 표식 규칙(사용자 결정 2026-11-17)은 이 PR. 코드에 있어도 실제 호출은 단계 8 전제 뒤에만 |
 | user_decisions | ["User_Decisions_2026-11-17_step8-l01.md (단계 8 L01 값: 개발 1,800초·150,000, Guardrail 600초·50,000. 실행안·묶음 승인 요청 작성. 예비는 건별)","User_Decisions_2026-11-17_spare.md (02-05 예산 예비 회차 (나): 사유·대체 시도 id 표식, 실패한 개발 회차만 대체, 1회, Guardrail 없음. 실제 호출 승인 아님)","User_Decisions_2026-11-16_recovery.md (충돌 복구 (나): 공식 복구 작업을 02-05 단계 7b로, 사람 운영 주체만 승인, 승인 하나에 실행 하나, 예산 초기화·추가 호출 승인 아님)","User_Decisions_2026-11-16_l01-step5.md (L01 정의: total_tokens = input+output+cache_creation, elapsed_seconds = 회차 시간 합, 배정 전체 세대 합. 값은 미결)","User_Decisions_2026-11-15_0205-x08.md (02-05 F4·S1·착수·예산 (나), X-08 Q-3·손상 대기 파일·유지 동작)","User_Decisions_2026-11-15_0204-acceptance.md ((나): 02-04 수용, 항목 1~9 처분, 예산·호출 금지)","User_Decisions_2026-11-15_resume.md (압축 뒤 재개: 항목 8 담당·재개 절차, 개정 A6)","User_Decisions_2026-11-14_grpc.md (X-03~X-07, 02-05의 선행 아님)","User_Decisions_2026-11-13_x02.md (X-02 예산·조건)","이전 결정은 docs/poc/User_Decisions_*.md 전체"] |
 | restart_procedure | 압축·세션 재시작 뒤 대화 요약보다 이 기록을 먼저 다시 읽는다: (1) git fetch 후 origin/main·gh pr list·main CI를 resume.branch_sha·running과 대조 (2) state.json의 current_task·next_task·resume(current_work·blocking·budget·user_decisions·next_action)과 STATUS를 읽음 (3) user_decisions의 최신 결정 문서와 담당 작업 unresolved를 읽음 (4) 차이가 있으면 최신 근거를 적용하고, 이미 병합된 PR·게시된 검토·완료된 실행을 다시 하지 않음 (5) blocking·budget을 다시 확인한 뒤 next_action을 이어감. 승인 범위 안의 재개는 재승인을 기다리지 않음. 근거: 재발 방지 대응표 §1.11 · 위임 작업 대기 중 완료 인수: 재발 방지 대응표 §1.12 |
