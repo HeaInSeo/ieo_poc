@@ -81,9 +81,18 @@ jobs:
           helm install cilium "$RUNNER_TEMP/cilium-1.20.5.tgz" --kubeconfig "$config" --kube-context kind-ieo-x07 \
             -n kube-system -f probes/x07-cilium-grpc/cilium-values.yaml \
             --set-string "k8sServiceHost=$api_ip" --set "k8sServicePort=6443" --wait --timeout 295s
-          remaining=$((deadline - SECONDS))
-          test "$remaining" -gt 0
-          "${k[@]}" wait --for=condition=Ready node --all --timeout="${remaining}s"
+          remaining() {
+            local seconds_left=$((deadline - SECONDS))
+            test "$seconds_left" -gt 0 || return 1
+            printf '%ss' "$seconds_left"
+          }
+          timeout=$(remaining)
+          "${k[@]}" wait --for=condition=Ready node --all --timeout="$timeout"
+          timeout=$(remaining)
+          "${k[@]}" -n kube-system wait --for='jsonpath={.status.numberReady}=4' \
+            daemonset/cilium daemonset/cilium-envoy --timeout="$timeout"
+          timeout=$(remaining)
+          "${k[@]}" -n kube-system wait --for=condition=Ready pod -l k8s-app=kube-dns --timeout="$timeout"
           "${k[@]}" -n kube-system get pods -o wide
       - name: Run frozen L4 control and Cilium L7 scenarios
         run: |
