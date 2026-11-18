@@ -1,0 +1,25 @@
+2026-11-18T21:01:46+09:00
+Filesystem           Size  Used Avail Use% Mounted on
+/dev/mapper/rl-root   67G   61G  6.0G  92% /
+/dev/mapper/rl-home   33G   30G  2.9G  92% /home
+systemd 239 (239-82.el8_10.5)
+kind v0.32.0-alpha+9145d421e0d4f7 go1.25.6 linux/amd64
+Client Version: v1.35.0
+Kustomize Version: v5.7.1
+podman version 4.9.4-rhel
+host cgroup type: cgroup2fs
+/sys/fs/cgroup controllers: [cpuset cpu io memory hugetlb pids rdma]
+/sys/fs/cgroup subtree_control: [memory pids]
+/sys/fs/cgroup/user.slice controllers: [memory pids]
+/sys/fs/cgroup/user.slice subtree_control: []
+/sys/fs/cgroup/user.slice/user-1001.slice controllers: []
+/sys/fs/cgroup/user.slice/user-1001.slice subtree_control: []
+/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service controllers: []
+/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service subtree_control: []
+scope: run-u11220.scope
+Delegate=yes
+scope cgroup.controllers: []
+{'cgroupVersion': 'v2', 'cgroupManager': 'cgroupfs', 'cgroupControllers': []} rootless= True
+dedicated node containers: 0
+kind node image cache entries: 0
+dedicated kubeconfig absent

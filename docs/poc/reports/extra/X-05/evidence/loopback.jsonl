@@ -1,0 +1,6 @@
+{"utc": "2026-11-18T12:04:55.803830+00:00", "elapsed_s": 1.012, "event": "watch_interrupted", "last_seq": 5, "terminal": {"code": "Unknown", "message": "h2 protocol error: error reading a body from connection", "request_id": "original"}, "elapsed_ms": 1}
+{"utc": "2026-11-18T12:04:56.901754+00:00", "elapsed_s": 2.11, "event": "watch_resumed", "sequences": [6, 7, 8, 9, 10]}
+{"utc": "2026-11-18T12:04:56.923849+00:00", "elapsed_s": 2.132, "event": "unary_interrupted", "outcome": {"code": "Unknown", "message": "transport error"}, "elapsed_ms": 1}
+{"utc": "2026-11-18T12:04:57.000440+00:00", "elapsed_s": 2.209, "event": "unary_reissued", "reply": {"pod": "third", "request_id": "reissue-loopback", "revision": "loopback", "seq": 0, "uid": "third", "value": "x05-fixture-value"}}
+{"utc": "2026-11-18T12:05:26.998882+00:00", "elapsed_s": 32.207, "event": "window", "counts": {"third": 300}, "issue_span_ms": 29900}
+{"utc": "2026-11-18T12:05:27.001458+00:00", "elapsed_s": 32.21, "event": "result", "verdict": "PASS", "scope": "loopback"}
