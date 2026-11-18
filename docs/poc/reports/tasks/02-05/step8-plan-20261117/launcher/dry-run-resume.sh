@@ -273,7 +273,8 @@ bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1-quota-refused.log" 2>&1; rc=$?
 [ $rc = 3 ] && grep -q "quota group mismatches must be an empty list" "$OUT/r2g1-quota-refused.log" && [ ! -e "$OUT/r2-body.json" ]; ok $? "r2g1 refuses without quota evidence: nothing sent (exit $rc)"
 mv -f "$ROLES.kept" "$ROLES"
 # Count successor POSTs at the transport and alter only the fresh status response.
-# G1 cases replay the already accepted R2 request using its original key and body.
+# G1 cases replay the fixture's R2 request by its original key and body. Once R2
+# is recorded, supply the original R1b status to reach the G1 gate on test replays.
 cat > "$W/mock-bin/curl" <<'PYTHON'
 #!/usr/bin/env python3
 import json
@@ -291,6 +292,10 @@ if key in args and "POST" in args:
 result = subprocess.run([os.environ["REAL_CURL"], *args])
 if result.returncode == 0 and "-o" in args:
     response = Path(args[args.index("-o") + 1])
+    if response.name == "status-before-s8-r2.json" and successor == "s8-g1":
+        status = json.loads(response.read_text())
+        if status["running"] is None and status["last"]["attempt_id"] == "s8-r2":
+            response.write_bytes(response.with_name("status-s8-r1b.json").read_bytes())
     if response.name == f"status-before-{successor}.json":
         assert args[-1] == f"http://127.0.0.1:{os.environ['PORT_DEV']}/v0/role/status"
         status = json.loads(response.read_text())
@@ -301,9 +306,10 @@ if result.returncode == 0 and "-o" in args:
             status["running"] = {"attempt_id": "other"}
         elif fault == "wrong-last":
             status["last"]["attempt_id"] = "other"
-        else:
-            assert fault == "missing-running"
+        elif fault == "missing-running":
             del status["running"]
+        else:
+            assert fault == "none"
         response.write_text(json.dumps(status))
 sys.exit(result.returncode)
 PYTHON
@@ -324,8 +330,11 @@ for transition in s8-r2 s8-g1; do
     ok $? "$predecessor -> $transition: saved status valid, fresh $fault, successor POSTs $(wc -l < "$probe.posts")"
   done
 done
-bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1.log" 2>&1; ok $? "r2g1: $(tail -1 "$OUT/r2g1.log")"
-grep -q "s8-r2: observation = s8-r1b's stream" "$OUT/r2g1.log" && grep -q "s8-g1: observation = s8-r2's stream" "$OUT/r2g1.log"; ok $? "the observation deadline is checked against the newest stream before R2 (s8-r1b) and G1 (s8-r2)"
+PATH="$W/mock-bin:$PATH" SUCCESSOR=s8-g1 PREDECESSOR=s8-r2 FAULT=none POSTS="$OUT/g1-success.posts" \
+  bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1.log" 2>&1; rc=$?
+[ "$rc" = 0 ] && [ "$(wc -l < "$OUT/g1-success.posts")" = 1 ]
+ok $? "r2g1: $(tail -1 "$OUT/r2g1.log")"
+grep -q "s8-r2: observation = s8-r1b's stream" "$OUT/fresh-s8-g1-busy.log" && grep -q "s8-g1: observation = s8-r2's stream" "$OUT/r2g1.log"; ok $? "the observation deadline is checked against the newest stream before R2 (s8-r1b) and G1 (s8-r2)"
 # the old check (raw ledger lines) would count s8-r1's original line as unmeasured; the effective records do not
 ( unset EFFECTIVE_RECORDS; R1_ATTEMPT=s8-r1b python3 -I "$L/check-run.py" "$LEDGER" "$OUT" s8-r2 development S8-DEV-A1 > "$OUT/raw-check.log" 2>&1 ); rc=$?
 [ $rc = 1 ] && grep -q "s8-r1: unmeasured" "$OUT/raw-check.log"; ok $? "check-run.py on the raw lines would fail on s8-r1's original line (why EFFECTIVE_RECORDS)"
