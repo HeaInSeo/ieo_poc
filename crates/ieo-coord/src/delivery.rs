@@ -943,7 +943,8 @@ pub fn deliver(
     let github = Some(again.body["github"].clone()).filter(|g| !g.is_null());
     // the delivery id travels with the start (02-05 step 4): the supervisor carries it on the
     // run's checkpoints and the takeover is linked to this delivery
-    let mut extra = json!({"target_sha": d["target_sha"], "delivery_id": id});
+    let mut extra = json!({"target_sha": d["target_sha"], "delivery_id": id,
+        "expected_checkpoint_sha256": again.body["central"]["checkpoint_sha256"]});
     // 02-05 step 7: the assignment's branch (the supervisor records the pushed SHA of it), and on
     // a resume the GitHub head and the CI result at it, as the judgment read them
     if let Some(b) = rec["branch_ref"].as_str() {
@@ -998,6 +999,7 @@ pub fn deliver(
             ));
         }
         lock(fence, &format!("delivery-evidence:{repo}"))?;
+        fence.batch_execute("SAVEPOINT checkpoint_snapshot")?;
         let final_judgment = compare_checkpoint(fence, repo, role, &local)?;
         let matches = final_judgment.body["central"] == again.body["central"]
             && if let Some(rid) = &recovery {
@@ -1051,6 +1053,10 @@ pub fn deliver(
             extra["recovery_id"] = json!(rid);
             sent["recovery_id"] = json!(rid);
         }
+        // Release the checkpoint lock before HTTP. The supervisor validates the pinned
+        // checkpoint digest before dispatch and can report takeover even if the reply
+        // is delayed. The assignment, review and evidence locks remain held.
+        fence.batch_execute("ROLLBACK TO SAVEPOINT checkpoint_snapshot")?;
         if STOPPING.load(Ordering::SeqCst) || begun.elapsed() > Duration::from_secs(deadline) {
             return Err(problem(
                 409,

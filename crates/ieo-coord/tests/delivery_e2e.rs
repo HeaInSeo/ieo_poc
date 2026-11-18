@@ -1029,6 +1029,10 @@ fn e2e(transport: &str) {
         assert_eq!(sent["delivery_id"], next_id);
         assert_eq!(sent["branch_ref"], BRANCH);
         assert_eq!(sent["github"]["head_sha"], SHA1);
+        assert_eq!(
+            sent["expected_checkpoint_sha256"],
+            predecessor["central"]["checkpoint_sha256"]
+        );
         assert_eq!(sent["coordinator"]["generation"], 0);
         assert_eq!(sent["coordinator"]["profile_id"], "dev-profile");
         let marker: Value =
@@ -1142,6 +1146,26 @@ fn e2e(transport: &str) {
             assert_eq!(launches(), 3);
             assert_eq!(trace().lines().count(), 3);
         }
+        // Check the receiving-side bound checkpoint independently of the HTTP relay.
+        let before = trace();
+        let mut wrong_checkpoint = sent;
+        wrong_checkpoint["attempt_id"] = json!("f-checkpoint-changed");
+        wrong_checkpoint["expected_checkpoint_sha256"] = json!("0".repeat(64));
+        let (status, denied) = role.call("POST", "/v0/role/start", &wrong_checkpoint);
+        assert_eq!(
+            (status, denied["code"].as_str()),
+            (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+            "{denied}"
+        );
+        assert!(
+            denied["message"]
+                .as_str()
+                .or(denied["reason"].as_str())
+                .unwrap()
+                .contains("checkpoint changed"),
+            "{denied}"
+        );
+        assert_eq!(trace(), before);
         coord.stop();
         drop(db);
         admin

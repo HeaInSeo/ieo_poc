@@ -810,11 +810,22 @@ impl Service {
         // the central record first (§2.1, §5-2): the local checkpoint must match the
         // coordinator's latest one (missing reports are sent from the archive) before anything
         // starts, a new session included (its checkpoints continue the sequence)
+        let local_checkpoint = self.local_checkpoint();
+        if let Some(expected) = req.get("expected_checkpoint_sha256") {
+            let actual = json!(local_checkpoint.as_deref().map(crate::central::sha256));
+            if expected != &actual {
+                return err(
+                    409,
+                    "EXTERNAL_RECONCILIATION_REQUIRED",
+                    "the local checkpoint changed after the coordinator authorized this delivery",
+                );
+            }
+        }
         let central = match crate::central::compare(
             &self.cfg.central,
             &self.cfg.repo,
             self.cfg.role_name(),
-            self.local_checkpoint().as_deref(),
+            local_checkpoint.as_deref(),
             &self.cfg.checkpoint_archive(),
         ) {
             Ok(c) => c,

@@ -1265,22 +1265,24 @@ fn e2e(transport: &str) {
         cfg.dbname(&dbname);
         let mut client = cfg.connect(NoTls).unwrap();
         let mut conflicting = client.transaction().unwrap();
-        for key in ["delivery-evidence:repo-a", "checkpoint:repo-a:development"] {
-            let can_update: bool = conflicting
-                .query_one(
-                    "SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))",
-                    &[&key],
-                )
-                .unwrap()
-                .get(0);
-            assert!(
-                !can_update,
-                "decision lock released before POST acceptance: {key}"
-            );
-        }
+        let can_lock = |tx: &mut postgres::Transaction, key: &str| -> bool {
+            tx.query_one(
+                "SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))",
+                &[&key],
+            )
+            .unwrap()
+            .get(0)
+        };
+        assert!(!can_lock(&mut conflicting, "delivery-evidence:repo-a"));
+        assert!(can_lock(&mut conflicting, "checkpoint:repo-a:development"));
+        assert_eq!(
+            sent["expected_checkpoint_sha256"],
+            observed["checkpoint"]["checkpoint_sha256"]
+        );
         assert!(conflicting.query_one(
             "SELECT 1 FROM assignment_heads WHERE repo_id='repo-a' AND role='development' FOR UPDATE NOWAIT", &[],
         ).is_err());
+        conflicting.rollback().unwrap();
         release.send(()).unwrap();
         send.join().unwrap()
     });
