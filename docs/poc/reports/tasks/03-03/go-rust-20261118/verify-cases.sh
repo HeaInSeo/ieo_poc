@@ -28,7 +28,7 @@ run_case() {
 
 (
   cd go
-  run_case go-format 0 '^format clean$' /bin/bash -ec 'test -z "$(gofmt -l .)"; echo format clean'
+  run_case go-format 0 '^format clean$' /bin/bash /policy/check-go-format.sh
   run_case go-vet 0 '^vet clean$' /bin/bash -ec 'go vet -mod=readonly ./...; echo vet clean'
   run_case go-test 0 '"Action":"pass".*"Test":"TestDouble"' go test -mod=readonly -count=1 -json ./...
   run_case go-race 0 '^ok[[:space:]]' go test -mod=readonly -race -count=1 ./...
@@ -45,8 +45,21 @@ run_case() {
 package fixture
 func badlyFormatted(){ println("an intentionally unformatted example") }
 GO
-  run_case go-format-failure 1 '^badfmt.go$' /bin/bash -ec 'files=$(gofmt -l .); printf "%s\n" "$files"; test -z "$files"'
+  run_case go-format-failure 1 '^badfmt.go$' /bin/bash /policy/check-go-format.sh
   rm badfmt.go
+  printf '%s\n' 'package fixture' 'func broken( {' >badsyntax.go
+  run_case go-format-tool-error 2 'badsyntax.go:[0-9]+:[0-9]+: expected' /bin/bash -c '
+    status=0
+    bash /policy/check-go-format.sh >/scratch/results/go-format-tool-error.stdout \
+      2>/scratch/results/go-format-tool-error.stderr || status=$?
+    if [[ -s /scratch/results/go-format-tool-error.stdout ]] ||
+       [[ ! -s /scratch/results/go-format-tool-error.stderr ]]; then
+      exit 98
+    fi
+    cat /scratch/results/go-format-tool-error.stderr >&2
+    exit "$status"
+  '
+  rm badsyntax.go
   cat >> double.go <<'GO'
 
 func vetFailure() {
