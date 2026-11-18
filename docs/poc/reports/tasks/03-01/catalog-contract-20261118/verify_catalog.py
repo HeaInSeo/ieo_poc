@@ -10,6 +10,20 @@ HERE = Path(__file__).resolve().parent
 POC = HERE.parents[3]
 VERSION = "0.1.0"
 
+# Approved design inputs taken from the task manifest, T01 scope table and T02/P25.
+# A historical source cannot acquire authority by changing its relation in the map.
+REQUIRED_SOURCES = {
+    "03-01.accept": {"spec-0301", "scope-0301", "t02-fields", "p25-readiness"},
+    "03-02.accept": {"t02-fields"},
+    "03-03.accept": {"t02-fields", "p25-readiness"},
+}
+REQUIREMENT_PATHS = {
+    "spec-0301": "Console_Coordinator_Sprints_v0.json",
+    "scope-0301": "reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md",
+    "t02-fields": "Console_Coordinator_PoC_Validation_Plan.md",
+    "p25-readiness": "Console_Coordinator_PoC_Validation_Plan.md",
+}
+
 
 def require(condition, message):
     if not condition:
@@ -78,6 +92,10 @@ def verify(catalog, source_map, spec, poc=POC):
             for item in acceptance["item_ids"]:
                 requirements.add((requirement, item, acceptance["profile_id"], acceptance["profile_revision"]))
 
+    profile_items = {
+        (profile["profile_id"], profile["revision"], item)
+        for profile in spec["inspection_profiles"] for item in profile["items"]
+    }
     entries = keyed(catalog["entries"], ("id", "version"))
     mappings = keyed(source_map["mappings"], ("item_id", "item_version"))
     sources = keyed(source_map["sources"], ("id",))
@@ -103,6 +121,9 @@ def verify(catalog, source_map, spec, poc=POC):
         require(all(type(key[-1]) is int for key in req_keys) and req_keys.keys() <= requirements,
                 f"{label}: invalid requirement/acceptance binding")
 
+        require(all((profile, rev, item) in profile_items for _, item, profile, rev in req_keys),
+                f"{label}: acceptance item absent from profile")
+
         execution = entry["execution"]
         text_fields(execution, "tools_and_versions environment permissions", label)
         if execution["kind"] == "policy":
@@ -119,6 +140,16 @@ def verify(catalog, source_map, spec, poc=POC):
         require("requirement" in relations and relations <= {"requirement", "candidate", "observation"},
                 f"{label}: invalid source relations")
         require(links.keys() <= sources.keys(), f"{label}: unresolved source")
+        required_sources = set()
+        for _, item, _, _ in req_keys:
+            require(item in REQUIRED_SOURCES, f"{label}: no approved source rule for {item}")
+            required_sources.update(REQUIRED_SOURCES[item])
+        actual_required = {source_id for (source_id,), link in links.items()
+                           if link["relation"] == "requirement"}
+        require(actual_required == required_sources, f"{label}: unapproved requirement source")
+        for source_id in required_sources:
+            require(sources[source_id,]["path"] == REQUIREMENT_PATHS[source_id],
+                    f"{label}: requirement source path mismatch")
         used_sources.update(links)
 
     require(used_sources == sources.keys(), "unreferenced source")

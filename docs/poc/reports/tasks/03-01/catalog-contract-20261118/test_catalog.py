@@ -69,6 +69,19 @@ class CatalogTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unresolved source"):
             self.verify()
 
+    def test_historical_source_cannot_be_promoted_to_requirement(self):
+        self.sources["mappings"][0]["sources"].append(
+            {"source_id": "npg-role", "relation": "requirement"}
+        )
+        with self.assertRaisesRegex(ValueError, "unapproved requirement source"):
+            self.verify()
+
+    def test_approved_source_cannot_be_rebound_to_another_path(self):
+        spec_source = self.sources["sources"][0]
+        spec_source["path"] = self.sources["sources"][-1]["path"]
+        with self.assertRaisesRegex(ValueError, "requirement source path mismatch"):
+            self.verify()
+
     def test_stale_digest(self):
         self.sources["sources"][0]["sha256"] = "0" * 64
         with self.assertRaisesRegex(ValueError, "digest mismatch"):

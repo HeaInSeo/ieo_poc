@@ -1,4 +1,6 @@
+test_approved_source_cannot_be_rebound_to_another_path (__main__.CatalogTest.test_approved_source_cannot_be_rebound_to_another_path) ... ok
 test_duplicate_identity (__main__.CatalogTest.test_duplicate_identity) ... ok
+test_historical_source_cannot_be_promoted_to_requirement (__main__.CatalogTest.test_historical_source_cannot_be_promoted_to_requirement) ... ok
 test_mismatched_version_join (__main__.CatalogTest.test_mismatched_version_join) ... ok
 test_required_fields (__main__.CatalogTest.test_required_fields) ... ok
 test_scope_and_expected_trace (__main__.CatalogTest.test_scope_and_expected_trace) ... ok
@@ -10,6 +12,6 @@ test_wrong_excerpt (__main__.CatalogTest.test_wrong_excerpt) ... ok
 test_wrong_profile (__main__.CatalogTest.test_wrong_profile) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 0.087s
+Ran 12 tests in 0.098s
 
 OK
