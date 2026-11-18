@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: __MODE__-coord
+  namespace: x06
+spec:
+  clusterIP: None
+  ipFamilies: [IPv4]
+  selector:
+    app: __MODE__-coord
+  ports:
+    - name: http
+      port: 8080
+    - name: grpc
+      port: 50051
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: __MODE__-coord
+  namespace: x06
+  labels:
+    app: __MODE__-coord
+spec:
+  nodeName: ieo-x06-worker
+  automountServiceAccountToken: false
+  containers:
+    - name: coord
+      image: localhost/ieo-x06:fixture
+      imagePullPolicy: Never
+      command: ["/ieo-coord"]
+      args:
+        - serve
+        - --listen
+        - "0.0.0.0:8080"
+        - --grpc-listen
+        - "0.0.0.0:50051"
+        - --tokens
+        - /config/tokens.json
+        - --manifest
+        - /config/manifest.json
+        - --bindings
+        - /config/bindings.json
+        - --roles
+        - /config/roles.json
+        - --policy
+        - /config/policy.json
+      env:
+        - name: IEO_DB_URL
+          value: "host=pg.x06.svc.cluster.local user=x06 password=x06-ephemeral-fixture dbname=__MODE__"
+      ports:
+        - containerPort: 8080
+        - containerPort: 50051
+      readinessProbe:
+        tcpSocket:
+          port: 50051
+        periodSeconds: 1
+      volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+  volumes:
+    - name: config
+      configMap:
+        name: coord-config

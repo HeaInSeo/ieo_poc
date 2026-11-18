@@ -8,6 +8,8 @@
 //! coordinator.rs (skipped without it outside CI).
 
 mod common;
+#[path = "grpc/kind.rs"]
+mod kind;
 use common::*;
 
 use ieo_coord::api::{self, Abort, Operation, Req, TxGuard};
@@ -555,10 +557,49 @@ fn assign_ok(e: &Env, role: &str, aid: &str, generation: u64, sha: &str, prev: V
     assert_eq!(st, 201, "{b}");
 }
 
+const RECOVERY_ID: &str = "R-grpc-fixture-seq1";
+const RECOVERY_ATTEMPT: &str = "D-t-repo-a-development-A1-0-2-recovery";
+
+fn seed_recovery(e: &Env, digest: &str) {
+    let takeover = cp_raw(
+        2,
+        0,
+        digest,
+        json!({
+            "phase":"takeover", "session_id":"s2", "delivery_id":RECOVERY_ATTEMPT,
+            "recovery_id":RECOVERY_ID
+        }),
+    );
+    ensure_delivery(e, &takeover);
+    let mut db = e.db();
+    let approvals = db
+        .execute(
+            "INSERT INTO role_recoveries (
+            recovery_id, repo_id, role, request_id, body, assignment_id, generation,
+            checkpoint_seq, checkpoint_sha256, checkpoint_phase, state, reasons, facts,
+            approved_by, approver_kind, reason
+         )
+         SELECT $1, repo_id, role, $1, '{}'::jsonb, assignment_id, generation,
+                seq, checkpoint_sha256, phase, 'approved', '[]'::jsonb, '{}'::jsonb,
+                'test-fixture', 'user', 'fixture of a used recovery approval'
+         FROM role_checkpoints WHERE repo_id = 'repo-a' AND role = 'development' AND seq = 1",
+            &[&RECOVERY_ID],
+        )
+        .expect("seed approval of the unfinished predecessor");
+    assert_eq!(approvals, 1);
+    db.execute(
+        "INSERT INTO role_recovery_uses (recovery_id, delivery_id, repo_id, role, checkpoint_seq)
+         VALUES ($1, $2, 'repo-a', 'development', 1)",
+        &[&RECOVERY_ID, &RECOVERY_ATTEMPT],
+    )
+    .expect("seed use of the recovery approval by the fixture delivery");
+}
+
 /// Every reachable row of contract §4.2, the role permissions, idempotency, stale generations,
 /// rollback after a write, size limits and path values.
 fn scenario(digest: &str) -> Vec<Step> {
     use Step::Do;
+    let recovery_digest = digest.to_owned();
     let d = digest.to_string();
     let cpx = |seq: u64, generation: u64, extra: Value| cp(seq, cp_raw(seq, generation, &d, extra));
     let big = "x".repeat(1 << 20);
@@ -986,6 +1027,14 @@ fn scenario(digest: &str) -> Vec<Step> {
             None,
             cpx(2, 0, json!({"pad": quotes.clone()})),
         ),
+        // X-06: the predecessor at seq 1 is unfinished. Seed the approval and its use that
+        // would normally be recorded by the delivery path before this takeover.
+        setup(
+            "fixture recovery over the unfinished predecessor",
+            move |e| {
+                seed_recovery(e, &recovery_digest);
+            },
+        ),
         // a write, then a refusal: everything rolls back
         Do(
             "checkpoint: tamper with another session",
@@ -993,7 +1042,7 @@ fn scenario(digest: &str) -> Vec<Step> {
             cpx(
                 2,
                 0,
-                json!({"phase": "takeover",
+                json!({"phase": "takeover", "recovery_id": RECOVERY_ID, "delivery_id": RECOVERY_ATTEMPT,
             "config_tamper_detected": {"old_session_id": "s1", "new_session_id": "other",
             "checkpoint_digest": "a".repeat(64), "observed_digest": "b".repeat(64)}, "session_id": "s2"}),
             ),
@@ -1004,7 +1053,7 @@ fn scenario(digest: &str) -> Vec<Step> {
             cpx(
                 2,
                 0,
-                json!({"phase": "takeover",
+                json!({"phase": "takeover", "recovery_id": RECOVERY_ID, "delivery_id": RECOVERY_ATTEMPT,
             "config_tamper_detected": {"old_session_id": "s1", "new_session_id": "s2",
             "checkpoint_digest": "a".repeat(64), "observed_digest": "b".repeat(64)}, "session_id": "s2"}),
             ),
@@ -1144,25 +1193,25 @@ fn scenario(digest: &str) -> Vec<Step> {
         Do(
             "first action: stored",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s1"),
+            fa("A1", 0, &att(1), "s1"),
         ),
         Do(
             "first action: replay",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s1"),
+            fa("A1", 0, &att(1), "s1"),
         ),
         Do(
             "first action: content conflict",
             Some("sup-dev-a"),
             Call::FirstAction(RecordFirstActionRequest {
                 event_offset: 9,
-                ..fa_msg("A1", 0, "att-1", "s1")
+                ..fa_msg("A1", 0, &att(1), "s1")
             }),
         ),
         Do(
             "first action: content conflict, other session",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s2"),
+            fa("A1", 0, &att(1), "s2"),
         ),
         // --- ReportSessionStatus (02-05 step 2)
         Do(
@@ -1450,17 +1499,17 @@ fn scenario(digest: &str) -> Vec<Step> {
         Do(
             "first action: replay after the move",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s1"),
+            fa("A1", 0, &att(1), "s1"),
         ),
         Do(
             "first action: the old run's, not current",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-2", "s2"),
+            fa("A1", 0, RECOVERY_ATTEMPT, "s2"),
         ),
         Do(
             "first action: new generation",
             Some("sup-dev-a"),
-            fa("A1", 1, "att-3", "s3"),
+            fa("A1", 1, "D-t-repo-a-development-A1-1-4", "s3"),
         ),
         Do(
             "first action: new generation, old session",
@@ -1496,33 +1545,59 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
     let Some(h) = start() else { return };
     let Some(r) = start() else { return };
     let g = grpc(&r);
+    compare_transports(&h, &r, |who, call| g.call(&r, who, call), |_, _| {});
+}
+
+fn compare_transports(
+    h: &Env,
+    r: &Env,
+    mut grpc: impl FnMut(Option<&str>, &Call) -> (u16, Value),
+    mut after_setup: impl FnMut(&str, &mut dyn FnMut(Option<&str>, &Call) -> (u16, Value)),
+) -> usize {
     let digest = spec("repo-a", 5, 3)["digest"]
         .as_str()
         .expect("digest")
         .to_string();
-    for e in [&h, &r] {
+    for e in [h, r] {
         ready_sprint(e, 3);
     }
     let mut seen = std::collections::BTreeSet::new();
     let (mut dh, mut dr) = (h.db(), r.db());
+    let mut requests = 0;
     for step in scenario(&digest) {
         match step {
             Step::Setup(label, f) => {
-                f(&h);
-                f(&r);
+                f(h);
+                f(r);
+                after_setup(label, &mut grpc);
                 eprintln!("setup: {label}");
             }
             Step::Do(label, who, call) => {
                 let before = snapshot(&mut dh);
-                let a = over_http(&h, who, &call);
+                let a = over_http(h, who, &call);
                 let t0 = Instant::now();
-                let b = g.call(&r, who, &call);
+                let b = grpc(who, &call);
+                requests += 1;
                 let took = t0.elapsed();
                 assert_eq!(a, b, "{label}: HTTP vs gRPC");
                 let after = (snapshot(&mut dh), snapshot(&mut dr));
                 assert_eq!(after.0, after.1, "{label}: database state");
-                if !(200..300).contains(&a.0) {
+                if label.contains("replay") || label == "checkpoint: duplicate" {
+                    assert_eq!(a.0, 200, "{label}: stored receipt is replayed");
+                    assert_eq!(before, after.0, "{label}: a replay changes nothing");
+                } else if !(200..300).contains(&a.0) {
                     assert_eq!(before, after.0, "{label}: a refusal changes nothing");
+                }
+                if matches!(
+                    label,
+                    "checkpoint: tamper recorded"
+                        | "checkpoint: the old run's next one, not current"
+                        | "checkpoint: new generation takeover"
+                        | "first action: stored"
+                        | "first action: the old run's, not current"
+                        | "first action: new generation"
+                ) {
+                    assert_eq!(a.0, 201, "{label}: {a:?}");
                 }
                 let code = a.1["code"]
                     .as_str()
@@ -1531,7 +1606,12 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
                     .to_string();
                 seen.insert((a.0, code));
                 // the handling time over gRPC (contract §6.1 records it)
-                eprintln!("{label}: {} {} [grpc {} ms]", a.0, a.1, took.as_millis());
+                eprintln!(
+                    "{requests:03} {label}: {} {} [grpc {} ms]",
+                    a.0,
+                    a.1,
+                    took.as_millis()
+                );
             }
         }
     }
@@ -1584,6 +1664,7 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
         .filter_map(|c| c["event_id"].as_str())
         .collect();
     assert!(!ids.contains(&"dev-late"), "{st2}");
+    requests
 }
 
 #[test]

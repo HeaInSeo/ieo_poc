@@ -1,0 +1,41 @@
+{
+  "conclusion": "success",
+  "databaseId": 44321144168,
+  "event": "push",
+  "headBranch": "main",
+  "headSha": "fcf1060dd0307a6c2b1005cac1a07f25f99a582f",
+  "jobs": [
+    {
+      "completedAt": "2026-11-18T14:17:13Z",
+      "conclusion": "success",
+      "databaseId": 134860100144,
+      "name": "rust fmt clippy test",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-11-18T14:09:25Z",
+      "conclusion": "success",
+      "databaseId": 134860100397,
+      "name": "proto buf lint and breaking",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-11-18T14:09:32Z",
+      "conclusion": "success",
+      "databaseId": 134860100467,
+      "name": "docs/poc package and progress validation",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-11-18T14:09:33Z",
+      "conclusion": "success",
+      "databaseId": 134860100948,
+      "name": "rust toolchain pin resolves",
+      "status": "completed"
+    }
+  ],
+  "status": "completed",
+  "updatedAt": "2026-11-18T14:17:14Z",
+  "url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321144168",
+  "workflowName": "ci"
+}

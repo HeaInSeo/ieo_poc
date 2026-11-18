@@ -1,0 +1,20 @@
+{
+  "paired_cases": 157,
+  "max_recorded_rpc_ms": 49,
+  "comparison_ms": 4707,
+  "prepare_seconds": 7,
+  "grpc_pod_uid": "1c7e9142-b8f2-4a6f-aaba-1c442af37185",
+  "grpc_pod_ip": "10.244.2.3",
+  "pod_nodes": {
+    "driver": "ieo-x06-worker2",
+    "grpc-coord": "ieo-x06-worker",
+    "http-coord": "ieo-x06-worker",
+    "pg": "ieo-x06-worker2"
+  },
+  "assignment_replay": 200,
+  "assignment_conflict": 409,
+  "checkpoint_head_after_rollback": 4,
+  "committed_repro_rows": 1,
+  "explicit_replays_after_confirmation": 1,
+  "verdict": "PASS"
+}
