@@ -1,6 +1,8 @@
 """Local P25 index checks for the independently selected initial use scope."""
 from copy import deepcopy
+import hashlib
 import json
+import re
 from pathlib import Path
 
 
@@ -12,6 +14,7 @@ STACKS = DOCS + "03-03/go-rust-20261118/"
 VALIDATION = DOCS + "03-04/p25-20261119/"
 HISTORIC_CATALOG = DOCS + "03-01/catalog-contract-20261118/catalog.json"
 RUNTIME = DOCS + "01-02/runtime-contract-20261112/Runtime_Contract_v0.md"
+RUNTIME_SHA256 = "8f538d1de9926611730c8db10ec6bfb5b3ed482365bbb43ef3d294babc55c90f"
 ROLES = {"development", "reviewer", "coordinator"}
 REPOSITORY = "HeaInSeo/ieo_poc"
 PROFILE = {"id": "poc-acceptance-v1.3.3", "revision": 4}
@@ -103,11 +106,17 @@ def link(path, name):
     return full
 
 
+def verify_runtime(data):
+    header = data.decode("utf-8").split("\n## ", 1)[0]
+    recorded = re.findall(r"^문서 \*\*revision ([0-9]+)\*\*\(", header, re.MULTILINE)
+    assert_input(recorded == ["20"], "unapproved current runtime revision")
+    assert_input(hashlib.sha256(data).hexdigest() == RUNTIME_SHA256, "runtime digest mismatch")
+
+
 def verify(catalog, manifest):
     assert_input(catalog["version"] == "0.2.2" and catalog["profile"] == PROFILE, "version/profile")
     plan_tasks = {t["task_id"]: t for sprint in manifest["sprints"] for t in sprint["tasks"]}
-    assert_input("**revision 20**" in link(RUNTIME, "common runtime").read_text(),
-                 "approved runtime version unavailable")
+    verify_runtime(link(RUNTIME, "common runtime").read_bytes())
     entries = {e["id"]: e for e in catalog["items"]}
     assert_input(len(entries) == len(catalog["items"]) and set(entries) == ITEMS.keys(),
                  "missing/extra/duplicate item")
@@ -206,7 +215,25 @@ def negative_controls(catalog, manifest):
             print(f"PASS rejected {name}: {exc}")
         else:
             raise AssertionError(f"accepted invalid {name}")
-    return len(controls)
+    runtime = link(RUNTIME, "common runtime").read_bytes()
+    current_mismatch = runtime.replace(
+        "문서 **revision 20**(".encode(),
+        "문서 **revision 21**(".encode(),
+        1,
+    ) + b"\nHistory: **revision 20**\n"
+    source_controls = [
+        ("old revision in history", current_mismatch, "unapproved current runtime revision"),
+        ("same revision with changed content", runtime + b"\nModified after freeze.\n", "runtime digest mismatch"),
+    ]
+    for name, data, reason in source_controls:
+        try:
+            verify_runtime(data)
+        except ValueError as exc:
+            assert reason in str(exc), (name, exc)
+            print(f"PASS rejected {name}: {exc}")
+        else:
+            raise AssertionError(f"accepted invalid {name}")
+    return len(controls) + len(source_controls)
 
 
 if __name__ == "__main__":
