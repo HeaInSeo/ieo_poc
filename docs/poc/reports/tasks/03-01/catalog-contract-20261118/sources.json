@@ -1,0 +1,219 @@
+{
+  "contract_version": "0.1.0",
+  "sources": [
+    {
+      "id": "spec-0301",
+      "path": "Console_Coordinator_Sprints_v0.json",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "ae5c1e7f230b0101ccfa759ccd1050868d218cced28653a7b84c48a51bfe4e85",
+      "lines": [
+        1366,
+        1373
+      ],
+      "excerpt": "03-01.accept",
+      "scope": "03-01 수용 프로파일"
+    },
+    {
+      "id": "scope-0301",
+      "path": "reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "e2dcd8659a4d87ad2b014b40d23186035cbdad302db9e35fc305c5e275d50098",
+      "lines": [
+        43,
+        45
+      ],
+      "excerpt": "POC-REQ-03-01",
+      "scope": "01-01의 세 작업과 산출물 매핑"
+    },
+    {
+      "id": "t02-fields",
+      "path": "Console_Coordinator_PoC_Validation_Plan.md",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "5c0c29276d739d771994ae53d8895bd0260c189179b7f4511974a7dcfc32d591",
+      "lines": [
+        216,
+        220
+      ],
+      "excerpt": "각 카탈로그 항목에는",
+      "scope": "초기 범위, 필수 필드와 독립 검증"
+    },
+    {
+      "id": "p25-readiness",
+      "path": "Console_Coordinator_PoC_Validation_Plan.md",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "5c0c29276d739d771994ae53d8895bd0260c189179b7f4511974a7dcfc32d591",
+      "lines": [
+        664,
+        675
+      ],
+      "excerpt": "카탈로그",
+      "scope": "작성 후보의 후속 독립 검증 조건"
+    },
+    {
+      "id": "npg-role",
+      "path": "05_npg_evidence/repo_documents/repo/AGENTS.md",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "520a26595d8d200864a7b2925086dce0546a363cbf8e53826dd6a598f1b9f647",
+      "lines": [
+        5,
+        13
+      ],
+      "excerpt": "normal reviews in force",
+      "scope": "보존된 NPG 작업·검토 규칙의 이식 후보"
+    },
+    {
+      "id": "npg-recovery",
+      "path": "05_npg_evidence/repo_documents/repo/AUTOMATIC_FOLLOWTHROUGH.md",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "299841daf91e6783606369a2b55b6e7d6a76e31d1c3a0faa1dac8af54766ab63",
+      "lines": [
+        6,
+        14
+      ],
+      "excerpt": "Input is sent once",
+      "scope": "보존된 NPG 응답 유실 대조 규칙의 이식 후보"
+    },
+    {
+      "id": "npg-ci",
+      "path": "05_npg_evidence/ci.yml",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "4895d8afb58db8249104e92e66bee526239510549cd13c3ed1b5b78efd2a2932",
+      "lines": [
+        9,
+        26
+      ],
+      "excerpt": "contents: read",
+      "scope": "보존된 NPG 워크플로의 권한·행렬 예"
+    },
+    {
+      "id": "npg-ci-run",
+      "path": "05_npg_evidence/CI_Evidence_Scope.md",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "6996b87781431b2b9b998346d4b24c6fb328364e0ef63649303013914e90d5d6",
+      "lines": [
+        5,
+        16
+      ],
+      "excerpt": "41469168311",
+      "scope": "고정 NPG 커밋과 실행, 기존 실행 근거의 한계"
+    },
+    {
+      "id": "collector-judge",
+      "path": "reports/tasks/02-01/collector-20261112/REPORT.md",
+      "revision": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+      "sha256": "d13f238fb0962467aa324e4e84bdc575fc488f3b8b321f4ae8ad368cf37e4470",
+      "lines": [
+        21,
+        24
+      ],
+      "excerpt": "종료 코드 0만으로 성공이 아니다",
+      "scope": "02-01의 실패·불충분 판정 계약"
+    }
+  ],
+  "mappings": [
+    {
+      "item_id": "CAT-FORM",
+      "item_version": "0.1.0",
+      "sources": [
+        {
+          "source_id": "spec-0301",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "scope-0301",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "t02-fields",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "p25-readiness",
+          "relation": "requirement"
+        }
+      ]
+    },
+    {
+      "item_id": "CAT-ROLE",
+      "item_version": "0.1.0",
+      "sources": [
+        {
+          "source_id": "t02-fields",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "npg-role",
+          "relation": "candidate"
+        }
+      ]
+    },
+    {
+      "item_id": "CAT-RECOVERY",
+      "item_version": "0.1.0",
+      "sources": [
+        {
+          "source_id": "t02-fields",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "collector-judge",
+          "relation": "observation"
+        },
+        {
+          "source_id": "npg-recovery",
+          "relation": "candidate"
+        }
+      ]
+    },
+    {
+      "item_id": "CAT-GITHUB",
+      "item_version": "0.1.0",
+      "sources": [
+        {
+          "source_id": "t02-fields",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "npg-ci",
+          "relation": "candidate"
+        },
+        {
+          "source_id": "npg-ci-run",
+          "relation": "observation"
+        }
+      ]
+    },
+    {
+      "item_id": "CAT-GO",
+      "item_version": "0.1.0",
+      "sources": [
+        {
+          "source_id": "t02-fields",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "p25-readiness",
+          "relation": "requirement"
+        }
+      ]
+    },
+    {
+      "item_id": "CAT-RUST",
+      "item_version": "0.1.0",
+      "sources": [
+        {
+          "source_id": "t02-fields",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "p25-readiness",
+          "relation": "requirement"
+        },
+        {
+          "source_id": "collector-judge",
+          "relation": "observation"
+        }
+      ]
+    }
+  ]
+}

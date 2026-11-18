@@ -1,0 +1,271 @@
+{
+  "contract_version": "0.1.0",
+  "plan_version": "v1.3.3",
+  "entries": [
+    {
+      "id": "CAT-FORM",
+      "version": "0.1.0",
+      "title": "카탈로그 작성·원본 결합",
+      "requirements": [
+        {
+          "requirement_id": "POC-REQ-03-01",
+          "item_id": "03-01.accept",
+          "profile_id": "poc-acceptance-v1.3.3",
+          "profile_revision": 4
+        }
+      ],
+      "scope": "common",
+      "roles": [
+        "author",
+        "reviewer"
+      ],
+      "applies_when": "T02 항목을 등록하거나 승인 범위·버전을 대조할 때",
+      "excludes_when": "런타임 배정과 운영 승인",
+      "purpose": "요구·항목·적용 증거의 연결을 고정",
+      "expected_evidence": "명세 요구/수용 ID, 항목 버전, 원본 SHA 및 행 대조",
+      "evidence_limits": "P25 명령 정확성·실제 활용 효과 미검증",
+      "readiness": "contract",
+      "execution": {
+        "kind": "policy",
+        "procedure": "검사기와 독립 기대 목록으로 세 파일을 대조",
+        "tools_and_versions": "Python 3.11+ · 카탈로그 v0.1.0",
+        "environment": "고정 PoC 개발 작업 트리와 원본 스냅샷",
+        "permissions": "문서·기존 증거 읽기. 실제 설정 적용 별도 승인",
+        "comparison": "명세 요구/수용 ID, 항목 버전, 원본 SHA 및 행 대조"
+      },
+      "verdicts": {
+        "pass": "정확한 요구·버전·조건·기대값과 원본을 대조해 일치",
+        "fail": "필수 필드나 대조 증거 누락, 조건·버전·실측 불일치",
+        "not_applicable": "사전에 고정한 제외 조건을 충족하고 사유 기록"
+      },
+      "cost": {
+        "state": "unestimated",
+        "basis": "계약 대조는 모델 호출 없이 수행. 후속 시험의 시간·자원·토큰은 확정 전 미산정",
+        "time": "실측 전 미산정",
+        "resources": "검증 환경 확정 후 계상",
+        "tokens": "03-01 정적 대조의 PoC 모델 요청 0회. 후속 사용량 미산정"
+      }
+    },
+    {
+      "id": "CAT-ROLE",
+      "version": "0.1.0",
+      "title": "역할·검토·인계",
+      "requirements": [
+        {
+          "requirement_id": "POC-REQ-03-02",
+          "item_id": "03-02.accept",
+          "profile_id": "poc-acceptance-v1.3.3",
+          "profile_revision": 4
+        }
+      ],
+      "scope": "common",
+      "roles": [
+        "development",
+        "reviewer"
+      ],
+      "applies_when": "역할 배정과 인계 정책을 작성할 때",
+      "excludes_when": "NPG 개인 운영 제약의 자동 이식",
+      "purpose": "권한과 변경 인계 경계 식별",
+      "expected_evidence": "역할별 허용 작업, 검토 head, 인계 상태와 독립 판정",
+      "evidence_limits": "실제 역할 권한 집행이나 NPG 정책 채택 증거가 아직 없음",
+      "readiness": "draft",
+      "execution": {
+        "kind": "policy",
+        "procedure": "원본 역할 절차를 범용 후보와 repo 전용 정책으로 분류",
+        "tools_and_versions": "후속 작성에서 도구와 버전을 고정",
+        "environment": "고정 PoC 개발 작업 트리와 원본 스냅샷",
+        "permissions": "문서·기존 증거 읽기. 실제 설정 적용 별도 승인",
+        "comparison": "역할별 허용 작업, 검토 head, 인계 상태와 독립 판정"
+      },
+      "verdicts": {
+        "pass": "정확한 요구·버전·조건·기대값과 원본을 대조해 일치",
+        "fail": "필수 필드나 대조 증거 누락, 조건·버전·실측 불일치",
+        "not_applicable": "사전에 고정한 제외 조건을 충족하고 사유 기록"
+      },
+      "cost": {
+        "state": "unestimated",
+        "basis": "계약 대조는 모델 호출 없이 수행. 후속 시험의 시간·자원·토큰은 확정 전 미산정",
+        "time": "실측 전 미산정",
+        "resources": "검증 환경 확정 후 계상",
+        "tokens": "03-01 정적 대조의 PoC 모델 요청 0회. 후속 사용량 미산정"
+      }
+    },
+    {
+      "id": "CAT-RECOVERY",
+      "version": "0.1.0",
+      "title": "실패·복구 대조",
+      "requirements": [
+        {
+          "requirement_id": "POC-REQ-03-02",
+          "item_id": "03-02.accept",
+          "profile_id": "poc-acceptance-v1.3.3",
+          "profile_revision": 4
+        }
+      ],
+      "scope": "common",
+      "roles": [
+        "development",
+        "reviewer"
+      ],
+      "applies_when": "실패 주입과 유실 결과 회수 절차를 작성할 때",
+      "excludes_when": "프로덕션 재전송이나 NPG 권한·기한의 자동 승계",
+      "purpose": "실패·불충분·복구의 증거 구분",
+      "expected_evidence": "기대 오류, 종료 사유, 시도 ID, 원본 로그와 복구 횟수",
+      "evidence_limits": "NPG 복구 상태·수치는 이식 검토 대상",
+      "readiness": "draft",
+      "execution": {
+        "kind": "policy",
+        "procedure": "02-01 판정과 NPG 원본의 유지 응답 조회를 분리 비교",
+        "tools_and_versions": "후속 작성에서 도구와 버전을 고정",
+        "environment": "고정 PoC 개발 작업 트리와 원본 스냅샷",
+        "permissions": "문서·기존 증거 읽기. 실제 설정 적용 별도 승인",
+        "comparison": "기대 오류, 종료 사유, 시도 ID, 원본 로그와 복구 횟수"
+      },
+      "verdicts": {
+        "pass": "정확한 요구·버전·조건·기대값과 원본을 대조해 일치",
+        "fail": "필수 필드나 대조 증거 누락, 조건·버전·실측 불일치",
+        "not_applicable": "사전에 고정한 제외 조건을 충족하고 사유 기록"
+      },
+      "cost": {
+        "state": "unestimated",
+        "basis": "계약 대조는 모델 호출 없이 수행. 후속 시험의 시간·자원·토큰은 확정 전 미산정",
+        "time": "실측 전 미산정",
+        "resources": "검증 환경 확정 후 계상",
+        "tokens": "03-01 정적 대조의 PoC 모델 요청 0회. 후속 사용량 미산정"
+      }
+    },
+    {
+      "id": "CAT-GITHUB",
+      "version": "0.1.0",
+      "title": "Actions·저장소 설정",
+      "requirements": [
+        {
+          "requirement_id": "POC-REQ-03-02",
+          "item_id": "03-02.accept",
+          "profile_id": "poc-acceptance-v1.3.3",
+          "profile_revision": 4
+        }
+      ],
+      "scope": "repository",
+      "roles": [
+        "author",
+        "reviewer"
+      ],
+      "applies_when": "고정 NPG 자료를 GitHub 정책 예로 대조할 때",
+      "excludes_when": "현재 저장소 설정·필수 검사 효과 판정",
+      "purpose": "워크플로 정의와 관측된 실행을 연결",
+      "expected_evidence": "고정 workflow와 run/head, 권한, job 결과 및 브랜치 정책의 별도 관측",
+      "evidence_limits": "보존 CI 결과는 배포 또는 현재 브랜치 보호 근거로 불충분",
+      "readiness": "draft",
+      "execution": {
+        "kind": "policy",
+        "procedure": "정의와 기존 실행을 대조하고 실제 설정은 P23에서 확인",
+        "tools_and_versions": "후속 작성에서 도구와 버전을 고정",
+        "environment": "고정 PoC 개발 작업 트리와 원본 스냅샷",
+        "permissions": "문서·기존 증거 읽기. 실제 설정 적용 별도 승인",
+        "comparison": "고정 workflow와 run/head, 권한, job 결과 및 브랜치 정책의 별도 관측"
+      },
+      "verdicts": {
+        "pass": "정확한 요구·버전·조건·기대값과 원본을 대조해 일치",
+        "fail": "필수 필드나 대조 증거 누락, 조건·버전·실측 불일치",
+        "not_applicable": "사전에 고정한 제외 조건을 충족하고 사유 기록"
+      },
+      "cost": {
+        "state": "unestimated",
+        "basis": "계약 대조는 모델 호출 없이 수행. 후속 시험의 시간·자원·토큰은 확정 전 미산정",
+        "time": "실측 전 미산정",
+        "resources": "검증 환경 확정 후 계상",
+        "tokens": "03-01 정적 대조의 PoC 모델 요청 0회. 후속 사용량 미산정"
+      },
+      "repository": "HeaInSeo/notion-projection-guard"
+    },
+    {
+      "id": "CAT-GO",
+      "version": "0.1.0",
+      "title": "Go 테스트·린트·실패 사례",
+      "requirements": [
+        {
+          "requirement_id": "POC-REQ-03-03",
+          "item_id": "03-03.accept",
+          "profile_id": "poc-acceptance-v1.3.3",
+          "profile_revision": 4
+        }
+      ],
+      "scope": "go",
+      "roles": [
+        "development",
+        "reviewer"
+      ],
+      "applies_when": "승인 초기 범위에 Go 프로젝트가 포함될 때",
+      "excludes_when": "Go 도구나 해당 모듈이 적용되지 않는 대상",
+      "purpose": "Go 검사 작성 조건과 검증 입력 고정",
+      "expected_evidence": "도구 버전·중요 옵션·정상/실패/비적용 로그·비용 근거",
+      "evidence_limits": "실행 명령과 판정 사례는 03-03에서 확정",
+      "readiness": "draft",
+      "execution": {
+        "kind": "policy",
+        "procedure": "Go 명령·버전·옵션과 독립 예상 판정을 작성",
+        "tools_and_versions": "후속 작성에서 도구와 버전을 고정",
+        "environment": "고정 PoC 개발 작업 트리와 원본 스냅샷",
+        "permissions": "문서·기존 증거 읽기. 실제 설정 적용 별도 승인",
+        "comparison": "도구 버전·중요 옵션·정상/실패/비적용 로그·비용 근거"
+      },
+      "verdicts": {
+        "pass": "정확한 요구·버전·조건·기대값과 원본을 대조해 일치",
+        "fail": "필수 필드나 대조 증거 누락, 조건·버전·실측 불일치",
+        "not_applicable": "사전에 고정한 제외 조건을 충족하고 사유 기록"
+      },
+      "cost": {
+        "state": "unestimated",
+        "basis": "계약 대조는 모델 호출 없이 수행. 후속 시험의 시간·자원·토큰은 확정 전 미산정",
+        "time": "실측 전 미산정",
+        "resources": "검증 환경 확정 후 계상",
+        "tokens": "03-01 정적 대조의 PoC 모델 요청 0회. 후속 사용량 미산정"
+      }
+    },
+    {
+      "id": "CAT-RUST",
+      "version": "0.1.0",
+      "title": "Rust 테스트·린트·실패 사례",
+      "requirements": [
+        {
+          "requirement_id": "POC-REQ-03-03",
+          "item_id": "03-03.accept",
+          "profile_id": "poc-acceptance-v1.3.3",
+          "profile_revision": 4
+        }
+      ],
+      "scope": "rust",
+      "roles": [
+        "development",
+        "reviewer"
+      ],
+      "applies_when": "승인 초기 범위에 Rust 프로젝트가 포함될 때",
+      "excludes_when": "Rust 도구나 해당 워크스페이스가 적용되지 않는 대상",
+      "purpose": "Rust 검사 작성 조건과 검증 입력 고정",
+      "expected_evidence": "도구 버전·중요 옵션·정상/실패/비적용 로그·비용 근거",
+      "evidence_limits": "실행 명령과 판정 사례는 03-03에서 확정",
+      "readiness": "draft",
+      "execution": {
+        "kind": "policy",
+        "procedure": "RUST 도구 버전과 옵션 및 종료/필수 산출물을 고정",
+        "tools_and_versions": "후속 작성에서 도구와 버전을 고정",
+        "environment": "고정 PoC 개발 작업 트리와 원본 스냅샷",
+        "permissions": "문서·기존 증거 읽기. 실제 설정 적용 별도 승인",
+        "comparison": "도구 버전·중요 옵션·정상/실패/비적용 로그·비용 근거"
+      },
+      "verdicts": {
+        "pass": "정확한 요구·버전·조건·기대값과 원본을 대조해 일치",
+        "fail": "필수 필드나 대조 증거 누락, 조건·버전·실측 불일치",
+        "not_applicable": "사전에 고정한 제외 조건을 충족하고 사유 기록"
+      },
+      "cost": {
+        "state": "unestimated",
+        "basis": "계약 대조는 모델 호출 없이 수행. 후속 시험의 시간·자원·토큰은 확정 전 미산정",
+        "time": "실측 전 미산정",
+        "resources": "검증 환경 확정 후 계상",
+        "tokens": "03-01 정적 대조의 PoC 모델 요청 0회. 후속 사용량 미산정"
+      }
+    }
+  ]
+}

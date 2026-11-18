@@ -31,3 +31,9 @@
 - **2. 시간·토큰·호출 상한.** 기존 감독자 `run_guard` 28/28 통과. 로컬 시간 마감, 정지 유예, 자식 프로세스 종료, 관측 사용량 상한 및 미계측 차단을 확인했다. 설치된 Codex 0.169.1의 App Server 계약에는 `turn/interrupt`와 turn ID가 붙은 사용량 업데이트가 있다. 생성한 `TurnStartParams`와 `ThreadStartParams`에는 이 시험의 과금 토큰 4,000·캐시 읽기 20,000을 공급자 쪽에서 제한하는 필드가 없다. 사용량은 관측 뒤에 도착하므로 로컬에서 중단해도 이미 진행된 응답의 상한을 보장할 수 없다. `turn/start` 1회로 공급자 모델 요청 1회와 자동 재시도 0회를 보장하는 근거도 미확보 상태다. 상한과 반복 차단을 강제할 수 있는 지원 경로가 입증될 때까지 실제 시험을 보류한다. [App Server](https://learn.chatgpt.com/docs/app-server) · [설정 참조](https://learn.chatgpt.com/docs/config-file/config-reference)
 - **3. 공유 장부.** Bubblewrap을 켠 격리 DB 전환 시험을 2/2 재통과했다. 동일 전송 ID가 코디네이터 행, 잠금 보유 중의 `inflight.json`, 종결 기록에 유지되는 것을 확인했다. 모의 Codex에는 선행 단계의 전송 ID가 들어간 `VERIFY` 한 건만 보냈으며, 응답 유실 뒤 결과는 미계측으로 남겨 후속 전송을 막았다. 실제 App Server의 `threadId`·`turnId`를 전송 ID에 고정하고 최종 사용량과 종료·저장소 상태를 한 건으로 검산하는 어댑터 검증은 남아 있다. 런타임 사용량 이벤트만으로 최종 정산 근거를 확정하지 않는다.
 - **실제 호출 승인.** 시험 계정 지정을 요청했다. 계정 소유자에게만 보이는 항목은 자연 소진 시 Claude `/usage`와 크레딧 상태, Codex 워크스페이스의 유료 대체·자동 충전·크레딧 지출 권한이다. 실제 역할 계정의 새 자연 소진·가용성 관측과 각 계정의 추가 청구 USD 0 증거는 미확보다. 호출 0회. 02-05 단계 8 환경과 원장은 별도 유지한다.
+
+## 실제 첫 전환 시험 대기 결정
+
+PR #95의 독립 승인 head `ef565f4b4592b7b9055c1b5e34712c535b409758`와 병합 SHA `b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6`에서 각각 CI 4/4가 통과했다. 병합 SHA의 모의 공유 장부 시험도 2/2를 통과했다. [PR CI](https://github.com/HeaInSeo/ieo_poc/actions/runs/44293402687) · [main CI](https://github.com/HeaInSeo/ieo_poc/actions/runs/44294601150)
+
+시험 계정은 사용자가 지정한 개발 호스트 기존 Claude 구독 로그인과 현재 Codex CLI의 ChatGPT 계정·워크스페이스다. 모델 없이 확보한 관측에서 Claude의 자연 소진이 확인되지 않았다. App Server 사용량 조회와 크레딧 잔액은 USD 0 정책 증거로 충분하지 않다. 코디네이터 전송 1회는 격리 시험 근거가 있다. 구독 런타임의 공급자 내부 요청 최대 1회, 과금 토큰 4,000 및 캐시 읽기 20,000을 강제하는 근거는 미확보다. 기존 상한을 유지하여 이번 실제 전환 시험만 `WAITING_FOR_PREREQUISITE`로 기록한다. 실제 호출은 0회다. [두 한도의 승인 기준](LIVE_PLAN.md#실제-첫-시험의-전송요청-한도)
