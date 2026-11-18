@@ -1,0 +1,33 @@
+{
+  "repository": "HeaInSeo/ieo_poc",
+  "branch": "main",
+  "head_before": "d27fa96504b568fd3156d6c5ac21e7d2f333ff9e",
+  "head_after": "d27fa96504b568fd3156d6c5ac21e7d2f333ff9e",
+  "observed_at": "2026-11-18T22:49:11+09:00",
+  "source_endpoints": [
+    "GET /repos/HeaInSeo/ieo_poc/branches/main",
+    "GET /repos/HeaInSeo/ieo_poc/branches/main/protection",
+    "GET /repos/HeaInSeo/ieo_poc"
+  ],
+  "branch_protection": {
+    "administrators_included": true,
+    "allow_delete": false,
+    "allow_force_push": false,
+    "allowed_to_push_restrictions": false,
+    "dismiss_stale_reviews": true,
+    "pull_request_protection": true,
+    "require_linear_history": false,
+    "required": [
+      "docs/poc package and progress validation",
+      "rust toolchain pin resolves",
+      "rust fmt clippy test"
+    ],
+    "required_approvals": 0,
+    "strict": true
+  },
+  "merge_methods": {
+    "allow_merge_commit": true,
+    "allow_rebase_merge": false,
+    "allow_squash_merge": false
+  }
+}

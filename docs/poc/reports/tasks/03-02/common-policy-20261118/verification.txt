@@ -1,0 +1,6 @@
+PASS same main SHA before and after settings read
+PASS workflow triggers and read-only default
+PASS 3 protected checks and 1 additional job
+PASS repository settings checked against the captured profile
+PASS test/lint/format commands match exact workflow
+PASS local policy and report references resolve

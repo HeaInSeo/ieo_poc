@@ -1,0 +1,24 @@
+Collector (local commands only)
+    Finished `test` profile [unoptimized] target(s) in 0.08s
+     Running tests/collector.rs (/tmp/ieo-pr91-target/debug/deps/collector-67b7ceda32279717)
+
+running 5 tests
+test launch_failure_still_writes_record ... ok
+test nonzero_exit_is_failure_with_stderr_kept ... ok
+test exit_zero_without_required_evidence_is_incomplete ... ok
+test normal_success_records_everything ... ok
+test timeout_sends_term_and_is_failure ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 1.03s
+
+Coordinator (disposable PostgreSQL, synthetic claims and GitHub events)
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running tests/coordinator.rs (/tmp/ieo-pr91-target/debug/deps/coordinator-dc518a347089295f)
+
+running 4 tests
+test authentication_and_scope_refusals_change_nothing ... ok
+test github_reviews_count_only_at_the_head_and_comments_do_not_clear_changes_requested ... ok
+test review_inputs_are_current_independent_and_for_the_head ... ok
+test verdict_uses_github_and_run_evidence_for_the_recorded_sha_only ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 78 filtered out; finished in 1.49s
