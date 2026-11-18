@@ -1,0 +1,1 @@
+duplicate evidence record: ('08-01', 'failure', 'fixture-meter')

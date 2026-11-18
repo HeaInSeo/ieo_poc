@@ -1,6 +1,6 @@
 # 실험·후속 후보 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0069-X-07-candidate-local` · 원장 SHA-256 `8657bba75c69f5d210dc1923f70617890f3e17bd914deefb8a21243866c1fabd`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0069-X-07-candidate-local` · 원장 SHA-256 `19a556211a15b219493ea34887cade3b9cdc56ffce5f3762be5dc8fd8cb44bb9`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -224,11 +224,61 @@
 
 ### P33 · 결과 처분·코드 재사용·최종 스프린트 연결 검증
 
-연결 작업: ["09-02","09-05"] · 실행 미실행 · 판정 미판정 · 평가 종료 False · 처분 미판정
+연결 작업: ["09-02","09-05"] · 실행 합성 회차 4건 기록 · 판정 미판정 · 평가 종료 False · 처분 미판정
 
-최근 보고: 없음 · 미실행
+최근 보고: [보고](../reports/tasks/09-02/submission-review-20261119/REPORT.md)
 
-회차 없음 · 미실행
+#### 회차 P33-09-02-SYNTHETIC-01 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P33-09-02-SYNTHETIC-01 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | FAIL |
+| checks | 28/32 |
+| latest_report | [보고](../reports/tasks/09-02/p33-synthetic/REPORT.md) |
+
+#### 회차 P33-09-02-SYNTHETIC-02 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P33-09-02-SYNTHETIC-02 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | PASS |
+| checks | 32/32 |
+| candidate_sha | 043546583aa46bf038f51122fc5dbe166d4bbc97 |
+| base_recheck | 28/32 |
+| prior_run_id | P33-09-02-SYNTHETIC-01 |
+| latest_report | [보고](../reports/tasks/09-02/independent-retest/REPORT.md) |
+
+#### 회차 P33-09-02-SYNTHETIC-03 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P33-09-02-SYNTHETIC-03 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | FAIL |
+| checks | 32/34 |
+| latest_report | [보고](../reports/tasks/09-02/remaining-synthetic/REPORT.md) |
+
+#### 회차 P33-09-02-SYNTHETIC-04 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P33-09-02-SYNTHETIC-04 |
+| revision | 1 |
+| execution_kind | synthetic |
+| observed_at | 2026-11-19T00:02:46+09:00 |
+| verdict | PASS |
+| checks | 34/34 |
+| candidate_sha | 4f0468f9afde904791c3af32ffc7dcd008d77e1c |
+| prior_run_id | P33-09-02-SYNTHETIC-03 |
+| verification_scope | 교정 담당의 동결 재실행. 해당 SHA의 독립 코드 승인은 중앙 인계로 확인. |
+| latest_report | [보고](../reports/tasks/09-02/submission-review-20261119/REPORT.md) |
+| evidence | ["reports/tasks/09-02/submission-review-20261119/exact-4f-frozen.txt","reports/tasks/09-02/remaining-correction-20261119/REPORT.md"] |
 
 ### P34 · repo 수명 동안 에이전트 지속성
 

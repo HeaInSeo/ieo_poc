@@ -4,9 +4,10 @@
 Cases: normal render and idempotence, hand-edit detection, invalid ledger (no write), evidence-link rules,
 interrupted generation and regeneration, separate main/follow-up counts, no timer or network use;
 02-01: the same snapshot_id/ledger digest in every view and no combined main+follow-up progress rate.
-Run from anywhere: python3 -I docs/poc/scripts/test_render_progress.py   (prints PASS/FAIL lines, exit 0 on all PASS)
+Run in the package validation Python environment: python3 -I docs/poc/scripts/test_render_progress.py.
+Prints PASS/FAIL lines and exits 0 on all PASS.
 """
-import hashlib, json, shutil, subprocess, sys, tempfile
+import hashlib, json, os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 POC = Path(__file__).resolve().parents[1]
@@ -112,6 +113,128 @@ with tempfile.TemporaryDirectory() as td:
     rc, out = run(root)
     check("accepted_without_evidence_rejected", rc == 1 and "검수 완료" in out, out)
     check("invalid_ledger_writes_nothing", views_digest(root) == base)
+
+with tempfile.TemporaryDirectory() as td:
+    root = fresh(td)
+    base = views_digest(root)
+    ledger = root / "progress/state.json"
+    original = ledger.read_bytes()
+    report_ref = "reports/render-progress-readable-test.txt"
+    report = root / report_ref
+    report.write_text("Renderer regression fixture\n")
+
+    def complete(s, **changes):
+        task = next(t for t in s["tasks"] if t["status"] == "검수 완료")
+        task.update(changes)
+
+    def reject(name, change, error):
+        mutate(root, change)
+        rc, out = run(root)
+        check(name, rc == 1 and error in out and views_digest(root) == base, out)
+        ledger.write_bytes(original)
+
+    reject("empty_evidence_reference_rejected",
+           lambda s: complete(s, evidence=[{}], latest_report=None), "증거/보고 참조")
+    reject("wrong_evidence_container_rejected",
+           lambda s: complete(s, evidence={"ref": report_ref}), "증거는 참조 목록")
+
+    report.chmod(0)
+    try:
+        if not os.access(report, os.R_OK):
+            reject("unreadable_latest_report_rejected",
+                   lambda s: complete(s, latest_report=report_ref), "읽을 수 없는 보고/증거")
+        else:
+            print("SKIP unreadable_latest_report_rejected (runner can read mode 000)")
+    finally:
+        report.chmod(0o600)
+
+    def shrink(s):
+        s["tasks"] = [t for t in s["tasks"] if t["task_id"] != "09-06"]
+        s["baselines"]["main_tasks"] -= 1
+
+    def replace_registration(s):
+        task = next(t for t in s["tasks"] if t["task_id"] == "09-06")
+        task["task_id"] = "99-99"
+
+    def exchange_tracks(s):
+        main = next(t for t in s["tasks"] if t["track"] == "main")
+        followup = next(t for t in s["tasks"] if t["track"] == "followup")
+        main["track"], followup["track"] = followup["track"], main["track"]
+
+    reject("shortened_ledger_and_denominator_rejected", shrink, "ledger ID/track mismatch")
+    reject("unregistered_task_with_same_count_rejected", replace_registration, "ledger ID/track mismatch")
+    reject("registered_tasks_on_wrong_tracks_rejected", exchange_tracks, "ledger ID/track mismatch")
+    reject("changed_approved_experiment_baseline_rejected",
+           lambda s: s["baselines"].update(main_experiments=30), "원장 기준선 불일치")
+
+    def close_experiment(s, original_id, replacement_id):
+        experiment = next(e for e in s["experiments"] if e["experiment_id"] == original_id)
+        experiment.update(experiment_id=replacement_id, evaluation_closed=True, latest_report=report_ref,
+                          runs=[{"run_id": "synthetic-completion", "revision": 1, "latest_report": report_ref}])
+
+    def exchange_experiment_tracks(s):
+        main = next(e for e in s["experiments"] if e["experiment_id"] == "P33")
+        followup = next(e for e in s["experiments"] if e["experiment_id"] == "P29")
+        main["track"], followup["track"] = followup["track"], main["track"]
+
+    reject("excluded_p15_cannot_replace_p33_and_close",
+           lambda s: close_experiment(s, "P33", "P15"), "등록 실험 ID·트랙")
+    reject("unregistered_followup_cannot_replace_graphify_and_close",
+           lambda s: close_experiment(s, "FX-GRAPHIFY", "FX-UNREGISTERED"), "등록 실험 ID·트랙")
+    reject("registered_experiments_on_wrong_tracks_rejected",
+           exchange_experiment_tracks, "등록 실험 ID·트랙")
+
+    mutate(root, lambda s: close_experiment(s, "FX-GRAPHIFY", "FX-GRAPHIFY"))
+    rc, out = run(root)
+    followup_closed = sum(e["track"] == "followup" and e["evaluation_closed"]
+                          for e in json.loads(original)["experiments"] if e["experiment_id"] != "FX-GRAPHIFY")
+    check("registered_followup_closure_counted",
+          rc == 0 and f"| 후속 후보 | {followup_closed + 1}/5 |" in (root / "progress/STATUS.md").read_text(), out)
+
+    mutate(root, lambda s: complete(s, evidence=[{"path": report_ref}], latest_report=report_ref))
+    rc, out = run(root)
+    check("readable_object_evidence_accepted", rc == 0, out)
+
+with tempfile.TemporaryDirectory() as td:
+    root = fresh(Path(td) / "docs")
+    base = views_digest(root)
+    ledger = root / "progress/state.json"
+    original = ledger.read_bytes()
+    report_ref = "reports/p33-package-validation-test.txt"
+    # Package validation also checks links from the documents into the repository.
+    for name in (".github", "contracts", "crates", "probes", "tools"):
+        shutil.copytree(POC.parents[1] / name, Path(td) / name)
+    shutil.copy2(POC.parents[1] / "rust-toolchain.toml", td)
+    (root / report_ref).write_text("Synthetic result, no runtime trial.\n")
+    synthetic = {"run_id": "P33-PACKAGE-TEST", "revision": 1, "execution_kind": "synthetic",
+                 "observed_at": "2026-11-18T00:00:00Z", "verdict": "FAIL",
+                 "latest_report": report_ref, "evidence": [report_ref]}
+
+    def record(s, run):
+        experiment = next(e for e in s["experiments"] if e["experiment_id"] == "P33")
+        experiment["runs"].append(run)
+
+    for name, case_run, error in (
+        ("invalid_run_revision_rejected", {**synthetic, "revision": True}, "잘못된 실험 회차"),
+        ("run_without_report_or_evidence_rejected",
+         {**synthetic, "latest_report": None, "evidence": []}, "보고/증거 참조가 없음"),
+    ):
+        mutate(root, lambda s: record(s, case_run))
+        rc, out = run(root)
+        check(name, rc == 1 and error in out and views_digest(root) == base, out)
+        ledger.write_bytes(original)
+    mutate(root, lambda s: record(s, synthetic))
+    rc, out = run(root)
+    package = subprocess.run([sys.executable, "-I", str(root / "scripts/validate_package.py"), "--root", str(root)],
+                             capture_output=True, text=True)
+    prior = [r.get("execution_kind") for e in json.loads(original)["experiments"] for r in e["runs"]]
+    result = json.loads(package.stdout) if package.returncode == 0 else {}
+    check("package_accepts_synthetic_p33_record",
+          rc == 0 and result.get("ledger_run_revisions") == {
+              "synthetic": prior.count("synthetic") + 1, "actual": prior.count("actual"),
+              "unclassified": sum(kind not in ("synthetic", "actual") for kind in prior),
+          } and result["runtime_probe"] == result["human_trials"] == "NOT_RUN"
+          and "P33-PACKAGE-TEST" in (root / "progress/RESULTS.md").read_text(), out + package.stderr)
 
 with tempfile.TemporaryDirectory() as td:
     root = fresh(td)

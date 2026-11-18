@@ -1,0 +1,22 @@
+Rejected candidate 043546583aa46bf038f51122fc5dbe166d4bbc97
+Before
+0435465 P33 replaced with excluded P15 and a synthetic run: rc=0, | 주계획 실험 | 1/31 |
+0435465 valid P33 synthetic record: renderer rc=0; package rc=1 (empty runs assertion)
+After: targeted results
+PASS excluded_p15_cannot_replace_p33_and_close
+PASS unregistered_followup_cannot_replace_graphify_and_close
+PASS registered_experiments_on_wrong_tracks_rejected
+PASS registered_followup_closure_counted
+PASS invalid_run_revision_rejected
+PASS run_without_report_or_evidence_rejected
+PASS package_accepts_synthetic_p33_record
+After: original P33 run proposal tested in a temporary copy
+{"ok": true, "mode": "render", "files": ["STATUS.md", "TASKS.md", "RESULTS.md", "RESUME.md", "events.jsonl"]}
+{"record": "P33-09-02-SYNTHETIC-01", "verdict": "FAIL", "p33_evaluation_closed": false, "ledger_run_revisions": {"synthetic": 1, "actual": 0, "unclassified": 0}, "runtime_probe": "NOT_RUN", "human_trials": "NOT_RUN"}
+After: original independent runner and expectation bytes unchanged
+3d1a78f6396f0846f68bac1d7583c479e8f0ef6e05a5f615ddcf5fa0e4235eba  EXPECTED.md
+b46bb51335af800aed882a5f419460943d048925d2ce554f682d602f3daeda0e  verify.py
+RESULT 32/32
+Renderer and package regressions: 47 passed
+09-01 compatibility CLI: 22 passed
+PASS validate_package.py, render_progress.py --check, git diff --check

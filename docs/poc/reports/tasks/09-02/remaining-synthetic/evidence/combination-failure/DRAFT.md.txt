@@ -1,0 +1,66 @@
+# Synthetic final sprint
+
+`FINAL-FIXTURE` revision 1 · synthetic · 검토용 초안
+
+[등록 명세](sprint.json) · [결과·처분·자산·변경 근거](export.json) · [진척표](progress/STATUS.md)
+
+독립 검토와 발행 승인 대기. 제품 완료 미확인. 실제 결과 연결은 09-05에서 검증한다.
+
+## 목표와 수용 기준
+
+| 목표 | 요구 ID | 범위 | 입증 대기 | 작업 누락 | 작업 | 수용 기준 |
+| --- | --- | --- | --- | --- | --- | --- |
+| missing | POC-REQ-08-04 | 필수 | missing |  | 90-04 | 관측과 차단을 분리하고 허용/미적용 대조·서버 수신으로 금지 경로의 실제 효과를 확인한다. |
+| optional | POC-REQ-08-03 | 선택 | optional |  |  | 개발/Guardrail/제품 Pod를 분리해 필수 행위·원본 이벤트·귀속·정책 적용·손실/중단 대조를 확인한다. repo/role 라벨·Pod UID·컨테이너 ID와 PID·프로세스 시작 시각·UID·세션/배정 기록을 대조해 역할별 Pod에 귀속한다. |
+| partial | POC-REQ-08-02 | 필수 | restore |  | 90-02, 90-03 | 커널·관측기·정책·Pod 주체·허용/금지 수신기·게시/pull/승격 자격과 초기 상태를 고정한다. |
+| runtime | POC-REQ-08-01 | 필수 |  |  | 90-01, 90-07, 90-31 | 검사·권한·승격 우회와 기동 실패를 차단하고 정상 후보 전환/직전 버전 복귀 뒤 상태를 대조한다. |
+| stale | POC-REQ-08-05 | 필수 | stale |  | 90-05 | PSA Restricted의 정상/위반 명세와 앱의 허용/범위 밖 접근을 각각 검증한다. 두 역할 Pod 모두 Restricted로 실행하고 서로 다른 역할별 NetworkPolicy의 허용/거부를 실제 수신기로 확인한다. 파일·자격 격리는 P07 거부 증거로 대조하며 정책 선언만으로 입증하지 않는다. |
+| unapproved | POC-REQ-08-06 | 필수 | unapproved |  | 90-06 | 한 스프린트에서 재시작·이벤트 누락·교정·런타임 증거 누락·main CI/산출물/후속을 연결해 정상 진행과 잘못된 완료 차단을 확인한다. |
+
+## 결과와 도입 결정
+
+| 목표 | 후보 | 회차 | 버전 | 판정 | 처분 | 채택 범위 | 검토 사유 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| runtime | alternative | alternative r1 | 현재 | PASS | 미판정 |  |  |
+| runtime | base | base r1 | 현재 | PASS | 채택 | base |  |
+| runtime | failure | failure r1 | 현재 | FAIL | 기각 |  |  |
+| runtime | paired-methods | paired-methods r1 | 현재 | FAIL | 기각 |  |  |
+| partial | partial | partial r1 | 현재 | PASS | 부분 채택 | worker |  |
+| optional | optional | optional r1 | 현재 | PASS | 기각 |  |  |
+| missing | missing | missing r1 | 현재 | INCONCLUSIVE | 보류 |  | unreadable_evidence |
+| stale | stale | stale r1 | 현재 | INCONCLUSIVE | 미판정 |  | target_version_mismatch, adoption_scope_unproven |
+| unapproved | unapproved | unapproved r1 | 현재 | INCONCLUSIVE | 미판정 |  | independent_result_review_missing, disposition_approval_missing |
+
+## 재사용 자산
+
+| 자산 | 버전 | 상태 | 대상 | 관련 작업 | 남은 보완 |
+| --- | --- | --- | --- | --- | --- |
+| meter | meter-1 | 편입 대기 | console-coordinator | 90-01 | Separate target integration and regression review. |
+| no-provenance | 미확인 | 보존 전용 | 미확인 |  | 미확인 |
+
+## 남은 작업
+
+| 작업 | 목표·범위 | 유형 | 담당 | 상태 | 선행 | 자산 | 복귀 조건 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 90-01 | runtime / base | integration | development | 편입 대기 |  | meter | Retain the baseline and report failure. |
+| 90-02 | partial / worker | integration | development | 편입 대기 |  |  | Retain the baseline and report failure. |
+| 90-03 | partial / restore | implementation | development | 조건 대기 | 90-02 |  | Retain the baseline and report failure. |
+| 90-04 | missing / missing | experiment | development | 조건 대기 |  |  | Retain the baseline and report failure. |
+| 90-05 | stale / stale | experiment | development | 조건 대기 |  |  | Retain the baseline and report failure. |
+| 90-06 | unapproved / unapproved | integration | development | 조건 대기 |  |  | Retain the baseline and report failure. |
+| 90-07 | runtime / base | experiment | development | 조건 대기 |  |  | Retain the baseline and report failure. |
+| 90-31 | runtime / base | integration | development | 조건 대기 |  |  | Retain the baseline and report failure. |
+
+작업별 공수 근거는 등록 명세에 기록했다. 스프린트 기한은 미확정이다.
+
+## 누적 사용량
+
+| 목표 | 회차 | 계측 시간(ms) | 계측 토큰 합 | 전체 토큰 | 반복 중단 사유 |
+| --- | --- | --- | --- | --- | --- |
+| missing | 1 | 100 | 8 | 8 |  |
+| optional | 1 | 100 | 8 | 8 |  |
+| partial | 1 | 100 | 8 | 8 |  |
+| runtime | 4 | 300 | 16 | 미확인 | attempts_limit_reached, usage_incomplete |
+| stale | 1 | 100 | 8 | 8 |  |
+| unapproved | 1 | 100 | 8 | 8 |  |
+

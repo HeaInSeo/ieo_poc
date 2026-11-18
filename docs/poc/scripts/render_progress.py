@@ -12,6 +12,17 @@ import sys
 from urllib.parse import urlsplit
 
 STATUSES = ('미착수', '준비됨', '진행', '검수 중', '검수 완료', '조건 대기', '종료 미충족')
+MAIN_PLAN = 'Console_Coordinator_Sprints_v0.json'
+FOLLOWUP_PLAN = 'Followup_Execution_v1.3.3.json'
+# v1.3.3 execution ledger §1 and the follow-up plan's candidate-to-experiment table.
+MAIN_EXPERIMENT_IDS = tuple(f'P{number:02d}' for number in (*range(1, 15), *range(16, 29), *range(33, 37)))
+FOLLOWUP_EXPERIMENT_IDS = {
+    'Graphify': 'FX-GRAPHIFY',
+    'SkillOps': 'P32',
+    'SkillOpt': 'P31',
+    'Harness²': 'P29',
+    'Trace2Skill': 'P30',
+}
 
 
 def cell(value):
@@ -23,7 +34,7 @@ def cell(value):
 
 
 def local_ref(root, ref):
-    if not isinstance(ref, str) or not ref:
+    if not isinstance(ref, str) or not ref.strip():
         raise ValueError('비어 있거나 잘못된 증거/보고 참조')
     parsed = urlsplit(ref)
     if parsed.scheme:
@@ -39,6 +50,16 @@ def local_ref(root, ref):
     return resolved
 
 
+def check_ref(root, ref):
+    path = local_ref(root, ref)
+    if path is not None:
+        try:
+            with path.open('rb') as file:
+                file.read(1)
+        except OSError as error:
+            raise ValueError('읽을 수 없는 보고/증거 경로: ' + ref) from error
+
+
 def link(ref, label='보고'):
     if not ref:
         return '없음 · 미실행'
@@ -46,33 +67,56 @@ def link(ref, label='보고'):
     return '[' + cell(label) + '](' + href.replace(' ', '%20').replace(')', '%29') + ')'
 
 
-def validate_state(root, s):
+def validate_state(root, s, *, main_plan=None, followup_plan=None):
     task_ids = [t['task_id'] for t in s['tasks']]
     if len(task_ids) != len(set(task_ids)):
         raise ValueError('중복 작업 ID')
-    for track, key in [('main', 'main_tasks'), ('followup', 'followup_tasks')]:
-        if sum(t['track'] == track for t in s['tasks']) != s['baselines'][key]:
-            raise ValueError('기준선과 작업 수 불일치: ' + track)
+    if main_plan is None:
+        main_plan = json.loads((root / MAIN_PLAN).read_bytes())
+    if followup_plan is None:
+        followup_plan = json.loads((root / FOLLOWUP_PLAN).read_bytes())
+    if not s['plan_version'] == main_plan['plan_version'] == followup_plan['version']:
+        raise ValueError('원장과 등록 계획 버전 불일치')
+    main_ids = [t['task_id'] for sprint in main_plan['sprints'] for t in sprint['tasks']]
+    followup_ids = [t['id'] for t in followup_plan['tasks']]
+    if len(set(main_ids + followup_ids)) != len(main_ids) + len(followup_ids):
+        raise ValueError('등록 계획의 중복 작업 ID')
+    if len(main_ids) != main_plan['baseline_tasks'] or len(followup_ids) != followup_plan['baseline_tasks']:
+        raise ValueError('등록 계획의 기준선과 작업 수 불일치')
+    expected = {**dict.fromkeys(main_ids, 'main'), **dict.fromkeys(followup_ids, 'followup')}
+    if {t['task_id']: t['track'] for t in s['tasks']} != expected:
+        raise ValueError('ledger ID/track mismatch: 등록 작업 ID·트랙 기준선과 불일치')
+    candidates = followup_plan['candidate_order']
+    if (len(MAIN_EXPERIMENT_IDS) != main_plan['baseline_experiments']
+        or len(candidates) != len(FOLLOWUP_EXPERIMENT_IDS)
+        or set(candidates) != FOLLOWUP_EXPERIMENT_IDS.keys()):
+        raise ValueError('등록 계획과 실험 ID 기준선 불일치')
+    baselines = {
+        'main_tasks': main_plan['baseline_tasks'],
+        'followup_tasks': followup_plan['baseline_tasks'],
+        'main_experiments': main_plan['baseline_experiments'],
+        'followup_candidates': len(candidates),
+    }
+    if s['baselines'] != baselines:
+        raise ValueError('등록 계획과 원장 기준선 불일치')
     # Extra tasks (X-*, amendment A3) are listed apart and never enter the 73/12 counts.
-    extra_ids = [t['task_id'] for t in s.get('extra_tasks', [])]
+    extras = s.get('extra_tasks', [])
+    extra_ids = [t['task_id'] for t in extras]
     if len(extra_ids) != len(set(extra_ids)) or set(extra_ids) & set(task_ids):
         raise ValueError('중복 추가 작업 ID')
-    for t in s.get('extra_tasks', []):
+    for t in extras:
         if t.get('track') != 'extra' or not t['task_id'].startswith('X-'):
             raise ValueError('추가 작업은 track=extra, ID X-*: ' + t['task_id'])
-        if t['status'] not in STATUSES:
-            raise ValueError('알 수 없는 추가 작업 상태: ' + t['task_id'])
-        if t['status'] == '검수 완료' and (
-            t.get('verification_level') != 'verified' or not t.get('evidence')
-        ):
-            raise ValueError('검수 완료에 verified/증거가 없음: ' + t['task_id'])
     exp_ids = [e['experiment_id'] for e in s['experiments']]
     if len(exp_ids) != len(set(exp_ids)):
         raise ValueError('중복 실험 ID')
-    for track, key in [('main', 'main_experiments'), ('followup', 'followup_candidates')]:
-        if sum(e['track'] == track for e in s['experiments']) != s['baselines'][key]:
-            raise ValueError('기준선과 실험 수 불일치: ' + track)
-    for t in s['tasks']:
+    expected_experiments = {
+        **dict.fromkeys(MAIN_EXPERIMENT_IDS, 'main'),
+        **dict.fromkeys(FOLLOWUP_EXPERIMENT_IDS.values(), 'followup'),
+    }
+    if {e['experiment_id']: e['track'] for e in s['experiments']} != expected_experiments:
+        raise ValueError('등록 실험 ID·트랙 기준선과 불일치')
+    for t in s['tasks'] + extras:
         if t['status'] not in STATUSES:
             raise ValueError('알 수 없는 작업 상태: ' + t['task_id'])
         if t['status'] == '검수 완료' and (
@@ -82,10 +126,22 @@ def validate_state(root, s):
     for e in s['experiments']:
         if not set(e.get('task_ids', [])).issubset(task_ids):
             raise ValueError('실험의 미정의 작업 참조')
-        runs = [(r['run_id'], r.get('revision', 1)) for r in e.get('runs', [])]
-        if len(runs) != len(set(runs)):
-            raise ValueError('중복 실험 회차 revision')
-        if e.get('evaluation_closed') and not e.get('runs'):
+        runs = e.get('runs', [])
+        if not isinstance(runs, list):
+            raise ValueError('실험 회차는 목록이어야 함')
+        run_keys = set()
+        for run in runs:
+            if not isinstance(run, dict):
+                raise ValueError('실험 회차는 객체여야 함')
+            run_id, revision = run.get('run_id'), run.get('revision', 1)
+            if not isinstance(run_id, str) or not run_id.strip() or type(revision) is not int or revision < 1:
+                raise ValueError('잘못된 실험 회차 ID/revision')
+            if (run_id, revision) in run_keys:
+                raise ValueError('중복 실험 회차 revision')
+            run_keys.add((run_id, revision))
+            if not run.get('latest_report') and not run.get('evidence'):
+                raise ValueError('실험 회차에 보고/증거 참조가 없음: ' + run_id)
+        if e.get('evaluation_closed') and not runs:
             raise ValueError('실제 회차 없는 평가 종료')
 
     # Check explicit refs before writing any view. URLs are not fetched or claimed verified.
@@ -94,13 +150,16 @@ def validate_state(root, s):
             if v.get('is_template'):
                 raise ValueError('양식을 실제 회차로 집계할 수 없음')
             for k, x in v.items():
-                if k == 'latest_report' and x:
-                    local_ref(root, x)
-                elif k == 'evidence' and isinstance(x, list):
+                if k == 'latest_report' and x is not None:
+                    check_ref(root, x)
+                elif k == 'evidence':
+                    if not isinstance(x, list):
+                        raise ValueError('증거는 참조 목록이어야 함')
                     for entry in x:
-                        ref = entry if isinstance(entry, str) else entry.get('ref') or entry.get('path') or entry.get('url')
-                        if ref:
-                            local_ref(root, ref)
+                        ref = entry
+                        if isinstance(entry, dict):
+                            ref = entry.get('ref') or entry.get('path') or entry.get('url')
+                        check_ref(root, ref)
                 refs(x)
         elif isinstance(v, list):
             for x in v:
@@ -114,8 +173,8 @@ def validate_state(root, s):
         raise ValueError('중복 사건 revision')
 
 
-def render(root):
-    raw = (root / 'progress/state.json').read_bytes()
+def render(root, *, state_bytes=None):
+    raw = (root / 'progress/state.json').read_bytes() if state_bytes is None else state_bytes
     s = json.loads(raw)
     validate_state(root, s)
     digest = hashlib.sha256(raw).hexdigest()

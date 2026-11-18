@@ -1,0 +1,830 @@
+[
+  {
+    "v1.2": "01-01",
+    "title": "01-01 · 목표·필수 기능·선택적 방법의 범위표",
+    "refs": "T01",
+    "documented": "01-01",
+    "exported": "01-01",
+    "registered_title": null,
+    "registered_refs": [
+      "T01"
+    ]
+  },
+  {
+    "v1.2": "01-02",
+    "title": "01-02 · 에이전트 런타임·역할·인증·재개 계약",
+    "refs": "T01 · T06",
+    "documented": "01-02",
+    "exported": "01-02",
+    "registered_title": null,
+    "registered_refs": [
+      "T01",
+      "T06"
+    ]
+  },
+  {
+    "v1.2": "01-03",
+    "title": "01-03 · 표본·독립 기대값·예산·기한",
+    "refs": "T01 · T08",
+    "documented": "01-03",
+    "exported": "01-03",
+    "registered_title": null,
+    "registered_refs": [
+      "T01",
+      "T08"
+    ]
+  },
+  {
+    "v1.2": "01-04",
+    "title": "01-04 · 시험 repo·DB·수신기·역할 자격",
+    "refs": "T05",
+    "documented": "01-04",
+    "exported": "01-04",
+    "registered_title": null,
+    "registered_refs": [
+      "T05"
+    ]
+  },
+  {
+    "v1.2": "01-05",
+    "title": "01-05 · 원본·기준선·운영 충돌 범위 기록",
+    "refs": "T01 · T05",
+    "documented": "01-05",
+    "exported": "01-05",
+    "registered_title": null,
+    "registered_refs": [
+      "T01",
+      "T05"
+    ]
+  },
+  {
+    "v1.2": "01-06",
+    "title": "01-06 · 시험실 초기화·증거 보존 경로",
+    "refs": "T05",
+    "documented": "01-06",
+    "exported": "01-06",
+    "registered_title": null,
+    "registered_refs": [
+      "T05"
+    ]
+  },
+  {
+    "v1.2": "02-01",
+    "title": "02-01 · 명령 실행·증거 수집·비용 계측기",
+    "refs": "T03",
+    "documented": "02-01",
+    "exported": "02-01",
+    "registered_title": null,
+    "registered_refs": [
+      "T03"
+    ]
+  },
+  {
+    "v1.2": "02-02",
+    "title": "02-02 · 독립 기대값·모의 시계·평가 자료",
+    "refs": "T03 · T08",
+    "documented": "02-02",
+    "exported": "02-02",
+    "registered_title": null,
+    "registered_refs": [
+      "T03",
+      "T08"
+    ]
+  },
+  {
+    "v1.2": "02-03",
+    "title": "02-03 · DB 스키마·API·소유권·사건 기록",
+    "refs": "T06",
+    "documented": "02-03",
+    "exported": "02-03",
+    "registered_title": null,
+    "registered_refs": [
+      "T06"
+    ]
+  },
+  {
+    "v1.2": "02-04",
+    "title": "02-04 · PID 1·역할별 기동·체크포인트·재개",
+    "refs": "T06",
+    "documented": "02-04",
+    "exported": "02-04",
+    "registered_title": null,
+    "registered_refs": [
+      "T06"
+    ]
+  },
+  {
+    "v1.2": "02-05",
+    "title": "02-05 · 문서 버전·배정·실제 인수 연결",
+    "refs": "T06",
+    "documented": "02-05",
+    "exported": "02-05",
+    "registered_title": null,
+    "registered_refs": [
+      "T06"
+    ]
+  },
+  {
+    "v1.2": "02-06",
+    "title": "02-06 · 현재 SHA 검토·교정·timeout 연결",
+    "refs": "T06",
+    "documented": "02-06",
+    "exported": "02-06",
+    "registered_title": null,
+    "registered_refs": [
+      "T06"
+    ]
+  },
+  {
+    "v1.2": "02-07",
+    "title": "02-07 · 완료 판정·보고 대기·현황 조회",
+    "refs": "T06",
+    "documented": "02-07",
+    "exported": "02-07",
+    "registered_title": null,
+    "registered_refs": [
+      "T06"
+    ]
+  },
+  {
+    "v1.2": "02-08",
+    "title": "02-08 · 후속 DAG 대조·외부 감시기",
+    "refs": "T06",
+    "documented": "02-08",
+    "exported": "02-08",
+    "registered_title": null,
+    "registered_refs": [
+      "T06"
+    ]
+  },
+  {
+    "v1.2": "02-09",
+    "title": "02-09 · 결과 처분·자산 목록·문서 변환기",
+    "refs": "T09",
+    "documented": "09-01",
+    "exported": "09-01",
+    "registered_title": null,
+    "registered_refs": [
+      "T09"
+    ]
+  },
+  {
+    "v1.2": "03-01",
+    "title": "03-01 · 카탈로그 계약·색인·원본 대응표",
+    "refs": "T02",
+    "documented": "03-01",
+    "exported": "03-01",
+    "registered_title": null,
+    "registered_refs": [
+      "T02"
+    ]
+  },
+  {
+    "v1.2": "03-02",
+    "title": "03-02 · 공통 정책·역할·GitHub 기준 문서",
+    "refs": "T02",
+    "documented": "03-02",
+    "exported": "03-02",
+    "registered_title": null,
+    "registered_refs": [
+      "T02"
+    ]
+  },
+  {
+    "v1.2": "03-03",
+    "title": "03-03 · Go·Rust 상세 항목과 실행 예",
+    "refs": "T02",
+    "documented": "03-03",
+    "exported": "03-03",
+    "registered_title": null,
+    "registered_refs": [
+      "T02"
+    ]
+  },
+  {
+    "v1.2": "03-04",
+    "title": "03-04 · 자료의 충실도·정확성 독립 검증",
+    "refs": "P25",
+    "documented": "03-04",
+    "exported": "03-04",
+    "registered_title": null,
+    "registered_refs": [
+      "P25"
+    ]
+  },
+  {
+    "v1.2": "03-05",
+    "title": "03-05 · 정책 내장 이미지·프로파일 후보",
+    "refs": "T04",
+    "documented": "03-05",
+    "exported": "03-05",
+    "registered_title": null,
+    "registered_refs": [
+      "T04"
+    ]
+  },
+  {
+    "v1.2": "03-06",
+    "title": "03-06 · 공통 이미지 기본 실행·권한·재현성",
+    "refs": "P22-B",
+    "documented": "03-06",
+    "exported": "03-06",
+    "registered_title": null,
+    "registered_refs": [
+      "P22-B"
+    ]
+  },
+  {
+    "v1.2": "03-07",
+    "title": "03-07 · 이미지·필수 품질 프로파일 강제",
+    "refs": "P08",
+    "documented": "03-07",
+    "exported": "03-07",
+    "registered_title": null,
+    "registered_refs": [
+      "P08"
+    ]
+  },
+  {
+    "v1.2": "03-08",
+    "title": "03-08 · 통합/언어별 이미지 비용 비교",
+    "refs": "P22-C",
+    "documented": "03-08",
+    "exported": "03-08",
+    "registered_title": null,
+    "registered_refs": [
+      "P22-C"
+    ]
+  },
+  {
+    "v1.2": "04-01",
+    "title": "04-01 · 구현 전 설계 오류 발견",
+    "refs": "P01",
+    "documented": "04-01",
+    "exported": "04-01",
+    "registered_title": null,
+    "registered_refs": [
+      "P01"
+    ]
+  },
+  {
+    "v1.2": "04-02",
+    "title": "04-02 · 정본·실행 문서 변경과 구버전 차단",
+    "refs": "P02",
+    "documented": "04-02",
+    "exported": "04-02",
+    "registered_title": null,
+    "registered_refs": [
+      "P02"
+    ]
+  },
+  {
+    "v1.2": "04-03",
+    "title": "04-03 · 실제 에이전트·API·DB·PR 연결",
+    "refs": "P03",
+    "documented": "04-03",
+    "exported": "04-03",
+    "registered_title": null,
+    "registered_refs": [
+      "P03"
+    ]
+  },
+  {
+    "v1.2": "04-04",
+    "title": "04-04 · 원자성·중복·잠금·repo 권한",
+    "refs": "P04",
+    "documented": "04-04",
+    "exported": "04-04",
+    "registered_title": null,
+    "registered_refs": [
+      "P04"
+    ]
+  },
+  {
+    "v1.2": "04-05",
+    "title": "04-05 · 재시작·세션 복구·한도 해소 재개",
+    "refs": "P05",
+    "documented": "04-05",
+    "exported": "04-05",
+    "registered_title": null,
+    "registered_refs": [
+      "P05-R"
+    ]
+  },
+  {
+    "v1.2": "04-06",
+    "title": "04-06 · 외부 결과 유실·격리·자동 재개",
+    "refs": "P06",
+    "documented": "04-06",
+    "exported": "04-06",
+    "registered_title": null,
+    "registered_refs": [
+      "P06"
+    ]
+  },
+  {
+    "v1.2": "04-07",
+    "title": "04-07 · 현재 SHA·숨긴 결함·검토 정지",
+    "refs": "P07",
+    "documented": "04-07",
+    "exported": "04-07",
+    "registered_title": null,
+    "registered_refs": [
+      "P07"
+    ]
+  },
+  {
+    "v1.2": "04-08",
+    "title": "04-08 · 완료와 보고 수신의 분리",
+    "refs": "P13",
+    "documented": "04-08",
+    "exported": "04-08",
+    "registered_title": null,
+    "registered_refs": [
+      "P13"
+    ]
+  },
+  {
+    "v1.2": "04-09",
+    "title": "04-09 · 최소 현황·보고의 사람 이해도",
+    "refs": "P12",
+    "documented": "04-09",
+    "exported": "04-09",
+    "registered_title": null,
+    "registered_refs": [
+      "P12"
+    ]
+  },
+  {
+    "v1.2": "04-10",
+    "title": "04-10 · NPG 기준선·책임·정책 이전",
+    "refs": "P21",
+    "documented": "04-10",
+    "exported": "04-10",
+    "registered_title": null,
+    "registered_refs": [
+      "P21"
+    ]
+  },
+  {
+    "v1.2": "04-11",
+    "title": "04-11 · 직접 후속 전부 처분·이월·인수",
+    "refs": "P28",
+    "documented": "04-11",
+    "exported": "04-11",
+    "registered_title": null,
+    "registered_refs": [
+      "P28"
+    ]
+  },
+  {
+    "v1.2": "04-12",
+    "title": "04-12 · 별도 감시의 정지·정상 대기·회복",
+    "refs": "P28",
+    "documented": "04-12",
+    "exported": "04-12",
+    "registered_title": null,
+    "registered_refs": [
+      "P28"
+    ]
+  },
+  {
+    "v1.2": "05-01",
+    "title": "05-01 · 보호된 CI 실행·검사 발행 후보",
+    "refs": "T04 · P23",
+    "documented": "05-01",
+    "exported": "05-01",
+    "registered_title": null,
+    "registered_refs": [
+      "T04",
+      "P23"
+    ]
+  },
+  {
+    "v1.2": "05-02",
+    "title": "05-02 · Actions의 정상/거짓 성공 대조",
+    "refs": "P23",
+    "documented": "05-02",
+    "exported": "05-02",
+    "registered_title": null,
+    "registered_refs": [
+      "P23"
+    ]
+  },
+  {
+    "v1.2": "05-03",
+    "title": "05-03 · 저장소 설정·브랜치·App·권한",
+    "refs": "P23",
+    "documented": "05-03",
+    "exported": "05-03",
+    "registered_title": null,
+    "registered_refs": [
+      "P23"
+    ]
+  },
+  {
+    "v1.2": "05-04",
+    "title": "05-04 · 처분·자산·진척·변환의 합성 검증",
+    "refs": "P33",
+    "documented": "09-02",
+    "exported": "09-02",
+    "registered_title": null,
+    "registered_refs": [
+      "P33"
+    ]
+  },
+  {
+    "v1.2": "05-05",
+    "title": "05-05 · 씨앗 v0·외부 실행/복귀 절차 고정",
+    "refs": "T06 · S0",
+    "documented": "05-05",
+    "exported": "05-05",
+    "registered_title": null,
+    "registered_refs": [
+      "T06",
+      "S0"
+    ]
+  },
+  {
+    "v1.2": "06-01",
+    "title": "06-01 · 자기 repo의 실제 한 변경 조율",
+    "refs": "P17 · S1",
+    "documented": "06-01",
+    "exported": "06-01",
+    "registered_title": null,
+    "registered_refs": [
+      "P17",
+      "S1"
+    ]
+  },
+  {
+    "v1.2": "06-02",
+    "title": "06-02 · 후보 GHCR 게시·pull·digest 연결",
+    "refs": "P19-B",
+    "documented": "06-02",
+    "exported": "06-02",
+    "registered_title": null,
+    "registered_refs": [
+      "P19-B"
+    ]
+  },
+  {
+    "v1.2": "06-03",
+    "title": "06-03 · Go 새 repo의 카탈로그 활용 비교",
+    "refs": "P20",
+    "documented": "06-03",
+    "exported": "06-03",
+    "registered_title": null,
+    "registered_refs": [
+      "P23-COMMON",
+      "P20"
+    ]
+  },
+  {
+    "v1.2": "06-04",
+    "title": "06-04 · Rust 새 repo의 카탈로그 활용 비교",
+    "refs": "P20",
+    "documented": "06-04",
+    "exported": "06-04",
+    "registered_title": null,
+    "registered_refs": [
+      "P23-COMMON",
+      "P20"
+    ]
+  },
+  {
+    "v1.2": "06-05",
+    "title": "06-05 · Go 내장 정책의 수정·재검증 루프",
+    "refs": "P24",
+    "documented": "06-05",
+    "exported": "06-05",
+    "registered_title": null,
+    "registered_refs": [
+      "P24"
+    ]
+  },
+  {
+    "v1.2": "06-06",
+    "title": "06-06 · Rust 내장 정책의 수정·재검증 루프",
+    "refs": "P24",
+    "documented": "06-06",
+    "exported": "06-06",
+    "registered_title": null,
+    "registered_refs": [
+      "P24"
+    ]
+  },
+  {
+    "v1.2": "07-01",
+    "title": "07-01 · 실제 표본 환경·프로파일·독점 범위",
+    "refs": "T05 · P26",
+    "documented": "07-01",
+    "exported": "07-01",
+    "registered_title": null,
+    "registered_refs": [
+      "T05",
+      "P26"
+    ]
+  },
+  {
+    "v1.2": "07-02",
+    "title": "07-02 · NodeKit 실제 표본의 무개입 산출",
+    "refs": "P26",
+    "documented": "07-02",
+    "exported": "07-02",
+    "registered_title": null,
+    "registered_refs": [
+      "P26"
+    ]
+  },
+  {
+    "v1.2": "07-03",
+    "title": "07-03 · Sori 실제 표본의 무개입 산출",
+    "refs": "P26",
+    "documented": "07-03",
+    "exported": "07-03",
+    "registered_title": null,
+    "registered_refs": [
+      "P26"
+    ]
+  },
+  {
+    "v1.2": "07-04",
+    "title": "07-04 · 실제 현황·제품 과업의 사람 평가",
+    "refs": "P12",
+    "documented": "07-04",
+    "exported": "07-04",
+    "registered_title": null,
+    "registered_refs": [
+      "P12"
+    ]
+  },
+  {
+    "v1.2": "07-05",
+    "title": "07-05 · 실제 실행 범위의 후속·외부 감시",
+    "refs": "P28",
+    "documented": "07-05",
+    "exported": "07-05",
+    "registered_title": null,
+    "registered_refs": [
+      "P28"
+    ]
+  },
+  {
+    "v1.2": "07-06",
+    "title": "07-06 · 현 운영 조사·격리 전환/복귀 연습",
+    "refs": "P27-R",
+    "documented": "07-06",
+    "exported": "07-06",
+    "registered_title": null,
+    "registered_refs": [
+      "P27-R"
+    ]
+  },
+  {
+    "v1.2": "07-07",
+    "title": "07-07 · 승인 범위 실제 이전·인수·복귀",
+    "refs": "P27-L",
+    "documented": "07-07",
+    "exported": "07-07",
+    "registered_title": null,
+    "registered_refs": [
+      "P27-L"
+    ]
+  },
+  {
+    "v1.2": "08-01",
+    "title": "08-01 · 후보 자기 변경 차단·격리 전환/복귀",
+    "refs": "P18 · S2",
+    "documented": "08-01",
+    "exported": "08-01",
+    "registered_title": null,
+    "registered_refs": [
+      "P18",
+      "S2"
+    ]
+  },
+  {
+    "v1.2": "08-02",
+    "title": "08-02 · 클러스터·노드 관측·시험 서버 준비",
+    "refs": "T05",
+    "documented": "08-02",
+    "exported": "08-02",
+    "registered_title": null,
+    "registered_refs": [
+      "T05"
+    ]
+  },
+  {
+    "v1.2": "08-03",
+    "title": "08-03 · 행동 관측·Pod 귀속·관측 누락",
+    "refs": "P09",
+    "documented": "08-03",
+    "exported": "08-03",
+    "registered_title": null,
+    "registered_refs": [
+      "P09"
+    ]
+  },
+  {
+    "v1.2": "08-04",
+    "title": "08-04 · 정책 위반 탐지와 실제 연결 차단",
+    "refs": "P10",
+    "documented": "08-04",
+    "exported": "08-04",
+    "registered_title": null,
+    "registered_refs": [
+      "P10"
+    ]
+  },
+  {
+    "v1.2": "08-05",
+    "title": "08-05 · 배포 정책·애플리케이션 권한",
+    "refs": "P11",
+    "documented": "08-05",
+    "exported": "08-05",
+    "registered_title": null,
+    "registered_refs": [
+      "P11"
+    ]
+  },
+  {
+    "v1.2": "08-06",
+    "title": "08-06 · 클러스터 종단·병합 이후·후속 실증",
+    "refs": "P14",
+    "documented": "08-06",
+    "exported": "08-06",
+    "registered_title": null,
+    "registered_refs": [
+      "P14"
+    ]
+  },
+  {
+    "v1.2": "08-07",
+    "title": "08-07 · 검증된 digest의 Kubernetes 승격",
+    "refs": "P19-S · S3",
+    "documented": "08-07",
+    "exported": "08-07",
+    "registered_title": null,
+    "registered_refs": [
+      "P19-S",
+      "S3"
+    ]
+  },
+  {
+    "v1.2": "08-08",
+    "title": "08-08 · eBPF 추가 가치·Aya 필요성 평가",
+    "refs": "P16",
+    "documented": "08-08",
+    "exported": "08-08",
+    "registered_title": null,
+    "registered_refs": [
+      "P16"
+    ]
+  },
+  {
+    "v1.2": "09-01",
+    "title": "09-01 · 기록 정규화·비밀 제거·독립 평가 분할",
+    "refs": "T08",
+    "documented": "F03",
+    "exported": "F03",
+    "registered_title": "실제 개발 기록의 정규화·독립 평가 분할",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "09-02",
+    "title": "09-02 · Harness² 원본·최소 연결",
+    "refs": "T07",
+    "documented": "F08",
+    "exported": "F08",
+    "registered_title": "Harness² 원본·최소 연결",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "09-03",
+    "title": "09-03 · Trace2Skill 원본·기록 입력 연결",
+    "refs": "T07",
+    "documented": "F10",
+    "exported": "F10",
+    "registered_title": "Trace2Skill 이용 조건·v5/코드 차이·기록 입력",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "09-04",
+    "title": "09-04 · SkillOpt 원본·실행/점수 연결",
+    "refs": "T07",
+    "documented": "F06",
+    "exported": "F06",
+    "registered_title": "SkillOpt 원본·실행/점수 연결",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "09-05",
+    "title": "09-05 · SkillOps 원본·계약/관계 연결",
+    "refs": "T07",
+    "documented": "F04",
+    "exported": "F04",
+    "registered_title": "SkillOps 원본·계약/관계 연결",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "10-01",
+    "title": "10-01 · Harness² 독립 효과·비용 비교",
+    "refs": "P29",
+    "documented": "F09",
+    "exported": "F09",
+    "registered_title": "Harness² 독립 효과·비용 비교",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "10-02",
+    "title": "10-02 · Trace2Skill 생성·검증·새 repo 평가",
+    "refs": "P30",
+    "documented": "F11",
+    "exported": "F11",
+    "registered_title": "Trace2Skill 생성·준비 검증·새 repo 평가",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "10-03",
+    "title": "10-03 · SkillOpt 제한 수정·독립 최종 평가",
+    "refs": "P31",
+    "documented": "F07",
+    "exported": "F07",
+    "registered_title": "SkillOpt 제한 수정·독립 최종 평가",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "10-04",
+    "title": "10-04 · SkillOps 계약·관계·유지보수 평가",
+    "refs": "P32",
+    "documented": "F05",
+    "exported": "F05",
+    "registered_title": "SkillOps 계약·관계·유지보수 평가",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "10-05",
+    "title": "10-05 · 선택 조합·새 버전의 편입 처분",
+    "refs": "P29 · P30 · P31 · P32",
+    "documented": "F12",
+    "exported": "F12",
+    "registered_title": "선택 조합·새 버전의 편입 처분",
+    "registered_refs": null
+  },
+  {
+    "v1.2": "11-01",
+    "title": "11-01 · 원본 결과·처분·후속 영향 동결",
+    "refs": "T09",
+    "documented": "09-03",
+    "exported": "09-03",
+    "registered_title": null,
+    "registered_refs": [
+      "T09"
+    ]
+  },
+  {
+    "v1.2": "11-02",
+    "title": "11-02 · 재사용 자산·제품화 보완 목록",
+    "refs": "T09",
+    "documented": "09-04",
+    "exported": "09-04",
+    "registered_title": null,
+    "registered_refs": [
+      "T09"
+    ]
+  },
+  {
+    "v1.2": "11-03",
+    "title": "11-03 · 실제 보고→진척→스프린트 연결 검증",
+    "refs": "P33",
+    "documented": "09-05",
+    "exported": "09-05",
+    "registered_title": null,
+    "registered_refs": [
+      "P33"
+    ]
+  },
+  {
+    "v1.2": "11-04",
+    "title": "11-04 · 최종 개발 스프린트 초안과 공수",
+    "refs": "T09",
+    "documented": "09-06",
+    "exported": "09-06",
+    "registered_title": null,
+    "registered_refs": [
+      "T09"
+    ]
+  },
+  {
+    "v1.2": "11-05",
+    "title": "11-05 · 독립 검토 반영·최종 보고 인계",
+    "refs": "T09",
+    "documented": "09-07",
+    "exported": "09-07",
+    "registered_title": null,
+    "registered_refs": [
+      "T09"
+    ]
+  }
+]

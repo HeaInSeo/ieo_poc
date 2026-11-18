@@ -1,0 +1,195 @@
+{
+  "P12": {
+    "mapping": {
+      "04-09": "04-09",
+      "07-04": "07-04"
+    },
+    "ledger_links": [
+      "04-09",
+      "07-04"
+    ],
+    "via": {}
+  },
+  "P19": {
+    "mapping": {
+      "06-02": "06-02",
+      "08-07": "08-07"
+    },
+    "ledger_links": [
+      "06-02",
+      "08-07"
+    ],
+    "via": {}
+  },
+  "P20": {
+    "mapping": {
+      "06-03": "06-03",
+      "06-04": "06-04"
+    },
+    "ledger_links": [
+      "06-03",
+      "06-04"
+    ],
+    "via": {}
+  },
+  "P24": {
+    "mapping": {
+      "06-05": "06-05",
+      "06-06": "06-06"
+    },
+    "ledger_links": [
+      "06-05",
+      "06-06"
+    ],
+    "via": {}
+  },
+  "P22": {
+    "mapping": {
+      "03-06": "03-06",
+      "03-08": "03-08"
+    },
+    "ledger_links": [
+      "03-06",
+      "03-08"
+    ],
+    "via": {}
+  },
+  "P23": {
+    "mapping": {
+      "05-01": "05-01",
+      "05-02": "05-02",
+      "05-03": "05-03"
+    },
+    "ledger_links": [
+      "05-01",
+      "05-02",
+      "05-03",
+      "06-03",
+      "06-04"
+    ],
+    "via": {}
+  },
+  "P26": {
+    "mapping": {
+      "07-02": "07-02",
+      "07-03": "07-03"
+    },
+    "ledger_links": [
+      "07-01",
+      "07-02",
+      "07-03"
+    ],
+    "via": {}
+  },
+  "P27": {
+    "mapping": {
+      "07-06": "07-06",
+      "07-07": "07-07"
+    },
+    "ledger_links": [
+      "07-06",
+      "07-07"
+    ],
+    "via": {}
+  },
+  "P28": {
+    "mapping": {
+      "04-11": "04-11",
+      "04-12": "04-12",
+      "07-05": "07-05"
+    },
+    "ledger_links": [
+      "04-11",
+      "04-12",
+      "07-05"
+    ],
+    "via": {}
+  },
+  "P29": {
+    "mapping": {
+      "09-01": "F03",
+      "09-02": "F08",
+      "10-01": "F09",
+      "10-05": "F12"
+    },
+    "ledger_links": [
+      "F08",
+      "F09"
+    ],
+    "via": {
+      "shared_source": "F03",
+      "combination": "F12",
+      "candidate_depends_on_source": true,
+      "evaluation_depends_on_candidate": true,
+      "combination_depends_on_evaluation": true
+    }
+  },
+  "P30": {
+    "mapping": {
+      "09-01": "F03",
+      "09-03": "F10",
+      "10-02": "F11",
+      "10-05": "F12"
+    },
+    "ledger_links": [
+      "F10",
+      "F11"
+    ],
+    "via": {
+      "shared_source": "F03",
+      "combination": "F12",
+      "candidate_depends_on_source": true,
+      "evaluation_depends_on_candidate": true,
+      "combination_depends_on_evaluation": true
+    }
+  },
+  "P31": {
+    "mapping": {
+      "09-01": "F03",
+      "09-04": "F06",
+      "10-03": "F07",
+      "10-05": "F12"
+    },
+    "ledger_links": [
+      "F06",
+      "F07"
+    ],
+    "via": {
+      "shared_source": "F03",
+      "combination": "F12",
+      "candidate_depends_on_source": true,
+      "evaluation_depends_on_candidate": true,
+      "combination_depends_on_evaluation": true
+    }
+  },
+  "P32": {
+    "mapping": {
+      "09-01": "F03",
+      "09-05": "F04",
+      "10-04": "F05",
+      "10-05": "F12"
+    },
+    "ledger_links": [
+      "F04",
+      "F05"
+    ],
+    "via": {
+      "shared_source": "F03",
+      "combination": "F12",
+      "candidate_depends_on_source": true,
+      "evaluation_depends_on_candidate": true,
+      "combination_depends_on_evaluation": true
+    }
+  },
+  "P33": {
+    "mapping": {
+      "05-04": "09-02",
+      "11-03": "09-05"
+    },
+    "ledger_links": [
+      "09-02",
+      "09-05"
+    ],
+    "via": {}
+  }
+}

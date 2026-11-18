@@ -1,0 +1,1 @@
+Combined fixture: outputs conflict; standalone control is valid.

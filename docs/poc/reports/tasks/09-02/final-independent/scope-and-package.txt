@@ -1,0 +1,9 @@
+PASS same-count P36 -> P15 rejected before writes
+PASS same-count P30 -> FX-UNKNOWN rejected before writes
+PASS P01/P32 track exchange rejected before writes
+PASS frozen package has zero run revisions
+PASS both independent P33 runs accepted; counts 2 synthetic / 0 actual / 0 unclassified
+PASS no change to task progress, evaluation closure, or runtime/human trial status
+PASS invalid P33 latest_report rejected by renderer and package
+PASS invalid P33 revision rejected by renderer and package
+PASS invalid P33 run_id rejected by renderer and package
