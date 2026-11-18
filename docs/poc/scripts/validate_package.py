@@ -82,9 +82,10 @@ def validate(root):
     assert ledger==g;out['ledger_spec_match']=True
     tech=json.loads((root/'Technical_Dependencies_v1.3.3.json').read_text());out['technical_graph']=graph_check({k:v['deps'] for k,v in tech.items()});assert 'P36' in tech['P26']['deps']
     f=json.loads((root/'Followup_Execution_v1.3.3.json').read_text());out['followup_graph']=graph_check({t['id']:t['deps'] for t in f['tasks']});assert len(f['tasks'])==12
-    m=module(root/'scripts/render_progress.py','render');views=m.render(root)
+    state_bytes = (root/'progress/state.json').read_bytes()
+    m=module(root/'scripts/render_progress.py','render');views=m.render(root,state_bytes=state_bytes)
     assert all((root/'progress'/name).read_bytes()==v.encode() for name,v in views.items());out['generated_views_match']=True
-    state=json.loads((root/'progress/state.json').read_text());assert state['baselines']=={'main_tasks':73,'followup_tasks':12,'main_experiments':31,'followup_candidates':5}
+    state=json.loads(state_bytes);assert state['baselines']=={'main_tasks':73,'followup_tasks':12,'main_experiments':31,'followup_candidates':5}
     extra_ids={x['task_id'] for am in amends for x in am.get('extra_tasks',[])};assert {x['task_id'] for x in state.get('extra_tasks',[])}<=extra_ids,'extra task not defined by an amendment'
     # A6: an extra task's prerequisites are those of its amendment plus later extra_prerequisite_changes,
     # and the resume record keeps what a restart must re-read (work, blocks, budget, decisions, next step).
@@ -102,7 +103,16 @@ def validate(root):
         ref=d.split(' ',1)[0]
         if ref.endswith('.md'):assert (root/ref).exists(),ref
     assert len(state['tasks'])==85 and len(state['experiments'])==36
-    assert all(not e['runs'] for e in state['experiments']);out['runtime_probe']='NOT_RUN';out['human_trials']='NOT_RUN'
+    # render() has already validated the current ledger. Preserve the frozen
+    # delivery snapshot separately, and do not infer execution from a run record.
+    kinds = [run.get('execution_kind') for e in state['experiments'] for run in e.get('runs', [])]
+    out['ledger_run_revisions'] = {
+        'synthetic': kinds.count('synthetic'),
+        'actual': kinds.count('actual'),
+        'unclassified': sum(kind not in ('synthetic', 'actual') for kind in kinds),
+    }
+    out['runtime_probe'] = 'NOT_RUN'
+    out['human_trials'] = 'NOT_RUN'
     out['progress']={'accepted_main_tasks':sum(t['status']=='검수 완료' for t in state['tasks'] if t['track']=='main'),'main_denominator':73,'followup_denominator':12}
     files=[p for p in root.glob('*.md') if not p.name.startswith(('V1_2','V1_3_','User_Decisions','PAPER_'))]
     files.append(root/'V1_3_3_Changes_and_Validation.md')
