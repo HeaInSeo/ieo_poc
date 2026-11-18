@@ -36,7 +36,9 @@ pub struct Observation {
     pub signal: String,
 }
 
-fn classify(runtime: Runtime, signal: &str) -> Quota {
+/// Classify provider or fixture quota evidence. Authentication, freshness and billing
+/// provenance still have to be verified by the observer before a dispatch.
+pub fn classify(runtime: Runtime, signal: &str) -> Quota {
     match runtime {
         Runtime::Claude => {
             let status = provider::classify(signal);

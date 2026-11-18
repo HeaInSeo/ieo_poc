@@ -4,8 +4,8 @@
 //!
 //! The shape: authorization → the request recorded (transaction 1) → the resume judgment
 //! (`compare`, `crate::api::judge_resume`) → the shared budget check
-//! ([`ieo_supervisor::caller::admit`]) → the supervisor's `start` or `reconnect` (outside any
-//! transaction) → its answer, or `unknown` when it was lost, recorded (transaction 2). A delivery
+//! ([`ieo_supervisor::caller::admit`]) → the supervisor's `start` or `reconnect` under a read-only
+//! assignment/approval fence → its answer, or `unknown` when it was lost, recorded (transaction 2). A delivery
 //! is what the coordinator itself did, so it is stored as `verified`; it is not a takeover: the
 //! supervisor's takeover checkpoint names this delivery (`delivery_id`, sent with the start) and
 //! the coordinator links the two when it stores the takeover (step 4).
@@ -858,10 +858,18 @@ pub fn deliver(
         return Ok(again);
     }
     let decision2 = again.body["decision"].as_str().unwrap_or_default();
-    if decision2 != decision || choose_op(decision2, new_session, &again.body) != Some(op) {
+    let current = &again.body["current_assignment"];
+    let basis_changed = current["assignment_id"] != d["assignment_id"]
+        || current["generation"] != d["generation"]
+        || again.body["central"] != judged.body["central"]
+        || again.body["github"] != judged.body["github"];
+    if basis_changed
+        || decision2 != decision
+        || choose_op(decision2, new_session, &again.body) != Some(op)
+    {
         drop(adm);
         let mut why = vec![json!(format!(
-            "the judgment changed while the budget check waited ({decision} → {decision2})"
+            "the judgment changed while the budget check waited ({decision} → {decision2}); verify assignment, checkpoint and branch evidence"
         ))];
         why.extend(
             again.body["reasons"]
@@ -990,7 +998,49 @@ pub fn deliver(
     o.github = github.clone();
     o.limits = Some(sent["limits"].clone());
     o.sent_sha256 = Some(sent_sha256);
-    match adm.start_with(&plan, &call, &caller::Http, &extra) {
+    // Hold a shared row lock on the reviewed revision and assignment head through the
+    // supervisor's bounded acceptance request. Supersession or review withdrawal that wins
+    // the lock invalidates the send; one waiting behind this fence follows the send.
+    let start = (|| -> Result<Option<Result<Sent, String>>, postgres::Error> {
+        let mut fence = db.transaction()?;
+        fence.batch_execute("SET LOCAL lock_timeout = '1s'")?;
+        let current = fence.query_opt(
+            "SELECT h.assignment_id, h.generation, s.digest, s.review_state
+             FROM assignment_heads h
+             JOIN assignments a USING (assignment_id, generation)
+             JOIN sprint_revisions s ON s.sprint_id = a.sprint_id AND s.revision = a.sprint_revision
+             WHERE h.repo_id = $1 AND h.role = $2
+             FOR SHARE OF h, s",
+            &[&repo, &role],
+        )?;
+        if !current.is_some_and(|r| {
+            r.get::<_, String>(0) == aid
+                && r.get::<_, i64>(1) == generation
+                && d["coordinator_record"]["spec_digest"] == r.get::<_, String>(2)
+                && r.get::<_, String>(3) == "semantic_review_passed"
+        }) || STOPPING.load(Ordering::SeqCst)
+            || begun.elapsed() > Duration::from_secs(deadline)
+        {
+            return Ok(None);
+        }
+        // No DB writes are pending here. Drop the fence after the bounded POST.
+        let result = adm.start_with(&plan, &call, &caller::Http, &extra);
+        drop(fence);
+        Ok(Some(result))
+    })();
+    let start = match start {
+        Ok(Some(result)) => result,
+        Ok(None) | Err(_) => {
+            let mut denied = base("not_called");
+            denied.op = None;
+            denied.reasons =
+                json!(["final assignment/approval fence failed or the send window closed"]);
+            return run_tx(db, guard, &|tx| {
+                record_result(tx, repo, role, &id, &denied, 201, None)
+            });
+        }
+    };
+    match start {
         Ok(Sent::Accepted { answer, running }) => {
             o.outcome = "accepted";
             o.supervisor = Some((202, answer));
