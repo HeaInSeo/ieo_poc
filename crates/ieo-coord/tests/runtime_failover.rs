@@ -45,6 +45,8 @@ struct World {
     verified: bool,
     paid_usage: bool,
     apply_effect: bool,
+    proof_not_sent: bool,
+    measured_ms: u64,
 }
 
 struct Evidence(Arc<Mutex<World>>);
@@ -52,6 +54,14 @@ impl Authority for Evidence {
     fn permits(&self, p: &Plan, cp: &Checkpoint) -> bool {
         let w = self.0.lock().unwrap();
         w.expected_approval == p.approval && &w.checkpoint == cp
+    }
+
+    fn submit_if_permitted(&self, p: &Plan, d: &Dispatch, submit: Box<dyn FnOnce() + '_>) -> bool {
+        if d.approval != p.approval || !self.permits(p, &d.checkpoint) {
+            return false;
+        }
+        submit();
+        true
     }
 
     fn reconcile(&self, attempt: &Dispatch) -> Resolution {
@@ -63,11 +73,14 @@ impl Authority for Evidence {
                 && s.stage == attempt.stage
                 && s.checkpoint == attempt.checkpoint
         });
+        if !recorded && w.proof_not_sent && w.checkpoint == attempt.checkpoint {
+            return Resolution::NotSent;
+        }
         if !w.verified || !recorded {
             return Resolution::Unknown;
         }
         let usage = Usage {
-            duration_ms: 1001,
+            duration_ms: w.measured_ms,
             input: 2,
             output: 3,
             cache_creation: 1,
@@ -94,12 +107,17 @@ struct Fake {
     status: &'static str,
     observed_at: u64,
     extra_usage_disabled: bool,
+    revoke_on_observe: bool,
+    crash_before_send: bool,
 }
 impl Adapter for Fake {
     fn runner(&self) -> &Runner {
         &self.runner
     }
     fn observe(&self) -> Option<Observation> {
+        if self.revoke_on_observe {
+            self.world.lock().unwrap().expected_approval = "revoked".into();
+        }
         let signal = match self.runner.runtime {
             Runtime::Claude => serde_json::json!({
                 "type":"rate_limit_event",
@@ -117,6 +135,7 @@ impl Adapter for Fake {
         })
     }
     fn submit(&mut self, d: &Dispatch) {
+        assert!(!self.crash_before_send, "fixture crash before send");
         let mut w = self.world.lock().unwrap();
         assert_eq!(d.assignment, "A17");
         assert_eq!(d.role, "development");
@@ -170,6 +189,8 @@ impl Scenario {
             verified: true,
             paid_usage: false,
             apply_effect: true,
+            proof_not_sent: false,
+            measured_ms: 1001,
         }));
         let fake = |runtime, group: &str, status| Fake {
             runner: Runner {
@@ -182,6 +203,8 @@ impl Scenario {
             status,
             observed_at: NOW,
             extra_usage_disabled: true,
+            revoke_on_observe: false,
+            crash_before_send: false,
         };
         let claude = fake(Runtime::Claude, "claude-sub", "allowed");
         let codex = fake(Runtime::Codex, "codex-sub", "available");
@@ -222,9 +245,22 @@ impl Scenario {
         )
         .unwrap()
     }
+    fn exhaust(&mut self, runtime: Runtime) {
+        self.now += 1;
+        match runtime {
+            Runtime::Claude => {
+                self.claude.observed_at = self.now;
+                self.claude.status = "rejected";
+            }
+            Runtime::Codex => {
+                self.codex.observed_at = self.now;
+                self.codex.status = "exhausted";
+            }
+        }
+    }
     fn exhaust_both(&mut self) {
-        self.claude.status = "rejected";
-        self.codex.status = "exhausted";
+        self.exhaust(Runtime::Claude);
+        self.exhaust(Runtime::Codex);
     }
 }
 
@@ -236,10 +272,7 @@ fn swaps_both_directions_and_only_sends_the_remaining_stage_in_a_new_session() {
     ] {
         let mut s = Scenario::new(first);
         assert_eq!(s.advance(), Decision::Dispatched(first));
-        match first {
-            Runtime::Claude => s.claude.status = "rejected",
-            Runtime::Codex => s.codex.status = "exhausted",
-        }
+        s.exhaust(first);
         assert_eq!(s.advance(), Decision::Dispatched(second));
         assert_eq!(s.advance(), Decision::Complete);
         let w = s.world.lock().unwrap();
@@ -259,7 +292,7 @@ fn swaps_both_directions_and_only_sends_the_remaining_stage_in_a_new_session() {
 fn unresolved_effect_blocks_after_restart_then_verified_effect_skips_the_stage() {
     let mut s = Scenario::new(Runtime::Claude);
     assert_eq!(s.advance(), Decision::Dispatched(Runtime::Claude));
-    s.claude.status = "rejected";
+    s.exhaust(Runtime::Claude);
     s.world.lock().unwrap().verified = false;
     // advance reconstructs state from disk; nothing depends on the first invocation's memory.
     assert_eq!(s.advance(), Decision::AwaitingReconciliation);
@@ -309,7 +342,7 @@ fn budget_approval_and_role_constraints_override_alternate_capacity() {
     assert_eq!(revoked.world.lock().unwrap().sends.len(), 1);
 
     let mut wrong_role = Scenario::new(Runtime::Claude);
-    wrong_role.claude.status = "rejected";
+    wrong_role.exhaust(Runtime::Claude);
     wrong_role.codex.runner.role = "guardrail".into();
     assert_eq!(wrong_role.advance(), Decision::BlockedApproval);
     assert!(wrong_role.world.lock().unwrap().sends.is_empty());
@@ -321,11 +354,13 @@ fn unknown_and_billable_overage_fail_closed() {
     s.claude.observed_at = 0;
     assert_eq!(s.advance(), Decision::QuotaUnknown);
     s.claude.observed_at = NOW;
-    s.claude.status = "rejected";
+    s.exhaust(Runtime::Claude);
     s.codex.extra_usage_disabled = false;
     assert_eq!(s.advance(), Decision::QuotaUnknown);
     assert!(s.world.lock().unwrap().sends.is_empty());
     s.codex.extra_usage_disabled = true;
+    s.now += 1;
+    s.codex.observed_at = s.now;
     s.world.lock().unwrap().paid_usage = true;
     assert_eq!(s.advance(), Decision::Dispatched(Runtime::Codex));
     assert_eq!(s.advance(), Decision::BlockedBudget);
@@ -406,7 +441,7 @@ fn exhausted_time_or_tokens_block_even_with_an_available_alternate() {
         let mut s = Scenario::new(Runtime::Claude);
         set_cap(&mut s.plan.ceiling);
         assert_eq!(s.advance(), Decision::Dispatched(Runtime::Claude));
-        s.claude.status = "rejected";
+        s.exhaust(Runtime::Claude);
         assert_eq!(s.advance(), Decision::BlockedBudget);
         assert_eq!(s.world.lock().unwrap().sends.len(), 1);
     }
@@ -424,4 +459,56 @@ fn a_changed_worktree_head_blocks_recovery() {
     s.world.lock().unwrap().checkpoint.head = "b".repeat(40);
     assert_eq!(s.advance(), Decision::BlockedApproval);
     assert_eq!(s.world.lock().unwrap().sends.len(), 1);
+}
+
+#[test]
+fn revocation_during_quota_observation_blocks_submission() {
+    let mut s = Scenario::new(Runtime::Claude);
+    s.claude.revoke_on_observe = true;
+    assert_eq!(s.advance(), Decision::BlockedApproval);
+    assert!(s.world.lock().unwrap().sends.is_empty());
+}
+
+#[test]
+fn old_and_conflicting_exhaustion_cannot_trigger_failover() {
+    let mut s = Scenario::new(Runtime::Claude);
+    assert_eq!(s.advance(), Decision::Dispatched(Runtime::Claude));
+    s.claude.status = "rejected";
+    s.claude.observed_at = NOW - 1;
+    assert_eq!(s.advance(), Decision::QuotaUnknown);
+    s.claude.observed_at = NOW;
+    assert_eq!(s.advance(), Decision::QuotaUnknown);
+    assert_eq!(s.advance(), Decision::QuotaUnknown);
+    assert_eq!(s.world.lock().unwrap().sends.len(), 1);
+    s.exhaust(Runtime::Claude);
+    assert_eq!(s.advance(), Decision::Dispatched(Runtime::Codex));
+}
+
+#[test]
+fn confirmed_per_run_time_breach_blocks_even_if_budget_has_room() {
+    let mut s = Scenario::new(Runtime::Claude);
+    s.plan.ceiling.per_run_seconds = 10;
+    s.world.lock().unwrap().measured_ms = 11000;
+    assert_eq!(s.advance(), Decision::Dispatched(Runtime::Claude));
+    s.exhaust(Runtime::Claude);
+    assert_eq!(s.advance(), Decision::BlockedBudget);
+    assert_eq!(s.world.lock().unwrap().sends.len(), 1);
+}
+
+#[test]
+fn verified_not_sent_does_not_consume_the_only_run() {
+    let mut s = Scenario::new(Runtime::Claude);
+    s.plan.ceiling.runs = 1;
+    s.claude.crash_before_send = true;
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| s.advance())).is_err());
+    assert_eq!(s.advance(), Decision::AwaitingReconciliation);
+    assert!(s.world.lock().unwrap().sends.is_empty());
+    s.claude.crash_before_send = false;
+    s.world.lock().unwrap().proof_not_sent = true;
+    assert_eq!(s.advance(), Decision::Dispatched(Runtime::Claude));
+    assert_eq!(s.advance(), Decision::BlockedBudget);
+    let world = s.world.lock().unwrap();
+    assert_eq!(world.sends.len(), 1);
+    assert_eq!(world.sends[0].attempt, 2);
+    assert_eq!(world.sends[0].seconds, 30);
 }

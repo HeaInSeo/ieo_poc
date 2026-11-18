@@ -119,6 +119,7 @@ pub struct Checkpoint {
 pub struct Dispatch {
     pub runtime: Runtime,
     pub attempt: u64,
+    pub approval: String,
     /// The adapter must create this coordinator-issued session, never reconnect another CLI.
     pub new_session: String,
     pub assignment: String,
@@ -146,6 +147,8 @@ pub struct Usage {
 
 pub enum Resolution {
     Unknown,
+    /// Independent evidence confirms the intent never reached the runner and had no effect.
+    NotSent,
     /// The authority independently confirms the ledger and actual effect for this attempt.
     Completed {
         checkpoint: Checkpoint,
@@ -160,6 +163,15 @@ pub enum Resolution {
 pub trait Authority {
     /// Verify current assignment, approval/review, branch, head and effect against the checkpoint.
     fn permits(&self, plan: &Plan, checkpoint: &Checkpoint) -> bool;
+    /// Validate the approval revision, worktree and role at submission. A live implementation
+    /// must hold the authorization fence through submission, including against revocation.
+    /// Return false only if submit was never invoked. Keep uncertainty as a pending intent.
+    fn submit_if_permitted(
+        &self,
+        plan: &Plan,
+        dispatch: &Dispatch,
+        submit: Box<dyn FnOnce() + '_>,
+    ) -> bool;
     /// Correlate the exact attempt with the ledger and actual worktree/remote effect.
     fn reconcile(&self, attempt: &Dispatch) -> Resolution;
 }
@@ -227,6 +239,7 @@ fn make_dispatch(
     Dispatch {
         runtime,
         attempt,
+        approval: plan.approval.clone(),
         new_session: format!("{}-failover-{attempt}", plan.assignment),
         assignment: plan.assignment.clone(),
         role: plan.role.clone(),
@@ -245,31 +258,58 @@ fn make_dispatch(
     }
 }
 
-fn quota(adapter: &dyn Adapter, now: u64, exhausted_at: &mut Value) -> Quota {
-    match adapter.observe() {
-        Some(o)
-            if o.group == adapter.runner().group
-                && o.extra_usage_disabled
-                && now
-                    .checked_sub(o.observed_at)
-                    .is_some_and(|age| age <= provider::DEFAULT_MAX_AGE_SECONDS) =>
-        {
-            let verdict = classify(adapter.runner().runtime, &o.signal);
-            let last_exhaustion = exhausted_at.as_u64();
-            match verdict {
-                Quota::Exhausted => {
-                    *exhausted_at =
-                        json!(last_exhaustion.map_or(o.observed_at, |old| old.max(o.observed_at)));
-                    verdict
-                }
-                Quota::Available if last_exhaustion.is_some_and(|old| o.observed_at <= old) => {
-                    Quota::Unknown
-                }
-                _ => verdict,
-            }
-        }
-        _ => Quota::Unknown,
+fn quota(adapter: &dyn Adapter, now: u64, history: &mut Value) -> Quota {
+    let Some(o) = adapter.observe() else {
+        return Quota::Unknown;
+    };
+    if o.group != adapter.runner().group
+        || now
+            .checked_sub(o.observed_at)
+            .is_none_or(|age| age > provider::DEFAULT_MAX_AGE_SECONDS)
+    {
+        return Quota::Unknown;
     }
+    let verdict = if o.extra_usage_disabled {
+        classify(adapter.runner().runtime, &o.signal)
+    } else {
+        Quota::Unknown
+    };
+    let label = match verdict {
+        Quota::Available => "available",
+        Quota::Exhausted => "exhausted",
+        Quota::Unknown => "unknown",
+    };
+    if let Some(previous) = history["observed_at"].as_u64() {
+        if o.observed_at < previous {
+            return Quota::Unknown;
+        }
+        if o.observed_at == previous && history["status"] != label {
+            history["status"] = json!("unknown");
+            return Quota::Unknown;
+        }
+    }
+    history["observed_at"] = json!(o.observed_at);
+    history["status"] = json!(label);
+    if verdict == Quota::Exhausted {
+        history["exhausted_at"] = json!(o.observed_at);
+    }
+    verdict
+}
+
+fn usage_breached(a: &Value) -> bool {
+    if a["model_request"] == false {
+        return false;
+    }
+    let usage = budget::spent(std::slice::from_ref(a));
+    [
+        usage.seconds,
+        usage.billable_tokens,
+        usage.cache_read_tokens,
+    ]
+    .into_iter()
+    .enumerate()
+    .any(|(i, used)| a["remaining"][i].as_u64().is_none_or(|cap| used > cap))
+        || a["cost_microusd"].as_u64() != Some(0)
 }
 
 /// Advance at most one dispatch in a private, pre-existing journal directory owned by the caller.
@@ -303,7 +343,7 @@ pub fn advance(
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({
             "plan": identity, "runners": bindings, "initial": checkpoint_value(initial),
             "checkpoint": checkpoint_value(initial), "attempts": [],
-            "exhausted_at": {"claude": null, "codex": null}, "waiting": false
+            "quota": {"claude": {}, "codex": {}}, "waiting": false
         }),
         Err(e) => return Err(e),
     };
@@ -364,19 +404,22 @@ pub fn advance(
                 && !next.verification.is_empty() =>
             {
                 checkpoint = next;
-                ("completed", usage)
+                ("completed", Some(usage))
             }
             Resolution::Completed { .. } => return Ok(Decision::AwaitingReconciliation),
-            Resolution::NoEffect { usage } => ("no_effect", usage),
+            Resolution::NoEffect { usage } => ("no_effect", Some(usage)),
+            Resolution::NotSent => ("not_sent", None),
         };
         last["result"] = json!(result);
-        last["model_request"] = json!(true);
-        last["duration_ms"] = json!(usage.duration_ms);
-        last["cost_microusd"] = json!(usage.cost_microusd);
-        last["usage"] = json!({"run": {"state": "measured", "tokens": {
-            "input": usage.input, "output": usage.output, "cache_creation": usage.cache_creation,
-            "cache_read": usage.cache_read
-        }}});
+        last["model_request"] = json!(usage.is_some());
+        if let Some(usage) = usage {
+            last["duration_ms"] = json!(usage.duration_ms);
+            last["cost_microusd"] = json!(usage.cost_microusd);
+            last["usage"] = json!({"run": {"state": "measured", "tokens": {
+                "input": usage.input, "output": usage.output, "cache_creation": usage.cache_creation,
+                "cache_read": usage.cache_read
+            }}});
+        }
         state["checkpoint"] = checkpoint_value(&checkpoint);
         persist(dir, &state)?;
     }
@@ -399,9 +442,7 @@ pub fn advance(
         || spent.cache_read_tokens > c.cache_read
         || !spent.unmeasured_runs.is_empty()
         || !spent.unclassified_records.is_empty()
-        || attempts
-            .iter()
-            .any(|a| a["cost_microusd"].as_u64() != Some(0))
+        || attempts.iter().any(usage_breached)
     {
         return Ok(Decision::BlockedBudget);
     }
@@ -418,19 +459,19 @@ pub fn advance(
 
     // Stay on the last runtime until it is explicitly exhausted. A recovery observation must
     // be newer than the last exhaustion, including across process restarts.
-    let preferred = attempts.last().map_or(plan.primary.name(), |a| {
+    let last_sent = attempts.iter().rfind(|a| a["model_request"] == true);
+    let preferred = last_sent.map_or(plan.primary.name(), |a| {
         a["runtime"].as_str().unwrap_or_default()
     });
     let primary = adapters
         .iter()
         .position(|a| a.runner().runtime.name() == preferred)
         .ok_or_else(invalid)?;
-    let no_effect = attempts
-        .last()
+    let no_effect = last_sent
         .filter(|a| a["result"] == "no_effect")
         .and_then(|a| a["submitted_at"].as_u64());
     let waiting = state["waiting"].as_bool().ok_or_else(invalid)?;
-    let observations = state["exhausted_at"].as_object_mut().ok_or_else(invalid)?;
+    let observations = state["quota"].as_object_mut().ok_or_else(invalid)?;
     let observe = |index: usize, observations: &mut serde_json::Map<String, Value>| {
         let adapter = &*adapters[index];
         let last = observations
@@ -441,7 +482,7 @@ pub fn advance(
     let selection = match observe(primary, observations)? {
         Quota::Available
             if no_effect.is_some_and(|sent| {
-                observations[adapters[primary].runner().runtime.name()]
+                observations[adapters[primary].runner().runtime.name()]["exhausted_at"]
                     .as_u64()
                     .is_none_or(|exhausted| exhausted < sent)
             }) =>
@@ -485,6 +526,19 @@ pub fn advance(
     );
     state["waiting"] = json!(false);
     persist(dir, &state)?;
-    adapters[index].submit(&dispatch);
+    if !authority.submit_if_permitted(
+        plan,
+        &dispatch,
+        Box::new(|| adapters[index].submit(&dispatch)),
+    ) {
+        let attempt = state["attempts"]
+            .as_array_mut()
+            .and_then(|a| a.last_mut())
+            .ok_or_else(invalid)?;
+        attempt["result"] = json!("not_sent");
+        attempt["model_request"] = json!(false);
+        persist(dir, &state)?;
+        return Ok(Decision::BlockedApproval);
+    }
     Ok(Decision::Dispatched(runtime))
 }
