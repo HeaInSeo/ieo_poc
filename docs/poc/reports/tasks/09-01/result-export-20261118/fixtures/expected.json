@@ -1,0 +1,45 @@
+{
+  "basis": "09-01.accept, T09, §2.3, §5.3, §5.6, P33. Values derived from the input and documented rules before the first converter execution.",
+  "baseline": {
+    "mode": "synthetic",
+    "work": {
+      "90-01": "편입 대기",
+      "90-02": "편입 대기",
+      "90-03": "조건 대기",
+      "90-04": "조건 대기",
+      "90-05": "조건 대기",
+      "90-06": "조건 대기",
+      "90-07": "조건 대기"
+    },
+    "product_completion": "unverified",
+    "registration_state": "draft",
+    "run_decisions": {
+      "base": ["PASS", "채택"],
+      "partial": ["PASS", "부분 채택"],
+      "failure": ["FAIL", "기각"],
+      "alternative": ["PASS", "미판정"],
+      "optional": ["PASS", "기각"],
+      "missing": ["INCONCLUSIVE", "보류"],
+      "stale": ["INCONCLUSIVE", "미판정"],
+      "unapproved": ["INCONCLUSIVE", "미판정"]
+    },
+    "runtime_budget": {"attempts": 3, "wall_ms": 300, "tokens_measured": 16, "tokens_total": null, "automatic_retry": false},
+    "assets": {"meter": "편입 대기", "no-provenance": "보존 전용"},
+    "history": {"version": "v1.2", "accepted": 0, "total": 76},
+    "denominators": {"main": 73, "followup": 12}
+  },
+  "cases": [
+    {"id": "C02", "change": "reverse_work", "expected": "same IDs, dependencies and spec digest within the same revision"},
+    {"id": "C03", "change": "duplicate_record", "expected": "reject cost double count"},
+    {"id": "C04", "change": "cycle", "expected": "reject registration with DEPENDENCY_CYCLE"},
+    {"id": "C05", "change": "remove_required_work", "expected": "retain the goal and show its missing work; draft only"},
+    {"id": "C06", "change": "falsify_ledger_track", "expected": "reject current ID/track mismatch even with unchanged totals"},
+    {"id": "C07", "change": "zero_baseline", "expected": "0/73 current and 0/12 followup; 0/76 historical"},
+    {"id": "C08", "change": "new_target", "expected": "new draft revision; stable task IDs; runtime evidence becomes stale and affected work is flagged"},
+    {"id": "C09", "change": "revision_retry", "expected": "same run counted once across result revisions; latest selected and earlier versions preserved"},
+    {"id": "C10", "change": "mode_actual", "expected": "synthetic run and approvals do not establish an actual result or product completion"},
+    {"id": "C11", "change": "missing_prerequisite", "expected": "reject registration with UNDEFINED_PREREQUISITE"},
+    {"id": "C12", "change": "evidence_recovery", "expected": "new proof supersedes the hold, authorizes integration review and retains the previous run and its budget"},
+    {"id": "C13", "change": "drop_budget_history", "expected": "never reset a cumulative budget by omitting prior attempts"}
+  ]
+}

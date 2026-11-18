@@ -1,0 +1,64 @@
+{
+  "schema_version": "console.report.v0",
+  "contract_revision": 4,
+  "event_id": "SIM-unapproved",
+  "event_revision": 1,
+  "sprint_id": "FINAL-FIXTURE",
+  "sprint_revision": 4,
+  "task_id": "08-06",
+  "repo_id": "fixture-repo",
+  "assignment_id": "fixture-assignment",
+  "generation": 1,
+  "actor": {
+    "role": "coordinator",
+    "name": "fixture-reviewer"
+  },
+  "observed_at": "2026-11-18T11:00:00Z",
+  "channel": "coordinator_to_client",
+  "evidence_level": "verified",
+  "phase": "개발",
+  "operational_state": "작업 중",
+  "reason_code": null,
+  "evidence": [
+    "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+    "sha256:a5253ba87301d6f8f51a693bb757eeea39908f4a3132705fc4e3ff8e2345f126",
+    "sha256:c41a2be344aa2972fd82b3eb0b31c898538c97078b50574740204711c44d7ab0"
+  ],
+  "unknown_facts": [
+    "설명용 fixture이며 실제 실행 증거가 아니다."
+  ],
+  "affected_tasks": [],
+  "next_action": "설명용 다음 행동",
+  "next_owner": "fixture-owner",
+  "resume_condition": null,
+  "next_check_at": null,
+  "decision": {
+    "required": false,
+    "question": null,
+    "options": [],
+    "recommendation": null,
+    "deadline_at": null,
+    "default_action": "현재 승인 범위 유지"
+  },
+  "schedule": {
+    "deadline_state": "undecided",
+    "deadline_at": null,
+    "status": "unassessed",
+    "remaining_tasks": null,
+    "remaining_reason": "설명용 표본",
+    "delay_reasons": [],
+    "affected_tasks": [],
+    "forecast": {
+      "state": "unestimated",
+      "completion_range": null,
+      "evidence": [],
+      "reason": "과거 실측 없음"
+    }
+  },
+  "report_type": "coordinator_verdict",
+  "body": {
+    "evidence_comparison": "설명용 대조 결과",
+    "affected_tasks": [],
+    "next_owner": "fixture-owner"
+  }
+}

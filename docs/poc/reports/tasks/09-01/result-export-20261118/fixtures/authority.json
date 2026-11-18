@@ -1,0 +1,12 @@
+{
+  "mode": "synthetic",
+  "approvals": {
+    "reports/tasks/09-01/result-export-20261118/fixtures/base-review.json": "ff8cd253cca78330e11bf2fbe90f5f8538d3d44f878769ce42274e8fa797bd04",
+    "reports/tasks/09-01/result-export-20261118/fixtures/partial-review.json": "64d4e218614a6cfa62dfaf39620ff50cca7f5757e189a1f1ca25f059e654c6e1",
+    "reports/tasks/09-01/result-export-20261118/fixtures/failure-review.json": "ae2d7811b77e396bbb9efb55e2169501c183788ccc4e1c93d3d16d17f1a3a8ad",
+    "reports/tasks/09-01/result-export-20261118/fixtures/alternative-review.json": "87866bcdf1168ef4febd46b3564bc383ddfe2bd08b601b6112c3bec576f58ed3",
+    "reports/tasks/09-01/result-export-20261118/fixtures/optional-review.json": "cfe207069e24d82e515fcb51985085cffdf02b249363f54a59d12b6750880cfe",
+    "reports/tasks/09-01/result-export-20261118/fixtures/missing-review.json": "8b6ec5dcefcb3be810db4d519afd6f02dcc6af287e52f33ac3a7ae78da7edabd",
+    "reports/tasks/09-01/result-export-20261118/fixtures/stale-review.json": "e7a27da52e4d91225b22dcf361f46fbeb2a32260cdb8bf04aa3ba7a1fb4e5f44"
+  }
+}
