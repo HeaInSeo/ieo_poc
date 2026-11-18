@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0060-03-02-r3",
-  "snapshot_created_at": "2026-11-18T22:59:49+09:00",
-  "last_actual_work_observed_at": "2026-11-18T22:59:49+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0061-03-02-X-05-local",
+  "snapshot_created_at": "2026-11-18T23:02:56+09:00",
+  "last_actual_work_observed_at": "2026-11-18T23:02:56+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4)",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -521,10 +521,10 @@
       "track": "main",
       "group": "핵심",
       "kind": "준비",
-      "status": "진행",
-      "last_observed_at": "2026-11-18T22:59:49+09:00",
+      "status": "검수 중",
+      "last_observed_at": "2026-11-18T23:02:56+09:00",
       "latest_report": "reports/tasks/03-02/common-policy-20261118/REPORT.md",
-      "result_state": "독립 검토 1차 반려 교정 · 격리 10/10 · 재검토 제출 대기",
+      "result_state": "격리 10/10 · 교정 후보 c831f32 독립 승인 · 최신 base 대조 대기",
       "verification_level": "unverified",
       "evidence": [
         "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
@@ -534,8 +534,8 @@
         "reports/tasks/03-02/common-policy-20261118/verification.txt",
         "reports/tasks/03-02/common-policy-20261118/verify-isolated.sh"
       ],
-      "next_action": "PR #98 우선 · 공통 원장 조율 후 최신 main과 교정 후보 대조 및 재검토",
-      "unresolved": "런타임 계약 rev 6 §10 항목 1(Edit(//path) 표기, Write( 미사용)·항목 6(개발 Bash 허용 목록은 경계 아님)을 정책 문서에 반영"
+      "next_action": "#98 이후 최신 main에 맞춰 최종 후보 재검토",
+      "unresolved": "최신 main 반영 후 최종 head의 독립 검토·CI·병합 및 병합 SHA의 main CI 확인 대기."
     },
     {
       "task_id": "03-03",
@@ -3001,12 +3001,38 @@
         "reports/tasks/03-02/common-policy-20261118/isolated-test.log",
         "reports/tasks/03-02/common-policy-20261118/verification.txt"
       ]
+    },
+    {
+      "event_id": "X-05-ACCEPTED-20261118",
+      "event_revision": 1,
+      "task_id": "X-05",
+      "observed_at": "2026-11-18T22:56:21+09:00",
+      "state": "X-05 검수 완료. 동결 기준 8d31eca, rootless Podman 기본 kind 4노드에서 고정 창 1,500/1,500, 편차 최대 4.0%p, 변경 중 성공 간격 최대 201ms. 스트림 14~18 연속 재개, 명시 읽기 재요청 한 번. PR #97 독립 승인 b507538, PR CI 4/4, 승인 head 병합 d27fa96, 해당 main CI 44317465418 4/4. 추가 작업으로 73·12 분모·완료 수에 미산입. 실제 모델 호출 0.",
+      "evidence": [
+        "reports/extra/X-05/REPORT.md",
+        "reports/extra/X-05/criteria.md",
+        "reports/extra/X-05/evidence/kind-evidence.tar.gz",
+        "https://github.com/HeaInSeo/ieo_poc/pull/97",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44303120976",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44317465418"
+      ]
+    },
+    {
+      "event_id": "03-02-REVIEW2-APPROVED-20261118",
+      "event_revision": 1,
+      "task_id": "03-02",
+      "observed_at": "2026-11-18T23:02:56+09:00",
+      "state": "독립 승인: 로컬 교정 후보 c831f32a4320f7745cdf8f7d50de892d180c42de. 이미 반영한 정책의 미해결 문구를 정리. 최종 base/head 검토와 CI는 대기.",
+      "evidence": [
+        "reports/tasks/03-02/common-policy-20261118/REPORT.md",
+        "reports/tasks/03-02/common-policy-20261118/isolated-test.log"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "03-02 반려 1회 교정 · 격리 10/10 · 원본 대조 8/8 · DB 미설정 대조 실패 및 설정 경로 CREATE/DROP 4쌍",
+    "last_verified_stage": "03-02 c831f32 독립 승인 · X-05 d27fa96 검수 완료(main CI 4/4)",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0301",
-    "branch_sha": "task/0302-common-policy · 03-02 교정 산출물 62cbfb1d1daab281a7c7bae913dfb942cc8575a2",
+    "branch_sha": "task/0302-common-policy · 이전 승인 후보 c831f32a4320f7745cdf8f7d50de892d180c42de · 로컬 staging 기준 d27fa96",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 18(단계 8 전 PR, 이 PR) · OpenAPI 0.17.1(이 PR)",
     "running": "이 작업 트리의 모델 요청·운영 서비스 변경 없음",
     "unresolved_external_effects": [],
@@ -3059,12 +3085,13 @@
       "reports/tasks/02-05/step8-plan-20261117/EXECUTION_PLAN.md",
       "reports/tasks/03-01/catalog-contract-20261118/REPORT.md",
       "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
-      "reports/tasks/03-02/common-policy-20261118/REPORT.md"
+      "reports/tasks/03-02/common-policy-20261118/REPORT.md",
+      "reports/extra/X-05/REPORT.md"
     ],
-    "pending_index_updates": "교정 후보 로컬 기록·검증. PR #98 우선, 공통 원장 원격 반영 대기",
-    "next_action": "조율 뒤 최신 main과 교정 후보·공통 원장 대조 및 독립 재검토 제출",
+    "pending_index_updates": "X-05 수용 기록과 03-02 교정 후보를 로컬 원장에 반영. #98 우선, 원격 반영 대기",
+    "next_action": "#98 이후 최신 main·공통 원장과 대조하고 최종 base/head 재검토",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다.",
-    "current_work": "03-02 최초 반려 교정 후보, PR #98 우선",
+    "current_work": "03-02·X-05 공통 원장 로컬 staging, X-06 격리 시험 별도 진행",
     "blocking": "X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다. 02-06은 02-05 검수 완료가 선행. 실제 failover 첫 시험은 WAITING_FOR_PREREQUISITE. 03-02 자료 준비는 병행한다.",
     "budget": "02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 검수 완료와 X-02 남은 조건 뒤에만 · 02-05 실제 회차 예산(사용자 결정 2026-11-15 (나)): 계획 3회(개발 R1·R2, Guardrail G1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, USD 0, 예산 검사는 컨테이너 밖. 단계 8에만, X-08 검수 완료와 예산 코드 PR 뒤 · 02-05 예산 코드(BUDGET_0205)와 예비 표식 규칙(사용자 결정 2026-11-17)은 이 PR. 코드에 있어도 실제 호출은 단계 8 전제 뒤에만",
     "user_decisions": [
@@ -3224,14 +3251,21 @@
       "prerequisites": [
         "X-03"
       ],
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
-      "verification_level": "unverified",
-      "evidence": [],
-      "next_action": "라이브러리 지원 확인(Headless Service+클라이언트 측 분산, 안 되면 L7 프록시 하나) → 기준 사전 커밋 → 시험(Plan_gRPC_Internal_API_v0.md §5·§7)",
-      "unresolved": "필수 시험: 복제본 증가, Pod 삭제·교체, 롤링 업데이트, 긴 스트림 중단, 요청 재전송. 실제 Claude 호출 없음. 기존 개발 클러스터·운영 DB 미사용"
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-18T22:56:21+09:00",
+      "latest_report": "reports/extra/X-05/REPORT.md",
+      "result_state": "X-05 검수 완료. 동결 기준 8d31eca, rootless Podman 기본 kind 4노드에서 고정 창 1,500/1,500, 편차 최대 4.0%p, 변경 중 성공 간격 최대 201ms. 스트림 14~18 연속 재개, 명시 읽기 재요청 한 번. PR #97 독립 승인 b507538, PR CI 4/4, 승인 head 병합 d27fa96, 해당 main CI 44317465418 4/4. 추가 작업으로 73·12 분모·완료 수에 미산입. 실제 모델 호출 0.",
+      "verification_level": "verified",
+      "evidence": [
+        "reports/extra/X-05/REPORT.md",
+        "reports/extra/X-05/criteria.md",
+        "reports/extra/X-05/evidence/kind-evidence.tar.gz",
+        "https://github.com/HeaInSeo/ieo_poc/pull/97",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44303120976",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44317465418"
+      ],
+      "next_action": "X-06 제품 경로 검증",
+      "unresolved": "기본 kind 시험용 경로 검증 범위. 제품 코디네이터와 DB 상태는 X-06. 물리 서버 장애와 운영 처리량은 별도 검증."
     },
     {
       "task_id": "X-06",
