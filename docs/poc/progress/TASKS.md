@@ -1,6 +1,6 @@
 # 주계획·후속 작업 상태
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0064-03-03-X-06-accepted-local` · 원장 SHA-256 `6da018edb685f62e29c2081939ac53400725d3334a7f8e44f8d6824abeee32ae`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0065-03-03-accepted-local` · 원장 SHA-256 `38292365c9c0e9a943506c4a3bb4a4343bdc69749a6125f52ef6f7c77509266c`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -26,7 +26,7 @@
 | 02-08 · 후속 DAG 대조·외부 감시기 | 구현 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |
 | 03-01 · 카탈로그 계약·색인·원본 대응표 | 설계 / 핵심 | 검수 완료 | PASS · 계약 v0.1.0 · 표적 시험 13/13 · 독립 승인 및 main CI / verified | 2026-11-18T21:22:33+09:00 | [보고](../reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md) | 03-02 공통 정책·역할·GitHub 기준 문서 작성에 인계 |
 | 03-02 · 공통 정책·역할·GitHub 기준 문서 | 준비 / 핵심 | 검수 완료 | PASS · 격리 10/10 · 독립 승인 및 병합 SHA main CI 4/4 / verified | 2026-11-18T23:29:44+09:00 | [보고](../reports/tasks/03-02/common-policy-20261118/ACCEPTANCE.md) | 03-03 Go·Rust 상세 정책과 실행 예 작성에 인계 |
-| 03-03 · Go·Rust 상세 항목과 실행 예 | 준비 / 핵심 | 검수 중 | 격리 19/19 · 교정 head 98503f0 독립 승인 · 원장 통합 head 재검토 대기 / unverified | 2026-11-18T23:50:54+09:00 | [보고](../reports/tasks/03-03/go-rust-20261118/REPORT.md) | X-06 수용 원장을 포함한 최종 head의 독립 재검토 → PR CI와 SHA 조건 병합 |
+| 03-03 · Go·Rust 상세 항목과 실행 예 | 준비 / 핵심 | 검수 완료 | PASS · Go 12/12·Rust 7/7 · #101 독립 승인 및 병합 SHA main CI 4/4 / verified | 2026-11-19T00:09:23+09:00 | [보고](../reports/tasks/03-03/go-rust-20261118/ACCEPTANCE.md) | 03-04/P25의 독립 자료 대비에 인계 |
 | 03-04 · 자료의 충실도·정확성 독립 검증 | 검증 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |
 | 03-05 · 정책 내장 이미지·프로파일 후보 | 구현 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |
 | 03-06 · 공통 이미지 기본 실행·권한·재현성 | 검증 / 핵심 | 미착수 | 미실행 / unverified | 미확인 | 없음 · 미실행 | 미확인 |

@@ -1,0 +1,524 @@
+{
+  "observation_id": "p25-20261119-review1-rerun",
+  "subject_revision": "ad7628c5f5f4342e9cd3a41a9a1785b842db77c1",
+  "frozen_runner_head": "4af66b7c6d060425bfd138e6ec7668482ce76a52",
+  "instrumented_runner_sha256": "acd0a4709cfc05a4569a6590aca10f07d483049c3461a4889adb04238f77e385",
+  "case_count": 19,
+  "records": [
+    {
+      "case": "go-format",
+      "argv": [
+        "/bin/bash",
+        "/policy/check-go-format.sh"
+      ],
+      "started_utc": "2026-11-18T15:21:32.860955482Z",
+      "ended_utc": "2026-11-18T15:21:32.867973517Z",
+      "exit_code": 0,
+      "elapsed_s": "0.00",
+      "max_rss_kib": 7140,
+      "streams": {
+        "stdout": {
+          "size": 13,
+          "sha256": "9226882183b146ff00b8d7e6d9e249af73dd92d0905471408af722a9eaab2488",
+          "path": "go-format.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-format.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-vet",
+      "argv": [
+        "/bin/bash",
+        "-ec",
+        "go vet -mod=readonly ./...; echo vet clean"
+      ],
+      "started_utc": "2026-11-18T15:21:32.871688441Z",
+      "ended_utc": "2026-11-18T15:21:40.174142207Z",
+      "exit_code": 0,
+      "elapsed_s": "7.30",
+      "max_rss_kib": 277892,
+      "streams": {
+        "stdout": {
+          "size": 10,
+          "sha256": "0fb55732cb11d6b0ac29c3a85c2fe81dd82c54ac00b22633359e0cf3c123d36c",
+          "path": "go-vet.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-vet.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-test",
+      "argv": [
+        "go",
+        "test",
+        "-mod=readonly",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:40.177826170Z",
+      "ended_utc": "2026-11-18T15:21:43.069691207Z",
+      "exit_code": 0,
+      "elapsed_s": "2.88",
+      "max_rss_kib": 114748,
+      "streams": {
+        "stdout": {
+          "size": 1040,
+          "sha256": "23d2eb2df48d792cfce56e47e209b6bca8c14de07167f4f94195917127621f46",
+          "path": "go-test.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-test.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-race",
+      "argv": [
+        "go",
+        "test",
+        "-mod=readonly",
+        "-race",
+        "-count=1",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:43.073645092Z",
+      "ended_utc": "2026-11-18T15:21:57.227766185Z",
+      "exit_code": 0,
+      "elapsed_s": "14.15",
+      "max_rss_kib": 236208,
+      "streams": {
+        "stdout": {
+          "size": 39,
+          "sha256": "366dbcb659f27e10726146f0cb09493f44719916964df7c3b77772d5ae07d261",
+          "path": "go-race.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-race.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-assertion",
+      "argv": [
+        "go",
+        "test",
+        "-mod=readonly",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:57.236090930Z",
+      "ended_utc": "2026-11-18T15:21:57.734424458Z",
+      "exit_code": 1,
+      "elapsed_s": "0.49",
+      "max_rss_kib": 85016,
+      "streams": {
+        "stdout": {
+          "size": 1216,
+          "sha256": "41c72264ce1e8a47ccc1f3f5c2cf9f43dc99c96270f9d207e11313b5b3b5cc16",
+          "path": "go-assertion.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-assertion.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-required-skip",
+      "argv": [
+        "go",
+        "test",
+        "-mod=readonly",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:57.742761104Z",
+      "ended_utc": "2026-11-18T15:21:57.985335488Z",
+      "exit_code": 0,
+      "elapsed_s": "0.24",
+      "max_rss_kib": 88904,
+      "streams": {
+        "stdout": {
+          "size": 1216,
+          "sha256": "16d80104540476776bf89a82130d05d743fbf33499e2b867a49dc6fea8191527",
+          "path": "go-required-skip.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-required-skip.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-format-failure",
+      "argv": [
+        "/bin/bash",
+        "/policy/check-go-format.sh"
+      ],
+      "started_utc": "2026-11-18T15:21:57.992087340Z",
+      "ended_utc": "2026-11-18T15:21:57.999183261Z",
+      "exit_code": 1,
+      "elapsed_s": "0.00",
+      "max_rss_kib": 7136,
+      "streams": {
+        "stdout": {
+          "size": 10,
+          "sha256": "88ddf64b73871aefaaac2527766a0fc05c2cfcf769221be988c1314e99626482",
+          "path": "go-format-failure.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-format-failure.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-format-tool-error",
+      "argv": [
+        "/bin/bash",
+        "-c",
+        "\n    status=0\n    bash /policy/check-go-format.sh >/scratch/results/go-format-tool-error.stdout \\\n      2>/scratch/results/go-format-tool-error.stderr || status=$?\n    if [[ -s /scratch/results/go-format-tool-error.stdout ]] ||\n       [[ ! -s /scratch/results/go-format-tool-error.stderr ]]; then\n      exit 98\n    fi\n    cat /scratch/results/go-format-tool-error.stderr >&2\n    exit \"$status\"\n  "
+      ],
+      "started_utc": "2026-11-18T15:21:58.003578426Z",
+      "ended_utc": "2026-11-18T15:21:58.011005527Z",
+      "exit_code": 2,
+      "elapsed_s": "0.00",
+      "max_rss_kib": 5084,
+      "streams": {
+        "stdout": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-format-tool-error.observed.stdout"
+        },
+        "stderr": {
+          "size": 43,
+          "sha256": "dfef8a651da9ea68ecdf69e3a85965952638966aa81ad48aeeb425667f0eaf76",
+          "path": "go-format-tool-error.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-vet-failure",
+      "argv": [
+        "go",
+        "vet",
+        "-mod=readonly",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:58.017838975Z",
+      "ended_utc": "2026-11-18T15:21:58.104894735Z",
+      "exit_code": 1,
+      "elapsed_s": "0.08",
+      "max_rss_kib": 25148,
+      "streams": {
+        "stdout": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-vet-failure.observed.stdout"
+        },
+        "stderr": {
+          "size": 67,
+          "sha256": "a0bf2c23718ab6bd964041b290aae9042b0beb264355145662baeeeb422aab26",
+          "path": "go-vet-failure.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-order-control",
+      "argv": [
+        "go",
+        "test",
+        "-mod=readonly",
+        "-count=1",
+        "-v",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:58.109548935Z",
+      "ended_utc": "2026-11-18T15:21:58.358717822Z",
+      "exit_code": 0,
+      "elapsed_s": "0.24",
+      "max_rss_kib": 83936,
+      "streams": {
+        "stdout": {
+          "size": 142,
+          "sha256": "ae7da84914d4ee11c27bb5621475c6d3d171825aba67a25324cba92200aaaeca",
+          "path": "go-order-control.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-order-control.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-order-shuffle",
+      "argv": [
+        "go",
+        "test",
+        "-mod=readonly",
+        "-count=1",
+        "-shuffle=2",
+        "-v",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:58.362586059Z",
+      "ended_utc": "2026-11-18T15:21:58.564813185Z",
+      "exit_code": 1,
+      "elapsed_s": "0.20",
+      "max_rss_kib": 87224,
+      "streams": {
+        "stdout": {
+          "size": 235,
+          "sha256": "70832547b56989c0f89d992f22a40e5b4f5bb03d967976633e756e1161bd6746",
+          "path": "go-order-shuffle.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-order-shuffle.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "go-order-corrected",
+      "argv": [
+        "go",
+        "test",
+        "-mod=readonly",
+        "-count=1",
+        "-shuffle=2",
+        "-v",
+        "./..."
+      ],
+      "started_utc": "2026-11-18T15:21:58.571191189Z",
+      "ended_utc": "2026-11-18T15:21:58.828261041Z",
+      "exit_code": 0,
+      "elapsed_s": "0.25",
+      "max_rss_kib": 85368,
+      "streams": {
+        "stdout": {
+          "size": 158,
+          "sha256": "c70d85e8968df64c9369dab123cfba0869520a21318b5f0c45255c0cc2d64b5a",
+          "path": "go-order-corrected.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "go-order-corrected.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "rust-format",
+      "argv": [
+        "/bin/bash",
+        "-ec",
+        "cargo fmt --all -- --check; echo format clean"
+      ],
+      "started_utc": "2026-11-18T15:21:58.833457185Z",
+      "ended_utc": "2026-11-18T15:21:58.860514563Z",
+      "exit_code": 0,
+      "elapsed_s": "0.02",
+      "max_rss_kib": 36908,
+      "streams": {
+        "stdout": {
+          "size": 13,
+          "sha256": "9226882183b146ff00b8d7e6d9e249af73dd92d0905471408af722a9eaab2488",
+          "path": "rust-format.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "rust-format.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "rust-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_utc": "2026-11-18T15:21:58.864446638Z",
+      "ended_utc": "2026-11-18T15:21:59.050603497Z",
+      "exit_code": 0,
+      "elapsed_s": "0.18",
+      "max_rss_kib": 109212,
+      "streams": {
+        "stdout": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "rust-clippy.observed.stdout"
+        },
+        "stderr": {
+          "size": 120,
+          "sha256": "9bace0b46debfb7fcc32fef7fd551b19931db8f3b9bdee6a30e384eef361325d",
+          "path": "rust-clippy.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "rust-test",
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-targets"
+      ],
+      "started_utc": "2026-11-18T15:21:59.054416684Z",
+      "ended_utc": "2026-11-18T15:21:59.198802373Z",
+      "exit_code": 0,
+      "elapsed_s": "0.14",
+      "max_rss_kib": 137468,
+      "streams": {
+        "stdout": {
+          "size": 145,
+          "sha256": "164cc122d2446ed56e4f577e835b55e6b75438e08d77e7177b4dce6a33f2c86a",
+          "path": "rust-test.observed.stdout"
+        },
+        "stderr": {
+          "size": 219,
+          "sha256": "37943d04fdb88d102fd062807e6cfa5e61cec77242850d16455e9924dd1c1971",
+          "path": "rust-test.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "rust-assertion",
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-targets"
+      ],
+      "started_utc": "2026-11-18T15:21:59.205299611Z",
+      "ended_utc": "2026-11-18T15:21:59.303092294Z",
+      "exit_code": 101,
+      "elapsed_s": "0.09",
+      "max_rss_kib": 124180,
+      "streams": {
+        "stdout": {
+          "size": 437,
+          "sha256": "3cebb5ac61e48f8ca55f50ac1773c81d72b6f2e008b75c901b25361e7d6fcf3b",
+          "path": "rust-assertion.observed.stdout"
+        },
+        "stderr": {
+          "size": 261,
+          "sha256": "9b899686841f95e9457ac595d28bf020f32cbfd1f1f6aeaf2e65adea776fab74",
+          "path": "rust-assertion.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "rust-required-ignore",
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-targets"
+      ],
+      "started_utc": "2026-11-18T15:21:59.308458166Z",
+      "ended_utc": "2026-11-18T15:21:59.414276005Z",
+      "exit_code": 0,
+      "elapsed_s": "0.10",
+      "max_rss_kib": 137004,
+      "streams": {
+        "stdout": {
+          "size": 175,
+          "sha256": "883497eaaaeb67a5dbac130ba744917330f09d8257f4f80281dc8c1f3ee32e08",
+          "path": "rust-required-ignore.observed.stdout"
+        },
+        "stderr": {
+          "size": 219,
+          "sha256": "e4042bf8eb762c0f29a88cb22c0d9a6dfebc0a014bd97020cd419df435f9f25b",
+          "path": "rust-required-ignore.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "rust-format-failure",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-11-18T15:21:59.418781165Z",
+      "ended_utc": "2026-11-18T15:21:59.443507447Z",
+      "exit_code": 1,
+      "elapsed_s": "0.02",
+      "max_rss_kib": 35624,
+      "streams": {
+        "stdout": {
+          "size": 132,
+          "sha256": "ddbd3669dcc69a4ec28722eb0e5a0486844f60939838326659994366da8b2471",
+          "path": "rust-format-failure.observed.stdout"
+        },
+        "stderr": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "rust-format-failure.observed.stderr"
+        }
+      }
+    },
+    {
+      "case": "rust-clippy-failure",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_utc": "2026-11-18T15:21:59.449373154Z",
+      "ended_utc": "2026-11-18T15:21:59.530106640Z",
+      "exit_code": 101,
+      "elapsed_s": "0.07",
+      "max_rss_kib": 110236,
+      "streams": {
+        "stdout": {
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "path": "rust-clippy-failure.observed.stdout"
+        },
+        "stderr": {
+          "size": 1204,
+          "sha256": "634ecd712fa6dca1da8651a4b01c3f440e5284860c135dcfe8b47ca19aea2ed1",
+          "path": "rust-clippy-failure.observed.stderr"
+        }
+      }
+    }
+  ]
+}

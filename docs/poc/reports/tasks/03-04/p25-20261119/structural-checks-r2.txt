@@ -1,0 +1,18 @@
+PASS normal catalog: links 5/5, selected text fields 40/40
+PASS rejected required item: missing/extra/duplicate item
+PASS rejected required field: CAT-ROLE: required field
+PASS rejected wrong option: CAT-GO: incorrect command/options
+PASS rejected omitted important option: CAT-RUST: incorrect command/options
+PASS rejected wrong version: CAT-GO: wrong tool version
+PASS rejected broken reference: CAT-RECOVERY: broken reference missing.md
+PASS rejected wrong role: CAT-ROLE: scope/role
+PASS rejected wrong stack: CAT-GO: scope/role
+PASS rejected wrong repository: CAT-GITHUB-IEO-POC: repository binding
+PASS rejected development granted reviewer authority: CAT-ROLE: role permission authority
+PASS rejected unrelated source: CAT-ROLE: wrong source binding
+PASS rejected unrelated cost: CAT-ROLE: wrong cost evidence
+PASS rejected version prefix collision: CAT-GO: wrong tool version
+PASS rejected non-applicable scope changed: CAT-GO: uncertified applicability
+PASS rejected role exclusion removed: CAT-GO: uncertified exclusion
+PASS repeat lookup plus stack, repository and role N/A controls
+PASS corrected catalog, 15/15 mutations rejected

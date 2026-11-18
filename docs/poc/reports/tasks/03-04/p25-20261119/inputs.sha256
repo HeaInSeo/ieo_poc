@@ -1,0 +1,15 @@
+ae5c1e7f230b0101ccfa759ccd1050868d218cced28653a7b84c48a51bfe4e85  docs/poc/Console_Coordinator_Sprints_v0.json
+5c0c29276d739d771994ae53d8895bd0260c189179b7f4511974a7dcfc32d591  docs/poc/Console_Coordinator_PoC_Validation_Plan.md
+e2dcd8659a4d87ad2b014b40d23186035cbdad302db9e35fc305c5e275d50098  docs/poc/reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md
+e08bdd26269a39ce72f91c71ebf605fb09d459f87a943f956953d15ca5509de9  docs/poc/reports/tasks/02-02/eval-20261112/REPORT.md
+e15156fcd5756c73c3f6ef7aa7505ab7530af5094f513bdda3ad7df0b5adc6bd  docs/poc/reports/tasks/03-01/catalog-contract-20261118/CATALOG_CONTRACT.md
+3648d5e911c1f340ae41e12abbee82d9220f404d462ee176cc2cb5148e0520d2  docs/poc/reports/tasks/03-01/catalog-contract-20261118/catalog.json
+b061e1443b838eb24fbd21c25d092fcfb2c6543b40e971b58fb653485d1f9ecb  docs/poc/reports/tasks/03-01/catalog-contract-20261118/sources.json
+f65a3261b52a37c222e6663710526c024208b3cf5bde37eeffdf554525b2605b  docs/poc/reports/tasks/03-02/common-policy-20261118/COMMON_POLICY.md
+940daf62475bf516c552e8ba33319ca006f797d3c321cc7c91d453b732cadca7  docs/poc/reports/tasks/03-02/common-policy-20261118/IEO_POC_GITHUB_PROFILE.md
+bf339da011f5f7e187af5ebd843f3849a692e8f1762445764e7cc3a2ca223003  docs/poc/reports/tasks/03-02/common-policy-20261118/github-main-observation.json
+95617064352e7182cbdf1cd111472b04285768b927bddf7116dbc80c05d8868f  docs/poc/reports/tasks/03-03/go-rust-20261118/GO_POLICY.md
+c6a10375f84b849c178529a4630d4bf64c221a9e62791599f3b7cf9b0f8254e0  docs/poc/reports/tasks/03-03/go-rust-20261118/RUST_POLICY.md
+b7532b4b009f2a7fb1fda91673b399ab19d75abba6fa8766234eabcb607d25ca  docs/poc/reports/tasks/03-03/go-rust-20261118/artifacts.sha256
+0052474810033460ba3828c753dd1d4dc7edc0e54a614f424ea997df85de5004  rust-toolchain.toml
+024152dbdb20646dfe98b68b8f21ae00669cf67aca3be7df9705d403fbd539de  .github/workflows/ci.yml
