@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0061-03-02-fcf1060",
-  "snapshot_created_at": "2026-11-18T23:11:44+09:00",
-  "last_actual_work_observed_at": "2026-11-18T23:11:44+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0062-X-06",
+  "snapshot_created_at": "2026-11-18T23:24:44+09:00",
+  "last_actual_work_observed_at": "2026-11-18T23:24:44+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 PR #98 병합(fcf1060), main CI 미확정 · 03-02 최종 통합 후보 재검토 대기",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 검수 완료(fcf1060 main CI 4/4) · 03-02 PR #99 병합(28c8b40), main CI 미확정 · X-06 실측 PASS와 7dc0571 독립 검토 기록, 통합 후보 검수 중",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -522,9 +522,9 @@
       "group": "핵심",
       "kind": "준비",
       "status": "검수 중",
-      "last_observed_at": "2026-11-18T23:11:44+09:00",
+      "last_observed_at": "2026-11-18T23:21:17+09:00",
       "latest_report": "reports/tasks/03-02/common-policy-20261118/REPORT.md",
-      "result_state": "c831f32 독립 승인 이력 보존 · 최신 main 통합 뒤 격리 재검증 10/10 · 최종 head 검토 대기",
+      "result_state": "c831f32 독립 승인 이력 보존 · 최신 main 통합 뒤 격리 재검증 10/10 · PR #99 독립 승인 head 8d12bb4의 PR CI 4/4(44321825323), 승인 head 조건 병합 28c8b40. 해당 병합 SHA의 main CI 수용은 미확정(44323337281).",
       "verification_level": "unverified",
       "evidence": [
         "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
@@ -533,9 +533,12 @@
         "reports/tasks/03-02/common-policy-20261118/isolated-test.log",
         "reports/tasks/03-02/common-policy-20261118/verification.txt",
         "reports/tasks/03-02/common-policy-20261118/verify-isolated.sh",
-        "reports/tasks/03-02/common-policy-20261118/final-base-recheck.txt"
+        "reports/tasks/03-02/common-policy-20261118/final-base-recheck.txt",
+        "https://github.com/HeaInSeo/ieo_poc/pull/99",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321825323",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44323337281"
       ],
-      "next_action": "중앙에서 최종 로컬 head를 독립 재검토한 뒤 PR·CI 절차 진행",
+      "next_action": "별도 중앙 조율에서 병합 SHA 28c8b40의 main CI 확정 후 수용 여부 기록",
       "unresolved": "최종 통합 head의 독립 검토·PR CI·병합 및 병합 SHA main CI 대기."
     },
     {
@@ -1222,22 +1225,24 @@
       "track": "main",
       "group": "종합",
       "kind": "구현",
-      "status": "검수 중",
-      "last_observed_at": "2026-11-18T23:11:44+09:00",
-      "latest_report": "reports/tasks/09-01/result-export-20261118/REPORT.md",
-      "result_state": "합성 CLI 22/22 · PR #98 독립 승인 및 PR CI 4/4 · 병합 SHA main CI 미확정",
-      "verification_level": "unverified",
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-18T23:17:14+09:00",
+      "latest_report": "reports/tasks/09-01/result-export-20261118/ACCEPTANCE.md",
+      "result_state": "09-01.accept rev 4 구현 검수 완료. 결과/도입 결정, 누적 예산, 자산 재사용, 작업·진척표 및 최종 스프린트 초안. PR #98 독립 반려 10a6878 뒤 9a6f485 승인(최초 변환부터 원증거 경로별 SHA-256 대조), 합성 CLI 22/22, 승인 head PR CI 4/4(44319728265), 병합 fcf1060 main CI 4/4(44321144168).",
+      "verification_level": "verified",
       "evidence": [
-        "reports/tasks/09-01/result-export-20261118/REPORT.md",
+        "reports/tasks/09-01/result-export-20261118/ACCEPTANCE.md",
         "reports/tasks/09-01/result-export-20261118/evidence/pr98-review1-recheck.txt",
+        "reports/tasks/09-01/result-export-20261118/evidence/pr98-main-ci.json",
         "https://github.com/HeaInSeo/ieo_poc/pull/98",
-        "https://github.com/HeaInSeo/ieo_poc/commit/9a6f48586451d7a6582879cc8dc9ba03fd0f692d",
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/44319728265",
-        "https://github.com/HeaInSeo/ieo_poc/commit/fcf1060dd0307a6c2b1005cac1a07f25f99a582f",
-        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321144168"
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321144168",
+        "reports/tasks/09-01/result-export-20261118/REPORT.md",
+        "https://github.com/HeaInSeo/ieo_poc/commit/9a6f48586451d7a6582879cc8dc9ba03fd0f692d",
+        "https://github.com/HeaInSeo/ieo_poc/commit/fcf1060dd0307a6c2b1005cac1a07f25f99a582f"
       ],
-      "next_action": "정확한 병합 SHA의 main CI 결과 대조 뒤 09-01 수용 여부 확인",
-      "unresolved": "fcf1060의 main CI 미확정. P33 독립 판정 및 09-05 실제 자료 연결은 후속 범위."
+      "next_action": "별도 담당의 09-02 독립 기대값 대조·P33 합성 판정에 구현과 증거 인계.",
+      "unresolved": "09-02/P33 독립 합성 판정, 09-05/P33 실제 입력 연결, 제품 완료는 미검증."
     },
     {
       "task_id": "09-02",
@@ -3063,12 +3068,53 @@
         "reports/tasks/03-02/common-policy-20261118/final-base-recheck.txt",
         "https://github.com/HeaInSeo/ieo_poc/commit/fcf1060dd0307a6c2b1005cac1a07f25f99a582f"
       ]
+    },
+    {
+      "event_id": "09-01-ACCEPTED-20261118",
+      "event_revision": 1,
+      "task_id": "09-01",
+      "observed_at": "2026-11-18T23:17:14+09:00",
+      "state": "09-01 구현 검수 완료. PR #98 10a6878 독립 반려 뒤 9a6f485 독립 승인 및 PR CI 4/4. fcf1060 병합 SHA main CI 4/4(44321144168). 09-02·09-05 및 제품 판정은 별도 범위.",
+      "evidence": [
+        "reports/tasks/09-01/result-export-20261118/ACCEPTANCE.md",
+        "reports/tasks/09-01/result-export-20261118/evidence/pr98-review1-recheck.txt",
+        "reports/tasks/09-01/result-export-20261118/evidence/pr98-main-ci.json",
+        "https://github.com/HeaInSeo/ieo_poc/pull/98",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321144168"
+      ]
+    },
+    {
+      "event_id": "03-02-PR99-MERGED-PENDING-MAIN-CI-20261118",
+      "event_revision": 1,
+      "task_id": "03-02",
+      "observed_at": "2026-11-18T23:21:17+09:00",
+      "state": "PR #99 독립 승인 head 8d12bb4의 PR CI 4/4(44321825323), 승인 head 조건 병합 28c8b40. 해당 병합 SHA의 main CI 수용은 미확정(44323337281).",
+      "evidence": [
+        "https://github.com/HeaInSeo/ieo_poc/pull/99",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321825323",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44323337281"
+      ]
+    },
+    {
+      "event_id": "X-06-PASS-REVIEW-20261118",
+      "event_revision": 1,
+      "task_id": "X-06",
+      "observed_at": "2026-11-18T23:24:44+09:00",
+      "state": "동결 기준 e95bd8e. 실제 ieo-coord와 전용 PostgreSQL의 기본 kind 3노드 실측 PASS. HTTP/gRPC 157/157, 요청별 상태 차이 0, 중복 배정 거부, 옛 세대 보존 및 현재 판정 제외, 기한 만료 롤백, 커밋 응답 유실 뒤 키 조회·명시 재요청 1회와 최종 행 1건. 시험 head a870b4b, 증거 및 픽스처 head 7dc0571 독립 승인. 최신 main 28c8b40 통합 후 승인 산출물 15/15 동일. 현재 후보의 독립 검토와 X-06 자체 PR·CI 절차 대기.",
+      "evidence": [
+        "reports/extra/X-06/REPORT.md",
+        "reports/extra/X-06/criteria.md",
+        "reports/extra/X-06/evidence/kind-pass.tar.gz",
+        "reports/extra/X-06/evidence/kind-summary.json",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321595437",
+        "https://github.com/HeaInSeo/ieo_poc/commit/7dc05718eeb2fb99db559f66b9493e2e1d33947d"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "03-01·X-05 검수 완료 · 03-02 통합 재검증 10/10 · 09-01 #98 병합(main CI 미확정)",
-    "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0301",
-    "branch_sha": "task/0302-common-policy · 최종 통합 기준 fcf1060dd0307a6c2b1005cac1a07f25f99a582f · 이전 독립 승인 c831f32",
+    "last_verified_stage": "03-01·X-05·09-01 검수 완료 · 03-02 PR #99 병합(해당 SHA main CI 미확정) · X-06 kind 실측 PASS, 7dc0571 독립 승인 이력",
+    "workspace": "/tmp/ieo-x06-kind-coord",
+    "branch_sha": "task/x06-kind-coord · 기준 28c8b40 · 이전 독립 승인 7dc0571",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 18(단계 8 전 PR, 이 PR) · OpenAPI 0.17.1(이 PR)",
     "running": "이 작업 트리의 모델 요청·운영 서비스 변경 없음",
     "unresolved_external_effects": [],
@@ -3123,12 +3169,14 @@
       "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
       "reports/tasks/03-02/common-policy-20261118/REPORT.md",
       "reports/extra/X-05/REPORT.md",
-      "reports/tasks/09-01/result-export-20261118/REPORT.md"
+      "reports/tasks/09-01/result-export-20261118/REPORT.md",
+      "reports/tasks/09-01/result-export-20261118/ACCEPTANCE.md",
+      "reports/extra/X-06/REPORT.md"
     ],
-    "pending_index_updates": "공통 원장 로컬 통합·생성 완료. 중앙 검토 및 PR 절차 대기.",
-    "next_action": "03-02 최종 head와 본문을 중앙 검토에 전달. 09-01은 해당 SHA main CI 결과 별도 확인",
+    "pending_index_updates": "09-01 수용 및 X-06 실측·독립 검토 이력의 공통 원장 후보 생성. 중앙 게시 대기.",
+    "next_action": "X-06 최종 head의 재검토·PR CI·병합 SHA main CI. 03-02는 별도 정확한 main CI 수용, 09-02는 독립 판정에 인계.",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다.",
-    "current_work": "03-02 최종 로컬 후보 중앙 재검토 대기. X-06 격리 시험 별도 진행",
+    "current_work": "X-06 최종 후보 및 공통 원장 통합안 준비, 중앙 게시 대기",
     "blocking": "X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다. 02-06은 02-05 검수 완료가 선행. 실제 failover 첫 시험은 WAITING_FOR_PREREQUISITE. 03-02 자료 준비는 병행한다.",
     "budget": "02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 검수 완료와 X-02 남은 조건 뒤에만 · 02-05 실제 회차 예산(사용자 결정 2026-11-15 (나)): 계획 3회(개발 R1·R2, Guardrail G1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, USD 0, 예산 검사는 컨테이너 밖. 단계 8에만, X-08 검수 완료와 예산 코드 PR 뒤 · 02-05 예산 코드(BUDGET_0205)와 예비 표식 규칙(사용자 결정 2026-11-17)은 이 PR. 코드에 있어도 실제 호출은 단계 8 전제 뒤에만",
     "user_decisions": [
@@ -3313,14 +3361,21 @@
         "X-04",
         "X-05"
       ],
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
+      "status": "검수 중",
+      "last_observed_at": "2026-11-18T23:24:44+09:00",
+      "latest_report": "reports/extra/X-06/REPORT.md",
+      "result_state": "동결 기준 e95bd8e. 실제 ieo-coord와 전용 PostgreSQL의 기본 kind 3노드 실측 PASS. HTTP/gRPC 157/157, 요청별 상태 차이 0, 중복 배정 거부, 옛 세대 보존 및 현재 판정 제외, 기한 만료 롤백, 커밋 응답 유실 뒤 키 조회·명시 재요청 1회와 최종 행 1건. 시험 head a870b4b, 증거 및 픽스처 head 7dc0571 독립 승인. 최신 main 28c8b40 통합 후 승인 산출물 15/15 동일. 현재 후보의 독립 검토와 X-06 자체 PR·CI 절차 대기.",
       "verification_level": "unverified",
-      "evidence": [],
-      "next_action": "X-04·X-05 뒤",
-      "unresolved": "시험용 서버 결과와 실제 코디네이터 결과를 구분. 04-03·04-04의 수용 기준은 바꾸지 않음"
+      "evidence": [
+        "reports/extra/X-06/REPORT.md",
+        "reports/extra/X-06/criteria.md",
+        "reports/extra/X-06/evidence/kind-pass.tar.gz",
+        "reports/extra/X-06/evidence/kind-summary.json",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321595437",
+        "https://github.com/HeaInSeo/ieo_poc/commit/7dc05718eeb2fb99db559f66b9493e2e1d33947d"
+      ],
+      "next_action": "통합 head 독립 검토 → X-06 PR CI → 승인 head 조건 병합 → 해당 SHA main CI 확인",
+      "unresolved": "제품 단항과 DB 상태를 검증했다. X-06의 PR CI·조건 병합·병합 SHA main CI와 수용 기록이 남아 있다."
     },
     {
       "task_id": "X-07",
