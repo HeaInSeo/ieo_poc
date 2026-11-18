@@ -1,0 +1,7 @@
+-test.shuffle 2
+=== RUN   TestConsume
+--- PASS: TestConsume (0.00s)
+=== RUN   TestSeed
+--- PASS: TestSeed (0.00s)
+PASS
+ok  	example.invalid/ieofixture	0.002s
