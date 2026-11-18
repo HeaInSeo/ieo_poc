@@ -1,0 +1,12 @@
+kind	Check the disposable VM and prepare fixture	2026-11-18T16:20:31.8915310Z 7.0.0-1017-azure
+kind	Check the disposable VM and prepare fixture	2026-11-18T16:20:32.4721276Z cgroup=2 driver=systemd opts=["name=apparmor","name=seccomp,profile=builtin","name=cgroupns"]
+kind	Create a Cilium-ready four-node cluster	2026-11-18T16:21:19.7794532Z kind v0.31.0 go1.25.5 linux/amd64
+kind	Verify and install pinned Cilium	2026-11-18T16:22:02.1589729Z Digest: sha256:873a782bf1064b08fbb05f64c4ed50fcb66d6f05f981f817bddd91f038b69935
+kind	Verify and install pinned Cilium	2026-11-18T16:22:02.1639685Z Digest: sha256:873a782bf1064b08fbb05f64c4ed50fcb66d6f05f981f817bddd91f038b69935
+kind	Verify and install pinned Cilium	2026-11-18T16:22:36.7628407Z daemonset.apps/cilium condition met
+kind	Verify and install pinned Cilium	2026-11-18T16:22:36.8693021Z daemonset.apps/cilium-envoy condition met
+kind	Preserve diagnostics and trial evidence	2026-11-18T16:26:03.1512823Z [36;1mecho X07_EVIDENCE_END[0m
+kind	Preserve diagnostics and trial evidence	2026-11-18T16:26:07.0442638Z e72dad8e5897d22afea54c83926318951c0643d76e3e76d12ce7d7b91090b62f  /home/runner/work/_temp/x07-evidence.tar.gz
+kind	Preserve diagnostics and trial evidence	2026-11-18T16:26:07.1469983Z X07_EVIDENCE_END
+kind	Remove test nodes	2026-11-18T16:26:07.1606058Z Deleting cluster "ieo-x07" ...
+kind	Remove test nodes	2026-11-18T16:26:13.2999434Z Deleted nodes: ["ieo-x07-worker3" "ieo-x07-worker2" "ieo-x07-worker" "ieo-x07-control-plane"]
