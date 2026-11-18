@@ -1,0 +1,15 @@
+using podman due to KIND_EXPERIMENTAL_PROVIDER
+enabling experimental podman provider
+ERROR: failed to create cluster: running kind with rootless provider requires setting systemd property "Delegate=yes", see https://kind.sigs.k8s.io/docs/user/rootless/
+
+Stack Trace:
+sigs.k8s.io/kind/pkg/errors.New
+	sigs.k8s.io/kind/pkg/errors/errors.go:28
+sigs.k8s.io/kind/pkg/cluster/internal/create.validateProvider
+	sigs.k8s.io/kind/pkg/cluster/internal/create/create.go:253
+sigs.k8s.io/kind/pkg/cluster/internal/create.Cluster
+	sigs.k8s.io/kind/pkg/cluster/internal/create/create.go:70
+sigs.k8s.io/kind/pkg/cluster.(*Provider).Create
+	sigs.k8s.io/kind/pkg/cluster/provider.go:195
+sigs.k8s.io/kind/pkg/cmd/kind/create/cluster.runE
+	sigs.k8s.io/kind/pkg/cmd/kind/create/cluster/createcluster.go:110
