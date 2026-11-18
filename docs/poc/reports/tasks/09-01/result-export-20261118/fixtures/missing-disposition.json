@@ -1,0 +1,10 @@
+{
+  "result_sha256": "257087fa6572be78953edae44a0d362a998230d5b5ad079c5bde63b40b302d1d",
+  "decision": "보류",
+  "scopes": [],
+  "reason": "Synthetic evaluation rationale",
+  "proposed_by": "fixture-author",
+  "owner": "fixture-owner",
+  "resume_condition": "Recover missing scope evidence",
+  "recheck_at": "2026-11-19T00:00:00Z"
+}
