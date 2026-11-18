@@ -1,0 +1,12 @@
++ gofmt -l .
++ go vet -mod=readonly ./...
++ go test -mod=readonly -count=1 -json ./...
+{"Time":"2026-11-18T16:34:41.728099683Z","Action":"start","Package":"example.invalid/ieofixture"}
+{"Time":"2026-11-18T16:34:41.729728775Z","Action":"run","Package":"example.invalid/ieofixture","Test":"TestDouble"}
+{"Time":"2026-11-18T16:34:41.729759285Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"=== RUN   TestDouble\n"}
+{"Time":"2026-11-18T16:34:41.729795313Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"--- PASS: TestDouble (0.00s)\n"}
+{"Time":"2026-11-18T16:34:41.729801808Z","Action":"pass","Package":"example.invalid/ieofixture","Test":"TestDouble","Elapsed":0}
+{"Time":"2026-11-18T16:34:41.729807019Z","Action":"output","Package":"example.invalid/ieofixture","Output":"PASS\n"}
+{"Time":"2026-11-18T16:34:41.72998468Z","Action":"output","Package":"example.invalid/ieofixture","Output":"ok  \texample.invalid/ieofixture\t0.002s\n"}
+{"Time":"2026-11-18T16:34:41.730009196Z","Action":"pass","Package":"example.invalid/ieofixture","Elapsed":0.002}
+PASS profile=go version=0.1.0 catalog=0.2.2

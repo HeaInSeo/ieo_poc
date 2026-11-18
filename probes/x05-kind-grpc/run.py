@@ -195,19 +195,20 @@ def check_stream(items, first_seq, expected, excluded=None):
 
 
 class Trial:
-    def __init__(self, kubeconfig, recorder):
-        self.command = ["kubectl", "--kubeconfig", str(kubeconfig), "--context", CONTEXT]
+    def __init__(self, kubeconfig, recorder, context=CONTEXT, namespace=NAMESPACE):
+        self.command = ["kubectl", "--kubeconfig", str(kubeconfig), "--context", context]
+        self.namespace = namespace
         self.recorder = recorder
         self.failures = []
 
-    def kubectl(self, *args, namespace=NAMESPACE, timeout=8):
-        process = subprocess.run(self.command + ["--request-timeout", f"{timeout}s", "-n", namespace, *args],
+    def kubectl(self, *args, namespace=None, timeout=8):
+        process = subprocess.run(self.command + ["--request-timeout", f"{timeout}s", "-n", namespace or self.namespace, *args],
                                  text=True, encoding="utf-8", capture_output=True, timeout=timeout + 2)
         if process.returncode:
             raise RuntimeError(f"kubectl {args}: {process.stderr.strip()}")
         return process.stdout
 
-    def get(self, *args, namespace=NAMESPACE):
+    def get(self, *args, namespace=None):
         return json.loads(self.kubectl("get", *args, "-o", "json", namespace=namespace))
 
     def bootstrap(self):
@@ -260,15 +261,18 @@ class Trial:
         self.recorder.snapshot(f"{stage}-last", state)
         raise TrialFailure(f"{stage}: Kubernetes did not converge within 120 seconds")
 
+    def frontend_matches(self, events, expected, deadline):
+        return any(event["event"] == "addresses" and
+                   set(event["data"]["current"]) == {f"{pod['ip']}:50051" for pod in expected.values()}
+                   for event in events if event["received_monotonic"] <= deadline)
+
     def window(self, stage, observed, expected, boundary=None):
         self.client.wait(
             lambda events: True if (
                 {reply(e).get("uid") for e in samples(events)
                  if observed <= e["received_monotonic"] <= observed + 30}
                 >= expected.keys()
-                and any(e["event"] == "addresses" and
-                        set(e["data"]["current"]) == {f"{pod['ip']}:50051" for pod in expected.values()}
-                        for e in events if e["received_monotonic"] <= observed + 30)
+                and self.frontend_matches(events, expected, observed + 30)
             ) else None,
             observed + 30, f"{stage}: all Ready endpoints serving and matching a DNS snapshot")
         mark = self.client.mark(stage + "-window")
@@ -284,6 +288,7 @@ class Trial:
         self.check(stage, check_window, window, expected, index)
         if boundary:
             self.check(stage, self.check_gap, boundary, window)
+        return window
 
     def check(self, stage, function, *args):
         try:
@@ -406,14 +411,20 @@ class Trial:
                 f"expected exactly one explicit reissue: {starts}")
         self.recorder.emit("unary_reissued", uid=response["uid"], request_id=request_id)
 
+    def before_trial(self):
+        """Optional control experiment after the environment is ready."""
+
+    def client_command(self):
+        return self.command + ["-n", self.namespace, "exec", "-i", "client", "--", "/ieo-x05-probe", "client"]
+
     def run(self):
         try:
             self.bootstrap()
         except TrialFailure as error:
             raise EnvironmentBlocked(str(error)) from error
+        self.before_trial()
         with (self.recorder.path / "client.stderr").open("x", encoding="utf-8") as stderr:
-            self.client = Client(self.command + ["-n", NAMESPACE, "exec", "-i", "client",
-                                                 "--", "/ieo-x05-probe", "client"], stderr)
+            self.client = Client(self.client_command(), stderr)
             try:
                 observed, initial = self.stable("initial", 2, "v1", set(), set(), time.monotonic() + 120)
                 self.window("initial", observed, initial)
@@ -440,14 +451,14 @@ class Trial:
         return self.failures
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(trial_type=Trial):
+    parser = argparse.ArgumentParser(description=trial_type.__doc__ or __doc__)
     parser.add_argument("--kubeconfig", required=True, type=Path)
     parser.add_argument("--evidence", required=True, type=Path, help="new directory for evidence")
     args = parser.parse_args()
     args.evidence.mkdir()
     recorder = Recorder(args.evidence)
-    trial = Trial(args.kubeconfig, recorder)
+    trial = trial_type(args.kubeconfig, recorder)
     try:
         failures = trial.run()
     except TrialFailure as error:

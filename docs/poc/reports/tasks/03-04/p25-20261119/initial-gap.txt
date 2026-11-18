@@ -1,0 +1,7 @@
+CAT-ROLE 0.1.0 common draft -
+CAT-RECOVERY 0.1.0 common draft -
+CAT-GITHUB 0.1.0 repository draft HeaInSeo/notion-projection-guard
+CAT-GO 0.1.0 go draft -
+CAT-RUST 0.1.0 rust draft -
+FAIL required detail navigation and ieo_poc repository lookup are absent from the original authoring index.
+Separate P25 verification index required. Existing T02 versions and original source bindings are preserved.

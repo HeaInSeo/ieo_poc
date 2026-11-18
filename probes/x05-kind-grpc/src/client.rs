@@ -6,10 +6,11 @@ use std::{
     time::{Duration, Instant},
 };
 
+use hyper_util::rt::TokioIo;
 use serde_json::{Value, json};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
-    net::lookup_host,
+    net::{TcpStream, lookup_host},
     sync::mpsc,
     time::{MissedTickBehavior, interval, timeout},
 };
@@ -201,15 +202,45 @@ async fn watch(mut client: Client, epoch: Instant, request_id: String, after_seq
     }
 }
 
-pub async fn run() -> Result<(), Box<dyn Error>> {
-    let host = env::var("PROBE_SERVICE")?;
+async fn vip_channel(host: &str, port: u16, epoch: Instant) -> Result<Channel, Box<dyn Error>> {
+    let addresses: BTreeSet<_> = timeout(LOOKUP_LIMIT, lookup_host((host, port)))
+        .await??
+        .filter(SocketAddr::is_ipv4)
+        .collect();
+    let Some(address) = addresses.first().copied().filter(|_| addresses.len() == 1) else {
+        return Err(format!("{host}: expected one IPv4 Service VIP, found {addresses:?}").into());
+    };
+    emit(epoch, "frontend", json!({"address": address}));
+    // One socket at a time, with each successful connection captured for the experiment.
+    let connector = tower::service_fn(move |_| async move {
+        let stream = TcpStream::connect(address).await?;
+        stream.set_nodelay(true)?;
+        emit(
+            epoch,
+            "connect",
+            json!({"address": address, "local": stream.local_addr()?}),
+        );
+        Ok::<_, std::io::Error>(TokioIo::new(stream))
+    });
+    Ok(endpoint(address).connect_with_connector_lazy(connector))
+}
+
+pub async fn run(vip_host: Option<String>) -> Result<(), Box<dyn Error>> {
     let port = env::var("PROBE_PORT")
         .unwrap_or_else(|_| "50051".to_owned())
         .parse()?;
     let epoch = Instant::now();
-    let (channel, changes) = Channel::balance_channel(32);
+    let (channel, discovery) = if let Some(host) = vip_host {
+        (vip_channel(&host, port, epoch).await?, None)
+    } else {
+        let host = env::var("PROBE_SERVICE")?;
+        let (channel, changes) = Channel::balance_channel(32);
+        (
+            channel,
+            Some(tokio::spawn(discover(host, port, changes, epoch))),
+        )
+    };
     let client = ProbeClient::new(channel);
-    let discovery = tokio::spawn(discover(host, port, changes, epoch));
     let mut commands = BufReader::new(tokio::io::stdin()).lines();
     let mut ticks = interval(Duration::from_millis(100));
     ticks.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -247,7 +278,9 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    discovery.abort();
+    if let Some(discovery) = discovery {
+        discovery.abort();
+    }
     Ok(())
 }
 
