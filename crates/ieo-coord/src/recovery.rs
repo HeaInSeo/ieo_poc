@@ -583,8 +583,9 @@ pub fn usable(
 }
 
 /// The one use of an approval, committed before the start is sent: `Err` when it was used
-/// already (or its checkpoint was) — the delivery then calls nothing.
-pub fn record_use(
+/// already (or its checkpoint was) — the delivery then calls nothing. The caller's
+/// submission fence holds the repo/role recovery advisory lock on another connection.
+pub(crate) fn record_use_under_fence(
     tx: &mut Transaction,
     repo: &str,
     role: &str,
@@ -592,7 +593,6 @@ pub fn record_use(
     delivery_id: &str,
     github: &Value,
 ) -> R {
-    lock(tx, &format!("recovery:{repo}:{role}"))?;
     let seq: Option<i64> = tx
         .query_opt(
             "SELECT checkpoint_seq FROM role_recoveries WHERE recovery_id = $1",

@@ -1021,32 +1021,48 @@ pub fn deliver(
         }
         ok(200, Value::Null)
     };
-    let start = if let Some(rid) = &recovery {
-        let used = run_tx(db, guard, &|tx| {
-            tx.batch_execute("SET LOCAL lock_timeout = '1s'")?;
+    // The DB fence stays open through the bounded POST. Recovery commits its one-shot
+    // use on a separate connection so durability does not release the decision locks.
+    let start = (|| -> Result<_, Resp> {
+        let mut fence = db.transaction()?;
+        if recovery.is_some() {
+            fence.batch_execute("SET LOCAL lock_timeout = '1s'")?;
             // Recovery approval also orders this lock before the checkpoint lock.
-            lock(tx, &format!("recovery:{repo}:{role}"))?;
-            validate(tx)?;
-            crate::recovery::record_use(tx, repo, role, rid, &id, &again.body["github"])
-        })?;
-        if used.status == 200 {
+            lock(&mut fence, &format!("recovery:{repo}:{role}"))?;
+        }
+        validate(&mut fence)?;
+        if let Some(rid) = &recovery {
+            let mut writer = ctx
+                .db_config
+                .clone()
+                .connect_timeout(Duration::from_secs(2))
+                .connect(postgres::NoTls)?;
+            let mut use_tx = writer.transaction()?;
+            use_tx.batch_execute("SET LOCAL statement_timeout = '2s'")?;
+            crate::recovery::record_use_under_fence(
+                &mut use_tx,
+                repo,
+                role,
+                rid,
+                &id,
+                &again.body["github"],
+            )?;
+            use_tx.commit()?;
             extra["recovery_id"] = json!(rid);
             sent["recovery_id"] = json!(rid);
-            Ok(adm.start_with(&plan, &call, &caller::Http, &extra))
-        } else {
-            Err(used)
         }
-    } else {
-        // Ordinary delivery holds the validated DB facts through the bounded POST.
+        if STOPPING.load(Ordering::SeqCst) || begun.elapsed() > Duration::from_secs(deadline) {
+            return Err(problem(
+                409,
+                "DELIVERY_FENCE",
+                "send window closed after authorization",
+            ));
+        }
         // The supervisor's own-assignment GET is read-only and takeover runs asynchronously.
-        (|| -> Result<_, Resp> {
-            let mut fence = db.transaction()?;
-            validate(&mut fence)?;
-            let result = adm.start_with(&plan, &call, &caller::Http, &extra);
-            drop(fence);
-            Ok(result)
-        })()
-    };
+        let result = adm.start_with(&plan, &call, &caller::Http, &extra);
+        drop(fence);
+        Ok(result)
+    })();
     let start = match start {
         Ok(result) => result,
         Err(refusal) => {

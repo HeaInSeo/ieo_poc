@@ -22,6 +22,8 @@ use std::collections::BTreeMap;
 
 /// Static configuration loaded at start-up.
 pub struct Ctx {
+    /// Connection settings for committing a one-shot recovery use while delivery holds its fence.
+    pub db_config: postgres::Config,
     pub policy: Policy,
     /// Plan manifest; only its `inspection_profiles` are read (approved acceptance profiles).
     pub manifest: Value,
