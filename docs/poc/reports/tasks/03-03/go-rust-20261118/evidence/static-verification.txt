@@ -1,0 +1,4 @@
+PASS manifest prerequisite and acceptance profile match existing 03-02 acceptance
+PASS prior catalog identities and local source/evidence links
+PASS same seed reproduced and cleared the order dependency
+PASS both zero-exit skip controls lack required test success
