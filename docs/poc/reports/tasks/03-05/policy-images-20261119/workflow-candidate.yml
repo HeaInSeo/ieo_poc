@@ -1,0 +1,35 @@
+name: T04 fixture policy candidate
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  policy:
+    name: policy candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      POLICY_IMAGE: ${{ vars.T04_POLICY_IMAGE }}
+      POLICY_PROFILE: ${{ vars.T04_POLICY_PROFILE }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          persist-credentials: false
+      - name: Run pinned verifier on exact candidate SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_SHA" ]]
+          [[ "$POLICY_IMAGE" =~ ^[a-zA-Z0-9./:_-]+@sha256:[0-9a-f]{64}$ ]]
+          [[ "$POLICY_PROFILE" == go || "$POLICY_PROFILE" == rust ]]
+          docker pull "$POLICY_IMAGE"
+          docker run --pull never --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --user 65532:65532 \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,mode=1777 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/work,readonly" \
+            "$POLICY_IMAGE" "$POLICY_PROFILE"

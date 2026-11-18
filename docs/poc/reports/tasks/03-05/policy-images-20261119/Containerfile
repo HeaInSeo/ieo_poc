@@ -1,0 +1,20 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS common
+USER 0
+ENV PATH=/opt/ieo-tools/go/bin:/opt/ieo-tools/rust/bin:/usr/bin:/bin \
+    GOLANG_VERSION="" GOPATH="" HOME=/tmp LC_ALL=C
+WORKDIR /work
+RUN rm -rf -- /usr/local/go /go && command -v git && command -v gcc && command -v python3
+COPY bundle/ /opt/ieo-policy/source/
+COPY bundle.sha256 inputs.env profiles.json /opt/ieo-policy/
+COPY verify.py /usr/local/bin/ieo-policy-verify
+RUN chmod 0555 /usr/local/bin/ieo-policy-verify
+ENTRYPOINT ["/usr/local/bin/ieo-policy-verify"]
+
+FROM common AS go
+COPY go/ /opt/ieo-tools/go/
+USER 65532:65532
+
+FROM common AS rust
+COPY rust/ /opt/ieo-tools/rust/
+USER 65532:65532

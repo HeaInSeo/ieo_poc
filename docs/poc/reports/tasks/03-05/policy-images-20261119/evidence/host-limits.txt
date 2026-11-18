@@ -1,0 +1,12 @@
+r1 combined build
+Error: committing container for step {Env:[GOTOOLCHAIN=local PATH=/opt/ieo-tools/go/bin:/opt/ieo-tools/rust/bin:/usr/bin:/bin GOLANG_VERSION= GOPATH= HOME=/tmp LC_ALL=C] Command:copy Args:[/opt/ieo-tools/rust/ /opt/ieo-tools/rust/] Flags:[--from=rust] Attrs:map[] Message:COPY --from=rust /opt/ieo-tools/rust/ /opt/ieo-tools/rust/ Heredocs:[] Original:COPY --from=rust /opt/ieo-tools/rust/ /opt/ieo-tools/rust/}: copying layers and metadata for container "4764edbe9df91c9f2543cba30b0fbe2c5202d37b110b540aa237a97b35f54ba5": writing blob: adding layer with blob "sha256:8cad9887dbf283b81314959eabd0fb823323eafcc3736563b62c576cf69d1131": processing tar file(write /opt/ieo-tools/rust/lib/rustlib/x86_64-unknown-linux-gnu/lib/libcore-1d288395a3394ed3.rmeta: no space left on device): exit status 1
+
+r2 rootless smoke before pids flag adjustment
+info-go rc=127 expected=0 image=81c3eb9c1ff7a6d92ed297b29644ffa7e17a32263cf9a13dc6253ea2e3dae548 profile=info
+Error: runc: runc create failed: unable to start container process: error during container init: error setting cgroup config for procHooks process: openat2 /sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/user.slice/74b902a61191610408a4c4ab72f2b643c1ae59cdf0a4c9941f26f33e891ccc6f/pids.max: no such file or directory: OCI runtime attempted to invoke a command that was not found
+
+r3 combined build attempted to reconstruct a standalone layer at the same time
+Error: mkdir /home/heain/.local/share/containers/storage/overlay/b573592dd134ccaa1bf35a162b02759f09fb971487f77a336df158fef0ea6482/merged.1: no space left on device: building at STEP "COPY rust/ /opt/ieo-tools/rust/": 3 errors occurred:
+/home image storage: 20 KiB available when default graph refused writes.
+r5 graph and runroot under /tmp, existing image store referenced read-only.
+Targeted cleanup of earlier build artifacts failed with ENOSPC.
