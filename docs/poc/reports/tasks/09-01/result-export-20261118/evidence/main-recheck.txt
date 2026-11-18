@@ -1,0 +1,71 @@
+Base d27fa96504b568fd3156d6c5ac21e7d2f333ff9e Merge pull request #97 from HeaInSeo/task/x05-kind-grpc
+Python 3.12 offline exporter CLI
+PASS frozen fixture digests
+PASS C01 baseline, collector totals, registration and idempotent package
+PASS C02 same IDs, dependencies and spec digest within the same revision
+PASS C03 reject cost double count
+PASS C04 reject registration with DEPENDENCY_CYCLE
+PASS C05 retain the goal and show its missing work; draft only
+PASS C06 reject current ID/track mismatch even with unchanged totals
+PASS C07 0/73 current and 0/12 followup; 0/76 historical
+PASS C08 new draft revision; stable task IDs; runtime evidence becomes stale and affected work is flagged
+PASS C09 same run counted once across result revisions; latest selected and earlier versions preserved
+PASS C10 synthetic run and approvals do not establish an actual result or product completion
+PASS C11 reject registration with UNDEFINED_PREREQUISITE
+PASS C12 new proof supersedes the hold, authorizes integration review and retains the previous run and its budget
+PASS C13 never reset a cumulative budget by omitting prior attempts
+PASS C14 reject in-place replacement of earlier evidence and retain the existing draft
+PASS C15 reject a revision that changes an existing run from synthetic to actual
+PASS C16 new draft records the withdrawal and affected work without changing the archived review file
+PASS C17 independent verification PASS supports regression review without implying adoption
+PASS C18 implementation of a rejected candidate remains on hold even when a different candidate covers the scope
+PASS shared ledger and generated views read-only
+Progress renderer regression checks
+PASS committed_views_match_ledger
+PASS render_ok
+PASS render_idempotent
+PASS main_and_followup_counted_separately
+PASS ledger_digest_in_views
+PASS same_snapshot_and_digest_in_all_views
+PASS no_combined_progress_rate
+PASS hand_edit_detected
+PASS rerender_restores_after_hand_edit
+PASS extra_task_listed_apart
+PASS extra_task_not_counted
+PASS extra_task_id_collision_rejected
+PASS extra_task_accepted_without_evidence_rejected
+PASS accepted_without_evidence_rejected
+PASS invalid_ledger_writes_nothing
+PASS missing_local_evidence_rejected
+PASS http_url_rejected
+PASS parent_path_rejected
+PASS absolute_path_rejected
+PASS https_url_accepted
+PASS restored_after_link_cases
+PASS baseline_count_mismatch_rejected
+PASS simulated_crash_reported
+PASS crash_left_partial_state
+PASS check_flags_partial_state
+PASS rerun_after_crash_ok
+PASS no_tmp_left_after_rerun
+PASS check_ok_after_rerun
+PASS views_reflect_new_ledger
+PASS stray_tmp_flagged_by_check
+PASS render_removes_stray_tmp
+PASS no_timer_or_network_in_renderer
+RESULT PASS 0
+Cargo 1.99.1, cargo test --offline --locked -p ieo-evidence -p ieo-spec -p ieo-report
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.03s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+PASS validate_package.py, render_progress.py --check, git diff --check, progress tree matches base
+{"progress":{"followup":{"accepted":0,"total":12},"historical":{"accepted":0,"source":"01_plan_and_review/Console_Coordinator_PoC_Validation_Plan_v1.2.md","total":76,"version":"v1.2"},"ledger_sha256":"c64523ce85fb70427b0fa5806a71b9d8376e70a123fc625284ddfd7eabc29583","main":{"accepted":12,"total":73},"snapshot_id":"v1.3.3-EXEC-0059-03-01-r3"},"converter_sha256":"a807d2ea3e77e10429b9a47a1f58f1a79e20d3de0747dffdd71064d930c7d02e","sprint_digest":"71c5401ae9bb200029686803e2e17c6947c7eef82242495cead81f14a55abd24","actual_linkage":"pending_09-05","product_completion":"unverified"}

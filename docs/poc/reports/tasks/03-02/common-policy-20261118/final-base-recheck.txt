@@ -1,0 +1,38 @@
+03-02 validation on merged base fcf1060dd0307a6c2b1005cac1a07f25f99a582f
+Local integration predecessor 9baa5bc1f6e13aaff03c241f37454324c5bcb18b
+PASS 03-02 previously reviewed artifacts match c831f32 byte-for-byte
+PASS .github/workflows/ci.yml, rust-toolchain.toml and 09-01 deliverables match latest main
+COMMON_POLICY.md: OK
+IEO_POC_GITHUB_PROFILE.md: OK
+github-main-observation.json: OK
+isolated-test.log: OK
+verification.txt: OK
+verify-isolated.sh: OK
+test launch_failure_still_writes_record ... ok
+test nonzero_exit_is_failure_with_stderr_kept ... ok
+test exit_zero_without_required_evidence_is_incomplete ... ok
+test normal_success_records_everything ... ok
+test timeout_sends_term_and_is_failure ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 1.03s
+test role_arguments_use_edit_paths_and_session_id_only ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+PASS unset DB fails the selected test with CI=1
+PostgreSQL image: docker.io/library/postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+127.0.0.1:5432 - accepting connections
+CI=1 | IEO_TEST_DB_URL=host=127.0.0.1 port=33519 user=ieo dbname=ieo
+test authentication_and_scope_refusals_change_nothing ... ok
+test github_reviews_count_only_at_the_head_and_comments_do_not_clear_changes_requested ... ok
+test review_inputs_are_current_independent_and_for_the_head ... ok
+test verdict_uses_github_and_run_evidence_for_the_recorded_sha_only ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 78 filtered out; finished in 1.54s
+CREATE DATABASE ieo_t_344860_0_322614047
+DROP DATABASE ieo_t_344860_0_322614047
+CREATE DATABASE ieo_t_344860_1_585181588
+DROP DATABASE ieo_t_344860_1_585181588
+CREATE DATABASE ieo_t_344860_2_4593833
+DROP DATABASE ieo_t_344860_2_4593833
+CREATE DATABASE ieo_t_344860_3_449123309
+DROP DATABASE ieo_t_344860_3_449123309
+Remaining isolated test databases: 0
+PASS server observed four distinct test databases created and dropped
+PASS disposable PostgreSQL stopped

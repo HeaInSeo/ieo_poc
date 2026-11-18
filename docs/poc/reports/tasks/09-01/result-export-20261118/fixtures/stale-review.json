@@ -1,0 +1,64 @@
+{
+  "schema_version": "console.report.v0",
+  "contract_revision": 4,
+  "event_id": "SIM-stale",
+  "event_revision": 1,
+  "sprint_id": "FINAL-FIXTURE",
+  "sprint_revision": 4,
+  "task_id": "08-05",
+  "repo_id": "fixture-repo",
+  "assignment_id": "fixture-assignment",
+  "generation": 1,
+  "actor": {
+    "role": "coordinator",
+    "name": "fixture-reviewer"
+  },
+  "observed_at": "2026-11-18T11:00:00Z",
+  "channel": "coordinator_to_client",
+  "evidence_level": "verified",
+  "phase": "개발",
+  "operational_state": "작업 중",
+  "reason_code": null,
+  "evidence": [
+    "sha256:b2d5b412466c9f1dacaf14e363cc5836abc83b1bb89c7e4259232c1304763ca7  reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+    "sha256:c037a36d23bbfcd87bd44ee9e7d805639fc37a3fd289424d9b7dba4a107dd363",
+    "sha256:67ed877a18c049e357dafa17c3f6cf52704aa7f7ee9a626ebdc1746da2f0c796"
+  ],
+  "unknown_facts": [
+    "설명용 fixture이며 실제 실행 증거가 아니다."
+  ],
+  "affected_tasks": [],
+  "next_action": "설명용 다음 행동",
+  "next_owner": "fixture-owner",
+  "resume_condition": null,
+  "next_check_at": null,
+  "decision": {
+    "required": false,
+    "question": null,
+    "options": [],
+    "recommendation": null,
+    "deadline_at": null,
+    "default_action": "현재 승인 범위 유지"
+  },
+  "schedule": {
+    "deadline_state": "undecided",
+    "deadline_at": null,
+    "status": "unassessed",
+    "remaining_tasks": null,
+    "remaining_reason": "설명용 표본",
+    "delay_reasons": [],
+    "affected_tasks": [],
+    "forecast": {
+      "state": "unestimated",
+      "completion_range": null,
+      "evidence": [],
+      "reason": "과거 실측 없음"
+    }
+  },
+  "report_type": "coordinator_verdict",
+  "body": {
+    "evidence_comparison": "설명용 대조 결과",
+    "affected_tasks": [],
+    "next_owner": "fixture-owner"
+  }
+}

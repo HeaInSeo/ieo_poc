@@ -1,0 +1,47 @@
+    Finished `test` profile [unoptimized] target(s) in 0.08s
+     Running tests/collector.rs (/tmp/ieo-pr91-target/debug/deps/collector-67b7ceda32279717)
+
+running 5 tests
+test launch_failure_still_writes_record ... ok
+test nonzero_exit_is_failure_with_stderr_kept ... ok
+test normal_success_records_everything ... ok
+test exit_zero_without_required_evidence_is_incomplete ... ok
+test timeout_sends_term_and_is_failure ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 1.03s
+
+    Finished `test` profile [unoptimized] target(s) in 0.12s
+     Running tests/supervisor.rs (/tmp/ieo-pr91-target/debug/deps/supervisor-9163e76b5452044e)
+
+running 1 test
+test role_arguments_use_edit_paths_and_session_id_only ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+
+IEO_TEST_DB_URL must be set in CI
+PASS unset DB fails the selected test with CI=1
+PostgreSQL image: docker.io/library/postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+127.0.0.1:5432 - accepting connections
+CI=1 | IEO_TEST_DB_URL=host=127.0.0.1 port=39479 user=ieo dbname=ieo
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running tests/coordinator.rs (/tmp/ieo-pr91-target/debug/deps/coordinator-dc518a347089295f)
+
+running 4 tests
+test authentication_and_scope_refusals_change_nothing ... ok
+test github_reviews_count_only_at_the_head_and_comments_do_not_clear_changes_requested ... ok
+test review_inputs_are_current_independent_and_for_the_head ... ok
+test verdict_uses_github_and_run_evidence_for_the_recorded_sha_only ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 78 filtered out; finished in 1.49s
+
+CREATE DATABASE ieo_t_331868_0_167906022
+DROP DATABASE ieo_t_331868_0_167906022
+CREATE DATABASE ieo_t_331868_1_425859242
+DROP DATABASE ieo_t_331868_1_425859242
+CREATE DATABASE ieo_t_331868_2_832949582
+DROP DATABASE ieo_t_331868_2_832949582
+CREATE DATABASE ieo_t_331868_3_261579679
+DROP DATABASE ieo_t_331868_3_261579679
+Remaining isolated test databases: 0
+PASS server observed four distinct test databases created and dropped
+PASS disposable PostgreSQL stopped

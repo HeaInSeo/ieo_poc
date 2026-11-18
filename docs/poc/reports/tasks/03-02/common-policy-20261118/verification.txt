@@ -1,0 +1,8 @@
+PASS same main SHA before and after settings read
+PASS workflow triggers and read-only default
+PASS 3 protected checks and 1 additional job
+PASS repository settings checked against the captured profile
+PASS test/lint/format commands match exact workflow
+PASS local policy and report references resolve
+PASS runtime contract §10 item 1: absolute Edit policy and Guardrail scratch; Write form excluded
+PASS runtime contract §10 item 6: Bash list excluded as evidence, container/scopes/coordinator named

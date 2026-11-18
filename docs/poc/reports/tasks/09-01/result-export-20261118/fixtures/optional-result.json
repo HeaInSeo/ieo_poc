@@ -1,0 +1,60 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": false,
+  "plan_version": "v1.3.3",
+  "task_id": "08-03",
+  "experiment_id": "SIM-optional",
+  "run_id": "optional",
+  "revision": 1,
+  "previous_run_ref": null,
+  "actor": {
+    "role": "development",
+    "name": "fixture-author"
+  },
+  "started_at": "2026-11-18T10:00:00Z",
+  "finished_at": "2026-11-18T10:00:01Z",
+  "execution_kind": "synthetic",
+  "execution_state": "완료",
+  "inputs": {
+    "spec_revision": "fixture-spec-1",
+    "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+    "model_runtime_versions": []
+  },
+  "expected": "Frozen plan criterion",
+  "observed": {
+    "covered_scopes": [
+      "optional"
+    ],
+    "validated_assets": []
+  },
+  "verdict": "PASS",
+  "verification": {
+    "level": "verified",
+    "reviewer": "fixture-reviewer",
+    "evidence": [
+      "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+    ]
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "Use stage evidence records.",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
+  "adoption": "미판정",
+  "reuse_assets": [],
+  "unresolved": [],
+  "next_action": null,
+  "next_owner": null,
+  "resume_condition": null,
+  "evidence_refs": [
+    "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+  ],
+  "operational_report_ref": "reports/tasks/09-01/result-export-20261118/fixtures/optional-review.json",
+  "schedule_report_ref": null
+}

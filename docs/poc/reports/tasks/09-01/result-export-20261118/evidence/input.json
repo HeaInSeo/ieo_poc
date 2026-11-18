@@ -1,0 +1,379 @@
+{
+  "as_of": "2026-11-18T12:00:00Z",
+  "assets": [
+    {
+      "asset_id": "meter",
+      "contract": "collector v0",
+      "dependencies": [
+        "fixture-runtime-1"
+      ],
+      "kind": "실행 코드",
+      "origin": "synthetic fixture",
+      "ref": "reports/tasks/09-01/result-export-20261118/fixtures/collector-module.txt",
+      "remaining": "Separate target integration and regression review.",
+      "scope": "base",
+      "sha256": "eab70d985ee8fe14a2f896e80dc313f5fdf65bd68b2bf3d8f2b4ff5ae87272e2",
+      "target": "console-coordinator",
+      "usage_terms": "fixture-only",
+      "validation_result": "reports/tasks/09-01/result-export-20261118/fixtures/failure-result.json",
+      "version": "meter-1"
+    },
+    {
+      "asset_id": "no-provenance",
+      "kind": "실행 코드"
+    }
+  ],
+  "draft": {
+    "seed_sprint_id": "POC-09",
+    "sprint_id": "FINAL-FIXTURE",
+    "title": "Synthetic final sprint"
+  },
+  "format": "console.poc.export-input.v0",
+  "goals": [
+    {
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "goal_id": "missing",
+      "required": true,
+      "scopes": [
+        "missing"
+      ],
+      "source_task_id": "08-04",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      }
+    },
+    {
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "goal_id": "optional",
+      "required": false,
+      "scopes": [
+        "optional"
+      ],
+      "source_task_id": "08-03",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      }
+    },
+    {
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "goal_id": "partial",
+      "required": true,
+      "scopes": [
+        "worker",
+        "restore"
+      ],
+      "source_task_id": "08-02",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      }
+    },
+    {
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "goal_id": "runtime",
+      "required": true,
+      "scopes": [
+        "base"
+      ],
+      "source_task_id": "08-01",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      }
+    },
+    {
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "goal_id": "stale",
+      "required": true,
+      "scopes": [
+        "stale"
+      ],
+      "source_task_id": "08-05",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      }
+    },
+    {
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "goal_id": "unapproved",
+      "required": true,
+      "scopes": [
+        "unapproved"
+      ],
+      "source_task_id": "08-06",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      }
+    }
+  ],
+  "mode": "synthetic",
+  "plan_version": "v1.3.3",
+  "runs": [
+    {
+      "candidate": "alternative",
+      "disposition": null,
+      "goal_id": "runtime",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/alternative/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/alternative-result.json"
+    },
+    {
+      "candidate": "base",
+      "disposition": "reports/tasks/09-01/result-export-20261118/fixtures/base-disposition.json",
+      "goal_id": "runtime",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/base/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/base-result.json"
+    },
+    {
+      "candidate": "failure",
+      "disposition": "reports/tasks/09-01/result-export-20261118/fixtures/failure-disposition.json",
+      "goal_id": "runtime",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/failure/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/failure-result.json"
+    },
+    {
+      "candidate": "missing",
+      "disposition": "reports/tasks/09-01/result-export-20261118/fixtures/missing-disposition.json",
+      "goal_id": "missing",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/missing/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/missing-result.json"
+    },
+    {
+      "candidate": "optional",
+      "disposition": "reports/tasks/09-01/result-export-20261118/fixtures/optional-disposition.json",
+      "goal_id": "optional",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/optional/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/optional-result.json"
+    },
+    {
+      "candidate": "partial",
+      "disposition": "reports/tasks/09-01/result-export-20261118/fixtures/partial-disposition.json",
+      "goal_id": "partial",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/partial/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/partial-result.json"
+    },
+    {
+      "candidate": "stale",
+      "disposition": "reports/tasks/09-01/result-export-20261118/fixtures/stale-disposition.json",
+      "goal_id": "stale",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/stale/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/stale-result.json"
+    },
+    {
+      "candidate": "unapproved",
+      "disposition": "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-disposition.json",
+      "goal_id": "unapproved",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/unapproved/record.json"
+      ],
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-result.json"
+    }
+  ],
+  "work": [
+    {
+      "after": [],
+      "asset_ids": [
+        "meter"
+      ],
+      "candidate": "base",
+      "followup": null,
+      "goal_id": "runtime",
+      "output": "Reviewed integration evidence",
+      "purpose": "integration",
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "base",
+      "task_id": "90-01"
+    },
+    {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "partial",
+      "followup": null,
+      "goal_id": "partial",
+      "output": "Reviewed integration evidence",
+      "purpose": "integration",
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "worker",
+      "task_id": "90-02"
+    },
+    {
+      "after": [
+        "90-02"
+      ],
+      "asset_ids": [],
+      "candidate": null,
+      "followup": null,
+      "goal_id": "partial",
+      "output": "Reviewed implementation evidence",
+      "purpose": "implementation",
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "restore",
+      "task_id": "90-03"
+    },
+    {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "missing",
+      "followup": {
+        "change": "Use a new sample",
+        "control": "Frozen baseline",
+        "hypothesis": "Recover the missing observation",
+        "pass_condition": "Same approved criteria",
+        "resume_condition": "Evidence available",
+        "stop_condition": "Stop at the family ceiling"
+      },
+      "goal_id": "missing",
+      "output": "Reviewed experiment evidence",
+      "purpose": "experiment",
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "missing",
+      "task_id": "90-04"
+    },
+    {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "stale",
+      "followup": {
+        "change": "Use a new sample",
+        "control": "Frozen baseline",
+        "hypothesis": "Recover the missing observation",
+        "pass_condition": "Same approved criteria",
+        "resume_condition": "Evidence available",
+        "stop_condition": "Stop at the family ceiling"
+      },
+      "goal_id": "stale",
+      "output": "Reviewed experiment evidence",
+      "purpose": "experiment",
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "stale",
+      "task_id": "90-05"
+    },
+    {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "unapproved",
+      "followup": null,
+      "goal_id": "unapproved",
+      "output": "Reviewed integration evidence",
+      "purpose": "integration",
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "unapproved",
+      "task_id": "90-06"
+    },
+    {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "alternative",
+      "followup": {
+        "change": "Use a new sample",
+        "control": "Frozen baseline",
+        "hypothesis": "Recover the missing observation",
+        "pass_condition": "Same approved criteria",
+        "resume_condition": "Evidence available",
+        "stop_condition": "Stop at the family ceiling"
+      },
+      "goal_id": "runtime",
+      "output": "Reviewed experiment evidence",
+      "purpose": "experiment",
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "base",
+      "task_id": "90-07"
+    }
+  ]
+}

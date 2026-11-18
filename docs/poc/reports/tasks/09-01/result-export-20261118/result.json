@@ -1,0 +1,68 @@
+{
+  "schema_version": "console.poc.run.v1",
+  "is_template": false,
+  "plan_version": "v1.3.3",
+  "task_id": "09-01",
+  "experiment_id": null,
+  "run_id": "result-export-20261118",
+  "revision": 1,
+  "previous_run_ref": null,
+  "actor": {
+    "role": "development",
+    "name": "Codex"
+  },
+  "started_at": null,
+  "finished_at": null,
+  "execution_kind": "synthetic",
+  "execution_state": "독립 검토 대기",
+  "inputs": {
+    "spec_revision": "POC-09 rev 5",
+    "repo_sha": "b3846434a46c3d0f89ae08feb1fc2ab8edeb1ad6",
+    "image_digest": null,
+    "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+    "model_runtime_versions": []
+  },
+  "expected": "09-01.accept와 T09·§2.3·§5.3·§5.6·P33 합성 입력",
+  "observed": {
+    "implementation_checks_passed": 13,
+    "model_requests": 0,
+    "server_changes": 0,
+    "converter_sha256": "53eb786f1a210873545a0147f1f0ea829be014f3b20a44ac8c5ec35ef3b3e0bb"
+  },
+  "verdict": "미판정",
+  "verification": {
+    "level": "claim",
+    "reviewer": null,
+    "evidence": []
+  },
+  "cost": {
+    "elapsed_seconds": null,
+    "parent_child_tokens": null,
+    "unmeasured_reason": "작업 대화의 경과·사용량은 계측하지 않았다. 시험용 모델 요청 0회.",
+    "review_pending_dev_idle_seconds": null,
+    "quota_stop_count": null,
+    "quota_wait_seconds": null,
+    "quota_group_ids": []
+  },
+  "adoption": "미판정",
+  "reuse_assets": [
+    "scripts/export_results.py",
+    "reports/tasks/09-01/result-export-20261118/check_export.py"
+  ],
+  "unresolved": [
+    "09-02 독립 기대값·합성 판정",
+    "09-05 실제 결과 연결",
+    "제품 완료 판정"
+  ],
+  "next_action": "현행 head의 독립 검토와 09-02 합성 판정",
+  "next_owner": "독립 검토 담당",
+  "resume_condition": "활성 수정 PR과 작업 소유권 대조 후 검토 제출",
+  "evidence_refs": [
+    "reports/tasks/09-01/result-export-20261118/REPORT.md",
+    "reports/tasks/09-01/result-export-20261118/fixtures.sha256",
+    "reports/tasks/09-01/result-export-20261118/evidence/targeted-checks.txt",
+    "reports/tasks/09-01/result-export-20261118/evidence/sprint.json"
+  ],
+  "operational_report_ref": null,
+  "schedule_report_ref": null
+}
