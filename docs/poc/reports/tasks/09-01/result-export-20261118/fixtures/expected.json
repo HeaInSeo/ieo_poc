@@ -40,6 +40,11 @@
     {"id": "C10", "change": "mode_actual", "expected": "synthetic run and approvals do not establish an actual result or product completion"},
     {"id": "C11", "change": "missing_prerequisite", "expected": "reject registration with UNDEFINED_PREREQUISITE"},
     {"id": "C12", "change": "evidence_recovery", "expected": "new proof supersedes the hold, authorizes integration review and retains the previous run and its budget"},
-    {"id": "C13", "change": "drop_budget_history", "expected": "never reset a cumulative budget by omitting prior attempts"}
+    {"id": "C13", "change": "drop_budget_history", "expected": "never reset a cumulative budget by omitting prior attempts"},
+    {"id": "C14", "change": "replace_original_evidence", "expected": "reject in-place replacement of earlier evidence and retain the existing draft"},
+    {"id": "C15", "change": "reclassify_run_revision", "expected": "reject a revision that changes an existing run from synthetic to actual"},
+    {"id": "C16", "change": "withdraw_review", "expected": "new draft records the withdrawal and affected work without changing the archived review file"},
+    {"id": "C17", "change": "regression_without_disposition", "expected": "independent verification PASS supports regression review without implying adoption"},
+    {"id": "C18", "change": "implement_rejected_candidate", "expected": "implementation of a rejected candidate remains on hold even when a different candidate covers the scope"}
   ]
 }

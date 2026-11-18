@@ -195,6 +195,52 @@ def compare(args, temp):
             bundle['runs'].pop(2)
             invoke(bundle, 'baseline', 'previous run or accounting evidence omitted')
             assert len(list((temp / 'baseline').glob('rev-*'))) == 2
+        elif change == 'replace_original_evidence':
+            report = read(root / bundle['runs'][0]['result'])
+            evidence = root / report['evidence_refs'][0]
+            original_bytes = evidence.read_bytes()
+            evidence.write_bytes(original_bytes + b'\nReplaced observations.\n')
+            invoke(bundle, 'baseline', 'previous result or evidence changed in place')
+            assert len(list((temp / 'baseline').glob('rev-*'))) == 2
+            evidence.write_bytes(original_bytes)
+        elif change == 'reclassify_run_revision':
+            entry = deepcopy(bundle['runs'][0])
+            raw = read(root / entry['result'])
+            raw.update(revision=2, previous_run_ref=entry['result'], execution_kind='actual')
+            ref = FIX / 'base-result-actual-r2.json'
+            write(root / ref, raw)
+            entry.update(result=str(ref), disposition=None)
+            bundle['runs'].append(entry)
+            invoke(bundle, 'reclassified-run', 'run execution kind changed')
+        elif change == 'withdraw_review':
+            archived, _, _ = invoke(bundle, 'withdrawn-review')
+            before = (archived / 'export.json').read_bytes()
+            authority_path = root / FIX / 'authority.json'
+            authority_bytes = authority_path.read_bytes()
+            authority = json.loads(authority_bytes)
+            report = read(root / bundle['runs'][0]['result'])
+            del authority['approvals'][report['operational_report_ref']]
+            write(authority_path, authority)
+            next_path, result, _ = invoke(bundle, 'withdrawn-review')
+            assert next_path.name == 'rev-2'
+            assert result['work']['90-01']['state'] == '조건 대기'
+            assert '90-01' in result['changes']['reverify_work']
+            assert (archived / 'export.json').read_bytes() == before
+            authority_path.write_bytes(authority_bytes)
+        elif change == 'regression_without_disposition':
+            bundle['work'].append({**bundle['work'][0], 'task_id': '90-08', 'purpose': 'regression',
+                                   'candidate': 'alternative', 'asset_ids': []})
+            _, result, _ = invoke(bundle, 'standalone-regression')
+            assert result['work']['90-08']['state'] == '검토 대기'
+            assert result['goals']['runtime']['verified_scopes'] == ['base']
+            run = next(r for r in result['runs'] if r['candidate'] == 'alternative')
+            assert run['adoption'] == '미판정'
+        elif change == 'implement_rejected_candidate':
+            bundle['work'].append({**bundle['work'][0], 'task_id': '90-08', 'purpose': 'implementation',
+                                   'candidate': 'failure', 'asset_ids': []})
+            _, result, _ = invoke(bundle, 'rejected-implementation')
+            assert result['work']['90-08']['state'] == '조건 대기'
+            assert result['work']['90-01']['state'] == '편입 대기'
         else:
             raise AssertionError(change)
         print(f'PASS {case["id"]} {case["expected"]}')

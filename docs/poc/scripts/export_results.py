@@ -129,6 +129,8 @@ def ledger_view(sources, manifest):
 
 def review_for(sources, authority, run, ref, as_of):
     review_ref = run.get('operational_report_ref')
+    if not review_ref or sources.readable([review_ref]):
+        return None
     pinned = authority.get(review_ref)
     if not pinned:
         return None
@@ -240,6 +242,7 @@ def classify_run(sources, authority, mode, goal, entry, run, current, as_of):
         'review': run.get('operational_report_ref'), 'disposition_ref': decision_ref,
         'reported_adoption': run['adoption'], 'disposition': decision, 'adoption': effective,
         'adopted_scopes': sorted(set(decision['scopes'])) if effective in {'채택', '부분 채택'} else [],
+        'verified_scopes': sorted(set(covered)) if verdict == 'PASS' else [],
         'validated_assets': observed.get('validated_assets', []) if verified_evaluation else [],
         'records': sorted(entry['records']),
         'issues': issues, 'reported_cost': run['cost'],
@@ -269,11 +272,13 @@ def results(sources, authority, bundle, goals, as_of):
     rows, costs = [], defaultdict(dict)
     for key, chain in sorted(chains.items()):
         latest = max(chain)
-        first_entry, _ = chain[min(chain)]
+        first_entry, first_run = chain[min(chain)]
         records = set()
         for rev, (entry, run) in sorted(chain.items()):
             require((entry['goal_id'], entry['candidate']) ==
                     (first_entry['goal_id'], first_entry['candidate']), f'run identity changed: {key}')
+            require(run['execution_kind'] == first_run['execution_kind'],
+                    f'run execution kind changed: {key}/{rev}')
             previous = chain[rev - 1][0]['result'] if rev - 1 in chain else None
             require((rev == 1 or previous is not None) and run['previous_run_ref'] == previous,
                     f'broken result revision chain: {key}/{rev}')
@@ -392,15 +397,20 @@ def work_and_goals(goals, work, rows, assets, usage, state_tasks, repo_id):
     for row in rows:
         if row['current']:
             goal_rows[row['goal_id']].append(row)
-    covered = {}
-    for goal_id in goals:
-        covered[goal_id] = {scope for row in goal_rows[goal_id] for scope in row['adopted_scopes']}
+    withheld = {goal_id: {r['candidate'] for r in goal_rows[goal_id] if r['adoption'] in {'보류', '기각'}}
+                for goal_id in goals}
+    covered, standalone, verified = {}, {}, {}
+    for goal_id, goal in goals.items():
+        eligible = [r for r in goal_rows[goal_id] if r['candidate'] not in withheld[goal_id]]
+        covered[goal_id] = {scope for row in eligible for scope in row['adopted_scopes']}
+        standalone[goal_id] = [r for r in eligible if goal['kind'] == '검증' and r['disposition_ref'] is None]
+        verified[goal_id] = {scope for row in standalone[goal_id] for scope in row['verified_scopes']}
     items = {}
     for task_id, w in sorted(work.items()):
         goal_id, scope = w['goal_id'], w['scope']
         candidates = [r for r in goal_rows[goal_id] if r['candidate'] == w.get('candidate')]
-        adopted = (any(scope in r['adopted_scopes'] for r in candidates)
-                   and all(r['adoption'] not in {'보류', '기각'} for r in candidates))
+        adopted = (w.get('candidate') not in withheld[goal_id]
+                   and any(scope in r['adopted_scopes'] for r in candidates))
         reasons = []
         if w['purpose'] == 'experiment':
             followup = w.get('followup') or {}
@@ -412,10 +422,16 @@ def work_and_goals(goals, work, rows, assets, usage, state_tasks, repo_id):
             if candidates and all(r['verdict'] == 'INCONCLUSIVE' for r in candidates):
                 reasons.append('resume_evidence_pending')
             reasons.extend(usage[goal_id]['stop_reasons'])
-        elif w['purpose'] in {'integration', 'regression'} and not adopted:
+        elif w['purpose'] == 'integration' and not adopted:
             reasons.append('adoption_unproven')
-        elif w['purpose'] == 'implementation' and not adopted and scope not in covered[goal_id]:
-            reasons.append('required_scope_unproven')
+        elif w['purpose'] == 'regression' and not adopted:
+            if not any(r['candidate'] == w.get('candidate') and scope in r['verified_scopes']
+                       for r in standalone[goal_id]):
+                reasons.append('regression_evidence_unproven')
+        elif w['purpose'] == 'implementation':
+            has_basis = adopted if w.get('candidate') else scope in covered[goal_id]
+            if not has_basis:
+                reasons.append('required_scope_unproven')
         for asset_id in w['asset_ids']:
             asset = assets.get(asset_id, {})
             if asset.get('status') not in {'편입 대기', '검증됨'} or asset.get('target') != repo_id:
@@ -432,7 +448,8 @@ def work_and_goals(goals, work, rows, assets, usage, state_tasks, repo_id):
         unwritten = set(goal['scopes']) - {w['scope'] for w in related}
         mapping[goal_id] = {
             **goal, 'covered_scopes': sorted(covered[goal_id]),
-            'unproven_scopes': sorted(set(goal['scopes']) - covered[goal_id]),
+            'verified_scopes': sorted(verified[goal_id]),
+            'unproven_scopes': sorted(set(goal['scopes']) - covered[goal_id] - verified[goal_id]),
             'missing_work_scopes': sorted(unwritten) if goal['required'] else [],
             'tasks': [w['task_id'] for w in related], 'results': [r['result'] for r in goal_rows[goal_id]],
         }
@@ -599,11 +616,12 @@ def export(args, temp, previous):
             require(ref in by_ref and by_ref[ref]['goal_id'] == old['goal_id']
                     and set(old['records']) <= set(by_ref[ref]['records']),
                     f'previous run or accounting evidence omitted: {ref}')
-            for evidence_ref in (ref, old['disposition_ref'], old['review'], *old['records']):
+            for evidence_ref in (ref, old['disposition_ref'], old['review'],
+                                 *old['original_evidence'], *old['records']):
                 saved = previous['source_digests'].get(evidence_ref)
                 if saved:
                     require(saved == source_digests.get(evidence_ref),
-                            f'previous result or record changed in place: {evidence_ref}')
+                            f'previous result or evidence changed in place: {evidence_ref}')
         archived = previous['budget_policies']
     budget_policies = {**archived, **{i: g['budget'] for i, g in goals.items()}}
     for i in archived.keys() & goals.keys():
