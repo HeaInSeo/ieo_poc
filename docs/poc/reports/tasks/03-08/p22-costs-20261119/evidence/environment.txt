@@ -1,0 +1,5 @@
+Linux 4.18.0-553.27.1.el8_lustre.x86_64 x86_64
+64
+Filesystem          Type 1K-blocks     Used Available Use% Mounted on
+/dev/mapper/rl-root xfs   69733104 65429620   4303484  94% /
+4.9.4-rhel
