@@ -1,0 +1,13 @@
++ gofmt -l .
++ go vet -mod=readonly ./...
++ go test -mod=readonly -count=1 -json ./...
+{"Time":"2026-11-18T16:34:58.273503987Z","Action":"start","Package":"example.invalid/ieofixture"}
+{"Time":"2026-11-18T16:34:58.275348681Z","Action":"run","Package":"example.invalid/ieofixture","Test":"TestDouble"}
+{"Time":"2026-11-18T16:34:58.275360719Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"=== RUN   TestDouble\n"}
+{"Time":"2026-11-18T16:34:58.275388068Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"    double_test.go:6: T04 required test skip control\n"}
+{"Time":"2026-11-18T16:34:58.275399427Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"--- SKIP: TestDouble (0.00s)\n"}
+{"Time":"2026-11-18T16:34:58.275404825Z","Action":"skip","Package":"example.invalid/ieofixture","Test":"TestDouble","Elapsed":0}
+{"Time":"2026-11-18T16:34:58.275410391Z","Action":"output","Package":"example.invalid/ieofixture","Output":"PASS\n"}
+{"Time":"2026-11-18T16:34:58.275618524Z","Action":"output","Package":"example.invalid/ieofixture","Output":"ok  \texample.invalid/ieofixture\t0.002s\n"}
+{"Time":"2026-11-18T16:34:58.275637878Z","Action":"pass","Package":"example.invalid/ieofixture","Elapsed":0.002}
+FAIL required Go test results: {'TestDouble': ['skip']}

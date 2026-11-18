@@ -1,0 +1,106 @@
+policy_source=0d8d74b0360854839b74f49d95459764d9a14c80 approved_head=2aac476e7fad82f3b36fedb14dee1ffdd4eed508 base=sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c
+5028cc4b1e08884579d6e0f090d4bf55fe21b263171d9996198cfe2225c3afd7  inputs.env
+181f23c8ba4ef4a3ed307db702fd39ed98ca71d5cfa380e598b129af2a2afc18  Containerfile
+5882dab975f44f421f99bd3ae395dd2b11db5c3fd9408e17f215c85c99de0323  Containerfile.combined
+f72220a561cd9a621dcbb219781f9923df3f2519046d847aff5830a5931ad557  build.sh
+ee766d89ce15bd9a6629f2a9dc907804a344c86ab0bd3ebeb469794f1f131b51  verify.py
+7e9e364d7383c6e9b43145c4a4cabf8b9cf337aa073bece45c8e9c2f4aeec75b  profiles.json
+a1983b82dcc2196b6d0eb893890a3a459350844bc8e11fa26851d90a3914ad78  workflow-candidate.yml
+bundle manifest 7a9ef56123a2f32ef4dd596af6e17735cb19a55facfbe745b269da72c7d6ab41
+[1/2] STEP 1/10: FROM docker.io/library/golang:1.26.9-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS common
+[1/2] STEP 2/10: USER 0
+--> Using cache e23c9d05dbb12c3f3f1fd77d5ad1ca0239287ea89c2d343b6951919219bbb3d4
+--> e23c9d05dbb1
+[1/2] STEP 3/10: ENV PATH=/opt/ieo-tools/go/bin:/opt/ieo-tools/rust/bin:/usr/bin:/bin     GOLANG_VERSION="" GOPATH="" HOME=/tmp LC_ALL=C
+--> Using cache ebbf20d890a280a62c08711962eefc38868eee04121786a8183c02f91182cca3
+--> ebbf20d890a2
+[1/2] STEP 4/10: WORKDIR /work
+--> Using cache 12235cd6535821c62ab4eefd7bb48ba544d3f6f4373f5cc4868c780d3a41996b
+--> 12235cd65358
+[1/2] STEP 5/10: RUN rm -rf -- /usr/local/go /go && command -v git && command -v gcc && command -v python3
+--> Using cache 1961c090487d0b3c819563bef5cc27acf19d6df1e475f46f0d93c2cb11475511
+--> 1961c090487d
+[1/2] STEP 6/10: COPY bundle/ /opt/ieo-policy/source/
+--> Using cache bca9d9b006072e701eaaaaa6ed9ff05ad8a63ce0ef0d63c4e6438d8182fce0b4
+--> bca9d9b00607
+[1/2] STEP 7/10: COPY bundle.sha256 inputs.env profiles.json /opt/ieo-policy/
+--> Using cache e5999b2f94b26476895d87d6a57a508a82357539c4fd8d0cefbf10517b348a0e
+--> e5999b2f94b2
+[1/2] STEP 8/10: COPY verify.py /usr/local/bin/ieo-policy-verify
+--> Using cache 5fa9f9d8250d2b055118842d265f715bf631f49f79dfc628eb4389308e63c41e
+--> 5fa9f9d8250d
+[1/2] STEP 9/10: RUN chmod 0555 /usr/local/bin/ieo-policy-verify
+--> Using cache e7f841b6f5af1887c10f5fa684588283b786cb6814f22a7288d2576ad17f15e7
+--> e7f841b6f5af
+[1/2] STEP 10/10: ENTRYPOINT ["/usr/local/bin/ieo-policy-verify"]
+--> Using cache 97fbb2f8ea6fd20937140be459ac8759f2799d6e5144015e29c306a2f808321e
+--> 97fbb2f8ea6f
+[2/2] STEP 1/4: FROM 97fbb2f8ea6fd20937140be459ac8759f2799d6e5144015e29c306a2f808321e AS go
+[2/2] STEP 2/4: COPY go/ /opt/ieo-tools/go/
+--> Using cache cbe78eaf965cf3dee9dc4cf5d228c25a4f7f5c68d56ac7b42e15f6a08e191aff
+--> cbe78eaf965c
+[2/2] STEP 3/4: USER 65532:65532
+--> Using cache 081ca15d5c307b34f47b41175bdd859add209d5e79faf1ff61b1ca72c80ce91d
+--> 081ca15d5c30
+[2/2] STEP 4/4: LABEL "org.opencontainers.image.revision"="0d8d74b0360854839b74f49d95459764d9a14c80" "org.opencontainers.image.title"="ieo_poc T04 policy image candidate"
+--> Using cache 4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da
+[2/2] COMMIT localhost/ieo-policy-0305-20261119-r5:go
+--> 4fc97aeca55c
+Successfully tagged localhost/ieo-policy-0305-20261119-r5:go
+Successfully tagged localhost/ieo-policy-0305-20261119-r3:go
+4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da
+localhost/ieo-policy-0305-20261119-r5:go 4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da sha256:74ee35f8bd046fab1e777624ef1bc28b7389ef060ef8b65f8579fe8ac2919bfb 1092296164
+[1/3] STEP 1/10: FROM docker.io/library/golang:1.26.9-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS common
+[1/3] STEP 2/10: USER 0
+--> Using cache e23c9d05dbb12c3f3f1fd77d5ad1ca0239287ea89c2d343b6951919219bbb3d4
+--> e23c9d05dbb1
+[1/3] STEP 3/10: ENV PATH=/opt/ieo-tools/go/bin:/opt/ieo-tools/rust/bin:/usr/bin:/bin     GOLANG_VERSION="" GOPATH="" HOME=/tmp LC_ALL=C
+--> Using cache ebbf20d890a280a62c08711962eefc38868eee04121786a8183c02f91182cca3
+--> ebbf20d890a2
+[1/3] STEP 4/10: WORKDIR /work
+--> Using cache 12235cd6535821c62ab4eefd7bb48ba544d3f6f4373f5cc4868c780d3a41996b
+--> 12235cd65358
+[1/3] STEP 5/10: RUN rm -rf -- /usr/local/go /go && command -v git && command -v gcc && command -v python3
+--> Using cache 1961c090487d0b3c819563bef5cc27acf19d6df1e475f46f0d93c2cb11475511
+--> 1961c090487d
+[1/3] STEP 6/10: COPY bundle/ /opt/ieo-policy/source/
+--> Using cache bca9d9b006072e701eaaaaa6ed9ff05ad8a63ce0ef0d63c4e6438d8182fce0b4
+--> bca9d9b00607
+[1/3] STEP 7/10: COPY bundle.sha256 inputs.env profiles.json /opt/ieo-policy/
+--> Using cache e5999b2f94b26476895d87d6a57a508a82357539c4fd8d0cefbf10517b348a0e
+--> e5999b2f94b2
+[1/3] STEP 8/10: COPY verify.py /usr/local/bin/ieo-policy-verify
+--> Using cache 5fa9f9d8250d2b055118842d265f715bf631f49f79dfc628eb4389308e63c41e
+--> 5fa9f9d8250d
+[1/3] STEP 9/10: RUN chmod 0555 /usr/local/bin/ieo-policy-verify
+--> Using cache e7f841b6f5af1887c10f5fa684588283b786cb6814f22a7288d2576ad17f15e7
+--> e7f841b6f5af
+[1/3] STEP 10/10: ENTRYPOINT ["/usr/local/bin/ieo-policy-verify"]
+--> Using cache 97fbb2f8ea6fd20937140be459ac8759f2799d6e5144015e29c306a2f808321e
+--> 97fbb2f8ea6f
+[3/3] STEP 1/4: FROM 97fbb2f8ea6fd20937140be459ac8759f2799d6e5144015e29c306a2f808321e AS rust
+[3/3] STEP 2/4: COPY rust/ /opt/ieo-tools/rust/
+--> Using cache b25777d611988176d0f3d144d77b376ee965ccbf7075bb27920823941cd94f61
+--> b25777d61198
+[3/3] STEP 3/4: USER 65532:65532
+--> Using cache 896b1aab4ebb3b40c491dded326dd82d28b5bb8354f39cbd0232a3a70c3a6137
+--> 896b1aab4ebb
+[3/3] STEP 4/4: LABEL "org.opencontainers.image.revision"="0d8d74b0360854839b74f49d95459764d9a14c80" "org.opencontainers.image.title"="ieo_poc T04 policy image candidate"
+--> Using cache 1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132
+[3/3] COMMIT localhost/ieo-policy-0305-20261119-r5:rust
+--> 1cb94c8d38da
+Successfully tagged localhost/ieo-policy-0305-20261119-r5:rust
+Successfully tagged localhost/ieo-policy-0305-20261119-r3:rust
+1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132
+localhost/ieo-policy-0305-20261119-r5:rust 1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132 sha256:3f32fc97df0e89737c1b2b8386a9859efba037daf544db372e2d19b62f9c66db 1513538534
+[1/2] STEP 1/1: FROM sha256:4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da AS go_source
+--> 5e35bbbb37c6
+[2/2] STEP 1/3: FROM sha256:1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132
+[2/2] STEP 2/3: COPY --from=go_source /opt/ieo-tools/go/ /opt/ieo-tools/go/
+--> 62e2adf5ff64
+[2/2] STEP 3/3: LABEL "org.opencontainers.image.revision"="0d8d74b0360854839b74f49d95459764d9a14c80" "org.opencontainers.image.title"="ieo_poc T04 policy image candidate"
+[2/2] COMMIT localhost/ieo-policy-0305-20261119-r5:combined
+--> f264d6d0ba1e
+Successfully tagged localhost/ieo-policy-0305-20261119-r5:combined
+f264d6d0ba1e8d3a8877a78819275d6ef4a830b4f1ae08fd7ab88666a4ca016a
+localhost/ieo-policy-0305-20261119-r5:combined f264d6d0ba1e8d3a8877a78819275d6ef4a830b4f1ae08fd7ab88666a4ca016a sha256:6ab2fe6cfe05744c636e3ed1459fd23b2c80af807aeee29088843e13f371f784 1738450787

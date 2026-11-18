@@ -1,0 +1,15 @@
++ cargo fmt --all -- --check
++ cargo clippy --offline --locked --all-targets -- -D warnings
+    Checking ieo-fixture v0.1.0 (/work)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
++ cargo test --offline --locked --all-targets
+   Compiling ieo-fixture v0.1.0 (/work)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running unittests src/lib.rs (/tmp/ieo-policy-ryosuuf3/target/debug/deps/ieo_fixture-7a5972e9b3dfeff3)
+
+running 1 test
+test tests::doubles_three ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+FAIL required Rust test results: {'tests::doubles_three': ['ignored']}

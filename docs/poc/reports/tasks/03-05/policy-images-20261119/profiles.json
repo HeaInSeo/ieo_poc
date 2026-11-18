@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0",
+  "item": "03-05.accept",
+  "catalog": "0.2.2",
+  "profiles": {
+    "go": {
+      "source": "docs/poc/reports/tasks/03-03/go-rust-20261118/fixtures/go",
+      "required_tests": [
+        "TestDouble"
+      ],
+      "package": "example.invalid/ieofixture"
+    },
+    "rust": {
+      "source": "docs/poc/reports/tasks/03-03/go-rust-20261118/fixtures/rust",
+      "required_tests": [
+        "tests::doubles_three"
+      ]
+    }
+  }
+}

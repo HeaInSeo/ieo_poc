@@ -1,0 +1,13 @@
+info-go rc=0 expected=0 image=4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da profile=info
+info-rust rc=0 expected=0 image=1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132 profile=info
+info-combined rc=0 expected=0 image=f264d6d0ba1e8d3a8877a78819275d6ef4a830b4f1ae08fd7ab88666a4ca016a profile=info
+go-go rc=0 expected=0 image=4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da profile=go
+go-combined rc=0 expected=0 image=f264d6d0ba1e8d3a8877a78819275d6ef4a830b4f1ae08fd7ab88666a4ca016a profile=go
+rust-rust rc=0 expected=0 image=1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132 profile=rust
+rust-combined rc=0 expected=0 image=f264d6d0ba1e8d3a8877a78819275d6ef4a830b4f1ae08fd7ab88666a4ca016a profile=rust
+wrong-stack-go rc=2 expected=2 image=1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132 profile=go
+wrong-stack-rust rc=2 expected=2 image=4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da profile=rust
+required-go-skip rc=1 expected=1 image=4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da profile=go
+required-rust-ignore rc=1 expected=1 image=1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132 profile=rust
+required-go-missing rc=2 expected=2 image=4fc97aeca55cfed9f23bbb399922571220f8faafd222ca524b96a7ad394247da profile=go
+required-rust-missing rc=2 expected=2 image=1cb94c8d38dac17574039c3739c6c50fce50fa99ba0bd0767b582be1835b6132 profile=rust

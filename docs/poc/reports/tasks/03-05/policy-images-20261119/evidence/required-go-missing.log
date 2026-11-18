@@ -1,0 +1,12 @@
++ gofmt -l .
++ go vet -mod=readonly ./...
++ go test -mod=readonly -count=1 -json ./...
+{"Time":"2026-11-18T16:35:11.626317907Z","Action":"start","Package":"example.invalid/ieofixture"}
+{"Time":"2026-11-18T16:35:11.628105908Z","Action":"run","Package":"example.invalid/ieofixture","Test":"TestOther"}
+{"Time":"2026-11-18T16:35:11.628117051Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestOther","Output":"=== RUN   TestOther\n"}
+{"Time":"2026-11-18T16:35:11.628149174Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestOther","Output":"--- PASS: TestOther (0.00s)\n"}
+{"Time":"2026-11-18T16:35:11.628153434Z","Action":"pass","Package":"example.invalid/ieofixture","Test":"TestOther","Elapsed":0}
+{"Time":"2026-11-18T16:35:11.628158476Z","Action":"output","Package":"example.invalid/ieofixture","Output":"PASS\n"}
+{"Time":"2026-11-18T16:35:11.628319027Z","Action":"output","Package":"example.invalid/ieofixture","Output":"ok  \texample.invalid/ieofixture\t0.002s\n"}
+{"Time":"2026-11-18T16:35:11.62833688Z","Action":"pass","Package":"example.invalid/ieofixture","Elapsed":0.002}
+INCONCLUSIVE required Go test results: {'TestDouble': []}
