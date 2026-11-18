@@ -1201,6 +1201,36 @@ fn e2e(transport: &str) {
         head("gh-head-7", SHA1);
     }
 
+    // A final approval-fence refusal does not consume the recovery. The next
+    // delivery below uses this exact approval after the fixture restores review.
+    {
+        let mut fixture = cfg.clone();
+        fixture.dbname(&dbname);
+        let mut fixture = fixture.connect(NoTls).unwrap();
+        let changes = |fixture: &mut postgres::Client, state: &str| {
+            assert_eq!(fixture.execute(
+                "UPDATE sprint_revisions SET review_state=$1 WHERE sprint_id='POC-01' AND revision=5",
+                &[&state],
+            ).unwrap(), 1);
+        };
+        changes(&mut fixture, "semantic_review_rejected");
+        let before = launches();
+        let (st, refused) = deliver(
+            "operator",
+            "rcv-final-fence",
+            "development",
+            &dbody("afence", 0, "sfence", json!({"recovery_id": rid})),
+        );
+        assert_eq!(
+            (st, refused["result"]["outcome"].as_str()),
+            (201, Some("not_called")),
+            "{refused}"
+        );
+        assert_eq!(launches(), before);
+        assert!(recovery(&rid)["used"].is_null());
+        changes(&mut fixture, "semantic_review_passed");
+    }
+
     // 9. the use: a new session over the unfinished checkpoint, never a resume
     let b6 = dbody("a6", 0, "s6", json!({"recovery_id": rid}));
     let (st, d6) = deliver("operator", "rcv-key-0006", "development", &b6);

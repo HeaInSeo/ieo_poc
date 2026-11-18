@@ -849,6 +849,88 @@ fn e2e(transport: &str) {
         assert_eq!(predecessor["decision"], "resume_allowed", "{predecessor}");
         switch_to_codex(&dir);
 
+        if shared_cap == 2 {
+            // Force a distinct HTTP request into admission while the role is idle.
+            // The same budget lock is already owned by another caller.
+            let lock = std::fs::OpenOptions::new()
+                .write(true)
+                .open(ledger.join("caller.lock"))
+                .unwrap();
+            lock.lock().unwrap();
+            let (status, blocked) = deliver(
+                "operator",
+                "failover-locked",
+                "development",
+                &dbody(
+                    "f-locked",
+                    0,
+                    "f-locked",
+                    json!({"new_session":true,"prompt":"VERIFY"}),
+                ),
+            );
+            assert_eq!(
+                (status, blocked["result"]["outcome"].as_str()),
+                (201, Some("budget_refused")),
+                "{blocked}"
+            );
+            assert_eq!(
+                blocked["result"]["reasons"][0],
+                "another caller holds the ledger"
+            );
+            assert_eq!(launches(), 1);
+            assert_eq!(records().len(), 1);
+            lock.unlock().unwrap();
+        } else {
+            // Wait for the final row-lock query, after the second checkpoint judgment.
+            // A branch observation committed at this point must invalidate the POST.
+            let mut lock_db = connection();
+            let mut locked = lock_db.transaction().unwrap();
+            locked.query_one("SELECT 1 FROM assignment_heads WHERE repo_id='repo-a' AND role='development' FOR UPDATE", &[]).unwrap();
+            let body = dbody(
+                "f-drift",
+                0,
+                "f-drift",
+                json!({"new_session":true,"prompt":"VERIFY"}),
+            );
+            let (status, blocked) = std::thread::scope(|sc| {
+                let request =
+                    sc.spawn(|| deliver("operator", "failover-drift", "development", &body));
+                let deadline = Instant::now() + Duration::from_secs(4);
+                loop {
+                    let waiting: bool = connection().query_one(
+                        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname=current_database()
+                         AND wait_event_type='Lock' AND query LIKE '%FOR SHARE OF h, s%')", &[],
+                    ).unwrap().get(0);
+                    if waiting {
+                        break;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "delivery never reached its final fence"
+                    );
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                head("gh-head-late-drift", SHA2);
+                locked.rollback().unwrap();
+                request.join().unwrap()
+            });
+            assert_eq!(
+                (status, blocked["result"]["outcome"].as_str()),
+                (201, Some("not_called")),
+                "{blocked}"
+            );
+            assert!(
+                blocked["result"]["reasons"][0]
+                    .as_str()
+                    .unwrap()
+                    .contains("branch evidence"),
+                "{blocked}"
+            );
+            assert_eq!(launches(), 1);
+            assert_eq!(records().len(), 1);
+            head("gh-head-after-drift", SHA1);
+        }
+
         let held = std::fs::OpenOptions::new()
             .write(true)
             .open(ledger.join("caller.lock"))

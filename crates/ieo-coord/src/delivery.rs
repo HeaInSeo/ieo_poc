@@ -969,28 +969,100 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     }
-    // the approval's one use, committed before the start is sent (02-05 step 7b): a second
-    // delivery, a replay or a restart can never start a second run with it
-    if let Some(rid) = &recovery {
-        let g = github.clone().unwrap_or(Value::Null);
+    // Re-read local status outside the DB transaction. Then serialize the DB facts
+    // against their writers: both assignment heads for guardrail, the review revision,
+    // checkpoint reports and new branch/CI evidence.
+    let local = role_status(ctx, repo, role);
+    let validate = |fence: &mut Transaction| -> R {
+        fence.batch_execute("SET LOCAL lock_timeout = '1s'")?;
+        let heads = fence.query(
+            "SELECT h.role, h.assignment_id, h.generation, s.digest, s.review_state
+             FROM assignment_heads h
+             JOIN assignments a USING (assignment_id, generation)
+             JOIN sprint_revisions s ON s.sprint_id = a.sprint_id AND s.revision = a.sprint_revision
+             WHERE h.repo_id = $1 AND (h.role = $2 OR ($2 = 'guardrail' AND h.role = 'development'))
+             ORDER BY h.role FOR SHARE OF h, s",
+            &[&repo, &role],
+        )?;
+        if !heads.iter().any(|r| {
+            r.get::<_, String>(0) == role
+                && r.get::<_, String>(1) == aid
+                && r.get::<_, i64>(2) == generation
+                && d["coordinator_record"]["spec_digest"] == r.get::<_, String>(3)
+                && r.get::<_, String>(4) == "semantic_review_passed"
+        }) {
+            return Err(problem(
+                409,
+                "DELIVERY_FENCE",
+                "assignment or approval changed",
+            ));
+        }
+        lock(fence, &format!("delivery-evidence:{repo}"))?;
+        let final_judgment = compare_checkpoint(fence, repo, role, &local)?;
+        let matches = final_judgment.body["central"] == again.body["central"]
+            && if let Some(rid) = &recovery {
+                // The legacy one-shot recovery use is still durable before the POST. Every
+                // fence check happens before recording it, never between its commit and send.
+                crate::recovery::usable(fence, repo, role, rid, &local, &id)?
+                    .is_ok_and(|g| g == again.body["github"])
+            } else {
+                final_judgment.body["decision"] == again.body["decision"]
+                    && final_judgment.body["github"] == again.body["github"]
+            };
+        if !matches
+            || STOPPING.load(Ordering::SeqCst)
+            || begun.elapsed() > Duration::from_secs(deadline)
+        {
+            return Err(problem(
+                409,
+                "DELIVERY_FENCE",
+                "checkpoint, branch evidence or send window changed",
+            ));
+        }
+        ok(200, Value::Null)
+    };
+    let start = if let Some(rid) = &recovery {
         let used = run_tx(db, guard, &|tx| {
-            crate::recovery::record_use(tx, repo, role, rid, &id, &g)
+            tx.batch_execute("SET LOCAL lock_timeout = '1s'")?;
+            // Recovery approval also orders this lock before the checkpoint lock.
+            lock(tx, &format!("recovery:{repo}:{role}"))?;
+            validate(tx)?;
+            crate::recovery::record_use(tx, repo, role, rid, &id, &again.body["github"])
         })?;
-        if used.status != 200 {
-            drop(adm);
-            let mut o = base("not_called");
-            o.op = None;
-            o.reasons = json!([format!(
-                "recovery {rid}: {}",
-                used.body["message"].as_str().unwrap_or("not usable")
+        if used.status == 200 {
+            extra["recovery_id"] = json!(rid);
+            sent["recovery_id"] = json!(rid);
+            Ok(adm.start_with(&plan, &call, &caller::Http, &extra))
+        } else {
+            Err(used)
+        }
+    } else {
+        // Ordinary delivery holds the validated DB facts through the bounded POST.
+        // The supervisor's own-assignment GET is read-only and takeover runs asynchronously.
+        (|| -> Result<_, Resp> {
+            let mut fence = db.transaction()?;
+            validate(&mut fence)?;
+            let result = adm.start_with(&plan, &call, &caller::Http, &extra);
+            drop(fence);
+            Ok(result)
+        })()
+    };
+    let start = match start {
+        Ok(result) => result,
+        Err(refusal) => {
+            let mut denied = base("not_called");
+            denied.op = None;
+            denied.reasons = json!([format!(
+                "final delivery fence closed: {}",
+                refusal.body["message"]
+                    .as_str()
+                    .unwrap_or("database lock or approval failure")
             )]);
             return run_tx(db, guard, &|tx| {
-                record_result(tx, repo, role, &id, &o, 201, None)
+                record_result(tx, repo, role, &id, &denied, 201, None)
             });
         }
-        extra["recovery_id"] = json!(rid);
-        sent["recovery_id"] = json!(rid);
-    }
+    };
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
@@ -998,48 +1070,6 @@ pub fn deliver(
     o.github = github.clone();
     o.limits = Some(sent["limits"].clone());
     o.sent_sha256 = Some(sent_sha256);
-    // Hold a shared row lock on the reviewed revision and assignment head through the
-    // supervisor's bounded acceptance request. Supersession or review withdrawal that wins
-    // the lock invalidates the send; one waiting behind this fence follows the send.
-    let start = (|| -> Result<Option<Result<Sent, String>>, postgres::Error> {
-        let mut fence = db.transaction()?;
-        fence.batch_execute("SET LOCAL lock_timeout = '1s'")?;
-        let current = fence.query_opt(
-            "SELECT h.assignment_id, h.generation, s.digest, s.review_state
-             FROM assignment_heads h
-             JOIN assignments a USING (assignment_id, generation)
-             JOIN sprint_revisions s ON s.sprint_id = a.sprint_id AND s.revision = a.sprint_revision
-             WHERE h.repo_id = $1 AND h.role = $2
-             FOR SHARE OF h, s",
-            &[&repo, &role],
-        )?;
-        if !current.is_some_and(|r| {
-            r.get::<_, String>(0) == aid
-                && r.get::<_, i64>(1) == generation
-                && d["coordinator_record"]["spec_digest"] == r.get::<_, String>(2)
-                && r.get::<_, String>(3) == "semantic_review_passed"
-        }) || STOPPING.load(Ordering::SeqCst)
-            || begun.elapsed() > Duration::from_secs(deadline)
-        {
-            return Ok(None);
-        }
-        // No DB writes are pending here. Drop the fence after the bounded POST.
-        let result = adm.start_with(&plan, &call, &caller::Http, &extra);
-        drop(fence);
-        Ok(Some(result))
-    })();
-    let start = match start {
-        Ok(Some(result)) => result,
-        Ok(None) | Err(_) => {
-            let mut denied = base("not_called");
-            denied.op = None;
-            denied.reasons =
-                json!(["final assignment/approval fence failed or the send window closed"]);
-            return run_tx(db, guard, &|tx| {
-                record_result(tx, repo, role, &id, &denied, 201, None)
-            });
-        }
-    };
     match start {
         Ok(Sent::Accepted { answer, running }) => {
             o.outcome = "accepted";

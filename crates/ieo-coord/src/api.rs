@@ -3346,6 +3346,9 @@ fn ingest(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
     }
     let id = str_field(&body, "evidence_id", 256)?.to_string();
     let (kind, sha) = validate_evidence(&body)?;
+    if matches!(kind.as_str(), "branch_head" | "ci_run") {
+        lock(tx, &format!("delivery-evidence:{repo}"))?;
+    }
     lock(tx, &format!("evidence:{repo}:{id}"))?;
     if let Some(row) = tx.query_opt(
         "SELECT body FROM evidence WHERE repo_id = $1 AND evidence_id = $2",

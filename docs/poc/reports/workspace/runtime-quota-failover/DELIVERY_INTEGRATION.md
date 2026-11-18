@@ -23,3 +23,9 @@ IEO_TEST_FIXTURE_BWRAP=1 cargo test --locked -p ieo-coord --test delivery_e2e fa
 ```
 
 The second variant requires a Linux host that allows Bubblewrap namespaces. GitHub CI runs the standard database cases. Local runs passed 4/4 with the standard fixtures and 2/2 with kernel isolation enabled. Provider quotas, runtime credentials, and the fixture's normalized usage stream are synthetic. Independent runtime identity binding, live policy parity, provider quota and billing gates, and an authorized method to settle usage when an actual reply is lost remain separate prerequisites. See [the one-direction live proposal](LIVE_PLAN.md).
+
+## Independent review correction
+
+The first integration head `32e93cd` was rejected on the final submission ordering and one test gap. Ordinary delivery now holds the requested assignment and review rows, the development head when acting as guardrail, and the checkpoint and branch/CI evidence locks through the bounded acceptance POST. A new test blocks the final row-lock query, ingests a different branch head after the previous judgment, and checks for zero supervisor POSTs. Another distinct-key HTTP case reaches the shared budget admission gate while idle and asserts the exact `another caller holds the ledger` refusal, with no additional POST or ledger row.
+
+The separate one-shot recovery endpoint still commits use before a possible POST to survive a process crash. It checks the final fence inside the same transaction *before* recording the use. A pre-send fence refusal leaves the same approval available. The recovery fixture proves that the same approval works after review is restored and that an ambiguous POST retains its committed use across restart. Its post-commit handoff retains the existing separate recovery semantics; it is not the ordinary failover path exercised here.
