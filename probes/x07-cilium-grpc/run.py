@@ -69,6 +69,10 @@ class CiliumTrial(Trial):
         overlay = self.recorder.path / "workload.yaml"
         text = BASE_WORKLOAD.read_text()
         require(text.count("  clusterIP: None\n") == 1, "X-05 fixture Service layout changed")
+        client_spec = "  name: client\n  namespace: x05-probe\nspec:\n"
+        require(text.count(client_spec) == 1, "X-05 fixture client layout changed")
+        # Use DNS for the VIP, and keep Kubernetes' generated PROBE_PORT away from the numeric setting.
+        text = text.replace(client_spec, client_spec + "  enableServiceLinks: false\n")
         overlay.write_text(text.replace("x05-probe", NAMESPACE).replace("  clusterIP: None\n", ""))
         self.kubectl("create", "-f", str(overlay), timeout=30)
         self.kubectl("expose", "deployment", "probe", "--name=probe-control", "--port=50051",
