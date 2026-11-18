@@ -316,6 +316,7 @@ def results(sources, authority, bundle, goals, as_of):
 
 def budgets(sources, goals, costs, as_of, collector, evidence_schema, temp):
     used = set()
+    measurement_refs = {}
     output = {}
     for goal_id, goal in sorted(goals.items()):
         policy = goal['budget']
@@ -336,7 +337,15 @@ def budgets(sources, goals, costs, as_of, collector, evidence_schema, temp):
                 identity = (record['task_id'], record['attempt_id'], record['command_id'])
                 require(identity not in used, f'duplicate evidence record: {identity}')
                 require(record['task_id'] == key[1], f'evidence record task mismatch: {ref}')
+                # Renaming a command or its attempt does not create a new measurement.
+                measurement = canonical_digest({
+                    field: value for field, value in record.items()
+                    if field not in {'attempt_id', 'command_id', 'retry_of'}
+                })
+                require(measurement not in measurement_refs,
+                        f'duplicate evidence measurement: {ref} matches {measurement_refs.get(measurement)}')
                 used.add(identity)
+                measurement_refs[measurement] = ref
                 path = temp / str(len(used)) / 'record.json'
                 path.parent.mkdir()
                 path.write_bytes(sources.read(ref))
@@ -566,7 +575,15 @@ def render_draft(result, spec):
                   [[i, f"{w['goal_id']} / {w['scope']}", w['purpose'], w['role'], w['state'],
                     ', '.join(w['after']), ', '.join(w['asset_ids']), w['rollback']]
                    for i, w in result['work'].items()])
-    text += '작업별 공수 근거는 등록 명세에 기록했다. 스프린트 기한은 미확정이다.\n\n'
+    text += '## 남은 작업 공수 추정\n\n'
+    estimates = []
+    for task in spec['tasks']:
+        estimate = task['estimate']
+        seconds = estimate['range_seconds']
+        estimated_time = f"{seconds['min']}–{seconds['max']}초" if seconds else '미산정'
+        estimates.append([task['task_id'], estimated_time, ', '.join(estimate['evidence']), estimate['reason'] or ''])
+    text += table(['작업', '예상 공수', '근거', '산정 사유'], estimates)
+    text += '스프린트 기한은 미확정이다.\n\n'
     text += '## 누적 사용량\n\n'
     text += table(['목표', '회차', '계측 시간(ms)', '계측 토큰 합', '전체 토큰', '반복 중단 사유'],
                   [[i, b['attempts'], b['wall_ms_measured'], b['tokens_measured'], b['tokens_total'],
