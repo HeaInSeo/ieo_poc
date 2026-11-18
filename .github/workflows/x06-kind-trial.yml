@@ -1,0 +1,90 @@
+name: X-06 isolated kind trial
+
+on:
+  push:
+    branches: [task/x06-kind-coord]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x06-kind-trial
+  cancel-in-progress: false
+
+jobs:
+  kind:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    env:
+      KIND_EXPERIMENTAL_PROVIDER: podman
+      CARGO_BUILD_JOBS: 2
+      CARGO_PROFILE_DEV_DEBUG: 0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify rootless runtime and available disk
+        run: |
+          df -h / "$HOME"
+          podman --version
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
+          systemd-run --user --scope --quiet -p Delegate=yes podman info --format json |
+            python3 -c 'import json,sys; h=json.load(sys.stdin)["host"]; print(h["security"]["rootless"], h["cgroupVersion"], h["cgroupControllers"]); assert h["security"]["rootless"] and h["cgroupVersion"] == "v2" and set(h["cgroupControllers"]) >= {"cpu","memory","pids"}'
+      - name: Package the product binary and trial driver
+        run: |
+          mkdir "$RUNNER_TEMP/x06-config" "$RUNNER_TEMP/x06-image"
+          cargo build --locked -p ieo-coord --bin ieo-coord
+          cargo test --locked -p ieo-coord --test grpc --no-run --message-format=json > "$RUNNER_TEMP/build.jsonl"
+          driver=$(jq -r 'select(.reason=="compiler-artifact" and .target.name=="grpc" and .executable!=null) | .executable' "$RUNNER_TEMP/build.jsonl")
+          test -x "$driver"
+          X06_CONFIG_OUT="$RUNNER_TEMP/x06-config" "$driver" kind::write_config --ignored --exact
+          for file in tokens.json manifest.json bindings.json roles.json policy.json; do
+            test -s "$RUNNER_TEMP/x06-config/$file"
+          done
+          install -m 755 target/debug/ieo-coord "$RUNNER_TEMP/x06-image/ieo-coord"
+          install -m 755 "$driver" "$RUNNER_TEMP/x06-image/grpc-tests"
+          strip "$RUNNER_TEMP/x06-image/ieo-coord" "$RUNNER_TEMP/x06-image/grpc-tests"
+          sha256sum "$RUNNER_TEMP/x06-image/ieo-coord" "$RUNNER_TEMP/x06-image/grpc-tests"
+          cp probes/x06-kind-coord/Containerfile "$RUNNER_TEMP/x06-image/"
+          podman build --network none -t localhost/ieo-x06:fixture "$RUNNER_TEMP/x06-image"
+          podman save --format docker-archive -o "$RUNNER_TEMP/x06-fixture.tar" localhost/ieo-x06:fixture
+          sha256sum "$RUNNER_TEMP/x06-fixture.tar"
+      - name: Create the disposable kind cluster
+        run: |
+          df -h / "$HOME"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/kind-x06" https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-amd64
+          echo "eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa  $RUNNER_TEMP/kind-x06" | sha256sum -c
+          chmod 0755 "$RUNNER_TEMP/kind-x06"
+          kind="$RUNNER_TEMP/kind-x06"
+          config="$RUNNER_TEMP/x06-kubeconfig"
+          "$kind" version
+          systemd-run --user --scope --quiet -p Delegate=yes "$kind" create cluster \
+            --config probes/x06-kind-coord/kind.yaml \
+            --image docker.io/kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f \
+            --kubeconfig "$config" --wait 120s
+          systemd-run --user --scope --quiet -p Delegate=yes "$kind" load image-archive \
+            --name ieo-x06 "$RUNNER_TEMP/x06-fixture.tar"
+          kubectl --kubeconfig "$config" --context kind-ieo-x06 wait --for=condition=Ready node --all --timeout=120s
+          kubectl --kubeconfig "$config" --context kind-ieo-x06 -n kube-system rollout status daemonset/kindnet --timeout=120s
+      - name: Run the frozen product-path trial
+        run: |
+          mkdir "$RUNNER_TEMP/x06-evidence"
+          bash probes/x06-kind-coord/run.sh "$RUNNER_TEMP/x06-kubeconfig" "$RUNNER_TEMP/x06-config" "$RUNNER_TEMP/x06-evidence"
+      - name: Print reproducible evidence
+        if: always()
+        run: |
+          if [[ -d "$RUNNER_TEMP/x06-evidence" ]]; then
+            tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/x06-evidence.tar.gz" x06-evidence
+            sha256sum "$RUNNER_TEMP/x06-evidence.tar.gz"
+            echo X06_EVIDENCE_BEGIN
+            base64 -w 96 "$RUNNER_TEMP/x06-evidence.tar.gz"
+            echo X06_EVIDENCE_END
+          fi
+      - name: Remove the disposable cluster
+        if: always()
+        run: |
+          if [[ -x "$RUNNER_TEMP/kind-x06" ]]; then
+            systemd-run --user --scope --quiet -p Delegate=yes "$RUNNER_TEMP/kind-x06" delete cluster \
+              --name ieo-x06 --kubeconfig "$RUNNER_TEMP/x06-kubeconfig"
+          fi

@@ -8,6 +8,8 @@
 //! coordinator.rs (skipped without it outside CI).
 
 mod common;
+#[path = "grpc/kind.rs"]
+mod kind;
 use common::*;
 
 use ieo_coord::api::{self, Abort, Operation, Req, TxGuard};
@@ -1496,32 +1498,47 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
     let Some(h) = start() else { return };
     let Some(r) = start() else { return };
     let g = grpc(&r);
+    compare_transports(&h, &r, |who, call| g.call(&r, who, call), |_, _| {});
+}
+
+fn compare_transports(
+    h: &Env,
+    r: &Env,
+    mut grpc: impl FnMut(Option<&str>, &Call) -> (u16, Value),
+    mut after_setup: impl FnMut(&str, &mut dyn FnMut(Option<&str>, &Call) -> (u16, Value)),
+) -> usize {
     let digest = spec("repo-a", 5, 3)["digest"]
         .as_str()
         .expect("digest")
         .to_string();
-    for e in [&h, &r] {
+    for e in [h, r] {
         ready_sprint(e, 3);
     }
     let mut seen = std::collections::BTreeSet::new();
     let (mut dh, mut dr) = (h.db(), r.db());
+    let mut requests = 0;
     for step in scenario(&digest) {
         match step {
             Step::Setup(label, f) => {
-                f(&h);
-                f(&r);
+                f(h);
+                f(r);
+                after_setup(label, &mut grpc);
                 eprintln!("setup: {label}");
             }
             Step::Do(label, who, call) => {
                 let before = snapshot(&mut dh);
-                let a = over_http(&h, who, &call);
+                let a = over_http(h, who, &call);
                 let t0 = Instant::now();
-                let b = g.call(&r, who, &call);
+                let b = grpc(who, &call);
+                requests += 1;
                 let took = t0.elapsed();
                 assert_eq!(a, b, "{label}: HTTP vs gRPC");
                 let after = (snapshot(&mut dh), snapshot(&mut dr));
                 assert_eq!(after.0, after.1, "{label}: database state");
-                if !(200..300).contains(&a.0) {
+                if label.contains("replay") || label == "checkpoint: duplicate" {
+                    assert_eq!(a.0, 200, "{label}: stored receipt is replayed");
+                    assert_eq!(before, after.0, "{label}: a replay changes nothing");
+                } else if !(200..300).contains(&a.0) {
                     assert_eq!(before, after.0, "{label}: a refusal changes nothing");
                 }
                 let code = a.1["code"]
@@ -1531,7 +1548,12 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
                     .to_string();
                 seen.insert((a.0, code));
                 // the handling time over gRPC (contract §6.1 records it)
-                eprintln!("{label}: {} {} [grpc {} ms]", a.0, a.1, took.as_millis());
+                eprintln!(
+                    "{requests:03} {label}: {} {} [grpc {} ms]",
+                    a.0,
+                    a.1,
+                    took.as_millis()
+                );
             }
         }
     }
@@ -1584,6 +1606,7 @@ fn both_transports_give_the_same_answers_and_the_same_database() {
         .filter_map(|c| c["event_id"].as_str())
         .collect();
     assert!(!ids.contains(&"dev-late"), "{st2}");
+    requests
 }
 
 #[test]
