@@ -1,0 +1,19 @@
+# Opt-in Codex trial adapter
+
+This isolated adapter is based on #106 merge `9e220a4d49b0db9d26d46422a20a4f1c811256b0`. The local App Server 0.169.1 schema and the existing mock/role-readiness evidence informed the implementation. Verification ran only against a fake executable over stdio.
+
+## Launcher interface
+
+The external caller invokes `adapter.py --delivery-id ID --attempt-id ID --cwd DIR --state DIR --codex ABSOLUTE_BINARY --model PINNED_MODEL --enable-trial`. It supplies one newline-terminated JSON string, an exact `{"prompt":"..."}` object, or one text block in the existing Claude user envelope on stdin. The adapter relays the text through the Codex protocol. The state directory must already exist, have mode 0700 and be owned by the execution UID. The launcher supplies the isolated `HOME` and `CODEX_HOME`; all other inherited variables are stripped when starting the child. The caller must pin the binary and trusted configuration, confine the filesystem and egress, and protect this durable state across attempts. The opt-in flag is a launcher interlock, not a substitute for caller approval.
+
+The adapter runs initialize/config/account checks, asks for a fresh ephemeral read-only thread with the pinned model, and rechecks the thread's effective settings. Only a ChatGPT account type is accepted, read without token refresh. The fixed RPC sequence sends one `turn/start` after synchronizing the durable intent to disk. The per-delivery lock blocks concurrent reuse. An existing complete, partial, or unknown intent prevents launching another child for that ID. The existing caller must enforce its shared assignment/budget lock and one authorized delivery across distinct IDs.
+
+For a matching successful `turn/completed`, stdout is exactly one JSON line of type `ieo_codex_trial_receipt` with delivery_id, attempt_id, thread_id, turn_id, result and auth. `usage` is absent because token notifications do not establish final usage. Treat absence as unmeasured, never as zero. A receipt establishes an observed completed turn, while repository effects and independent usage remain the caller's evidence obligations. Failed/ambiguous operations return nonzero and no receipt. An already stored receipt stays in state for separate reconciliation, never via re-execution.
+
+Post-intent parsed events are retained in `STATE/DELIVERY/events.jsonl`. `state.json` records intent, observed status, IDs and the last matching cumulative snapshot on completion. Early start notifications cannot bind the RPC without a matching ACK. Regressing counters, mismatched identifiers, unexpected server requests and failed turns block a receipt. Diagnostic stderr never carries provider payloads. No Claude-compatible stream or synthesized billing row is generated.
+
+## Verification and live blockers
+
+Run `python3.11 -I probes/codex-trial/test_adapter.py` to exercise mock subprocesses. Coverage includes configuration/identity refusal, fsynced intent before the child sees the turn, existing and active intent refusal, lost ACK, mismatch, failed turn, usage regression, no finality, and one-line receipt. [Results](verification.txt)
+
+Real App Server behavior and the effective account/role binding are unverified. The separate launcher needs to prove API credential exclusion (including configuration and role storage), approved endpoint and RPC restrictions, billing mutation/egress controls and concurrent credit checks. Missing internal request counts and final usage are still blockers for a fully measured trial. The adapter budgets 115 seconds for local I/O and up to 5 seconds for terminating its child, and the caller must enforce the outer 120-second process-group boundary, including any storage stalls. Child termination is local and does not establish provider cancellation. No real provider RPC, authentication copy, model request, remote operation or product routing change was performed.
