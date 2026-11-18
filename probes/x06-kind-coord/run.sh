@@ -39,16 +39,22 @@ pod_uid=$("${ns[@]}" get pod grpc-coord -o 'jsonpath={.metadata.uid}')
 pod_ip=$("${ns[@]}" get pod grpc-coord -o 'jsonpath={.status.podIP}')
 printf 'prepare_seconds=%s grpc_uid=%s grpc_ip=%s\n' "$((SECONDS - prepare_at))" "$pod_uid" "$pod_ip" | tee "$evidence/prepared.txt"
 "${ns[@]}" run driver --restart=Never --image=localhost/ieo-x06:fixture --image-pull-policy=Never   --overrides='{"spec":{"nodeName":"ieo-x06-worker2","automountServiceAccountToken":false}}'   --env=X06_ISOLATED_KIND=ieo-x06 --env="X06_GRPC_POD_UID=$pod_uid" --env="X06_GRPC_POD_IP=$pod_ip"   --command -- /grpc-tests kind::product_paths --ignored --exact --nocapture
-set +e
-"${ns[@]}" wait --for=jsonpath='{.status.phase}'=Succeeded pod/driver --timeout=145s
-status=$?
-set -e
+driver_deadline=$((SECONDS + 145))
+phase=Pending
+while (( SECONDS <= driver_deadline )); do
+  phase=$("${ns[@]}" get pod driver -o 'jsonpath={.status.phase}')
+  case "$phase" in
+    Succeeded|Failed) break ;;
+  esac
+  sleep 1
+done
 collect
 trap - EXIT
 cat "$evidence/driver.log"
-if [[ "$status" != 0 ]]; then
+if [[ "$phase" != Succeeded ]]; then
+  echo "Driver phase: $phase" >&2
   cat "$evidence/grpc-coord.log" "$evidence/http-coord.log"
-  exit "$status"
+  exit 1
 fi
 jq -e --arg uid "$pod_uid" --arg ip "$pod_ip" '
   [.items[] | select(.kind == "EndpointSlice" and .metadata.labels."kubernetes.io/service-name" == "grpc-coord")]

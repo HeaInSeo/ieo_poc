@@ -1146,25 +1146,25 @@ fn scenario(digest: &str) -> Vec<Step> {
         Do(
             "first action: stored",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s1"),
+            fa("A1", 0, &att(1), "s1"),
         ),
         Do(
             "first action: replay",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s1"),
+            fa("A1", 0, &att(1), "s1"),
         ),
         Do(
             "first action: content conflict",
             Some("sup-dev-a"),
             Call::FirstAction(RecordFirstActionRequest {
                 event_offset: 9,
-                ..fa_msg("A1", 0, "att-1", "s1")
+                ..fa_msg("A1", 0, &att(1), "s1")
             }),
         ),
         Do(
             "first action: content conflict, other session",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s2"),
+            fa("A1", 0, &att(1), "s2"),
         ),
         // --- ReportSessionStatus (02-05 step 2)
         Do(
@@ -1452,17 +1452,17 @@ fn scenario(digest: &str) -> Vec<Step> {
         Do(
             "first action: replay after the move",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-1", "s1"),
+            fa("A1", 0, &att(1), "s1"),
         ),
         Do(
             "first action: the old run's, not current",
             Some("sup-dev-a"),
-            fa("A1", 0, "att-2", "s2"),
+            fa("A1", 0, &att(2), "s2"),
         ),
         Do(
             "first action: new generation",
             Some("sup-dev-a"),
-            fa("A1", 1, "att-3", "s3"),
+            fa("A1", 1, "D-t-repo-a-development-A1-1-4", "s3"),
         ),
         Do(
             "first action: new generation, old session",
@@ -1540,6 +1540,14 @@ fn compare_transports(
                     assert_eq!(before, after.0, "{label}: a replay changes nothing");
                 } else if !(200..300).contains(&a.0) {
                     assert_eq!(before, after.0, "{label}: a refusal changes nothing");
+                }
+                if matches!(
+                    label,
+                    "first action: stored"
+                        | "first action: the old run's, not current"
+                        | "first action: new generation"
+                ) {
+                    assert_eq!(a.0, 201, "{label}: {a:?}");
                 }
                 let code = a.1["code"]
                     .as_str()
