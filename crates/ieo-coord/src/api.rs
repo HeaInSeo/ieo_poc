@@ -22,6 +22,8 @@ use std::collections::BTreeMap;
 
 /// Static configuration loaded at start-up.
 pub struct Ctx {
+    /// Connection settings for committing a one-shot recovery use while delivery holds its fence.
+    pub db_config: postgres::Config,
     pub policy: Policy,
     /// Plan manifest; only its `inspection_profiles` are read (approved acceptance profiles).
     pub manifest: Value,
@@ -3346,6 +3348,9 @@ fn ingest(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
     }
     let id = str_field(&body, "evidence_id", 256)?.to_string();
     let (kind, sha) = validate_evidence(&body)?;
+    if matches!(kind.as_str(), "branch_head" | "ci_run") {
+        lock(tx, &format!("delivery-evidence:{repo}"))?;
+    }
     lock(tx, &format!("evidence:{repo}:{id}"))?;
     if let Some(row) = tx.query_opt(
         "SELECT body FROM evidence WHERE repo_id = $1 AND evidence_id = $2",
@@ -4141,6 +4146,18 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
     // a takeover answers a delivery of this assignment and generation (02-05 step 4): a
     // request alone is never a takeover, and a takeover without a delivery is refused
     if phase == "takeover" {
+        if let Some(expected) = cp.get("expected_checkpoint_sha256") {
+            let stored = latest
+                .as_ref()
+                .map_or(&Value::Null, |l| &l["checkpoint_sha256"]);
+            if expected != stored {
+                return Err(problem(
+                    409,
+                    "CHECKPOINT_MISMATCH",
+                    "the predecessor changed after this delivery was authorized",
+                ));
+            }
+        }
         check_delivery(
             tx,
             repo,

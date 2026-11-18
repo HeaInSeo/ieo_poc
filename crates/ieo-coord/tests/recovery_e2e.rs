@@ -150,6 +150,11 @@ impl Drop for Coord {
 
 /// The role service behind a fixed HTTP port; the service inside can be replaced (a restart of
 /// the role process on the same volume).
+struct LaunchGate {
+    received: std::sync::mpsc::Sender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+}
+
 struct Role {
     _svc: Arc<Mutex<Arc<Service>>>,
     port: u16,
@@ -161,6 +166,7 @@ struct Role {
     fail_status: Arc<std::sync::atomic::AtomicBool>,
     /// The body of the last start or reconnect that reached the service.
     last_launch: Arc<Mutex<Value>>,
+    pause_launch: Arc<Mutex<Option<LaunchGate>>>,
 }
 
 impl Role {
@@ -173,6 +179,8 @@ impl Role {
         let launches = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let fail_status = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let last_launch = Arc::new(Mutex::new(Value::Null));
+        let pause_launch = Arc::new(Mutex::new(None::<LaunchGate>));
+        let gate = pause_launch.clone();
         let (d, n, f, last) = (
             Arc::clone(&drop_next),
             Arc::clone(&launches),
@@ -195,6 +203,10 @@ impl Role {
                     n.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     *last.lock().expect("last") =
                         serde_json::from_slice(&body).unwrap_or(Value::Null);
+                    if let Some(gate) = gate.lock().unwrap().take() {
+                        gate.received.send(()).unwrap();
+                        gate.release.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
                 }
                 if req.url().ends_with("/status") && f.load(std::sync::atomic::Ordering::SeqCst) {
                     let _ =
@@ -223,6 +235,7 @@ impl Role {
             launches,
             fail_status,
             last_launch,
+            pause_launch,
         }
     }
     fn call(&self, method: &str, path: &str, body: &Value) -> (u16, Value) {
@@ -1201,9 +1214,78 @@ fn e2e(transport: &str) {
         head("gh-head-7", SHA1);
     }
 
+    // A final approval-fence refusal does not consume the recovery. The next
+    // delivery below uses this exact approval after the fixture restores review.
+    {
+        let mut fixture = cfg.clone();
+        fixture.dbname(&dbname);
+        let mut fixture = fixture.connect(NoTls).unwrap();
+        let changes = |fixture: &mut postgres::Client, state: &str| {
+            assert_eq!(fixture.execute(
+                "UPDATE sprint_revisions SET review_state=$1 WHERE sprint_id='POC-01' AND revision=5",
+                &[&state],
+            ).unwrap(), 1);
+        };
+        changes(&mut fixture, "semantic_review_rejected");
+        let before = launches();
+        let (st, refused) = deliver(
+            "operator",
+            "rcv-final-fence",
+            "development",
+            &dbody("afence", 0, "sfence", json!({"recovery_id": rid})),
+        );
+        assert_eq!(
+            (st, refused["result"]["outcome"].as_str()),
+            (201, Some("not_called")),
+            "{refused}"
+        );
+        assert_eq!(launches(), before);
+        assert!(recovery(&rid)["used"].is_null());
+        changes(&mut fixture, "semantic_review_passed");
+    }
+
     // 9. the use: a new session over the unfinished checkpoint, never a resume
     let b6 = dbody("a6", 0, "s6", json!({"recovery_id": rid}));
-    let (st, d6) = deliver("operator", "rcv-key-0006", "development", &b6);
+    let (entered, recv_entered) = std::sync::mpsc::channel();
+    let (release, recv_release) = std::sync::mpsc::channel();
+    *role.pause_launch.lock().unwrap() = Some(LaunchGate {
+        received: entered,
+        release: recv_release,
+    });
+    let (st, d6) = std::thread::scope(|sc| {
+        let send = sc.spawn(|| deliver("operator", "rcv-key-0006", "development", &b6));
+        recv_entered
+            .recv_timeout(Duration::from_secs(10))
+            .expect("supervisor POST");
+        // The durable use is visible even before the supervisor can accept the POST.
+        let observed = recovery(&rid);
+        let sent = role.last_launch.lock().unwrap().clone();
+        assert_eq!(observed["used"]["delivery_id"], sent["delivery_id"]);
+        let mut cfg = cfg.clone();
+        cfg.dbname(&dbname);
+        let mut client = cfg.connect(NoTls).unwrap();
+        let mut conflicting = client.transaction().unwrap();
+        let can_lock = |tx: &mut postgres::Transaction, key: &str| -> bool {
+            tx.query_one(
+                "SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))",
+                &[&key],
+            )
+            .unwrap()
+            .get(0)
+        };
+        assert!(!can_lock(&mut conflicting, "delivery-evidence:repo-a"));
+        assert!(can_lock(&mut conflicting, "checkpoint:repo-a:development"));
+        assert_eq!(
+            sent["expected_checkpoint_sha256"],
+            observed["checkpoint"]["checkpoint_sha256"]
+        );
+        assert!(conflicting.query_one(
+            "SELECT 1 FROM assignment_heads WHERE repo_id='repo-a' AND role='development' FOR UPDATE NOWAIT", &[],
+        ).is_err());
+        conflicting.rollback().unwrap();
+        release.send(()).unwrap();
+        send.join().unwrap()
+    });
     assert_eq!(
         outcome(&d6),
         o("recovery_allowed", Some("start"), "accepted"),

@@ -90,6 +90,7 @@ fn run() -> Result<(), String> {
             let _ = ieo_coord::delivery::bounds();
             let app = App {
                 ctx: Ctx {
+                    db_config: cfg.clone(),
                     policy,
                     manifest,
                     bindings,

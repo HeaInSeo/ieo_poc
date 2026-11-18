@@ -255,6 +255,7 @@ pub fn start() -> Option<Env> {
                      "observed_at": null}]}});
     let app = App {
         ctx: Ctx {
+            db_config: cfg.clone(),
             policy: policy::load(POLICY).expect("policy"),
             manifest,
             bindings,

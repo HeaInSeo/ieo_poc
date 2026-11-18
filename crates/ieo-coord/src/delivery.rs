@@ -4,8 +4,8 @@
 //!
 //! The shape: authorization → the request recorded (transaction 1) → the resume judgment
 //! (`compare`, `crate::api::judge_resume`) → the shared budget check
-//! ([`ieo_supervisor::caller::admit`]) → the supervisor's `start` or `reconnect` (outside any
-//! transaction) → its answer, or `unknown` when it was lost, recorded (transaction 2). A delivery
+//! ([`ieo_supervisor::caller::admit`]) → the supervisor's `start` or `reconnect` under a read-only
+//! assignment/approval fence → its answer, or `unknown` when it was lost, recorded (transaction 2). A delivery
 //! is what the coordinator itself did, so it is stored as `verified`; it is not a takeover: the
 //! supervisor's takeover checkpoint names this delivery (`delivery_id`, sent with the start) and
 //! the coordinator links the two when it stores the takeover (step 4).
@@ -858,10 +858,18 @@ pub fn deliver(
         return Ok(again);
     }
     let decision2 = again.body["decision"].as_str().unwrap_or_default();
-    if decision2 != decision || choose_op(decision2, new_session, &again.body) != Some(op) {
+    let current = &again.body["current_assignment"];
+    let basis_changed = current["assignment_id"] != d["assignment_id"]
+        || current["generation"] != d["generation"]
+        || again.body["central"] != judged.body["central"]
+        || again.body["github"] != judged.body["github"];
+    if basis_changed
+        || decision2 != decision
+        || choose_op(decision2, new_session, &again.body) != Some(op)
+    {
         drop(adm);
         let mut why = vec![json!(format!(
-            "the judgment changed while the budget check waited ({decision} → {decision2})"
+            "the judgment changed while the budget check waited ({decision} → {decision2}); verify assignment, checkpoint and branch evidence"
         ))];
         why.extend(
             again.body["reasons"]
@@ -935,7 +943,8 @@ pub fn deliver(
     let github = Some(again.body["github"].clone()).filter(|g| !g.is_null());
     // the delivery id travels with the start (02-05 step 4): the supervisor carries it on the
     // run's checkpoints and the takeover is linked to this delivery
-    let mut extra = json!({"target_sha": d["target_sha"], "delivery_id": id});
+    let mut extra = json!({"target_sha": d["target_sha"], "delivery_id": id,
+        "expected_checkpoint_sha256": again.body["central"]["checkpoint_sha256"]});
     // 02-05 step 7: the assignment's branch (the supervisor records the pushed SHA of it), and on
     // a resume the GitHub head and the CI result at it, as the judgment read them
     if let Some(b) = rec["branch_ref"].as_str() {
@@ -961,28 +970,121 @@ pub fn deliver(
             record_result(tx, repo, role, &id, &o, 201, None)
         });
     }
-    // the approval's one use, committed before the start is sent (02-05 step 7b): a second
-    // delivery, a replay or a restart can never start a second run with it
-    if let Some(rid) = &recovery {
-        let g = github.clone().unwrap_or(Value::Null);
-        let used = run_tx(db, guard, &|tx| {
-            crate::recovery::record_use(tx, repo, role, rid, &id, &g)
-        })?;
-        if used.status != 200 {
-            drop(adm);
-            let mut o = base("not_called");
-            o.op = None;
-            o.reasons = json!([format!(
-                "recovery {rid}: {}",
-                used.body["message"].as_str().unwrap_or("not usable")
+    // Re-read local status outside the DB transaction. Then serialize the DB facts
+    // against their writers: both assignment heads for guardrail, the review revision,
+    // checkpoint reports and new branch/CI evidence.
+    let local = role_status(ctx, repo, role);
+    let validate = |fence: &mut Transaction| -> R {
+        fence.batch_execute("SET LOCAL lock_timeout = '1s'")?;
+        let heads = fence.query(
+            "SELECT h.role, h.assignment_id, h.generation, s.digest, s.review_state
+             FROM assignment_heads h
+             JOIN assignments a USING (assignment_id, generation)
+             JOIN sprint_revisions s ON s.sprint_id = a.sprint_id AND s.revision = a.sprint_revision
+             WHERE h.repo_id = $1 AND (h.role = $2 OR ($2 = 'guardrail' AND h.role = 'development'))
+             ORDER BY h.role FOR SHARE OF h, s",
+            &[&repo, &role],
+        )?;
+        if !heads.iter().any(|r| {
+            r.get::<_, String>(0) == role
+                && r.get::<_, String>(1) == aid
+                && r.get::<_, i64>(2) == generation
+                && d["coordinator_record"]["spec_digest"] == r.get::<_, String>(3)
+                && r.get::<_, String>(4) == "semantic_review_passed"
+        }) {
+            return Err(problem(
+                409,
+                "DELIVERY_FENCE",
+                "assignment or approval changed",
+            ));
+        }
+        lock(fence, &format!("delivery-evidence:{repo}"))?;
+        fence.batch_execute("SAVEPOINT checkpoint_snapshot")?;
+        let final_judgment = compare_checkpoint(fence, repo, role, &local)?;
+        let matches = final_judgment.body["central"] == again.body["central"]
+            && if let Some(rid) = &recovery {
+                // The legacy one-shot recovery use is still durable before the POST. Every
+                // fence check happens before recording it, never between its commit and send.
+                crate::recovery::usable(fence, repo, role, rid, &local, &id)?
+                    .is_ok_and(|g| g == again.body["github"])
+            } else {
+                final_judgment.body["decision"] == again.body["decision"]
+                    && final_judgment.body["github"] == again.body["github"]
+            };
+        if !matches
+            || STOPPING.load(Ordering::SeqCst)
+            || begun.elapsed() > Duration::from_secs(deadline)
+        {
+            return Err(problem(
+                409,
+                "DELIVERY_FENCE",
+                "checkpoint, branch evidence or send window changed",
+            ));
+        }
+        ok(200, Value::Null)
+    };
+    // The DB fence stays open through the bounded POST. Recovery commits its one-shot
+    // use on a separate connection so durability does not release the decision locks.
+    let start = (|| -> Result<_, Resp> {
+        let mut fence = db.transaction()?;
+        if recovery.is_some() {
+            fence.batch_execute("SET LOCAL lock_timeout = '1s'")?;
+            // Recovery approval also orders this lock before the checkpoint lock.
+            lock(&mut fence, &format!("recovery:{repo}:{role}"))?;
+        }
+        validate(&mut fence)?;
+        if let Some(rid) = &recovery {
+            let mut writer = ctx
+                .db_config
+                .clone()
+                .connect_timeout(Duration::from_secs(2))
+                .connect(postgres::NoTls)?;
+            let mut use_tx = writer.transaction()?;
+            use_tx.batch_execute("SET LOCAL statement_timeout = '2s'")?;
+            crate::recovery::record_use_under_fence(
+                &mut use_tx,
+                repo,
+                role,
+                rid,
+                &id,
+                &again.body["github"],
+            )?;
+            use_tx.commit()?;
+            extra["recovery_id"] = json!(rid);
+            sent["recovery_id"] = json!(rid);
+        }
+        // Release the checkpoint lock before HTTP. The supervisor validates the pinned
+        // checkpoint digest before dispatch and can report takeover even if the reply
+        // is delayed. The assignment, review and evidence locks remain held.
+        fence.batch_execute("ROLLBACK TO SAVEPOINT checkpoint_snapshot")?;
+        if STOPPING.load(Ordering::SeqCst) || begun.elapsed() > Duration::from_secs(deadline) {
+            return Err(problem(
+                409,
+                "DELIVERY_FENCE",
+                "send window closed after authorization",
+            ));
+        }
+        // The supervisor's own-assignment GET is read-only and takeover runs asynchronously.
+        let result = adm.start_with(&plan, &call, &caller::Http, &extra);
+        drop(fence);
+        Ok(result)
+    })();
+    let start = match start {
+        Ok(result) => result,
+        Err(refusal) => {
+            let mut denied = base("not_called");
+            denied.op = None;
+            denied.reasons = json!([format!(
+                "final delivery fence closed: {}",
+                refusal.body["message"]
+                    .as_str()
+                    .unwrap_or("database lock or approval failure")
             )]);
             return run_tx(db, guard, &|tx| {
-                record_result(tx, repo, role, &id, &o, 201, None)
+                record_result(tx, repo, role, &id, &denied, 201, None)
             });
         }
-        extra["recovery_id"] = json!(rid);
-        sent["recovery_id"] = json!(rid);
-    }
+    };
     let sent_sha256 = hex::encode(Sha256::digest(
         serde_json::to_vec(&sent).unwrap_or_default(),
     ));
@@ -990,7 +1092,7 @@ pub fn deliver(
     o.github = github.clone();
     o.limits = Some(sent["limits"].clone());
     o.sent_sha256 = Some(sent_sha256);
-    match adm.start_with(&plan, &call, &caller::Http, &extra) {
+    match start {
         Ok(Sent::Accepted { answer, running }) => {
             o.outcome = "accepted";
             o.supervisor = Some((202, answer));

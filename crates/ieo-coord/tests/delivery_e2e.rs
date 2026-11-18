@@ -7,6 +7,7 @@
 
 mod common;
 use common::free_port;
+use ieo_coord::failover::{Quota, Runtime, classify};
 use ieo_supervisor::serve::{Config, Service};
 use postgres::NoTls;
 use serde_json::{Value, json};
@@ -217,8 +218,12 @@ impl Role {
 /// A fake `claude` (no model call) whose session totals grow per session, so a resumed run's
 /// share is measurable (the 02-04 caller's fake, reduced). Prompt "SLEEP" runs for 3 s.
 fn fake_claude(dir: &Path) -> PathBuf {
+    fake_claude_with_state(dir, dir)
+}
+
+fn fake_claude_with_state(dir: &Path, state: &Path) -> PathBuf {
     let p = dir.join("fake-claude");
-    let cum = dir.join("cum");
+    let cum = state.join("cum");
     std::fs::write(
         &p,
         format!(
@@ -241,6 +246,120 @@ printf '{{"type":"result","subtype":"success","is_error":false,"session_id":"%s"
     .expect("fake");
     let _ = Command::new("chmod").arg("+x").arg(&p).status();
     p
+}
+
+/// Both fake executables consume the same read-only tool envelope from the supervisor, and
+/// can only exercise the primitive fixed fixture read. No adapter executes a requested shell,
+/// tool invocation, path, or network operation. This is the isolated role-policy fixture.
+fn fake_runtime_pair(dir: &Path) -> PathBuf {
+    let programs = dir.join("fixture-runners");
+    let state = dir.join("fixture-runs");
+    std::fs::create_dir(&programs).unwrap();
+    std::fs::create_dir(&state).unwrap();
+    let common = fake_claude_with_state(&programs, &state);
+    let fixture = programs.join("allowed.txt");
+    let secret = dir.join("forbidden.txt");
+    std::fs::write(&secret, "synthetic outside-root file").unwrap();
+    let kernel = std::env::var_os("IEO_TEST_FIXTURE_BWRAP").is_some();
+    std::fs::write(&fixture, "fixture-evidence\n").unwrap();
+    for runtime in ["claude", "codex"] {
+        let path = programs.join(format!("fake-{runtime}-runner"));
+        std::fs::write(
+            &path,
+            format!(
+                r#"#!/bin/sh
+set -eu
+tools=$(printf '%s\n' "$@" | awk 'prev=="--tools"{{print; exit}} {{prev=$0}}')
+test "$tools" = Read,Grep,Glob
+printf '%s\n' "$@" | grep -Fxq 'Read(//state/work/repo-a/**)'
+printf '%s\n' "$@" | grep -Fxq 'Read(//run/ieo/**)'
+printf '%s\n' "$@" | grep -Fxq -- '--strict-mcp-config'
+payload=$(cat)
+prompt=$(printf '%s' "$payload" | '{python}' -c 'import json,sys; print(json.load(sys.stdin)["message"]["content"][0]["text"])')
+case "$prompt" in
+    PREPARE|VERIFY*|FINAL*) ;;
+    *) exit 41;;
+esac
+read -r evidence < '{fixture}'
+test "$evidence" = fixture-evidence
+if test '{kernel}' = true; then
+    test ! -r '{secret}'
+    if (printf denied > '{fixture}') 2>/dev/null; then exit 43; fi
+    test "$(readlink /proc/self/ns/net)" != '{host_net}'
+    printf '%s\n' '{runtime}: denied outside read, source write and host networking' >> '{policy_trace}'
+fi
+printf '%s|%s|%s|%s\n' '{runtime}' "$prompt" "$tools" "$evidence" >> '{trace}'
+printf '%s' "$payload" | '{common}' "$@"
+"#,
+                fixture = fixture.display(),
+                trace = state.join("runner-trace").display(),
+                policy_trace = state.join("policy-trace").display(),
+                common = common.display(),
+                kernel = kernel,
+                python = std::fs::canonicalize("/usr/bin/python3").unwrap().display(),
+                secret = secret.display(),
+                host_net = std::fs::read_link("/proc/self/ns/net").unwrap().display(),
+            ),
+        )
+        .unwrap();
+        assert!(
+            Command::new("chmod")
+                .arg("+x")
+                .arg(path)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    let route = dir.join("runtime-route");
+    std::fs::write(&route, "claude\n").unwrap();
+    let broker = dir.join("fake-runner-broker");
+    let launch = if kernel {
+        // Read-only fixture and interpreter; only the synthetic evidence directory is writable.
+        format!(
+            "bwrap --unshare-net --ro-bind /usr /usr --symlink usr/bin /bin \
+                --symlink usr/lib /lib --symlink usr/lib64 /lib64 --proc /proc --dev /dev \
+                --ro-bind '{p}' '{p}' --bind '{s}' '{s}' --chdir '{p}' --",
+            p = programs.display(),
+            s = state.display()
+        )
+    } else {
+        String::new()
+    };
+    std::fs::write(
+        &broker,
+        format!(
+            r#"#!/bin/sh
+set -eu
+read -r runtime < '{route}'
+case "$runtime" in
+    claude|codex) exec {launch} '{programs}/fake-'"$runtime"'-runner' "$@";;
+    *) exit 42;;
+esac
+"#,
+            route = route.display(),
+            programs = programs.display(),
+            launch = launch,
+        ),
+    )
+    .unwrap();
+    assert!(
+        Command::new("chmod")
+            .arg("+x")
+            .arg(&broker)
+            .status()
+            .unwrap()
+            .success()
+    );
+    broker
+}
+
+fn switch_to_codex(dir: &Path) {
+    let claude = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","isUsingOverage":false}}"#;
+    let codex = r#"{"format":"ieo-codex-quota-fixture/v0","status":"available"}"#;
+    assert_eq!(classify(Runtime::Claude, claude), Quota::Exhausted);
+    assert_eq!(classify(Runtime::Codex, codex), Quota::Available);
+    std::fs::write(dir.join("runtime-route"), "codex\n").unwrap();
 }
 
 fn spec() -> Value {
@@ -287,6 +406,16 @@ fn deliveries_go_through_compare_budget_and_the_supervisor_over_grpc() {
     e2e("grpc");
 }
 
+#[test]
+fn failover_delivery_shares_approval_checkpoint_and_restart_reconciliation() {
+    e2e("failover");
+}
+
+#[test]
+fn failover_delivery_competes_on_one_budget_lock() {
+    e2e("failover_budget");
+}
+
 fn unix_now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -304,6 +433,8 @@ fn e2e(transport: &str) {
         return;
     };
     let cfg: postgres::Config = base.parse().expect("IEO_TEST_DB_URL");
+    let failover = transport.starts_with("failover");
+    let shared_cap = if transport == "failover_budget" { 2 } else { 4 };
     let dbname = format!("ieo_t_dlv_{transport}_{}", std::process::id());
     let mut admin = cfg.connect(NoTls).expect("connect");
     let _ = admin.batch_execute(&format!("DROP DATABASE IF EXISTS {dbname} WITH (FORCE)"));
@@ -337,21 +468,26 @@ fn e2e(transport: &str) {
     std::fs::write(root.join("cred/adapter.sha256"), digest(ADAPTER)).expect("a");
     std::fs::write(root.join("cred/coordinator_token"), tok("sup")).expect("c");
     std::fs::write(dir.join("adapter_token"), ADAPTER).expect("at");
-    let claude = fake_claude(&dir);
+    let claude = if failover {
+        fake_runtime_pair(&dir)
+    } else {
+        fake_claude(&dir)
+    };
     let port = free_port();
     let grpc_port = free_port();
     let central_port = if transport == "grpc" { grpc_port } else { port };
-    let role = Role::new(
-        Config::from_json(&json!({"role": "development", "repo": "repo-a",
+    let mut dev_config = json!({"role": "development", "repo": "repo-a",
             "state": root.join("state"), "etc": root.join("etc"), "cred": root.join("cred"),
             "claude": claude, "budget": "02-04", "quota_group_id": "anthropic-shared-0104",
             "checkpoint_central": {"url": format!("http://127.0.0.1:{central_port}"),
                                    "token_file": root.join("cred/coordinator_token"),
-                                   "transport": transport},
+                                   "transport": if transport == "grpc" { "grpc" } else { "http" }},
             "share": {"max_runs": 12, "total_seconds": 9_600, "billable_tokens": 1_000_000,
-                      "cache_read_tokens": 10_000_000}}))
-        .expect("role config"),
-    );
+                      "cache_read_tokens": 10_000_000}});
+    if failover {
+        dev_config["tools"] = json!("read_only");
+    }
+    let role = Role::new(Config::from_json(&dev_config).expect("role config"));
     // the guardrail role's service (idle throughout; the budget check asks it too)
     let groot = dir.join("guard");
     std::fs::create_dir_all(groot.join("etc/template")).expect("etc");
@@ -404,7 +540,7 @@ fn e2e(transport: &str) {
     };
     std::fs::write(
         dir.join("roles.json"),
-        roles_json(4, &["development", "guardrail"]),
+        roles_json(shared_cap, &["development", "guardrail"]),
     )
     .expect("roles");
     let rootdir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
@@ -509,7 +645,16 @@ fn e2e(transport: &str) {
     };
 
     // 1. authorization, format and configuration refusals leave nothing behind
-    let b1 = dbody("a1", 0, "s1", json!({}));
+    let b1 = dbody(
+        "a1",
+        0,
+        "s1",
+        if failover {
+            json!({"prompt":"PREPARE"})
+        } else {
+            json!({})
+        },
+    );
     let p = "/v0/repos/repo-a/roles/development/deliveries";
     assert_eq!(
         http(port, None, Some("dlv-key-0001"), "POST", p, Some(&b1))
@@ -669,6 +814,366 @@ fn e2e(transport: &str) {
         own["expected_runtime"],
         json!({"image_digest": "sha256:img", "profile_id": "dev-profile", "profile_revision": 1})
     );
+
+    if failover {
+        use std::sync::atomic::Ordering::SeqCst;
+
+        let trace = || {
+            std::fs::read_to_string(dir.join("fixture-runs/runner-trace")).expect("runner trace")
+        };
+        let connection = || {
+            let mut c2 = cfg.clone();
+            c2.dbname(&dbname);
+            c2.connect(NoTls).expect("fixture db")
+        };
+        let recorded = |key: &str| -> String {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                if let Some(row) = connection()
+                    .query_opt(
+                        "SELECT delivery_id FROM role_deliveries WHERE request_id=$1",
+                        &[&key],
+                    )
+                    .expect("lookup delivery")
+                {
+                    return row.get(0);
+                }
+                assert!(Instant::now() < deadline, "missing delivery {key}");
+                std::thread::sleep(Duration::from_millis(15));
+            }
+        };
+        assert_eq!(trace(), "claude|PREPARE|Read,Grep,Glob|fixture-evidence\n");
+        assert_eq!(r1["delivery_id"], d1_id);
+        head("gh-head-failover", SHA1);
+        let predecessor = compare("development");
+        assert_eq!(predecessor["decision"], "resume_allowed", "{predecessor}");
+        switch_to_codex(&dir);
+
+        if shared_cap == 2 {
+            // Force a distinct HTTP request into admission while the role is idle.
+            // The same budget lock is already owned by another caller.
+            let lock = std::fs::OpenOptions::new()
+                .write(true)
+                .open(ledger.join("caller.lock"))
+                .unwrap();
+            lock.lock().unwrap();
+            let (status, blocked) = deliver(
+                "operator",
+                "failover-locked",
+                "development",
+                &dbody(
+                    "f-locked",
+                    0,
+                    "f-locked",
+                    json!({"new_session":true,"prompt":"VERIFY"}),
+                ),
+            );
+            assert_eq!(
+                (status, blocked["result"]["outcome"].as_str()),
+                (201, Some("budget_refused")),
+                "{blocked}"
+            );
+            assert_eq!(
+                blocked["result"]["reasons"][0],
+                "another caller holds the ledger"
+            );
+            assert_eq!(launches(), 1);
+            assert_eq!(records().len(), 1);
+            lock.unlock().unwrap();
+        } else {
+            // Wait for the final row-lock query, after the second checkpoint judgment.
+            // A branch observation committed at this point must invalidate the POST.
+            let mut lock_db = connection();
+            let mut locked = lock_db.transaction().unwrap();
+            locked.query_one("SELECT 1 FROM assignment_heads WHERE repo_id='repo-a' AND role='development' FOR UPDATE", &[]).unwrap();
+            let body = dbody(
+                "f-drift",
+                0,
+                "f-drift",
+                json!({"new_session":true,"prompt":"VERIFY"}),
+            );
+            let (status, blocked) = std::thread::scope(|sc| {
+                let request =
+                    sc.spawn(|| deliver("operator", "failover-drift", "development", &body));
+                let deadline = Instant::now() + Duration::from_secs(4);
+                loop {
+                    let waiting: bool = connection().query_one(
+                        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname=current_database()
+                         AND wait_event_type='Lock' AND query LIKE '%FOR SHARE OF h, s%')", &[],
+                    ).unwrap().get(0);
+                    if waiting {
+                        break;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "delivery never reached its final fence"
+                    );
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                head("gh-head-late-drift", SHA2);
+                locked.rollback().unwrap();
+                request.join().unwrap()
+            });
+            assert_eq!(
+                (status, blocked["result"]["outcome"].as_str()),
+                (201, Some("not_called")),
+                "{blocked}"
+            );
+            assert!(
+                blocked["result"]["reasons"][0]
+                    .as_str()
+                    .unwrap()
+                    .contains("branch evidence"),
+                "{blocked}"
+            );
+            assert_eq!(launches(), 1);
+            assert_eq!(records().len(), 1);
+            head("gh-head-after-drift", SHA1);
+        }
+
+        let held = std::fs::OpenOptions::new()
+            .write(true)
+            .open(ledger.join("caller.lock"))
+            .unwrap();
+        held.lock().unwrap();
+        let b2 = dbody(
+            "f2",
+            0,
+            "f2-session",
+            json!({
+                "new_session": true, "prompt": format!("VERIFY {} SLEEP", d1_id)
+            }),
+        );
+        let (st, refused) = std::thread::scope(|sc| {
+            let send = sc.spawn(|| deliver("operator", "failover-key-02", "development", &b2));
+            recorded("failover-key-02");
+            // Inject review withdrawal in the fixture DB immediately before admission.
+            // The old assignment and checkpoint still agree, so only the final fence
+            // can block this delivery. Normal APIs do not mutate a review verdict.
+            assert_eq!(
+                connection()
+                    .execute(
+                        "UPDATE sprint_revisions SET review_state='semantic_review_rejected'
+                 WHERE sprint_id='POC-01' AND revision=5",
+                        &[],
+                    )
+                    .unwrap(),
+                1
+            );
+            held.unlock().unwrap();
+            send.join().unwrap()
+        });
+        assert_eq!(st, 201, "{refused}");
+        assert_eq!(refused["result"]["outcome"], "not_called", "{refused}");
+        assert_eq!(launches(), 1);
+        assert_eq!(runs(), 1);
+        assert!(records().iter().all(|r| r["attempt_id"] != "f2"));
+        assert_eq!(
+            deliver("operator", "failover-key-02", "development", &b2).1,
+            refused
+        );
+
+        assert_eq!(
+            connection()
+                .execute(
+                    "UPDATE sprint_revisions SET review_state='semantic_review_passed'
+             WHERE sprint_id='POC-01' AND revision=5",
+                    &[],
+                )
+                .unwrap(),
+            1
+        );
+        let b3 = dbody(
+            "f3",
+            0,
+            "f3-session",
+            json!({
+                "new_session": true, "prompt": format!("VERIFY {} SLEEP", d1_id)
+            }),
+        );
+        let b4 = dbody(
+            "f4",
+            0,
+            "f4-session",
+            json!({"new_session": true, "prompt": "FINAL"}),
+        );
+        let ready = std::sync::Barrier::new(2);
+        let pair = std::thread::scope(|sc| {
+            let send = || {
+                ready.wait();
+                deliver("operator", "failover-key-03", "development", &b3)
+            };
+            // The barrier is outside the scope so both requests compete to create the intent.
+            let other = sc.spawn(send);
+            let one = send();
+            [one, other.join().unwrap()]
+        });
+        let next = &pair
+            .iter()
+            .find(|(status, _)| *status == 201)
+            .expect("one new delivery")
+            .1;
+        assert_eq!(pair.iter().filter(|(status, _)| *status == 201).count(), 1);
+        let retry = pair.iter().find(|(status, _)| *status != 201).unwrap();
+        assert!(
+            retry.0 == 200
+                || (retry.0 == 409 && retry.1["rejections"][0]["code"] == "DELIVERY_IN_PROGRESS"),
+            "{retry:?}"
+        );
+        assert_eq!(next["result"]["outcome"], "accepted", "{next}");
+        assert_eq!(next["result"]["op"], "start", "{next}");
+        let next_id = recorded("failover-key-03");
+        assert_eq!(next["delivery_id"], next_id);
+        assert_ne!(next["session_id"], d1["session_id"]);
+        let sent = role.last_launch.lock().unwrap().clone();
+        assert_eq!(sent["delivery_id"], next_id);
+        assert_eq!(sent["branch_ref"], BRANCH);
+        assert_eq!(sent["github"]["head_sha"], SHA1);
+        assert_eq!(
+            sent["expected_checkpoint_sha256"],
+            predecessor["central"]["checkpoint_sha256"]
+        );
+        assert_eq!(sent["coordinator"]["generation"], 0);
+        assert_eq!(sent["coordinator"]["profile_id"], "dev-profile");
+        let marker: Value =
+            serde_json::from_slice(&std::fs::read(ledger.join("inflight.json")).unwrap()).unwrap();
+        assert_eq!(marker["delivery_id"], next_id);
+        assert!(matches!(
+            held.try_lock(),
+            Err(std::fs::TryLockError::WouldBlock)
+        ));
+
+        // Two requests on the same continuation key cannot submit again. A distinct
+        // request on the shared budget may not compete past either in-flight or role caps.
+        std::thread::scope(|sc| {
+            let one = sc.spawn(|| deliver("operator", "failover-key-03", "development", &b3));
+            let two = sc.spawn(|| deliver("operator", "failover-key-03", "development", &b3));
+            for retry in [one, two] {
+                let (st, replay) = retry.join().unwrap();
+                assert_eq!(
+                    (st, replay["delivery_id"].as_str()),
+                    (200, Some(next_id.as_str()))
+                );
+            }
+            if shared_cap == 2 {
+                let until = Instant::now() + Duration::from_secs(2);
+                while !trace().contains("codex|VERIFY") {
+                    assert!(Instant::now() < until, "the Codex fixture did not start");
+                    std::thread::sleep(Duration::from_millis(15));
+                }
+                assert!(!role.status()["running"].is_null());
+                // A hypothetical recovery selects Claude for the competing request;
+                // Codex already owns the same lock and the last run of the share.
+                std::fs::write(dir.join("runtime-route"), "claude\n").unwrap();
+                let (_, blocked) = deliver("operator", "failover-key-04", "development", &b4);
+                assert_ne!(blocked["result"]["outcome"], "accepted", "{blocked}");
+            }
+        });
+        role.wait("f3");
+        let r3 = settled("f3");
+        assert_eq!(r3["delivery_id"], next_id);
+        assert_eq!(launches(), 2);
+        let t = trace();
+        assert_eq!(t.lines().count(), 2, "{t}");
+        assert!(
+            t.lines()
+                .nth(1)
+                .unwrap()
+                .starts_with(&format!("codex|VERIFY {d1_id} "))
+        );
+        if std::env::var_os("IEO_TEST_FIXTURE_BWRAP").is_some() {
+            let policy = std::fs::read_to_string(dir.join("fixture-runs/policy-trace")).unwrap();
+            assert_eq!(
+                policy.lines().collect::<Vec<_>>(),
+                [
+                    "claude: denied outside read, source write and host networking",
+                    "codex: denied outside read, source write and host networking",
+                ]
+            );
+        }
+        let spent = ieo_supervisor::budget::spent(&records());
+        assert_eq!(spent.runs, 2);
+        assert_eq!(spent.billable_tokens, 40);
+        assert_eq!(spent.cache_read_tokens, 40);
+        if shared_cap == 2 {
+            let (_, exhausted) = deliver(
+                "operator",
+                "failover-key-05",
+                "development",
+                &dbody(
+                    "f5",
+                    0,
+                    "f5-session",
+                    json!({"new_session":true,"prompt":"FINAL"}),
+                ),
+            );
+            assert_eq!(
+                exhausted["result"]["outcome"], "budget_refused",
+                "{exhausted}"
+            );
+            assert_eq!(launches(), 2);
+        } else {
+            role.drop_next.store(true, SeqCst);
+            let (st, lost) = deliver("operator", "failover-key-04", "development", &b4);
+            assert_eq!(st, 201, "{lost}");
+            assert_eq!(lost["result"]["outcome"], "unknown", "{lost}");
+            role.wait("f4");
+            let lost_rec = settled("f4");
+            assert_eq!(lost_rec["delivery_id"], lost["delivery_id"]);
+            assert_eq!(lost_rec["usage"]["run"]["state"], "unmeasured");
+            coord.stop();
+            coord.start();
+            let (st, replay) = deliver("operator", "failover-key-04", "development", &b4);
+            assert_eq!(st, 200, "{replay}");
+            assert_eq!(replay["result"]["outcome"], "accepted", "{replay}");
+            assert_eq!(replay["delivery_id"], lost["delivery_id"]);
+            let (st, blocked) = deliver(
+                "operator",
+                "failover-key-05",
+                "development",
+                &dbody(
+                    "f5",
+                    0,
+                    "f5-session",
+                    json!({"new_session":true,"prompt":"FINAL"}),
+                ),
+            );
+            assert_eq!(
+                (st, blocked["rejections"][0]["code"].as_str()),
+                (409, Some("ASSIGNMENT_USAGE_UNMEASURED")),
+                "{blocked}"
+            );
+            assert_eq!(launches(), 3);
+            assert_eq!(trace().lines().count(), 3);
+        }
+        // Check the receiving-side bound checkpoint independently of the HTTP relay.
+        let before = trace();
+        let mut wrong_checkpoint = sent;
+        wrong_checkpoint["attempt_id"] = json!("f-checkpoint-changed");
+        wrong_checkpoint["expected_checkpoint_sha256"] = json!("0".repeat(64));
+        let (status, denied) = role.call("POST", "/v0/role/start", &wrong_checkpoint);
+        assert_eq!(
+            (status, denied["code"].as_str()),
+            (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+            "{denied}"
+        );
+        assert!(
+            denied["message"]
+                .as_str()
+                .or(denied["reason"].as_str())
+                .unwrap()
+                .contains("checkpoint changed"),
+            "{denied}"
+        );
+        assert_eq!(trace(), before);
+        coord.stop();
+        drop(db);
+        admin
+            .batch_execute(&format!("DROP DATABASE {dbname} WITH (FORCE)"))
+            .unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        return;
+    }
 
     // 3. the same request again: the stored delivery, nothing sent; other content → 409; the
     //    same attempt under another key → 409

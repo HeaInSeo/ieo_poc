@@ -3068,3 +3068,70 @@ fn a_start_over_an_unfinished_run_needs_a_recovery() {
             .is_null()
     );
 }
+
+#[test]
+fn a_checkpoint_changed_during_central_comparison_cannot_be_accepted() {
+    use ieo_supervisor::central::{Central, CoordinatorClient, Reply};
+    #[derive(Debug)]
+    struct ChangeDuringRead {
+        path: PathBuf,
+        digest: String,
+    }
+    impl CoordinatorClient for ChangeDuringRead {
+        fn latest_checkpoint(&self, _: &str, _: &str) -> Reply {
+            std::fs::write(
+                &self.path,
+                r#"{"seq":1,"phase":"after_run","session_id":"changed"}"#,
+            )
+            .unwrap();
+            Reply::Answered(200, json!({"seq": 1, "checkpoint_sha256":self.digest}))
+        }
+        fn report_checkpoint(&self, _: &str, _: &str, _: u64, _: &[u8]) -> Reply {
+            panic!("a changed predecessor must not report takeover");
+        }
+        fn own_assignment(&self, _: &str, _: &str) -> Reply {
+            Reply::Answered(200, coord(0))
+        }
+        fn describe(&self) -> String {
+            "fixture-checkpoint-race".into()
+        }
+    }
+
+    let _serial = serial();
+    let (t, _) = setup("checkpoint-race");
+    let mut config = svc_config(&t);
+    let path = config.state.join("checkpoint.json");
+    std::fs::create_dir_all(&config.state).unwrap();
+    let original = br#"{"seq":1,"phase":"after_run","session_id":"old"}"#;
+    std::fs::write(&path, original).unwrap();
+    let digest = hex::encode(Sha256::digest(original));
+    config.central = Central::Coordinator(Arc::new(ChangeDuringRead {
+        path,
+        digest: digest.clone(),
+    }));
+    let svc = Arc::new(Service::new(config));
+    let (status, failure) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req(
+            "pinned",
+            "fixture",
+            json!({
+                "session_id":"new", "expected_checkpoint_sha256":digest
+            }),
+        ),
+    );
+    assert_eq!(
+        (status, failure["code"].as_str()),
+        (409, Some("EXTERNAL_RECONCILIATION_REQUIRED")),
+        "{failure}"
+    );
+    assert!(
+        failure["message"]
+            .as_str()
+            .unwrap()
+            .contains("checkpoint changed")
+    );
+    assert!(!t.0.join("state/runs/pinned").exists());
+}

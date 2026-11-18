@@ -412,7 +412,7 @@ fn inflight_path(plan: &Plan) -> PathBuf {
 /// Marks a call as started before the start request is sent: until the call's record is
 /// appended, every further call is refused (a caller that dies mid-run leaves it behind, and a
 /// person reconciles it — review c4620d2 H1).
-fn mark_inflight(plan: &Plan, c: &Call) -> Result<(), String> {
+fn mark_inflight(plan: &Plan, c: &Call, delivery_id: Option<&str>) -> Result<(), String> {
     use std::io::Write;
     std::fs::create_dir_all(&plan.ledger_dir).map_err(|e| e.to_string())?;
     let mut f = std::fs::OpenOptions::new()
@@ -420,8 +420,11 @@ fn mark_inflight(plan: &Plan, c: &Call) -> Result<(), String> {
         .create_new(true)
         .open(inflight_path(plan))
         .map_err(|e| format!("in-flight marker: {e}"))?;
-    let v = json!({"attempt_id": c.attempt_id, "role": c.role, "op": c.op,
-                   "started_at": ieo_evidence::time::now()});
+    let mut v = json!({"attempt_id": c.attempt_id, "role": c.role, "op": c.op,
+                      "started_at": ieo_evidence::time::now()});
+    if let Some(id) = delivery_id {
+        v["delivery_id"] = json!(id);
+    }
     f.write_all(format!("{v}\n").as_bytes())
         .and_then(|()| f.sync_all())
         .and_then(|()| std::fs::File::open(&plan.ledger_dir)?.sync_all())
@@ -1167,7 +1170,11 @@ impl Admission {
         if let Some(s) = &self.spare {
             base_rec["spare"] = s.clone();
         }
-        mark_inflight(plan, c)?;
+        let delivery_id = body["delivery_id"].as_str();
+        if let Some(id) = delivery_id {
+            base_rec["delivery_id"] = json!(id);
+        }
+        mark_inflight(plan, c, delivery_id)?;
         match adapter.send(&target, "POST", &format!("/v0/role/{}", c.op), Some(&body)) {
             Ok((202, answer)) => Ok(Sent::Accepted {
                 answer,
