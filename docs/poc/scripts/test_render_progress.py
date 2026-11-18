@@ -6,7 +6,7 @@ interrupted generation and regeneration, separate main/follow-up counts, no time
 02-01: the same snapshot_id/ledger digest in every view and no combined main+follow-up progress rate.
 Run from anywhere: python3 -I docs/poc/scripts/test_render_progress.py   (prints PASS/FAIL lines, exit 0 on all PASS)
 """
-import hashlib, json, shutil, subprocess, sys, tempfile
+import hashlib, json, os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 POC = Path(__file__).resolve().parents[1]
@@ -112,6 +112,63 @@ with tempfile.TemporaryDirectory() as td:
     rc, out = run(root)
     check("accepted_without_evidence_rejected", rc == 1 and "검수 완료" in out, out)
     check("invalid_ledger_writes_nothing", views_digest(root) == base)
+
+with tempfile.TemporaryDirectory() as td:
+    root = fresh(td)
+    base = views_digest(root)
+    ledger = root / "progress/state.json"
+    original = ledger.read_bytes()
+    report_ref = "reports/render-progress-readable-test.txt"
+    report = root / report_ref
+    report.write_text("Renderer regression fixture\n")
+
+    def complete(s, **changes):
+        task = next(t for t in s["tasks"] if t["status"] == "검수 완료")
+        task.update(changes)
+
+    def reject(name, change, error):
+        mutate(root, change)
+        rc, out = run(root)
+        check(name, rc == 1 and error in out and views_digest(root) == base, out)
+        ledger.write_bytes(original)
+
+    reject("empty_evidence_reference_rejected",
+           lambda s: complete(s, evidence=[{}], latest_report=None), "증거/보고 참조")
+    reject("wrong_evidence_container_rejected",
+           lambda s: complete(s, evidence={"ref": report_ref}), "증거는 참조 목록")
+
+    report.chmod(0)
+    try:
+        if not os.access(report, os.R_OK):
+            reject("unreadable_latest_report_rejected",
+                   lambda s: complete(s, latest_report=report_ref), "읽을 수 없는 보고/증거")
+        else:
+            print("SKIP unreadable_latest_report_rejected (runner can read mode 000)")
+    finally:
+        report.chmod(0o600)
+
+    def shrink(s):
+        s["tasks"] = [t for t in s["tasks"] if t["task_id"] != "09-06"]
+        s["baselines"]["main_tasks"] -= 1
+
+    def replace_registration(s):
+        task = next(t for t in s["tasks"] if t["task_id"] == "09-06")
+        task["task_id"] = "99-99"
+
+    def exchange_tracks(s):
+        main = next(t for t in s["tasks"] if t["track"] == "main")
+        followup = next(t for t in s["tasks"] if t["track"] == "followup")
+        main["track"], followup["track"] = followup["track"], main["track"]
+
+    reject("shortened_ledger_and_denominator_rejected", shrink, "ledger ID/track mismatch")
+    reject("unregistered_task_with_same_count_rejected", replace_registration, "ledger ID/track mismatch")
+    reject("registered_tasks_on_wrong_tracks_rejected", exchange_tracks, "ledger ID/track mismatch")
+    reject("changed_approved_experiment_baseline_rejected",
+           lambda s: s["baselines"].update(main_experiments=30), "원장 기준선 불일치")
+
+    mutate(root, lambda s: complete(s, evidence=[{"path": report_ref}], latest_report=report_ref))
+    rc, out = run(root)
+    check("readable_object_evidence_accepted", rc == 0, out)
 
 with tempfile.TemporaryDirectory() as td:
     root = fresh(td)

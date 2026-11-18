@@ -101,20 +101,13 @@ class Sources:
 
 def ledger_view(sources, manifest):
     state = sources.json(LEDGER)
-    validate_state(sources.root, state)
+    followup_plan = sources.json(FOLLOWUP)
+    validate_state(sources.root, state, main_plan=manifest, followup_plan=followup_plan)
     main = indexed((t for spec in manifest['sprints'] for t in spec['tasks']), 'task_id')
-    followup = indexed(sources.json(FOLLOWUP)['tasks'], 'id')
-    require(state['plan_version'] == manifest['plan_version'], 'ledger plan version mismatch')
-    require(set(main).isdisjoint(followup), 'main and followup IDs overlap')
-    expected = {**dict.fromkeys(main, 'main'), **dict.fromkeys(followup, 'followup')}
-    require({t['task_id']: t['track'] for t in state['tasks']} == expected,
-            'ledger ID/track mismatch with current manifests')
-    require(len(main) == manifest['baseline_tasks'] and
-            len(followup) == sources.json(FOLLOWUP)['baseline_tasks'], 'manifest denominator mismatch')
+    followup = indexed(followup_plan['tasks'], 'id')
     state_tasks = indexed(state['tasks'], 'task_id')
     progress = {}
-    for track in ('main', 'followup'):
-        ids = sorted(i for i in expected if expected[i] == track)
+    for track, ids in [('main', main), ('followup', followup)]:
         progress[track] = {
             'accepted': sum(state_tasks[i]['status'] == '검수 완료' for i in ids),
             'total': len(ids),
