@@ -1,0 +1,8 @@
+   Compiling ieo-fixture v0.1.0 (/scratch/rust)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (/scratch/cargo-target/debug/deps/ieo_fixture-7a5972e9b3dfeff3)
+
+running 1 test
+test tests::doubles_three ... ignored, synthetic required skip
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s

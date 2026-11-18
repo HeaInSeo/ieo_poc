@@ -1,0 +1,36 @@
+{
+  "version": "0.1.0",
+  "item": "03-05.accept",
+  "catalog": "0.2.2",
+  "profiles": {
+    "go": {
+      "source": "docs/poc/reports/tasks/03-03/go-rust-20261118/fixtures/go",
+      "required_tests": [
+        "TestDouble"
+      ],
+      "package": "example.invalid/ieofixture"
+    },
+    "rust": {
+      "source": "docs/poc/reports/tasks/03-03/go-rust-20261118/fixtures/rust",
+      "required_tests": [
+        "tests::doubles_three"
+      ]
+    }
+  }
+}
++ git --version
+git version 2.39.5
++ gcc -dumpfullversion
+12.2.0
++ python3 -V
+Python 3.11.2
++ go version
+go version go1.26.10 linux/amd64
++ rustc -V
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
++ cargo -V
+cargo 1.99.1 (5f94df478 2026-08-27)
++ rustfmt -V
+rustfmt 1.10.0-stable (58cf8f9c35 2026-10-13)
++ clippy-driver -V
+clippy 0.1.99 (58cf8f9c35 2026-10-13)
