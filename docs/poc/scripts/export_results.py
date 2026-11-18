@@ -30,6 +30,8 @@ RUN_TEMPLATE = 'reports/templates/result.template.json'
 ADOPTION = {'채택', '부분 채택', '보류', '기각'}
 WORK_KINDS = {'integration': '구현', 'implementation': '구현', 'regression': '검증', 'experiment': '평가'}
 TOKEN_FIELDS = {'input', 'output', 'cache_read', 'cache_creation'}
+BARE_DIGEST = re.compile(r'sha256:[a-f0-9]{64}')
+EVIDENCE_PIN = re.compile(r'sha256:([a-f0-9]{64})  (.+)')
 
 
 def require(condition, message):
@@ -151,12 +153,37 @@ def review_for(sources, authority, run, ref, as_of):
                 and review['actor']['name'] != run['actor']['name']
                 and review['task_id'] == run['task_id']
                 and 'sha256:' + sha(sources.read(ref)) in review['evidence']):
-            refs = [e for e in review['evidence'] if not re.fullmatch(r'sha256:[a-f0-9]{64}', e)]
-            if refs and not sources.readable(refs):
-                return review
+            return review
     except (KeyError, TypeError, ValueError, OSError, ValidationError):
         return None
     return None
+
+
+def review_evidence(sources, review, run_refs):
+    pins = defaultdict(set)
+    review_refs = set()
+    for entry in review['evidence'] if review else ():
+        match = EVIDENCE_PIN.fullmatch(entry)
+        if match:
+            digest, ref = match.groups()
+            pins[ref].add(digest)
+            review_refs.add(ref)
+        elif not BARE_DIGEST.fullmatch(entry):
+            review_refs.add(entry)
+
+    refs = sorted(set(run_refs) | review_refs)
+    failures = dict.fromkeys(sources.readable(refs), 'unreadable_evidence')
+    if review:
+        for ref in refs:
+            if ref in failures:
+                continue
+            if not pins[ref]:
+                failures[ref] = 'evidence_digest_missing'
+            elif len(pins[ref]) > 1:
+                failures[ref] = 'evidence_digest_conflict'
+            elif sha(sources.read(ref)) not in pins[ref]:
+                failures[ref] = 'evidence_digest_mismatch'
+    return failures, bool(review_refs) and review_refs.isdisjoint(failures)
 
 
 def classify_run(sources, authority, mode, goal, entry, run, current, as_of):
@@ -165,17 +192,17 @@ def classify_run(sources, authority, mode, goal, entry, run, current, as_of):
     evidence = run['evidence_refs'] + run['verification']['evidence']
     if not run['evidence_refs'] or not run['verification']['evidence']:
         issues.append('missing_original_or_review_evidence')
-    missing = sources.readable(evidence)
-    if missing:
-        issues.append('unreadable_evidence')
+    review = review_for(sources, authority, run, ref, as_of)
+    evidence_issues, review_evidence_valid = review_evidence(sources, review, evidence)
+    issues.extend(sorted(set(evidence_issues.values())))
+    missing = sorted(ref for ref, status in evidence_issues.items() if status == 'unreadable_evidence')
     if run['execution_kind'] != mode:
         issues.append('execution_kind_mismatch')
     target = goal['target']
     if (not all(target.get(k) for k in ('spec_revision', 'repo_sha', 'profile_revision'))
             or run['inputs'] != target):
         issues.append('target_version_mismatch')
-    review = review_for(sources, authority, run, ref, as_of)
-    if run['verification']['level'] != 'verified' or review is None:
+    if run['verification']['level'] != 'verified' or not review_evidence_valid:
         issues.append('independent_result_review_missing')
     if not run['expected'] or run['observed'] is None:
         issues.append('expectation_or_observation_missing')
@@ -203,7 +230,7 @@ def classify_run(sources, authority, mode, goal, entry, run, current, as_of):
         scopes = decision['scopes']
         require(decision['decision'] in ADOPTION and isinstance(scopes, list)
                 and all(isinstance(s, str) for s in scopes), f'invalid disposition: {decision_ref}')
-        approved = bool(review and current and run['execution_kind'] == mode
+        approved = bool(review_evidence_valid and current and run['execution_kind'] == mode
                         and decision['result_sha256'] == sha(sources.read(ref))
                         and 'sha256:' + sha(sources.read(decision_ref)) in review['evidence']
                         and decision['proposed_by'] != review['actor']['name']
@@ -238,7 +265,7 @@ def classify_run(sources, authority, mode, goal, entry, run, current, as_of):
         'run_id': run['run_id'], 'revision': run['revision'], 'current': current,
         'inputs': run['inputs'], 'reported_verdict': run['verdict'], 'verdict': verdict,
         'expected': run['expected'], 'observed': run['observed'],
-        'original_evidence': evidence, 'missing_evidence': missing,
+        'original_evidence': evidence, 'missing_evidence': missing, 'evidence_issues': evidence_issues,
         'review': run.get('operational_report_ref'), 'disposition_ref': decision_ref,
         'reported_adoption': run['adoption'], 'disposition': decision, 'adoption': effective,
         'adopted_scopes': sorted(set(decision['scopes'])) if effective in {'채택', '부분 채택'} else [],

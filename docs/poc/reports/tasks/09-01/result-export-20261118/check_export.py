@@ -25,6 +25,10 @@ def write(path, value):
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 
 
+def evidence_pin(root, ref):
+    return f'sha256:{hashlib.sha256((root / ref).read_bytes()).hexdigest()}  {ref}'
+
+
 def project(result, spec):
     budget = result['budgets']['runtime']
     return {
@@ -172,8 +176,8 @@ def compare(args, temp):
             write(root / disposal_ref, disposal)
             disposal_sha = hashlib.sha256((root / disposal_ref).read_bytes()).hexdigest()
             review = read(root / FIX / 'missing-review.json')
-            review.update(event_revision=2, evidence=[*raw['evidence_refs'], 'sha256:' + result_sha,
-                                                       'sha256:' + disposal_sha])
+            review.update(event_revision=2, evidence=[evidence_pin(root, ref) for ref in raw['evidence_refs']]
+                          + ['sha256:' + result_sha, 'sha256:' + disposal_sha])
             write(root / review_ref, review)
             authority_path = root / FIX / 'authority.json'
             raw_authority = authority_path.read_bytes()
@@ -241,6 +245,48 @@ def compare(args, temp):
             _, result, _ = invoke(bundle, 'rejected-implementation')
             assert result['work']['90-08']['state'] == '조건 대기'
             assert result['work']['90-01']['state'] == '편입 대기'
+        elif change in {'replace_first_export_observation', 'unbound_observation_digest',
+                        'digest_for_other_observation', 'missing_approved_observation'}:
+            report = read(root / bundle['runs'][0]['result'])
+            evidence_ref = report['evidence_refs'][0]
+            evidence_path = root / evidence_ref
+            original_bytes = evidence_path.read_bytes()
+            review_ref = report['operational_report_ref']
+            review_path = root / review_ref
+            review_bytes = review_path.read_bytes()
+            authority_path = root / FIX / 'authority.json'
+            authority_bytes = authority_path.read_bytes()
+            if change == 'replace_first_export_observation':
+                evidence_path.write_text('미실행\n', encoding='utf-8')
+                expected_issue = 'evidence_digest_mismatch'
+            elif change == 'missing_approved_observation':
+                evidence_path.unlink()
+                expected_issue = 'unreadable_evidence'
+            else:
+                review = json.loads(review_bytes)
+                pinned = evidence_pin(root, evidence_ref)
+                review['evidence'].remove(pinned)
+                if change == 'unbound_observation_digest':
+                    review['evidence'].extend([evidence_ref, pinned.split('  ', 1)[0]])
+                else:
+                    different_ref = str(FIX / 'different-observation.txt')
+                    (root / different_ref).write_bytes(original_bytes)
+                    review['evidence'].append(evidence_pin(root, different_ref))
+                write(review_path, review)
+                authority = json.loads(authority_bytes)
+                authority['approvals'][review_ref] = hashlib.sha256(review_path.read_bytes()).hexdigest()
+                write(authority_path, authority)
+                expected_issue = 'evidence_digest_missing'
+            out, result, _ = invoke(bundle, change)
+            assert out.name == 'rev-1'
+            run = next(r for r in result['runs'] if r['candidate'] == 'base')
+            assert run['reported_verdict'] == 'PASS' and run['verdict'] == 'INCONCLUSIVE', run
+            assert run['adoption'] == '미판정' and run['verified_scopes'] == []
+            assert expected_issue in run['issues'] and run['evidence_issues'][evidence_ref] == expected_issue
+            assert result['work']['90-01']['state'] == '조건 대기'
+            evidence_path.write_bytes(original_bytes)
+            review_path.write_bytes(review_bytes)
+            authority_path.write_bytes(authority_bytes)
         else:
             raise AssertionError(change)
         print(f'PASS {case["id"]} {case["expected"]}')

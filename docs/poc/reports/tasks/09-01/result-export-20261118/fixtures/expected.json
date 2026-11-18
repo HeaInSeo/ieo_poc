@@ -45,6 +45,10 @@
     {"id": "C15", "change": "reclassify_run_revision", "expected": "reject a revision that changes an existing run from synthetic to actual"},
     {"id": "C16", "change": "withdraw_review", "expected": "new draft records the withdrawal and affected work without changing the archived review file"},
     {"id": "C17", "change": "regression_without_disposition", "expected": "independent verification PASS supports regression review without implying adoption"},
-    {"id": "C18", "change": "implement_rejected_candidate", "expected": "implementation of a rejected candidate remains on hold even when a different candidate covers the scope"}
+    {"id": "C18", "change": "implement_rejected_candidate", "expected": "implementation of a rejected candidate remains on hold even when a different candidate covers the scope"},
+    {"id": "C19", "change": "replace_first_export_observation", "expected": "an unchanged approval cannot verify changed evidence on the first export"},
+    {"id": "C20", "change": "unbound_observation_digest", "expected": "an approved report with a path and an unbound digest cannot verify evidence"},
+    {"id": "C21", "change": "digest_for_other_observation", "expected": "a matching digest bound to a different path cannot verify the declared observation"},
+    {"id": "C22", "change": "missing_approved_observation", "expected": "an approved digest cannot replace an unreadable observation"}
   ]
 }

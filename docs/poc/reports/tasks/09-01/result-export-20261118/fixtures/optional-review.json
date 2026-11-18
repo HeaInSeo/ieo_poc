@@ -20,7 +20,7 @@
   "operational_state": "작업 중",
   "reason_code": null,
   "evidence": [
-    "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+    "sha256:b2d5b412466c9f1dacaf14e363cc5836abc83b1bb89c7e4259232c1304763ca7  reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
     "sha256:e1b263b66eeb02cc7804ab3dd2eb30b14b583084bb112123ac426a045d1143ad",
     "sha256:663757e2b89b670cd3f8014c7e5f58601bc5982460681c593cee6806396548d5"
   ],

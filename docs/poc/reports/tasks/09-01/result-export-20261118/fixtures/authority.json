@@ -1,12 +1,12 @@
 {
   "mode": "synthetic",
   "approvals": {
-    "reports/tasks/09-01/result-export-20261118/fixtures/base-review.json": "ff8cd253cca78330e11bf2fbe90f5f8538d3d44f878769ce42274e8fa797bd04",
-    "reports/tasks/09-01/result-export-20261118/fixtures/partial-review.json": "64d4e218614a6cfa62dfaf39620ff50cca7f5757e189a1f1ca25f059e654c6e1",
-    "reports/tasks/09-01/result-export-20261118/fixtures/failure-review.json": "ae2d7811b77e396bbb9efb55e2169501c183788ccc4e1c93d3d16d17f1a3a8ad",
-    "reports/tasks/09-01/result-export-20261118/fixtures/alternative-review.json": "87866bcdf1168ef4febd46b3564bc383ddfe2bd08b601b6112c3bec576f58ed3",
-    "reports/tasks/09-01/result-export-20261118/fixtures/optional-review.json": "cfe207069e24d82e515fcb51985085cffdf02b249363f54a59d12b6750880cfe",
-    "reports/tasks/09-01/result-export-20261118/fixtures/missing-review.json": "8b6ec5dcefcb3be810db4d519afd6f02dcc6af287e52f33ac3a7ae78da7edabd",
-    "reports/tasks/09-01/result-export-20261118/fixtures/stale-review.json": "e7a27da52e4d91225b22dcf361f46fbeb2a32260cdb8bf04aa3ba7a1fb4e5f44"
+    "reports/tasks/09-01/result-export-20261118/fixtures/base-review.json": "8305383d1aac248958f898fdfb9337f2e112fd02b44e8f1bd22c5429d38a3540",
+    "reports/tasks/09-01/result-export-20261118/fixtures/partial-review.json": "93faff6405dccafde26a14c92afb3d6a204cf8ba38ce56c069fd91ee7395943a",
+    "reports/tasks/09-01/result-export-20261118/fixtures/failure-review.json": "4ed31fa40c3628e5d18fd53b486932221c9ed3e13a5890ba24683c9d53d1d5d7",
+    "reports/tasks/09-01/result-export-20261118/fixtures/alternative-review.json": "f0557151241bdac0933628ae3ae6d4c41953061ae29aa5bd654b4e8e84bafc4b",
+    "reports/tasks/09-01/result-export-20261118/fixtures/optional-review.json": "03d1437165060e21aea5e4c35da6c23f84960e89550503d3586356f140d2c23f",
+    "reports/tasks/09-01/result-export-20261118/fixtures/missing-review.json": "7cdefbbd2ba24ea4a9fe51e29f00fe2b8cb0cc1a2cf2c2be491cc989ee8e1490",
+    "reports/tasks/09-01/result-export-20261118/fixtures/stale-review.json": "51a12e2e45b268e8d9e7d5bad7556471d9bd49ef2ea220806c8f3968c44c27a4"
   }
 }

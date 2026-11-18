@@ -1,0 +1,30 @@
+Reviewed candidate 10a6878d2fb6fadc1f0d4a43bedca06583b27c82 Harden result export evidence and candidate handling for review
+Before: C19 failed on 10a6878 with PASS and 채택 after replacing observations.txt before the first export.
+After: original reported PASS preserved, effective INCONCLUSIVE and 미판정, and dependent work on hold.
+PASS frozen fixture digests
+PASS C01 baseline, collector totals, registration and idempotent package
+PASS C02 same IDs, dependencies and spec digest within the same revision
+PASS C03 reject cost double count
+PASS C04 reject registration with DEPENDENCY_CYCLE
+PASS C05 retain the goal and show its missing work; draft only
+PASS C06 reject current ID/track mismatch even with unchanged totals
+PASS C07 0/73 current and 0/12 followup; 0/76 historical
+PASS C08 new draft revision; stable task IDs; runtime evidence becomes stale and affected work is flagged
+PASS C09 same run counted once across result revisions; latest selected and earlier versions preserved
+PASS C10 synthetic run and approvals do not establish an actual result or product completion
+PASS C11 reject registration with UNDEFINED_PREREQUISITE
+PASS C12 new proof supersedes the hold, authorizes integration review and retains the previous run and its budget
+PASS C13 never reset a cumulative budget by omitting prior attempts
+PASS C14 reject in-place replacement of earlier evidence and retain the existing draft
+PASS C15 reject a revision that changes an existing run from synthetic to actual
+PASS C16 new draft records the withdrawal and affected work without changing the archived review file
+PASS C17 independent verification PASS supports regression review without implying adoption
+PASS C18 implementation of a rejected candidate remains on hold even when a different candidate covers the scope
+PASS C19 an unchanged approval cannot verify changed evidence on the first export
+PASS C20 an approved report with a path and an unbound digest cannot verify evidence
+PASS C21 a matching digest bound to a different path cannot verify the declared observation
+PASS C22 an approved digest cannot replace an unreadable observation
+PASS shared ledger and generated views read-only
+Progress renderer: 32 passed. Progress files match d27fa96.
+{"snapshot":"v1.3.3-EXEC-0059-03-01-r3","converter_sha256":"57351fd954d5e5bb4e37333c8458d08680382abf1a74f12e5be4d64765b6744e","sprint_digest":"71c5401ae9bb200029686803e2e17c6947c7eef82242495cead81f14a55abd24","product_completion":"unverified","actual_linkage":"pending_09-05"}
+PASS validate_package.py, render_progress.py --check, git diff --check
