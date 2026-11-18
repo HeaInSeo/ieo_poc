@@ -1,0 +1,10 @@
+driver_commit=d66bdd4c47f1c3761a820a4556b0bc75ca4fb3d6
+temporary_store=/tmp/ieo-p22-store.DQ45R3X9
+images_reused=3, image_rebuilds=0, case_containers=40, leftover_containers=0
+role_probe_cases=34, expected_denials=340, forbidden_access=0, synthetic_tool_launches=0
+frozen_profile=0.1.0, frozen_catalog=0.2.2, model_requests=0, additional_usd=0
+normal_fixture_heads:
+  go-a bbc8cb02a236b8c83a93148cdf2e60cfbd22394b
+  go-b cacb298ad0061843d036e06d55f058bf0bbc5e4a
+  rust-a d4fcaa0d801fd1e14d9500a7ff9ef2a6953cfe53
+  rust-b de2849867f63eaa5a9a8f9bcebcb57dab306bdfc

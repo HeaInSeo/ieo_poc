@@ -1,0 +1,16 @@
+{
+  "approval": {
+    "head": "6e39c42c8b2e4afc33e63881467827d875399988",
+    "merge": "ed15dabafc2c2cb55eb5ac7bbb3afa09a2263dae",
+    "profile_version": "0.1.0",
+    "catalog_version": "0.2.2"
+  },
+  "images": {
+    "go": "sha256:74ee35f8bd046fab1e777624ef1bc28b7389ef060ef8b65f8579fe8ac2919bfb",
+    "rust": "sha256:3f32fc97df0e89737c1b2b8386a9859efba037daf544db372e2d19b62f9c66db",
+    "combined": "sha256:6ab2fe6cfe05744c636e3ed1459fd23b2c80af807aeee29088843e13f371f784"
+  },
+  "roles": {"development": 20001, "guardrail": 20002},
+  "repositories": ["a", "b"],
+  "stacks": ["go", "rust"]
+}

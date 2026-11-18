@@ -1,0 +1,49 @@
+{
+  "id": 44408383281,
+  "head_sha": "a6d8955a6614eb0f979112f9044cc131c03e623e",
+  "head_branch": "task/x07-cilium-grpc",
+  "event": "pull_request",
+  "run_attempt": 1,
+  "status": "completed",
+  "conclusion": "success",
+  "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44408383281",
+  "updated_at": "2026-11-18T22:14:59Z",
+  "jobs": [
+    {
+      "id": 135169614517,
+      "name": "proto buf lint and breaking",
+      "head_sha": "a6d8955a6614eb0f979112f9044cc131c03e623e",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44408383281/job/135169614517"
+    },
+    {
+      "id": 135169614787,
+      "name": "rust toolchain pin resolves",
+      "head_sha": "a6d8955a6614eb0f979112f9044cc131c03e623e",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44408383281/job/135169614787"
+    },
+    {
+      "id": 135169614923,
+      "name": "docs/poc package and progress validation",
+      "head_sha": "a6d8955a6614eb0f979112f9044cc131c03e623e",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44408383281/job/135169614923"
+    },
+    {
+      "id": 135169614964,
+      "name": "rust fmt clippy test",
+      "head_sha": "a6d8955a6614eb0f979112f9044cc131c03e623e",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44408383281/job/135169614964"
+    }
+  ]
+}
