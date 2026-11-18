@@ -1,0 +1,208 @@
+{
+  "version": "0.2.0",
+  "profile": {
+    "id": "poc-acceptance-v1.3.3",
+    "revision": 4
+  },
+  "items": [
+    {
+      "id": "CAT-ROLE",
+      "version": "0.2.0",
+      "scope": "common",
+      "roles": [
+        "development",
+        "reviewer",
+        "coordinator"
+      ],
+      "requirement": "POC-REQ-03-02",
+      "acceptance": "03-02.accept",
+      "detail": "docs/poc/reports/tasks/03-02/common-policy-20261118/COMMON_POLICY.md",
+      "purpose": "역할 책임과 현재 SHA 인계를 검증",
+      "applies_when": "승인된 역할에 작업 배정",
+      "excludes_when": "다른 역할·환경의 자격",
+      "tools": "Runtime Contract rev 20",
+      "environment": "분리된 역할 작업공간과 정본",
+      "permissions": "배정의 기존 역할 범위",
+      "method": {
+        "procedure": "정확한 후보 SHA와 역할별 기존 권한·독립 승인 대조"
+      },
+      "expected_evidence": "배정 세대·SHA·역할 범위 및 거부 근거",
+      "evidence_limits": "P07의 실제 격리 별도",
+      "cost_basis": "docs/poc/reports/tasks/03-02/common-policy-20261118/REPORT.md",
+      "verdicts": {
+        "pass": "적용 필수 검사와 기대 증거 일치",
+        "fail": "검사 위반·명령 오류·필수 검사 건너뜀 확인",
+        "inconclusive": "필수 실행이나 근거가 미확인",
+        "not_applicable": "승인한 제외 조건과 근거가 일치"
+      },
+      "sources": [
+        "docs/poc/reports/tasks/03-01/catalog-contract-20261118/catalog.json",
+        "docs/poc/reports/tasks/03-02/common-policy-20261118/ACCEPTANCE.md"
+      ],
+      "title": "공통 역할과 현재 SHA 인계",
+      "detail_revision": "0.1.0",
+      "readiness": "draft"
+    },
+    {
+      "id": "CAT-RECOVERY",
+      "version": "0.2.0",
+      "scope": "common",
+      "roles": [
+        "development",
+        "reviewer",
+        "coordinator"
+      ],
+      "requirement": "POC-REQ-03-02",
+      "acceptance": "03-02.accept",
+      "detail": "docs/poc/reports/tasks/03-02/common-policy-20261118/COMMON_POLICY.md",
+      "purpose": "실패·불충분·재개의 증거를 구분",
+      "applies_when": "해당 승인 범위의 검증·회수",
+      "excludes_when": "운영 조치와 자동 재전송",
+      "tools": "ieo-evidence 02-01 검수본 및 역할 계약 rev 20",
+      "environment": "기록과 격리 DB",
+      "permissions": "필요 증거 읽기",
+      "method": {
+        "procedure": "종료·필수 증거·시도 ID와 실제 상태를 대조"
+      },
+      "expected_evidence": "실패·미계측 이유와 독립 상태 기록",
+      "evidence_limits": "유실 회차의 운영 효과와 과금 별도 확인",
+      "cost_basis": "docs/poc/reports/tasks/03-02/common-policy-20261118/REPORT.md",
+      "verdicts": {
+        "pass": "적용 필수 검사와 기대 증거 일치",
+        "fail": "검사 위반·명령 오류·필수 검사 건너뜀 확인",
+        "inconclusive": "필수 실행이나 근거가 미확인",
+        "not_applicable": "승인한 제외 조건과 근거가 일치"
+      },
+      "sources": [
+        "docs/poc/reports/tasks/03-01/catalog-contract-20261118/catalog.json",
+        "docs/poc/reports/tasks/02-01/collector-20261112/REPORT.md"
+      ],
+      "title": "공통 검사 실패와 복구",
+      "detail_revision": "0.1.0",
+      "readiness": "draft"
+    },
+    {
+      "id": "CAT-GO",
+      "version": "0.2.0",
+      "scope": "go",
+      "roles": [
+        "development",
+        "reviewer"
+      ],
+      "requirement": "POC-REQ-03-03",
+      "acceptance": "03-03.accept",
+      "detail": "docs/poc/reports/tasks/03-03/go-rust-20261118/GO_POLICY.md",
+      "purpose": "Go 형식·정적 분석·기능과 조건부 동시성 검증",
+      "applies_when": "Go 모듈 및 승인된 조건",
+      "excludes_when": "Rust 및 비대상 환경",
+      "tools": "Go 1.26.10; GCC 8",
+      "environment": "linux/amd64, cgo, 네트워크 격리",
+      "permissions": "소스 읽기, 임시 쓰기",
+      "method": {
+        "commands": [
+          "gofmt -l .",
+          "go vet -mod=readonly ./...",
+          "go test -mod=readonly -count=1 -json ./...",
+          "go test -mod=readonly -count=1 -shuffle=2 -v ./...",
+          "go test -mod=readonly -race -count=1 ./..."
+        ]
+      },
+      "expected_evidence": "포맷 실행 상태와 파일 목록, 분석 진단, 필수 테스트 이벤트와 셔플 seed",
+      "evidence_limits": "조건부 실행의 개별 적용 근거 필요",
+      "cost_basis": "docs/poc/reports/tasks/03-03/go-rust-20261118/REPORT.md",
+      "verdicts": {
+        "pass": "적용 필수 검사와 기대 증거 일치",
+        "fail": "검사 위반·명령 오류·필수 검사 건너뜀 확인",
+        "inconclusive": "필수 실행이나 근거가 미확인",
+        "not_applicable": "승인한 제외 조건과 근거가 일치"
+      },
+      "sources": [
+        "docs/poc/reports/tasks/03-01/catalog-contract-20261118/catalog.json",
+        "docs/poc/reports/tasks/03-03/go-rust-20261118/ACCEPTANCE.md"
+      ],
+      "title": "Go 검사 상세",
+      "detail_revision": "0.2.0",
+      "readiness": "draft"
+    },
+    {
+      "id": "CAT-RUST",
+      "version": "0.2.0",
+      "scope": "rust",
+      "roles": [
+        "development",
+        "reviewer"
+      ],
+      "requirement": "POC-REQ-03-03",
+      "acceptance": "03-03.accept",
+      "detail": "docs/poc/reports/tasks/03-03/go-rust-20261118/RUST_POLICY.md",
+      "purpose": "Rust 형식·경고·실제 실행 검증",
+      "applies_when": "Rust 패키지 및 승인 target·feature",
+      "excludes_when": "Go 또는 제외된 target",
+      "tools": "Rust/Cargo 1.99.1; rustfmt 1.10.0-stable; Clippy 0.1.99",
+      "environment": "linux/amd64, 네트워크 격리",
+      "permissions": "소스 읽기, 임시 쓰기",
+      "method": {
+        "commands": [
+          "cargo fmt --all -- --check",
+          "cargo clippy --locked --all-targets -- -D warnings",
+          "cargo test --locked --all-targets"
+        ]
+      },
+      "expected_evidence": "포맷 차이, Clippy 진단, 실행한 단위 시험 수와 ignored 수",
+      "evidence_limits": "별도 doctest·feature·target의 관측은 추가 증거",
+      "cost_basis": "docs/poc/reports/tasks/03-03/go-rust-20261118/REPORT.md",
+      "verdicts": {
+        "pass": "적용 필수 검사와 기대 증거 일치",
+        "fail": "검사 위반·명령 오류·필수 검사 건너뜀 확인",
+        "inconclusive": "필수 실행이나 근거가 미확인",
+        "not_applicable": "승인한 제외 조건과 근거가 일치"
+      },
+      "sources": [
+        "docs/poc/reports/tasks/03-01/catalog-contract-20261118/catalog.json",
+        "rust-toolchain.toml"
+      ],
+      "title": "Rust 검사 상세",
+      "detail_revision": "0.2.0",
+      "readiness": "draft"
+    },
+    {
+      "id": "CAT-GITHUB-IEO-POC",
+      "version": "0.2.0",
+      "scope": "repository",
+      "roles": [
+        "development",
+        "reviewer",
+        "coordinator"
+      ],
+      "requirement": "POC-REQ-03-02",
+      "acceptance": "03-02.accept",
+      "detail": "docs/poc/reports/tasks/03-02/common-policy-20261118/IEO_POC_GITHUB_PROFILE.md",
+      "purpose": "워크플로 선언과 보호 관측을 대조",
+      "applies_when": "HeaInSeo/ieo_poc main과 해당 PR",
+      "excludes_when": "다른 저장소 정책",
+      "tools": "GitHub Actions 및 gh 읽기 관측; rust-toolchain.toml",
+      "environment": "고정 workflow 및 저장소 설정 snapshot",
+      "permissions": "읽기 관측, 승인된 자만 병합",
+      "method": {
+        "procedure": "트리거·보호 check 목록·CI 실행 SHA·조건 병합을 대조"
+      },
+      "expected_evidence": "워크플로, 설정 관측, 독립 승인 SHA와 CI 실행 ID",
+      "evidence_limits": "실제 강제 효과는 P23",
+      "cost_basis": "docs/poc/reports/tasks/03-02/common-policy-20261118/REPORT.md",
+      "verdicts": {
+        "pass": "적용 필수 검사와 기대 증거 일치",
+        "fail": "검사 위반·명령 오류·필수 검사 건너뜀 확인",
+        "inconclusive": "필수 실행이나 근거가 미확인",
+        "not_applicable": "승인한 제외 조건과 근거가 일치"
+      },
+      "sources": [
+        ".github/workflows/ci.yml",
+        "docs/poc/reports/tasks/03-02/common-policy-20261118/github-main-observation.json"
+      ],
+      "repository": "HeaInSeo/ieo_poc",
+      "title": "ieo_poc 전용 GitHub 정책",
+      "detail_revision": "0.1.0",
+      "readiness": "draft"
+    }
+  ]
+}

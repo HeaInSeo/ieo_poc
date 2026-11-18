@@ -1,0 +1,27 @@
+{
+  "expectation_freeze": "96d913617c8c7b591e15976dca56578c205efeb1",
+  "basis": "ad7628c5f5f4342e9cd3a41a9a1785b842db77c1",
+  "author_static_text_fields": "50/50",
+  "required_links": "5/5",
+  "invalid_index_mutations_rejected": "9/9",
+  "common": {
+    "collector": "5/5",
+    "role_arguments": "1/1",
+    "coord": "4/4",
+    "db_lifecycles": 4
+  },
+  "stacks": {
+    "go": {
+      "count": 12,
+      "elapsed_sum_s": "26.21",
+      "max_rss_kib": 296056
+    },
+    "rust": {
+      "count": 7,
+      "elapsed_sum_s": "0.58",
+      "max_rss_kib": 162324
+    }
+  },
+  "actual_product_model_requests": 0,
+  "p25_verdict": "pending_independent_review"
+}

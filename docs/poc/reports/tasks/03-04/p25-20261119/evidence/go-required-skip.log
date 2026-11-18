@@ -1,0 +1,9 @@
+{"Time":"2026-11-18T15:12:52.24351482Z","Action":"start","Package":"example.invalid/ieofixture"}
+{"Time":"2026-11-18T15:12:52.245856273Z","Action":"run","Package":"example.invalid/ieofixture","Test":"TestDouble"}
+{"Time":"2026-11-18T15:12:52.245878484Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"=== RUN   TestDouble\n"}
+{"Time":"2026-11-18T15:12:52.245904887Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"    double_test.go:6: synthetic required skip\n"}
+{"Time":"2026-11-18T15:12:52.245917112Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"--- SKIP: TestDouble (0.00s)\n"}
+{"Time":"2026-11-18T15:12:52.245922376Z","Action":"skip","Package":"example.invalid/ieofixture","Test":"TestDouble","Elapsed":0}
+{"Time":"2026-11-18T15:12:52.245927439Z","Action":"output","Package":"example.invalid/ieofixture","Output":"PASS\n"}
+{"Time":"2026-11-18T15:12:52.246166375Z","Action":"output","Package":"example.invalid/ieofixture","Output":"ok  \texample.invalid/ieofixture\t0.002s\n"}
+{"Time":"2026-11-18T15:12:52.246322481Z","Action":"pass","Package":"example.invalid/ieofixture","Elapsed":0.003}

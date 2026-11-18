@@ -1,0 +1,12 @@
+PASS normal catalog: links 5/5, selected text fields 50/50
+PASS rejected required item: missing/extra/duplicate item
+PASS rejected required field: CAT-ROLE: required field
+PASS rejected wrong option: CAT-GO: incorrect command/options
+PASS rejected omitted important option: CAT-RUST: incorrect command/options
+PASS rejected wrong version: CAT-GO: wrong tool version
+PASS rejected broken reference: CAT-RECOVERY: broken reference missing.md
+PASS rejected wrong role: CAT-ROLE: scope/role
+PASS rejected wrong stack: CAT-GO: scope/role
+PASS rejected wrong repository: CAT-GITHUB-IEO-POC: repository binding
+PASS repeat lookup plus stack, repository and role N/A controls
+PASS corrected catalog, 9/9 mutations rejected
