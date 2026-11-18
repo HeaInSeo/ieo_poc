@@ -1,14 +1,14 @@
 # 중단·재개 기록
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0059-03-01-r2` · 원장 SHA-256 `a768797cd216c9fb25f2c3bc4649b5a514de68d08bb42b5ba0dd59f3654ffad0`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0059-03-01-r3` · 원장 SHA-256 `c64523ce85fb70427b0fa5806a71b9d8376e70a123fc625284ddfd7eabc29583`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
 | 항목 | 기록 |
 | --- | --- |
-| last_verified_stage | 03-01 교정: 6개 항목·9개 원본·표적 시험 12/12 |
+| last_verified_stage | 03-01 2차 교정: 6개 항목·9개 원본·표적 시험 13/13 |
 | workspace | /opt/rust/src/github.com/HeaInSeo/ieo_poc-0301 |
-| branch_sha | task/0301-catalog-contract · 교정 산출물 ea2b777411b48bcd3a2fc7ba0595f91142a6e32b |
+| branch_sha | task/0301-catalog-contract · 교정 산출물 bedd4d95463c7c77e54a339ad946266d2b312d65 |
 | plan_and_spec | v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 18(단계 8 전 PR, 이 PR) · OpenAPI 0.17.1(이 PR) |
 | running | 이 작업 트리의 모델 요청·운영 서비스 변경 없음 |
 | unresolved_external_effects | [] |
