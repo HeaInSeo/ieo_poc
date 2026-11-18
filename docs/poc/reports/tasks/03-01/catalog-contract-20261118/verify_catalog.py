@@ -17,11 +17,14 @@ REQUIRED_SOURCES = {
     "03-02.accept": {"t02-fields"},
     "03-03.accept": {"t02-fields", "p25-readiness"},
 }
-REQUIREMENT_PATHS = {
-    "spec-0301": "Console_Coordinator_Sprints_v0.json",
-    "scope-0301": "reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md",
-    "t02-fields": "Console_Coordinator_PoC_Validation_Plan.md",
-    "p25-readiness": "Console_Coordinator_PoC_Validation_Plan.md",
+REQUIREMENT_ANCHORS = {
+    "spec-0301": ("Console_Coordinator_Sprints_v0.json", [1366, 1373], "03-01.accept"),
+    "scope-0301": (
+        "reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md",
+        [43, 45], "POC-REQ-03-01",
+    ),
+    "t02-fields": ("Console_Coordinator_PoC_Validation_Plan.md", [216, 220], "각 카탈로그 항목에는"),
+    "p25-readiness": ("Console_Coordinator_PoC_Validation_Plan.md", [664, 675], "카탈로그"),
 }
 
 
@@ -148,8 +151,10 @@ def verify(catalog, source_map, spec, poc=POC):
                            if link["relation"] == "requirement"}
         require(actual_required == required_sources, f"{label}: unapproved requirement source")
         for source_id in required_sources:
-            require(sources[source_id,]["path"] == REQUIREMENT_PATHS[source_id],
-                    f"{label}: requirement source path mismatch")
+            source = sources[source_id,]
+            locator = (source["path"], source["lines"], source["excerpt"])
+            require(locator == REQUIREMENT_ANCHORS[source_id],
+                    f"{label}: requirement source anchor mismatch")
         used_sources.update(links)
 
     require(used_sources == sources.keys(), "unreferenced source")

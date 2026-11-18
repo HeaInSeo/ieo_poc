@@ -2,7 +2,7 @@
 from copy import deepcopy
 import unittest
 
-from verify_catalog import inputs, verify
+from verify_catalog import POC, inputs, verify
 
 
 class CatalogTest(unittest.TestCase):
@@ -79,7 +79,16 @@ class CatalogTest(unittest.TestCase):
     def test_approved_source_cannot_be_rebound_to_another_path(self):
         spec_source = self.sources["sources"][0]
         spec_source["path"] = self.sources["sources"][-1]["path"]
-        with self.assertRaisesRegex(ValueError, "requirement source path mismatch"):
+        with self.assertRaisesRegex(ValueError, "requirement source anchor mismatch"):
+            self.verify()
+
+    def test_approved_source_cannot_cite_another_clause_in_the_same_file(self):
+        source = self.sources["sources"][0]
+        spec_lines = (POC / source["path"]).read_text(encoding="utf-8").splitlines()
+        line = next(index for index, text in enumerate(spec_lines, 1)
+                    if '"03-02.accept"' in text)
+        source.update(lines=[line, line], excerpt="03-02.accept")
+        with self.assertRaisesRegex(ValueError, "requirement source anchor mismatch"):
             self.verify()
 
     def test_stale_digest(self):
@@ -93,7 +102,8 @@ class CatalogTest(unittest.TestCase):
             self.verify()
 
     def test_wrong_excerpt(self):
-        self.sources["sources"][0]["excerpt"] = "not present on these lines"
+        source = next(source for source in self.sources["sources"] if source["id"] == "npg-role")
+        source["excerpt"] = "not present on these lines"
         with self.assertRaisesRegex(ValueError, "excerpt missing"):
             self.verify()
 
