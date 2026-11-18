@@ -1,0 +1,1 @@
+double.go:12:22: fmt.Sprintf format %s has arg n of wrong type int

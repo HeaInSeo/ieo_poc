@@ -1,0 +1,8 @@
+{"Time":"2026-11-18T14:36:37.860475806Z","Action":"start","Package":"example.invalid/ieofixture"}
+{"Time":"2026-11-18T14:36:37.862426895Z","Action":"run","Package":"example.invalid/ieofixture","Test":"TestDouble"}
+{"Time":"2026-11-18T14:36:37.862452759Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"=== RUN   TestDouble\n"}
+{"Time":"2026-11-18T14:36:37.862493401Z","Action":"output","Package":"example.invalid/ieofixture","Test":"TestDouble","Output":"--- PASS: TestDouble (0.00s)\n"}
+{"Time":"2026-11-18T14:36:37.862500352Z","Action":"pass","Package":"example.invalid/ieofixture","Test":"TestDouble","Elapsed":0}
+{"Time":"2026-11-18T14:36:37.862506877Z","Action":"output","Package":"example.invalid/ieofixture","Output":"PASS\n"}
+{"Time":"2026-11-18T14:36:37.86266479Z","Action":"output","Package":"example.invalid/ieofixture","Output":"ok  \texample.invalid/ieofixture\t0.002s\n"}
+{"Time":"2026-11-18T14:36:37.862687673Z","Action":"pass","Package":"example.invalid/ieofixture","Elapsed":0.002}

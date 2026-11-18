@@ -1,0 +1,26 @@
+go version go1.26.10 linux/amd64
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+cargo 1.99.1 (5f94df478 2026-08-27)
+rustfmt 1.10.0-stable (58cf8f9c35 2026-10-13)
+clippy 0.1.99 (58cf8f9c35 2026-10-13)
+8
+Isolation: private scratch, no mounted host home, loopback only
+PASS go-format exit=0 elapsed_seconds=0.00 peak_rss_kib=5084
+PASS go-vet exit=0 elapsed_seconds=7.78 peak_rss_kib=293436
+PASS go-test exit=0 elapsed_seconds=3.10 peak_rss_kib=115228
+PASS go-race exit=0 elapsed_seconds=14.40 peak_rss_kib=244316
+PASS go-assertion exit=1 elapsed_seconds=0.24 peak_rss_kib=86896
+PASS go-required-skip exit=0 elapsed_seconds=0.24 peak_rss_kib=86816
+PASS go-format-failure exit=1 elapsed_seconds=0.00 peak_rss_kib=7136
+PASS go-format-tool-error exit=2 elapsed_seconds=0.00 peak_rss_kib=5080
+PASS go-vet-failure exit=1 elapsed_seconds=0.08 peak_rss_kib=24884
+PASS go-order-control exit=0 elapsed_seconds=0.25 peak_rss_kib=89108
+PASS go-order-shuffle exit=1 elapsed_seconds=0.20 peak_rss_kib=86616
+PASS go-order-corrected exit=0 elapsed_seconds=0.23 peak_rss_kib=86660
+PASS rust-format exit=0 elapsed_seconds=0.02 peak_rss_kib=36852
+PASS rust-clippy exit=0 elapsed_seconds=0.10 peak_rss_kib=113564
+PASS rust-test exit=0 elapsed_seconds=0.16 peak_rss_kib=160264
+PASS rust-assertion exit=101 elapsed_seconds=0.11 peak_rss_kib=147988
+PASS rust-required-ignore exit=0 elapsed_seconds=0.11 peak_rss_kib=155880
+PASS rust-format-failure exit=1 elapsed_seconds=0.02 peak_rss_kib=35624
+PASS rust-clippy-failure exit=101 elapsed_seconds=0.08 peak_rss_kib=112856
