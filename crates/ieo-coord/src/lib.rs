@@ -8,6 +8,7 @@ pub mod api;
 pub mod auth;
 pub mod chain;
 pub mod delivery;
+pub mod failover;
 pub mod grpc;
 pub mod http;
 pub mod limits;
