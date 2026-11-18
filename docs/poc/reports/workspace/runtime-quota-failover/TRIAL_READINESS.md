@@ -23,3 +23,11 @@
 5. Claude 전송 0회, Codex 전송 최대 1회, 정지 유예 포함 120초, 과금 토큰 4,000, 캐시 읽기 20,000, 추가 USD 0. 코디네이터가 완료 단계·선행 시도와 실제 저장소 효과를 대조한 뒤 공유 잠금 아래 예산을 확보하고 전송 ID를 기록한다. 다음 미완료 단계만 보내고 같은 ID로 실제 사용량과 종료를 대조해야 통과다. 수락·효과·사용량·권한·과금이 불확실하거나 임계값에 걸리면 추가 전송과 재시도를 중단한다.
 
 별도 검증 항목은 지원되는 최신 Claude 신호를 이용한 무인 소진 감지, 양쪽 자연 소진 시 전송 0건, 한쪽 자연 회복 뒤 권한·예산·체크포인트를 다시 검증한 단일 재개다. 첫 시험은 운영자 관측을 입력으로 하는 단방향 시험으로 기록한다.
+
+## 스프린트 순서별 진행 기록
+
+- **원장 병합.** PR #94 head `1574beba289d33ad9a9ab96af05992cd0ca6f5c4`를 독립 검토에서 승인했고 [PR CI](https://github.com/HeaInSeo/ieo_poc/actions/runs/44290774396) 4/4가 통과했다. SHA 조건을 걸어 `3b1bd2bc48bf3dad14c05c10e2effa16a61d8b89`로 병합했다. [병합 SHA main CI](https://github.com/HeaInSeo/ieo_poc/actions/runs/44292115673) 4/4 통과.
+- **1. 역할 계정 및 권한.** 호스트 홈 없이 환경을 초기화하고 네트워크를 분리한 Bubblewrap에서 실행했다. Claude `auth status --json`은 `loggedIn=false`였고, Codex App Server `account/read`는 빈 계정, `account/rateLimits/read`는 인증 필요를 반환했다. 호스트 인증 상속이 차단됐음을 확인했다. Codex `config/read`에서 `read-only`, `approval_policy=never`, 웹 검색 비활성, 빈 MCP 설정, 셸 도구·플러그인 비활성을 확인했다. 도구 호출 없이 읽은 설정 값이다. 실제 시험 계정 지정과 로그인·워크스페이스·quota group 결합, 양쪽의 유효 도구 정책과 공급자 전용 egress 검증은 대기 중이다.
+- **2. 시간·토큰·호출 상한.** 기존 감독자 `run_guard` 28/28 통과. 로컬 시간 마감, 정지 유예, 자식 프로세스 종료, 관측 사용량 상한 및 미계측 차단을 확인했다. 설치된 Codex 0.169.1의 App Server 계약에는 `turn/interrupt`와 turn ID가 붙은 사용량 업데이트가 있다. 생성한 `TurnStartParams`와 `ThreadStartParams`에는 이 시험의 과금 토큰 4,000·캐시 읽기 20,000을 공급자 쪽에서 제한하는 필드가 없다. 사용량은 관측 뒤에 도착하므로 로컬에서 중단해도 이미 진행된 응답의 상한을 보장할 수 없다. `turn/start` 1회로 공급자 모델 요청 1회와 자동 재시도 0회를 보장하는 근거도 미확보 상태다. 상한과 반복 차단을 강제할 수 있는 지원 경로가 입증될 때까지 실제 시험을 보류한다. [App Server](https://learn.chatgpt.com/docs/app-server) · [설정 참조](https://learn.chatgpt.com/docs/config-file/config-reference)
+- **3. 공유 장부.** Bubblewrap을 켠 격리 DB 전환 시험을 2/2 재통과했다. 동일 전송 ID가 코디네이터 행, 잠금 보유 중의 `inflight.json`, 종결 기록에 유지되는 것을 확인했다. 모의 Codex에는 선행 단계의 전송 ID가 들어간 `VERIFY` 한 건만 보냈으며, 응답 유실 뒤 결과는 미계측으로 남겨 후속 전송을 막았다. 실제 App Server의 `threadId`·`turnId`를 전송 ID에 고정하고 최종 사용량과 종료·저장소 상태를 한 건으로 검산하는 어댑터 검증은 남아 있다. 런타임 사용량 이벤트만으로 최종 정산 근거를 확정하지 않는다.
+- **실제 호출 승인.** 시험 계정 지정을 요청했다. 계정 소유자에게만 보이는 항목은 자연 소진 시 Claude `/usage`와 크레딧 상태, Codex 워크스페이스의 유료 대체·자동 충전·크레딧 지출 권한이다. 실제 역할 계정의 새 자연 소진·가용성 관측과 각 계정의 추가 청구 USD 0 증거는 미확보다. 호출 0회. 02-05 단계 8 환경과 원장은 별도 유지한다.
