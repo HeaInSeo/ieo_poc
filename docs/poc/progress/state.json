@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0063-X-06-r1",
-  "snapshot_created_at": "2026-11-18T23:31:01+09:00",
-  "last_actual_work_observed_at": "2026-11-18T23:31:01+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0064-03-03-298053b-local",
+  "snapshot_created_at": "2026-11-18T23:45:12+09:00",
+  "last_actual_work_observed_at": "2026-11-18T23:45:12+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 검수 완료(fcf1060 main CI 4/4) · 03-02 검수 완료(#99, 28c8b40 main CI 4/4) · X-06 실측 PASS와 7dc0571 독립 검토 기록, 통합 후보 검수 중",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 검수 완료(fcf1060 main CI 4/4) · 03-02 검수 완료(#99, 28c8b40 main CI 4/4) · X-06 실측 PASS와 7dc0571 독립 검토 기록, 통합 후보 검수 중 · X-06 #100 병합(main CI·수용 대기) · 03-03 첫 반려 교정·격리 19/19",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -13,7 +13,7 @@
     "main_experiments": 31,
     "followup_candidates": 5
   },
-  "current_task": "03-02",
+  "current_task": "03-03",
   "next_task": "03-03",
   "tasks": [
     {
@@ -550,13 +550,20 @@
       "track": "main",
       "group": "핵심",
       "kind": "준비",
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
+      "status": "검수 중",
+      "last_observed_at": "2026-11-18T23:45:12+09:00",
+      "latest_report": "reports/tasks/03-03/go-rust-20261118/REPORT.md",
+      "result_state": "첫 사전 검토 지적 교정 · 최신 main에서 Go 12/12·Rust 7/7 · 최종 head 재검토 대기",
       "verification_level": "unverified",
-      "evidence": [],
-      "next_action": null
+      "evidence": [
+        "reports/tasks/03-03/go-rust-20261118/artifacts.sha256",
+        "reports/tasks/03-03/go-rust-20261118/evidence/isolation.txt",
+        "reports/tasks/03-03/go-rust-20261118/evidence/static-verification.txt",
+        "reports/tasks/03-03/go-rust-20261118/evidence/review1-rerun/isolation.txt",
+        "reports/tasks/03-03/go-rust-20261118/evidence/review1-rerun/go-format-tool-error.stderr"
+      ],
+      "next_action": "중앙에 최종 로컬 head 인계 후 독립 재검토와 PR 조건 확인",
+      "unresolved": "독립 재검토 및 PR CI·병합, 후속 P25와 07-01의 다른 스택 적합성 검증 대기."
     },
     {
       "task_id": "03-04",
@@ -3140,12 +3147,49 @@
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/44323337281",
         "reports/extra/X-06/REPORT.md"
       ]
+    },
+    {
+      "event_id": "03-03-CANDIDATE-20261118",
+      "event_revision": 1,
+      "task_id": "03-03",
+      "observed_at": "2026-11-18T23:38:52+09:00",
+      "state": "03-02 검수 뒤 작업 착수. Go 11/11·Rust 7/7 격리 대조. 산출물 dd5ec3b0f17173f449ec487fbed0e3a7c71c2d3f.",
+      "evidence": [
+        "reports/tasks/03-03/go-rust-20261118/artifacts.sha256",
+        "reports/tasks/03-03/go-rust-20261118/evidence/isolation.txt",
+        "reports/tasks/03-03/go-rust-20261118/evidence/static-verification.txt"
+      ]
+    },
+    {
+      "event_id": "X-06-PR100-MERGED-PENDING-MAIN-CI-20261118",
+      "event_revision": 1,
+      "task_id": "X-06",
+      "observed_at": "2026-11-18T23:45:12+09:00",
+      "state": "PR #100 승인 head b25b24e PR CI 4/4 및 조건부 병합 298053b. 해당 main CI·담당 수용 변경 대기.",
+      "evidence": [
+        "https://github.com/HeaInSeo/ieo_poc/pull/100",
+        "https://github.com/HeaInSeo/ieo_poc/commit/b25b24e05ca36d128093d328996d722409930489",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44325388603",
+        "https://github.com/HeaInSeo/ieo_poc/commit/298053bba4156342da0ae008a381f12417c72f1b",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44326951060"
+      ]
+    },
+    {
+      "event_id": "03-03-PREVIEW1-CORRECTED-20261118",
+      "event_revision": 1,
+      "task_id": "03-03",
+      "observed_at": "2026-11-18T23:45:12+09:00",
+      "state": "첫 독립 검토 dd5ec3b 반려. gofmt 도구 오류 exit2와 stderr가 보존되도록 교정. 298053b 통합 뒤 19/19. 산출물 f2948c7bfa8e300c969573222f553b3c8b838c78.",
+      "evidence": [
+        "reports/tasks/03-03/go-rust-20261118/evidence/review1-rerun/isolation.txt",
+        "reports/tasks/03-03/go-rust-20261118/evidence/review1-rerun/go-format-tool-error.stderr"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "03-01·X-05·09-01 검수 완료 · 03-02 #99 검수 완료(28c8b40 main CI 4/4) · X-06 실측 PASS, 7dc0571 독립 승인 이력, PR #100 독립 반려 교정 후보",
-    "workspace": "/tmp/ieo-x06-kind-coord",
-    "branch_sha": "task/x06-kind-coord · 기준 28c8b40 · 이전 독립 승인 7dc0571",
+    "last_verified_stage": "03-02·09-01·X-05 검수 완료 · X-06 병합(main CI·수용 대기) · 03-03 격리 19/19",
+    "workspace": "/tmp/ieo-poc-0303",
+    "branch_sha": "task/0303-go-rust · 기준 298053bba4156342da0ae008a381f12417c72f1b · 교정 산출물 f2948c7bfa8e300c969573222f553b3c8b838c78",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 18(단계 8 전 PR, 이 PR) · OpenAPI 0.17.1(이 PR)",
     "running": "이 작업 트리의 모델 요청·운영 서비스 변경 없음",
     "unresolved_external_effects": [],
@@ -3203,12 +3247,13 @@
       "reports/tasks/09-01/result-export-20261118/REPORT.md",
       "reports/tasks/09-01/result-export-20261118/ACCEPTANCE.md",
       "reports/extra/X-06/REPORT.md",
-      "reports/tasks/03-02/common-policy-20261118/ACCEPTANCE.md"
+      "reports/tasks/03-02/common-policy-20261118/ACCEPTANCE.md",
+      "reports/tasks/03-03/go-rust-20261118/REPORT.md"
     ],
-    "pending_index_updates": "03-02·09-01 수용 및 X-06 실측·독립 검토 이력 원장 후보 생성. 중앙 게시 대기.",
-    "next_action": "PR #100 교정 head의 독립 재검토·PR CI·승인 head 조건 병합·병합 SHA main CI 확인. 03-03 Go·Rust 상세 정책과 09-02 독립 판정은 별도 담당에 인계.",
+    "pending_index_updates": "최신 main 원장에 03-03 교정 근거를 로컬 반영. 중앙 PR 제출 대기.",
+    "next_action": "중앙에서 03-03 최종 head 독립 재검토. X-06은 main CI와 담당 수용 변경을 별도 대조.",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다.",
-    "current_work": "PR #100 원장 정합성 반려 교정 및 03-02 수용 통합, 중앙 게시 대기",
+    "current_work": "03-03 사전 검토 첫 지적 교정, 최신 main 기반 최종 후보 로컬 인계",
     "blocking": "X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다. 02-06은 02-05 검수 완료가 선행. 실제 failover 첫 시험은 WAITING_FOR_PREREQUISITE.",
     "budget": "02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 검수 완료와 X-02 남은 조건 뒤에만 · 02-05 실제 회차 예산(사용자 결정 2026-11-15 (나)): 계획 3회(개발 R1·R2, Guardrail G1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, USD 0, 예산 검사는 컨테이너 밖. 단계 8에만, X-08 검수 완료와 예산 코드 PR 뒤 · 02-05 예산 코드(BUDGET_0205)와 예비 표식 규칙(사용자 결정 2026-11-17)은 이 PR. 코드에 있어도 실제 호출은 단계 8 전제 뒤에만",
     "user_decisions": [
@@ -3394,9 +3439,9 @@
         "X-05"
       ],
       "status": "검수 중",
-      "last_observed_at": "2026-11-18T23:24:44+09:00",
+      "last_observed_at": "2026-11-18T23:45:12+09:00",
       "latest_report": "reports/extra/X-06/REPORT.md",
-      "result_state": "동결 기준 e95bd8e. 실제 ieo-coord와 전용 PostgreSQL의 기본 kind 3노드 실측 PASS. HTTP/gRPC 157/157, 요청별 상태 차이 0, 중복 배정 거부, 옛 세대 보존 및 현재 판정 제외, 기한 만료 롤백, 커밋 응답 유실 뒤 키 조회·명시 재요청 1회와 최종 행 1건. 시험 head a870b4b, 증거 및 픽스처 head 7dc0571 독립 승인. 최신 main 28c8b40 통합 후 승인 산출물 15/15 동일. 현재 후보의 독립 검토와 X-06 자체 PR·CI 절차 대기.",
+      "result_state": "동결 기준 e95bd8e. 실제 ieo-coord와 전용 PostgreSQL의 기본 kind 3노드 실측 PASS. HTTP/gRPC 157/157, 요청별 상태 차이 0, 중복 배정 거부, 옛 세대 보존 및 현재 판정 제외, 기한 만료 롤백, 커밋 응답 유실 뒤 키 조회·명시 재요청 1회와 최종 행 1건. 시험 head a870b4b, 증거 및 픽스처 head 7dc0571 독립 승인. 최신 main 28c8b40 통합 후 승인 산출물 15/15 동일. PR #100 독립 승인 및 PR CI 4/4, SHA 조건 병합 298053b. 해당 main CI 결과 및 담당 수용 변경 대기.",
       "verification_level": "unverified",
       "evidence": [
         "reports/extra/X-06/REPORT.md",
@@ -3404,10 +3449,15 @@
         "reports/extra/X-06/evidence/kind-pass.tar.gz",
         "reports/extra/X-06/evidence/kind-summary.json",
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321595437",
-        "https://github.com/HeaInSeo/ieo_poc/commit/7dc05718eeb2fb99db559f66b9493e2e1d33947d"
+        "https://github.com/HeaInSeo/ieo_poc/commit/7dc05718eeb2fb99db559f66b9493e2e1d33947d",
+        "https://github.com/HeaInSeo/ieo_poc/pull/100",
+        "https://github.com/HeaInSeo/ieo_poc/commit/b25b24e05ca36d128093d328996d722409930489",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44325388603",
+        "https://github.com/HeaInSeo/ieo_poc/commit/298053bba4156342da0ae008a381f12417c72f1b",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44326951060"
       ],
-      "next_action": "통합 head 독립 검토 → X-06 PR CI → 승인 head 조건 병합 → 해당 SHA main CI 확인",
-      "unresolved": "제품 단항과 DB 상태를 검증했다. X-06의 PR CI·조건 병합·병합 SHA main CI와 수용 기록이 남아 있다."
+      "next_action": "병합 SHA main CI와 담당자의 수용 기록을 대조",
+      "unresolved": "298053b의 main CI 통과와 담당 수용 근거 확인 대기."
     },
     {
       "task_id": "X-07",
