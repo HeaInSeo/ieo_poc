@@ -1,0 +1,76 @@
+{
+  "verdict": "PASS",
+  "control": {
+    "08fe9aaa-b29e-4ef2-8590-27c57d6ff175": 30
+  },
+  "proxy": "10.96.227.17:50051",
+  "stages": {
+    "initial": {
+      "counts": {
+        "probe-7cd5b76fdf-mfq27": 150,
+        "probe-7cd5b76fdf-jpcmd": 150
+      },
+      "socket": "10.244.3.132:59512",
+      "issue_span_ms": 29900,
+      "last_result_ms": 29902
+    },
+    "scale": {
+      "counts": {
+        "probe-7cd5b76fdf-jpcmd": 100,
+        "probe-7cd5b76fdf-mfq27": 100,
+        "probe-7cd5b76fdf-xstn2": 100
+      },
+      "socket": "10.244.3.132:59512",
+      "issue_span_ms": 29901,
+      "last_result_ms": 29903,
+      "max_success_gap_ms": 119,
+      "transition_errors": 0,
+      "converged_ms": 1201
+    },
+    "stream-replacement": {
+      "counts": {
+        "probe-7cd5b76fdf-xstn2": 100,
+        "probe-7cd5b76fdf-jt8m8": 100,
+        "probe-7cd5b76fdf-mfq27": 100
+      },
+      "socket": "10.244.3.132:59512",
+      "issue_span_ms": 29900,
+      "last_result_ms": 29902,
+      "max_success_gap_ms": 198,
+      "transition_errors": 1,
+      "converged_ms": 3282
+    },
+    "rollout": {
+      "counts": {
+        "probe-787bc54766-n975q": 100,
+        "probe-787bc54766-qjl27": 100,
+        "probe-787bc54766-9qxkh": 100
+      },
+      "socket": "10.244.3.132:59512",
+      "issue_span_ms": 29899,
+      "last_result_ms": 29902,
+      "max_success_gap_ms": 299,
+      "transition_errors": 5,
+      "converged_ms": 4073
+    },
+    "unary-replacement": {
+      "counts": {
+        "probe-787bc54766-9qxkh": 100,
+        "probe-787bc54766-sdfbp": 100,
+        "probe-787bc54766-qjl27": 100
+      },
+      "socket": "10.244.3.132:59512",
+      "issue_span_ms": 29900,
+      "last_result_ms": 29902,
+      "max_success_gap_ms": 103,
+      "transition_errors": 0,
+      "converged_ms": 2320
+    }
+  },
+  "watch_break_ms": 2091,
+  "watch_resumed_from": 14,
+  "watch_resume_five_ms": 1003,
+  "unary_break_ms": 2094,
+  "unary_reissue_ms": 3,
+  "explicit_reissues": 1
+}

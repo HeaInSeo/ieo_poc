@@ -1,0 +1,27 @@
+fd8ee99f5003e221e43c15287dfc0824ed5f941e7545eb01a256b27f8b1cbc65  /tmp/ieo-0305-pr103-main-attempt1-failed.log
+4b7762a268f9ce18f879b350580270b5a38184cc47e774e63f3499c4c03474b7  /tmp/ieo-0305-settlement-diagnostic.714Fh2hG/trace-14.txt
+e74d1b38515976843f7f57ceb6feeaa903cb62b8f9fe90c67e962db511207c4a  /tmp/ieo-0305-settlement-diagnostic.714Fh2hG/trace-failed-14.log
+
+GitHub attempt 1 cargo test, original excerpt
+rust fmt clippy test	cargo test	2026-11-18T21:52:44.5938601Z thread 'not_enough_evidence_writes_nothing' (20324) panicked at crates/ieo-supervisor/tests/settlement.rs:605:5:
+rust fmt clippy test	cargo test	2026-11-18T21:52:44.5939261Z assertion failed: settle(&l, false).expect_err("inflight").contains("in flight")
+rust fmt clippy test	cargo test	2026-11-18T21:52:44.5941140Z test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+Local trace with 20ms execve delay, filtered from trace-14.txt
+785621 1795039028.738741 flock(4</tmp/ieo-0305-settlement-diagnostic.714Fh2hG/test-tmp/ieo-settle-noargs-785601-1795039028732852495/ledger/caller.lock>, LOCK_EX|LOCK_NB) = 0
+785633 1795039028.739991 clone(child_stack=0x7f86f6e8eff0, flags=CLONE_VM|CLONE_VFORK|SIGCHLD <unfinished ...>
+785621 1795039028.741236 close(4</tmp/ieo-0305-settlement-diagnostic.714Fh2hG/test-tmp/ieo-settle-noargs-785601-1795039028732852495/ledger/caller.lock> <unfinished ...>
+785621 1795039028.742576 openat(AT_FDCWD</tmp/ieo-poc-0305-accepted>, "/tmp/ieo-0305-settlement-diagnostic.714Fh2hG/test-tmp/ieo-settle-noargs-785601-1795039028732852495/ledger/inflight.json", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 4</tmp/ieo-0305-settlement-diagnostic.714Fh2hG/test-tmp/ieo-settle-noargs-785601-1795039028732852495/ledger/inflight.json>
+785621 1795039028.742979 flock(4</tmp/ieo-0305-settlement-diagnostic.714Fh2hG/test-tmp/ieo-settle-noargs-785601-1795039028732852495/ledger/caller.lock>, LOCK_EX|LOCK_NB) = -1 EAGAIN (Resource temporarily unavailable)
+785646 1795039028.743470 execve("/tmp/ieo-0305-settlement-diagnostic.714Fh2hG/target/debug/ieo-role-call", ["/tmp/ieo-0305-settlement-diagnos"..., "records", "--plan", "/tmp/ieo-0305-settlement-diagnos"...], 0x7f86e0007e80 /* 86 vars */ <unfinished ...>
+785633 1795039028.763615 <... clone resumed>) = 785646
+785646 1795039028.763702 <... execve resumed>) = 0 (DELAYED)
+inflight refused with "another caller holds the ledger"; records=1; marker=true
+
+Local control and serial result
+held lock: refused; after release inflight: refused; ledger bytes and marker unchanged; children absent
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+serial suite 50/50
+
+Local untraced parallel repetitions
+{0: 585, 101: 15}

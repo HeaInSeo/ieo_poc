@@ -11,8 +11,14 @@ use std::{env, error::Error, future::pending};
 async fn main() -> Result<(), Box<dyn Error>> {
     match env::args().nth(1).as_deref() {
         Some("server") => server::serve().await,
-        Some("client") => client::run().await,
+        Some("client") => client::run(None).await,
+        Some("client-vip") => {
+            let host = env::args()
+                .nth(2)
+                .ok_or("client-vip requires a Service hostname")?;
+            client::run(Some(host)).await
+        }
         Some("idle") => pending().await,
-        _ => Err("usage: ieo-x05-probe server|client|idle".into()),
+        _ => Err("usage: ieo-x05-probe server|client|client-vip HOST|idle".into()),
     }
 }
