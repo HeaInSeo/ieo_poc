@@ -1,0 +1,33 @@
+PASS N1 initial separate counts
+PASS N1 no extra milestone or P15 rows
+PASS N2 task and experiment counts independent
+PASS N2 transition remains unverified
+PASS N3 repeated render stable
+PASS N2 no evidence rejected rc=1
+PASS N2 empty evidence object rejected rc=1
+PASS N3 duplicate task rejected rc=1
+PASS N3 duplicate run rejected rc=1
+PASS N3 changed denominator alone rejected rc=1
+PASS N3 changed denominator with matching row removal rejected rc=1
+PASS N3 unknown same-count replacement rejected rc=1
+PASS N4 forced process exit leaves mixed snapshots
+PASS N4 regeneration byte-exact and inputs unchanged
+PASS N5 missing report rejected
+PASS N5 unreadable existing report rejected rc=1
+PASS N1 exporter historical denominator separate
+PASS P1 adoption and partial scope
+PASS P2 verdict split
+PASS P3 optional rejection and unresolved required work
+PASS P4 invalid provenance cannot integrate
+PASS P5 family budget stops retry
+PASS P6 stale scope remains unproven independently of base
+PASS P8 draft without approval or execution
+PASS P8 same input same package bytes
+PASS P8 changed target creates a new draft and preserves prior bytes ['90-01', '90-07']
+PASS P7 omitted required work remains unready
+PASS N3 exporter rejects row and denominator
+PASS N3 exporter rejects unknown same-count ID
+PASS P7 cycle rejected [{"code": "DEPENDENCY_CYCLE", "correction": "순환의 한 간선을 제거하거나 작업을 나누세요.", "field": "tasks[0].prerequisites", "message": "선행 관계가 순환합니다: 90-01 → 90-01", "retryable_after_edit": true}]
+PASS P7 absent prerequisite rejected [{"code": "UNDEFINED_PREREQUISITE", "correction": "등록된 작업 ID·계획 버전으로 고치거나 선행 명세를 먼저 등록하세요.", "field": "tasks[0].prerequisites[0].task_id", "message": "선행 작업 99-99(v1.3.3)이(가) 이 명세에도 등록 목록에도 없습니다.", "retryable_after_edit": true}]
+PASS P7 duplicated result rejected duplicate run revision: ('v1.3.3', '08-01', 'SIM-runtime', 'base')/1
+RESULT 32/32

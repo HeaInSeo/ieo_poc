@@ -1,0 +1,8 @@
+{
+  "run_id": "P33-09-02-SYNTHETIC-01",
+  "revision": 1,
+  "execution_kind": "synthetic",
+  "verdict": "FAIL",
+  "checks": "28/32",
+  "latest_report": "reports/tasks/09-02/p33-synthetic/REPORT.md"
+}

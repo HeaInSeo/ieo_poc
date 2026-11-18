@@ -1,0 +1,11 @@
+{
+  "run_id": "P33-09-02-SYNTHETIC-02",
+  "revision": 1,
+  "execution_kind": "synthetic",
+  "verdict": "PASS",
+  "checks": "32/32",
+  "candidate_sha": "043546583aa46bf038f51122fc5dbe166d4bbc97",
+  "base_recheck": "28/32",
+  "prior_run_id": "P33-09-02-SYNTHETIC-01",
+  "latest_report": "reports/tasks/09-02/independent-retest/REPORT.md"
+}
