@@ -272,6 +272,58 @@ echo '{"code":"ROLE_STATUS_FAILED"}' > "$ROLES"
 bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1-quota-refused.log" 2>&1; rc=$?
 [ $rc = 3 ] && grep -q "quota group mismatches must be an empty list" "$OUT/r2g1-quota-refused.log" && [ ! -e "$OUT/r2-body.json" ]; ok $? "r2g1 refuses without quota evidence: nothing sent (exit $rc)"
 mv -f "$ROLES.kept" "$ROLES"
+# Count successor POSTs at the transport and alter only the fresh status response.
+# G1 cases replay the already accepted R2 request using its original key and body.
+cat > "$W/mock-bin/curl" <<'PYTHON'
+#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+args = sys.argv[1:]
+successor = os.environ["SUCCESSOR"]
+key = "Idempotency-Key: s8-dlv-" + successor[3:] + "-0001"
+if key in args and "POST" in args:
+    with open(os.environ["POSTS"], "a") as log:
+        print(successor, file=log)
+result = subprocess.run([os.environ["REAL_CURL"], *args])
+if result.returncode == 0 and "-o" in args:
+    response = Path(args[args.index("-o") + 1])
+    if response.name == f"status-before-{successor}.json":
+        assert args[-1] == f"http://127.0.0.1:{os.environ['PORT_DEV']}/v0/role/status"
+        status = json.loads(response.read_text())
+        assert status["running"] is None
+        assert status["last"]["attempt_id"] == os.environ["PREDECESSOR"]
+        fault = os.environ["FAULT"]
+        if fault == "busy":
+            status["running"] = {"attempt_id": "other"}
+        elif fault == "wrong-last":
+            status["last"]["attempt_id"] = "other"
+        else:
+            assert fault == "missing-running"
+            del status["running"]
+        response.write_text(json.dumps(status))
+sys.exit(result.returncode)
+PYTHON
+for transition in s8-r2 s8-g1; do
+  predecessor=s8-r1b
+  [ "$transition" = s8-g1 ] && predecessor=s8-r2
+  for fault in busy wrong-last missing-running; do
+    probe="$OUT/fresh-$transition-$fault"
+    : > "$probe.posts"
+    PATH="$W/mock-bin:$PATH" SUCCESSOR="$transition" PREDECESSOR="$predecessor" FAULT="$fault" POSTS="$probe.posts" \
+      bash "$L/run-step8-resume.sh" r2g1 > "$probe.log" 2>&1
+    rc=$?
+    expected='fresh role status must have explicit running: null'
+    [ "$fault" = wrong-last ] && expected="fresh role status last.attempt_id must equal $predecessor"
+    [ "$rc" = 3 ] && grep -Fxq "$expected" "$probe.log" && [ ! -s "$probe.posts" ] \
+      && python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["running"] is None and d["last"]["attempt_id"] == sys.argv[2]' \
+        "$OUT/status-$predecessor.json" "$predecessor"
+    ok $? "$predecessor -> $transition: saved status valid, fresh $fault, successor POSTs $(wc -l < "$probe.posts")"
+  done
+done
 bash "$L/run-step8-resume.sh" r2g1 > "$OUT/r2g1.log" 2>&1; ok $? "r2g1: $(tail -1 "$OUT/r2g1.log")"
 grep -q "s8-r2: observation = s8-r1b's stream" "$OUT/r2g1.log" && grep -q "s8-g1: observation = s8-r2's stream" "$OUT/r2g1.log"; ok $? "the observation deadline is checked against the newest stream before R2 (s8-r1b) and G1 (s8-r2)"
 # the old check (raw ledger lines) would count s8-r1's original line as unmeasured; the effective records do not

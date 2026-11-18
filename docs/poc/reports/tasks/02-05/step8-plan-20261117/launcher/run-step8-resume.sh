@@ -67,13 +67,34 @@ after() { # tag role assignment attempt port
   effective || stop "$att: the ledger's effective records do not read"
   python3 -I "$HERE/check-run.py" "$LEDGER" "$OUT" "$att" "$role" "$aid" || stop "$att: a run check failed (above)"
 }
-run_one() { # tag role assignment attempt key port decision op prompt-file
-  local tag=$1 role=$2 aid=$3 att=$4 key=$5 port=$6 dec=$7 op=$8 pf=$9 sid st got
+# Both predecessors ran on the development role. Keep the fresh response separate from
+# the evidence saved by after(), so a later change in role status is visible.
+require_completed_development_run() {
+  local prev=$1 next=$2 response="$OUT/status-before-$2.json" code
+  code=$(curl -fsS --max-time 5 -o "$response" -w '%{http_code}' -H @"$ADAPTER_HEADER" \
+    "http://127.0.0.1:$PORT_DEV/v0/role/status") || stop "$next: fresh role status request failed"
+  [ "$code" = 200 ] || stop "$next: fresh role status answered HTTP $code"
+  python3 -I - "$response" "$prev" <<'PYTHON' || stop "$next: fresh role status does not confirm completion of $prev"
+import json
+import sys
+
+with open(sys.argv[1]) as evidence:
+    status = json.load(evidence)
+if not isinstance(status, dict) or "running" not in status or status["running"] is not None:
+    sys.exit("fresh role status must have explicit running: null")
+last = status.get("last")
+if not isinstance(last, dict) or last.get("attempt_id") != sys.argv[2]:
+    sys.exit(f"fresh role status last.attempt_id must equal {sys.argv[2]}")
+PYTHON
+}
+run_one() { # tag role assignment attempt key port decision op prompt-file predecessor
+  local tag=$1 role=$2 aid=$3 att=$4 key=$5 port=$6 dec=$7 op=$8 pf=$9 prev=${10} sid st got
   if [ -e "$OUT/$tag-body.json" ]; then sid=$(python3 -I -c "import json,sys; print(json.load(open(sys.argv[1]))['session_id'])" "$OUT/$tag-body.json")
   else sid=$(cat /proc/sys/kernel/random/uuid); fi
   [[ "$sid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || stop "$att: session id is not a lowercase UUID"
   [ -e "$OUT/$tag-body.json" ] || python3 -I -c "import json,sys; a=sys.argv; json.dump({'assignment_id': a[1], 'generation': 0, 'attempt_id': a[2], 'session_id': a[3], 'prompt': open(a[4]).read().strip()}, open(a[5], 'w'))" \
     "$aid" "$att" "$sid" "$pf" "$OUT/$tag-body.json"
+  require_completed_development_run "$prev" "$att"
   st=$(req "$tag" s8-operator POST "/v0/repos/$REPO_ID/roles/$role/deliveries" "$OUT/$tag-body.json" "$key")
   got=$(j "$tag" "(d['result']['decision'], d['result']['op'], d['result']['outcome'])" 2>/dev/null)
   { [ "$st" = 201 ] || [ "$st" = 200 ]; } && [ "$got" = "('$dec', '$op', 'accepted')" ] || stop "$att: delivery answered $st $got: $(head -c 600 "$OUT/$tag.json")"
@@ -200,10 +221,10 @@ r2g1)
   python3 -I "$HERE/check-run.py" "$LEDGER" "$OUT" s8-r1b development S8-DEV-A1 || stop "s8-r1b: a run check fails: no R2 (above)"
   spare_check
   deadline s8-r2
-  run_one r2 development S8-DEV-A1 s8-r2 s8-dlv-r2-0001 "$PORT_DEV" resume_allowed reconnect "$PROMPTS/R2.txt"
+  run_one r2 development S8-DEV-A1 s8-r2 s8-dlv-r2-0001 "$PORT_DEV" resume_allowed reconnect "$PROMPTS/R2.txt" s8-r1b
   python3 -I "$HERE/check-run.py" --g1-prompt "$LEDGER" "$PROMPTS/G1-head.txt" "$OUT/G1.txt" || stop "G1 prompt (above)"
   deadline s8-g1
-  run_one g1 guardrail S8-GR-A1 s8-g1 s8-dlv-g1-0001 "$PORT_GR" no_checkpoint start "$OUT/G1.txt"
+  run_one g1 guardrail S8-GR-A1 s8-g1 s8-dlv-g1-0001 "$PORT_GR" no_checkpoint start "$OUT/G1.txt" s8-r2
   echo "R1b, R2 and G1 recorded and checked"
   ;;
 *) stop "unknown phase $PHASE";;
