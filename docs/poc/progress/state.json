@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0059-03-01-r3",
-  "snapshot_created_at": "2026-11-18T21:06:07+09:00",
-  "last_actual_work_observed_at": "2026-11-18T21:06:07+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0060-03-02",
+  "snapshot_created_at": "2026-11-18T21:22:33+09:00",
+  "last_actual_work_observed_at": "2026-11-18T21:22:33+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -13,7 +13,7 @@
     "main_experiments": 31,
     "followup_candidates": 5
   },
-  "current_task": "03-01",
+  "current_task": "03-02",
   "next_task": "03-02",
   "tasks": [
     {
@@ -495,20 +495,25 @@
       "track": "main",
       "group": "핵심",
       "kind": "설계",
-      "status": "검수 중",
-      "last_observed_at": "2026-11-18T21:06:07+09:00",
-      "latest_report": "reports/tasks/03-01/catalog-contract-20261118/REPORT.md",
-      "result_state": "독립 검토 2차 반려 교정 · 표적 시험 13/13 · 재검토 대기",
-      "verification_level": "unverified",
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-18T21:22:33+09:00",
+      "latest_report": "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
+      "result_state": "PASS · 계약 v0.1.0 · 표적 시험 13/13 · 독립 승인 및 main CI",
+      "verification_level": "verified",
       "evidence": [
         "reports/tasks/03-01/catalog-contract-20261118/artifacts.sha256",
         "reports/tasks/03-01/catalog-contract-20261118/verification.txt",
         "https://github.com/HeaInSeo/ieo_poc/commit/33f4503634f54c6e7d4b61dd54db115fd22431c6",
         "https://github.com/HeaInSeo/ieo_poc/commit/ea2b777411b48bcd3a2fc7ba0595f91142a6e32b",
         "https://github.com/HeaInSeo/ieo_poc/commit/c3553cbe5e5b2b7b54ea4eb19b629e585ab7bb8c",
-        "https://github.com/HeaInSeo/ieo_poc/commit/bedd4d95463c7c77e54a339ad946266d2b312d65"
+        "https://github.com/HeaInSeo/ieo_poc/commit/bedd4d95463c7c77e54a339ad946266d2b312d65",
+        "https://github.com/HeaInSeo/ieo_poc/pull/96",
+        "https://github.com/HeaInSeo/ieo_poc/commit/e215c4bf79e92267d8690e1432eda25667e9ce43",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44300730785",
+        "https://github.com/HeaInSeo/ieo_poc/commit/a7d386b4a851a6fc28bc9e904dc327538e842b98",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44301972127"
       ],
-      "next_action": "독립 검토 및 PR CI → 승인 SHA 조건 병합 → 병합 SHA main CI → 03-02"
+      "next_action": "03-02 공통 정책·역할·GitHub 기준 문서 작성에 인계"
     },
     {
       "task_id": "03-02",
@@ -516,13 +521,16 @@
       "track": "main",
       "group": "핵심",
       "kind": "준비",
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
+      "status": "준비됨",
+      "last_observed_at": "2026-11-18T21:22:33+09:00",
+      "latest_report": "reports/tasks/03-02/common-policy-20261118/REPORT.md",
       "result_state": "미실행",
       "verification_level": "unverified",
-      "evidence": [],
-      "next_action": null,
+      "evidence": [
+        "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
+        "reports/tasks/03-02/common-policy-20261118/REPORT.md"
+      ],
+      "next_action": "재사용 원본으로 공통과 저장소 전용 정책을 작성하고 근거를 대조",
       "unresolved": "런타임 계약 rev 6 §10 항목 1(Edit(//path) 표기, Write( 미사용)·항목 6(개발 Bash 허용 목록은 경계 아님)을 정책 문서에 반영"
     },
     {
@@ -2938,12 +2946,38 @@
         "https://github.com/HeaInSeo/ieo_poc/commit/c3553cbe5e5b2b7b54ea4eb19b629e585ab7bb8c",
         "https://github.com/HeaInSeo/ieo_poc/commit/bedd4d95463c7c77e54a339ad946266d2b312d65"
       ]
+    },
+    {
+      "event_id": "03-01-ACCEPTED-20261118",
+      "event_revision": 1,
+      "task_id": "03-01",
+      "observed_at": "2026-11-18T21:22:33+09:00",
+      "state": "독립 승인 e215c4b·PR CI 4/4, head 조건 병합 a7d386b·main CI 4/4. 검수 완료.",
+      "evidence": [
+        "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/96",
+        "https://github.com/HeaInSeo/ieo_poc/commit/e215c4bf79e92267d8690e1432eda25667e9ce43",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44300730785",
+        "https://github.com/HeaInSeo/ieo_poc/commit/a7d386b4a851a6fc28bc9e904dc327538e842b98",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44301972127"
+      ]
+    },
+    {
+      "event_id": "03-02-PREPARED-20261118",
+      "event_revision": 1,
+      "task_id": "03-02",
+      "observed_at": "2026-11-18T21:22:33+09:00",
+      "state": "03-01 검수 완료 확인. 기존 원본과 작성 범위·기대 증거 연결.",
+      "evidence": [
+        "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
+        "reports/tasks/03-02/common-policy-20261118/REPORT.md"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "03-01 2차 교정: 6개 항목·9개 원본·표적 시험 13/13",
+    "last_verified_stage": "03-01 검수 완료 · 승인 head 및 병합 SHA CI 각 4/4",
     "workspace": "/opt/rust/src/github.com/HeaInSeo/ieo_poc-0301",
-    "branch_sha": "task/0301-catalog-contract · 교정 산출물 bedd4d95463c7c77e54a339ad946266d2b312d65",
+    "branch_sha": "task/0302-common-policy · 03-01 승인/병합 e215c4bf79e92267d8690e1432eda25667e9ce43 / a7d386b4a851a6fc28bc9e904dc327538e842b98",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 18(단계 8 전 PR, 이 PR) · OpenAPI 0.17.1(이 PR)",
     "running": "이 작업 트리의 모델 요청·운영 서비스 변경 없음",
     "unresolved_external_effects": [],
@@ -2994,13 +3028,15 @@
       "reports/tasks/02-05/pre-step8-20261117/REPORT.md",
       "reports/tasks/02-05/step8-runbook-20261117/RUNBOOK.md",
       "reports/tasks/02-05/step8-plan-20261117/EXECUTION_PLAN.md",
-      "reports/tasks/03-01/catalog-contract-20261118/REPORT.md"
+      "reports/tasks/03-01/catalog-contract-20261118/REPORT.md",
+      "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
+      "reports/tasks/03-02/common-policy-20261118/REPORT.md"
     ],
-    "pending_index_updates": "없음",
-    "next_action": "03-01 정확한 head 독립 검토와 필수 검사 → SHA 조건 병합 → 병합 SHA main CI → 03-02 준비",
+    "pending_index_updates": "로컬 원장 갱신·검증. 다음 03-02 변경과 함께 최신 main 기준으로 반영",
+    "next_action": "03-02 공통/저장소 전용 정책 상세 작성·대조·독립 검토",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다.",
-    "current_work": "03-01 독립 검토 및 CI. X-05 별도 작업 트리와 병행",
-    "blocking": "X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다. 02-06은 02-05 검수 완료가 선행. 실제 failover 첫 시험은 WAITING_FOR_PREREQUISITE. 03-01을 병행한다.",
+    "current_work": "03-02 원본·범위 준비. X-05 별도 작업 트리 병행",
+    "blocking": "X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다. 02-06은 02-05 검수 완료가 선행. 실제 failover 첫 시험은 WAITING_FOR_PREREQUISITE. 03-02 자료 준비는 병행한다.",
     "budget": "02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 검수 완료와 X-02 남은 조건 뒤에만 · 02-05 실제 회차 예산(사용자 결정 2026-11-15 (나)): 계획 3회(개발 R1·R2, Guardrail G1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, USD 0, 예산 검사는 컨테이너 밖. 단계 8에만, X-08 검수 완료와 예산 코드 PR 뒤 · 02-05 예산 코드(BUDGET_0205)와 예비 표식 규칙(사용자 결정 2026-11-17)은 이 PR. 코드에 있어도 실제 호출은 단계 8 전제 뒤에만",
     "user_decisions": [
       "User_Decisions_2026-11-17_step8-l01.md (단계 8 L01 값: 개발 1,800초·150,000, Guardrail 600초·50,000. 실행안·묶음 승인 요청 작성. 예비는 건별)",
