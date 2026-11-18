@@ -4146,6 +4146,18 @@ fn report_checkpoint(tx: &mut Transaction, who: &Caller, repo: &str, role: &str,
     // a takeover answers a delivery of this assignment and generation (02-05 step 4): a
     // request alone is never a takeover, and a takeover without a delivery is refused
     if phase == "takeover" {
+        if let Some(expected) = cp.get("expected_checkpoint_sha256") {
+            let stored = latest
+                .as_ref()
+                .map_or(&Value::Null, |l| &l["checkpoint_sha256"]);
+            if expected != stored {
+                return Err(problem(
+                    409,
+                    "CHECKPOINT_MISMATCH",
+                    "the predecessor changed after this delivery was authorized",
+                ));
+            }
+        }
         check_delivery(
             tx,
             repo,

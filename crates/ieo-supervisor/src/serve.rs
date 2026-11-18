@@ -296,6 +296,22 @@ fn err(status: u16, code: &str, message: &str) -> Response {
     resp(status, json!({"code": code, "message": message}))
 }
 
+fn checkpoint_digest(raw: &std::io::Result<Vec<u8>>) -> Option<Value> {
+    match raw {
+        Ok(bytes) => Some(json!(crate::central::sha256(bytes))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(Value::Null),
+        Err(_) => None,
+    }
+}
+
+fn changed_checkpoint() -> Response {
+    err(
+        409,
+        "EXTERNAL_RECONCILIATION_REQUIRED",
+        "the local checkpoint changed after the coordinator authorized this delivery",
+    )
+}
+
 /// The stream-json user message carrying `prompt`.
 pub fn prompt_message(prompt: &str) -> Vec<u8> {
     let mut v = serde_json::to_vec(&json!({"type": "user", "message": {"role": "user",
@@ -459,6 +475,10 @@ impl Service {
             let _ = crate::central::durable_write(&crate::central::archive_path(&archive, n), &raw);
         }
         Some(raw)
+    }
+
+    fn checkpoint_matches(&self, pin: &Value) -> bool {
+        checkpoint_digest(&std::fs::read(self.cfg.checkpoint_path())).as_ref() == Some(pin)
     }
 
     fn authorized(&self, bearer: Option<&str>) -> bool {
@@ -810,22 +830,18 @@ impl Service {
         // the central record first (§2.1, §5-2): the local checkpoint must match the
         // coordinator's latest one (missing reports are sent from the archive) before anything
         // starts, a new session included (its checkpoints continue the sequence)
-        let local_checkpoint = self.local_checkpoint();
-        if let Some(expected) = req.get("expected_checkpoint_sha256") {
-            let actual = json!(local_checkpoint.as_deref().map(crate::central::sha256));
-            if expected != &actual {
-                return err(
-                    409,
-                    "EXTERNAL_RECONCILIATION_REQUIRED",
-                    "the local checkpoint changed after the coordinator authorized this delivery",
-                );
-            }
+        let cp_raw = self
+            .local_checkpoint()
+            .map_or_else(|| std::fs::read(self.cfg.checkpoint_path()), Ok);
+        let expected_checkpoint = req.get("expected_checkpoint_sha256");
+        if expected_checkpoint.is_some_and(|pin| checkpoint_digest(&cp_raw).as_ref() != Some(pin)) {
+            return changed_checkpoint();
         }
         let central = match crate::central::compare(
             &self.cfg.central,
             &self.cfg.repo,
             self.cfg.role_name(),
-            local_checkpoint.as_deref(),
+            cp_raw.as_deref().ok(),
             &self.cfg.checkpoint_archive(),
         ) {
             Ok(c) => c,
@@ -833,9 +849,9 @@ impl Service {
         };
         if central["compared"] == true
             && let Some(n) = central["local_seq"].as_u64()
-            && let Ok(b) = std::fs::read(self.cfg.checkpoint_path())
+            && let Ok(b) = &cp_raw
         {
-            self.mark_accepted(n, &crate::central::sha256(&b));
+            self.mark_accepted(n, &crate::central::sha256(b));
         }
         // the pending external requests, re-queried (02-05 step 6). A reconnect does not
         // resume over a request whose outcome is still unknown (runtime contract §5-1, §6):
@@ -871,8 +887,7 @@ impl Service {
                 }
             }
         }
-        // decide what runs
-        let cp_raw = std::fs::read(self.cfg.checkpoint_path());
+        // Choose the session from the bytes already checked against the pin.
         let cp = cp_raw
             .as_ref()
             .ok()
@@ -1102,6 +1117,10 @@ impl Service {
                 json!({"code": "ALREADY_RUNNING", "status": self.status()}),
             );
         }
+        // Recheck the disk under the acceptance mutex after central and pending-request I/O.
+        if expected_checkpoint.is_some_and(|pin| !self.checkpoint_matches(pin)) {
+            return changed_checkpoint();
+        }
         // budget backstop (F4): the caller computes exact limits; the service still refuses
         // anything beyond the approved caps, and counts every attempt it starts
         if let Err(why) = self.budget_backstop(&limits) {
@@ -1134,6 +1153,7 @@ impl Service {
             "assignment_id": assignment_id, "generation": generation,
             "attempt_id": attempt, "session_id": session_id})));
         let job = Job {
+            expected_checkpoint: expected_checkpoint.cloned(),
             attempt,
             session_id,
             resume,
@@ -1200,11 +1220,16 @@ impl Service {
             .map_err(|e| format!("session lock: {e:?}"))?;
         let report = crate::configdir::clean(&cfg.config_dir(), &cfg.etc.join("template"))
             .map_err(|e| format!("config cleanup: {e}"))?;
-        if job.stop.load(std::sync::atomic::Ordering::SeqCst) {
+        let changed = job
+            .expected_checkpoint
+            .as_ref()
+            .is_some_and(|pin| !self.checkpoint_matches(pin));
+        if changed || job.stop.load(std::sync::atomic::Ordering::SeqCst) {
             // stopped before anything was spawned: no process, no model call
             let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
                 "mode": if job.resume { "resume" } else { "new" },
-                "stop": "Requested", "stopped_by_guard": false, "spawned": false,
+                "stop": if changed { "CheckpointChanged" } else { "Requested" },
+                "stopped_by_guard": false, "spawned": false,
                 "tamper": job.tamper});
             let _ = std::fs::write(
                 dir.join("outcome.json"),
@@ -1378,6 +1403,11 @@ impl Service {
         // the run's first action — `none` after a run that showed none; not known at takeover
         // or after an error without one
         cp["delivery_id"] = c["delivery_id"].clone();
+        if phase == "takeover"
+            && let Some(pin) = &job.expected_checkpoint
+        {
+            cp["expected_checkpoint_sha256"] = pin.clone();
+        }
         // the attempt (the delivery's call) the run belongs to (review 5dbb3d8 M-1)
         cp["attempt_id"] = json!(job.attempt);
         cp["first_action"] = match phase {
@@ -1711,6 +1741,7 @@ fn s_of(v: &Value, k: &str) -> Option<String> {
 }
 
 struct Job {
+    expected_checkpoint: Option<Value>,
     attempt: String,
     session_id: String,
     resume: bool,
@@ -2011,6 +2042,7 @@ mod tests {
         .expect("cfg");
         let svc = Service::new(cfg);
         let job = Job {
+            expected_checkpoint: None,
             attempt: "a1".into(),
             session_id: "s1".into(),
             resume: false,
