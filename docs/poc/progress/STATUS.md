@@ -1,6 +1,6 @@
 # PoC 진행과 최근 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0067-03-05-candidate-local` · 원장 SHA-256 `d6c7c553effff26dc3e6902a687a942256469a5cf94ebea807bed8b582fa1222`
+계획 v1.3.3 · snapshot `v1.3.3-EXEC-0068-X-07-candidate-local` · 원장 SHA-256 `fcc3188086cdd22160d058943bcdc7e4033be2cdca04fad22793d76222ed476e`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -28,7 +28,7 @@
 | X-04 · gRPC 경로 구현(작업 표 분리·tonic 어댑터·metadata 인증)과 HTTP·gRPC 공통 회귀 | 검수 완료 | X-03 | [보고](../reports/extra/X-04/grpc-path-20261115/REPORT.md) |
 | X-05 · 기본 kind(Cilium 없음, 멀티 노드) gRPC 서비스 발견·분산·장애 복구 시험(시험용 서버·클라이언트) | 검수 완료 | X-03 | [보고](../reports/extra/X-05/REPORT.md) |
 | X-06 · 제품 경로 kind 재검증: 실제 코디네이터 gRPC 경로의 판정·DB 상태·중복 처리 | 검수 완료 | X-04, X-05 | [보고](../reports/extra/X-06/ACCEPTANCE.md) |
-| X-07 · Cilium L7 분산 경로 추가 시험(별도 kind 구성) | 미착수 | X-05 | 없음 · 미실행 |
+| X-07 · Cilium L7 분산 경로 추가 시험(별도 kind 구성) | 검수 중 | X-05 | [보고](../reports/extra/X-07/REPORT.md) |
 | X-08 · 02-04 호출자 이월 교정(결정 항목 8) | 검수 완료 | 02-04 | [보고](../reports/tasks/02-04/caller-carryovers-20261115/REPORT.md) |
 
 | 구간 | 평가 종료 |
@@ -42,8 +42,8 @@
 | --- | --- |
 | 현재 작업 | 03-05 |
 | 다음 작업 | 03-06 |
-| 마지막 실제 작업 관측 | 2026-11-19T01:35:42+09:00 |
-| 화면 snapshot 작성 | 2026-11-19T01:35:42+09:00 |
+| 마지막 실제 작업 관측 | 2026-11-19T06:46:17+09:00 |
+| 화면 snapshot 작성 | 2026-11-19T06:46:17+09:00 |
 | 보고 owner | 개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님) |
 | 열람 상태 | GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면) |
 | 고정 사용자 링크 | https://github.com/HeaInSeo/ieo_poc/blob/main/docs/poc/progress/STATUS.md |

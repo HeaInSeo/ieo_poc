@@ -1,9 +1,9 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "v1.3.3-EXEC-0067-03-05-candidate-local",
-  "snapshot_created_at": "2026-11-19T01:35:42+09:00",
-  "last_actual_work_observed_at": "2026-11-19T01:35:42+09:00",
+  "snapshot_id": "v1.3.3-EXEC-0068-X-07-candidate-local",
+  "snapshot_created_at": "2026-11-19T06:46:17+09:00",
+  "last_actual_work_observed_at": "2026-11-19T06:46:17+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
   "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 검수 완료(fcf1060 main CI 4/4) · 03-02 검수 완료(#99, 28c8b40 main CI 4/4) · X-06 검수 완료(#100, 298053b main CI 4/4) · 03-03 첫 반려 교정·격리 19/19 · 03-03 교정 후보 독립 승인(98503f0), 원장 통합 head 재검토 대기 · 03-03 검수 완료(#101, ad7628c main CI 4/4) · 03-04 검수 완료(#102, 0d8d74b main CI 4/4) · 03-05 로컬 후보 이미지 3개·격리 13/13 · 검수 중",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
@@ -3297,6 +3297,21 @@
         "reports/tasks/03-05/policy-images-20261119/evidence/build.log",
         "reports/tasks/03-05/policy-images-20261119/evidence/results.txt"
       ]
+    },
+    {
+      "event_id": "X-07-CANDIDATE-20261119",
+      "event_revision": 1,
+      "task_id": "X-07",
+      "observed_at": "2026-11-19T06:46:17+09:00",
+      "state": "동결 기준 5aa3587. Cilium 1.20.5의 격리 4노드 kind 실측 PASS. L4 대조군 30/30 한 Pod, L7은 TCP 연결 하나로 정상 1,500/1,500 정확히 균등 분산. 변경 중 일반 호출 성공 간격 최대 299 ms. 스트림 중단 뒤 순번 14부터 재개, 보류 단항 호출 자동 재실행 0건과 명시 재요청·서버 처리 시작 각 1건. 노드 4개 정리. 격리 시험 후보 4468b9c 독립 승인, 통합 head 독립 재검토 대기. 실제 모델 호출 0건.",
+      "evidence": [
+        "reports/extra/X-07/REPORT.md",
+        "reports/extra/X-07/criteria.md",
+        "reports/extra/X-07/evidence/verified-run.tar.gz",
+        "reports/extra/X-07/evidence/recheck.json",
+        "reports/extra/X-07/evidence/runtime.log",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44346080838"
+      ]
     }
   ],
   "resume": {
@@ -3587,14 +3602,21 @@
       "prerequisites": [
         "X-05"
       ],
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
+      "status": "검수 중",
+      "last_observed_at": "2026-11-19T06:46:17+09:00",
+      "latest_report": "reports/extra/X-07/REPORT.md",
+      "result_state": "동결 기준 5aa3587. Cilium 1.20.5의 격리 4노드 kind 실측 PASS. L4 대조군 30/30 한 Pod, L7은 TCP 연결 하나로 정상 1,500/1,500 정확히 균등 분산. 변경 중 일반 호출 성공 간격 최대 299 ms. 스트림 중단 뒤 순번 14부터 재개, 보류 단항 호출 자동 재실행 0건과 명시 재요청·서버 처리 시작 각 1건. 노드 4개 정리. 격리 시험 후보 4468b9c 독립 승인, 통합 head 독립 재검토 대기. 실제 모델 호출 0건.",
       "verification_level": "unverified",
-      "evidence": [],
-      "next_action": "호환 환경이 있으면 X-05 뒤 순차 실행, 불가하면 이유·필요 조건 기록",
-      "unresolved": "선택 시험. 미실행이 다른 작업을 막지 않음. 설치 여부가 아니라 활성 기능·설정과 실제 요청 분포로 판정"
+      "evidence": [
+        "reports/extra/X-07/REPORT.md",
+        "reports/extra/X-07/criteria.md",
+        "reports/extra/X-07/evidence/verified-run.tar.gz",
+        "reports/extra/X-07/evidence/recheck.json",
+        "reports/extra/X-07/evidence/runtime.log",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44346080838"
+      ],
+      "next_action": "통합 head 독립 재검토 → PR CI → 승인 SHA 조건 병합 → 병합 SHA main CI 확인",
+      "unresolved": "고정 조합의 시험용 읽기·스트림 범위. 운영 배포와 실제 모델 실행은 별도 범위."
     },
     {
       "task_id": "X-08",
