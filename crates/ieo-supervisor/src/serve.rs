@@ -1099,14 +1099,85 @@ impl Service {
         {
             return err(500, "INTERNAL", &format!("pending tamper: {e}"));
         }
-        let credential = match std::fs::read_to_string(self.cfg.cred.join("oauth_token")) {
-            Ok(c) if !c.trim().is_empty() => c.trim().to_string(),
-            _ => {
+        let codex_bridge = self.cfg.etc.join("codex-trial-bridge");
+        let codex_trial = match std::fs::symlink_metadata(&codex_bridge) {
+            Ok(meta) if meta.is_file() => true,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+            _ => return err(503, "CREDENTIAL_UNAVAILABLE", "invalid Codex trial bridge"),
+        };
+        if codex_trial
+            && (!matches!(
+                self.cfg.role,
+                Role::Development {
+                    read_only: true,
+                    ..
+                }
+            ) || !matches!(self.cfg.central, crate::central::Central::Coordinator(_))
+                || resume
+                || delivery_id.is_none()
+                || expected_checkpoint.is_none()
+                || limits.timeout.saturating_add(limits.grace) > Duration::from_secs(120))
+        {
+            return err(
+                409,
+                "CODEX_TRIAL_SCOPE",
+                "trial requires a pinned, centrally admitted new read-only delivery within 120 seconds",
+            );
+        }
+        let mut codex_model = None;
+        if codex_trial {
+            let approved = self.cfg.etc.join("codex-trial-approval.json");
+            let approval = std::fs::read(approved)
+                .ok()
+                .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .ok()
+                .map(|t| t.as_secs());
+            if !approval.as_ref().is_some_and(|a| {
+                a["assignment_id"] == assignment_id
+                    && a["generation"] == generation
+                    && a["target_sha"] == req["target_sha"]
+                    && a["checkpoint_sha256"] == req["expected_checkpoint_sha256"]
+                    && a["expires_unix"]
+                        .as_u64()
+                        .zip(now)
+                        .is_some_and(|(expires, now)| now < expires)
+                    && a["max_dispatches"] == 1
+                    && a["additional_usd"] == 0
+            }) {
                 return err(
-                    503,
-                    "CREDENTIAL_UNAVAILABLE",
-                    "the role credential file is missing",
+                    409,
+                    "CODEX_TRIAL_APPROVAL",
+                    "missing, expired or mismatched trial approval",
                 );
+            }
+            codex_model = approval
+                .as_ref()
+                .and_then(|a| a["model"].as_str())
+                .filter(|m| {
+                    !m.is_empty()
+                        && m.len() <= 64
+                        && m.bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+                })
+                .map(str::to_owned);
+            if codex_model.is_none() {
+                return err(409, "CODEX_TRIAL_APPROVAL", "missing pinned trial model");
+            }
+        }
+        let credential = if codex_trial {
+            String::new()
+        } else {
+            match std::fs::read_to_string(self.cfg.cred.join("oauth_token")) {
+                Ok(c) if !c.trim().is_empty() => c.trim().to_string(),
+                _ => {
+                    return err(
+                        503,
+                        "CREDENTIAL_UNAVAILABLE",
+                        "the role credential file is missing",
+                    );
+                }
             }
         };
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -1160,6 +1231,8 @@ impl Service {
             prompt,
             limits,
             credential,
+            codex_trial,
+            codex_model,
             coord: json!({"generation": generation, "assignment_id": assignment_id,
                 "sprint_id": sprint_id, "sprint_revision": sprint_revision,
                 "spec_digest": spec_digest, "image_digest": image_digest,
@@ -1255,15 +1328,63 @@ impl Service {
             );
             return Ok(v);
         }
-        let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
-        let mut cmd = Command::new(&cfg.claude);
+        let (mut cmd, argv, env_names) = if job.codex_trial {
+            let bridge = cfg.etc.join("codex-trial-bridge");
+            let state_dir = cfg.state.join("codex-trial");
+            std::fs::create_dir_all(&state_dir).map_err(|e| format!("Codex trial state: {e}"))?;
+            let delivery = job.coord["delivery_id"]
+                .as_str()
+                .ok_or("missing Codex delivery ID")?;
+            let argv = vec![
+                "--delivery-id".into(),
+                delivery.into(),
+                "--attempt-id".into(),
+                job.attempt.clone(),
+                "--cwd".into(),
+                cfg.cwd().to_string_lossy().into_owned(),
+                "--state".into(),
+                state_dir.to_string_lossy().into_owned(),
+                "--codex".into(),
+                "/usr/bin/codex".into(),
+                "--model".into(),
+                job.codex_model.clone().ok_or("missing pinned model")?,
+                "--enable-trial".into(),
+            ];
+            // The trial admits only one start even if a different key is later presented.
+            // Persist the reservation before launching the subprocess and never clear it here.
+            use std::io::Write;
+            let mut reservation = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(state_dir.join("supervisor-reservation"))
+                .map_err(|e| format!("Codex trial already reserved or unavailable: {e}"))?;
+            writeln!(reservation, "{delivery}").map_err(|e| e.to_string())?;
+            reservation.sync_all().map_err(|e| e.to_string())?;
+            std::fs::File::open(&state_dir)
+                .and_then(|d| d.sync_all())
+                .map_err(|e| e.to_string())?;
+            let mut cmd = Command::new(bridge);
+            cmd.env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env("HOME", cfg.home())
+                .env("CODEX_HOME", cfg.cred.join("codex-home"));
+            (
+                cmd,
+                argv,
+                vec!["CODEX_HOME".into(), "HOME".into(), "PATH".into()],
+            )
+        } else {
+            let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
+            let mut cmd = Command::new(&cfg.claude);
+            let env = crate::env::build(
+                &cfg.home().to_string_lossy(),
+                &cfg.config_dir().to_string_lossy(),
+                &job.credential,
+            );
+            crate::env::apply(&mut cmd, &env)?;
+            (cmd, argv, crate::env::names(&env))
+        };
         cmd.args(&argv).current_dir(cfg.cwd());
-        let env = crate::env::build(
-            &cfg.home().to_string_lossy(),
-            &cfg.config_dir().to_string_lossy(),
-            &job.credential,
-        );
-        crate::env::apply(&mut cmd, &env)?;
         let opts = Options {
             kill: cfg.kill.clone(),
             stdin: Some(prompt_message(&job.prompt)),
@@ -1280,14 +1401,44 @@ impl Service {
                     return Err(format!("run: {e}"));
                 }
             };
-        let children = self.keep_child_transcripts(job, &stdout, &dir);
+        let exited = outcome.stop == Stop::Exited;
+        let codex_tokens =
+            if job.codex_trial && exited && outcome.exit_code == Some(0) && !outcome.cleanup_failed
+            {
+                let delivery = job.coord["delivery_id"]
+                    .as_str()
+                    .ok_or("missing Codex delivery ID")?;
+                std::fs::read_to_string(&stdout).ok().and_then(|stream| {
+                    crate::codex_trial::receipt(&stream, delivery, &job.attempt)
+                        .ok()
+                        .and_then(|(_, tokens)| tokens)
+                })
+            } else {
+                None
+            };
+        let children = if job.codex_trial {
+            json!([])
+        } else {
+            self.keep_child_transcripts(job, &stdout, &dir)
+        };
         self.write_checkpoint(
             job,
             &report.digest,
             Some(&stdout),
-            outcome.stop == Stop::Exited,
+            exited && (!job.codex_trial || codex_tokens.is_some()),
             "after_run",
         )?;
+        let observed = if job.codex_trial {
+            codex_tokens.map_or(Value::Null, |t| json!({
+                "billable_lower_bound": t.input.saturating_add(t.output).saturating_add(t.cache_creation),
+                "cache_read_lower_bound": t.cache_read
+            }))
+        } else {
+            json!({"billable_lower_bound": outcome.observed.billable,
+                "cache_read_lower_bound": outcome.observed.cache_read,
+                "messages": outcome.observed.messages,
+                "incomplete_lines": outcome.observed.incomplete_lines})
+        };
         let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
             "mode": if job.resume { "resume" } else { "new" },
             "stop": format!("{:?}", outcome.stop),
@@ -1297,17 +1448,15 @@ impl Service {
                 &std::fs::read_to_string(&stdout).unwrap_or_default(),
                 &job.attempt, &job.started_at, Some(&ieo_evidence::time::now())),
             "exit_code": outcome.exit_code, "elapsed_ms": outcome.elapsed.as_millis() as u64,
-            "observed": {"billable_lower_bound": outcome.observed.billable,
-                         "cache_read_lower_bound": outcome.observed.cache_read,
-                         "messages": outcome.observed.messages,
-                         "incomplete_lines": outcome.observed.incomplete_lines},
+            "observed": observed,
             "cleanup_failed": outcome.cleanup_failed,
             "children": children,
             "config_cleanup": {"digest": report.digest, "removed": report.removed.len(),
                                "credentials_removed": report.credentials_removed},
             "tamper": job.tamper,
             "first_action": first_action_json(job, true),
-            "argv": argv, "env_names": crate::env::names(&env)});
+            "argv": argv, "env_names": env_names,
+            "runtime": if job.codex_trial { "codex-trial" } else { "claude" }});
         let _ = std::fs::write(
             dir.join("outcome.json"),
             serde_json::to_vec_pretty(&v).unwrap_or_default(),
@@ -1748,6 +1897,8 @@ struct Job {
     prompt: String,
     limits: Limits,
     credential: String,
+    codex_trial: bool,
+    codex_model: Option<String>,
     coord: Value,
     tamper: Option<Value>,
     stop: Arc<AtomicBool>,
@@ -2055,6 +2206,8 @@ mod tests {
                 grace: Duration::from_secs(1),
             },
             credential: "c".into(),
+            codex_trial: false,
+            codex_model: None,
             coord: json!({}),
             tamper: None,
             stop: Arc::new(AtomicBool::new(true)),

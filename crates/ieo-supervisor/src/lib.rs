@@ -20,6 +20,7 @@ pub mod budget;
 pub mod caller;
 pub mod central;
 pub mod checkpoint;
+mod codex_trial;
 pub mod configdir;
 pub mod env;
 pub mod first_action;

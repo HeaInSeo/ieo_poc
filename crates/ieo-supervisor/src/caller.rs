@@ -1343,6 +1343,47 @@ impl After<'_> {
             .join("streams")
             .join(format!("{}.jsonl", c.attempt_id));
         write_private(&stream_path, stream.as_bytes()).map_err(|e| format!("stream save: {e}"))?;
+        if last["runtime"] == "codex-trial" {
+            let mut record = base_rec;
+            let delivery = record["delivery_id"]
+                .as_str()
+                .ok_or("missing admitted delivery ID")?;
+            if stop_sent
+                || last["stop"] != "Exited"
+                || last["exit_code"] != 0
+                || last["cleanup_failed"] != false
+                || last["mode"] != "new"
+            {
+                return Err(
+                    "the Codex trial did not exit cleanly; receipt requires reconciliation".into(),
+                );
+            }
+            let (receipt, tokens) = crate::codex_trial::receipt(&stream, delivery, &c.attempt_id)?;
+            let measured = match tokens {
+                Some(tokens) => Measure::Measured {
+                    tokens,
+                    source: "codex-trial-receipt".into(),
+                },
+                None => Measure::unmeasured("no authoritative final Codex usage"),
+            };
+            record["ended_at"] = json!(ieo_evidence::time::now());
+            record["ended_unix"] = json!(unix_now());
+            record["duration_ms"] =
+                json!(last["elapsed_ms"].as_u64().ok_or("missing elapsed time")?);
+            record["session"] = json!({"mode":"new", "session_id":last["session_id"]});
+            record["outcome"] =
+                json!({"stop":"Exited", "runtime":"codex-trial", "result":receipt["result"]});
+            record["codex"] = json!({"thread_id":receipt["thread_id"], "turn_id":receipt["turn_id"],
+                "provider_usage":receipt["usage"]});
+            record["usage"] = json!({"run":measured, "session":measured, "cost_usd_reported":null});
+            record["stream"] = json!({"path":stream_path,"bytes":stream.len(),
+                "sha256":hex::encode(Sha256::digest(stream.as_bytes()))});
+            record["stop_required"] = json!(true);
+            record["stop_reason"] = json!(
+                "isolated Codex trial ended; reconcile usage, repository effects and billing"
+            );
+            return Ok(record);
+        }
         // the children's transcripts (a child's total comes only from its transcript)
         let mut transcripts = std::collections::BTreeMap::new();
         let mut children = Vec::new();
