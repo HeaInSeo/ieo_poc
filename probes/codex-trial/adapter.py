@@ -134,19 +134,32 @@ class Pipe:
         return item
 
     def call(self, number, method, params):
-        self.send({"id": number, "method": method, "params": params})
+        request = {"id": number, "method": method}
+        if params is not None:
+            request["params"] = params
+        self.send(request)
         while True:
             item = self.receive()
             if "id" in item:
                 require(item["id"] == number and isinstance(item.get("result"), dict),
                         f"{method} response missing or ambiguous")
                 return item["result"]
-            require(item.get("method") in PASSIVE, f"unexpected notification during {method}")
+            name = item.get("method")
+            if name == "remoteControl/status/changed":
+                require(item.get("params", {}).get("status") == "disabled",
+                        "remote control is not disabled")
+                continue
+            if name == "account/updated" and method == "account/read":
+                require(item.get("params", {}).get("authMode") == "chatgpt",
+                        "subscription changed during account read")
+                continue
+            label = name if isinstance(name, str) and re.fullmatch(r"[A-Za-z/._-]{1,80}", name) else "unknown"
+            require(name in PASSIVE, f"unexpected notification {label} during {method}")
             require(item["method"] not in {"item/started", "item/completed"},
                     f"unexpected item during {method}")
 
 
-def prepare(pipe, cwd, model):
+def verify_subscription(pipe, cwd, model):
     pipe.call(1, "initialize", {"clientInfo": {"name": "ieo-codex-trial", "version": "0.1"}})
     pipe.send({"method": "initialized"})
     config = pipe.call(2, "config/read", {"cwd": cwd, "includeLayers": False})["config"]
@@ -158,6 +171,11 @@ def prepare(pipe, cwd, model):
     account = pipe.call(3, "account/read", {"refreshToken": False}).get("account")
     require(isinstance(account, dict) and account.get("type") == "chatgpt",
             "ChatGPT subscription identity not confirmed")
+    return account
+
+
+def prepare(pipe, cwd, model):
+    verify_subscription(pipe, cwd, model)
     response = pipe.call(4, "thread/start", {"cwd": cwd, "model": model, "modelProvider": "openai",
                          "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": True})
     thread = response["thread"]
@@ -256,7 +274,8 @@ def trial(process, directory, delivery, attempt, cwd, model, prompt, deadline):
         }})
         turn, observed = observe(pipe, directory, state)
         receipt = {"type": "ieo_codex_trial_receipt", "delivery_id": delivery, "attempt_id": attempt,
-                   "thread_id": thread, "turn_id": state["turn_id"], "result": turn, "auth": "chatgpt"}
+                   "thread_id": thread, "turn_id": state["turn_id"], "result": turn, "auth": "chatgpt",
+                   "observed_usage": observed}
         # Snapshots do not establish final/authoritative usage. Never put them in the receipt.
         state.update(status="completed_observed", usage_final=False, observed_total=observed, receipt=receipt)
         store(directory / "state.json", state)
@@ -312,12 +331,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("delivery-id", "attempt-id", "cwd", "state", "codex", "model"):
         parser.add_argument("--" + name, required=True)
-    parser.add_argument("--enable-trial", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--enable-trial", action="store_true")
+    modes.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args()
     os.umask(0o077)
     deadline = time.monotonic() + RPC_SECONDS
     try:
-        require(args.enable_trial, "trial requires explicit opt-in from the admitted launcher")
+        require(args.enable_trial or args.preflight_only, "trial requires explicit opt-in from the admitted launcher")
         for identifier in (args.delivery_id, args.attempt_id):
             require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", identifier), "invalid identity")
         require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", args.model), "invalid pinned model")
@@ -326,11 +347,24 @@ def main():
         home = {k: os.environ.get(k) for k in ("HOME", "CODEX_HOME")}
         require(all(v and Path(v).is_absolute() for v in home.values()), "launcher must set isolated homes")
         env = {**home, "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
+        cmd = [args.codex, "app-server", "--strict-config", "--listen", "stdio://"]
+        for key, value in {**SETTINGS, "model": args.model, "model_provider": "openai"}.items():
+            cmd += ["-c", key + "=" + json.dumps(value)]
+        if args.preflight_only:
+            process = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            try:
+                pipe = Pipe(process, deadline)
+                account = verify_subscription(pipe, cwd, args.model)
+                limits = pipe.call(4, "account/rateLimits/read", None)
+                print(json.dumps({"account": {k: account.get(k) for k in ("type", "planType")},
+                                  "rateLimits": limits.get("rateLimits"),
+                                  "rateLimitsByLimitId": limits.get("rateLimitsByLimitId")}))
+            finally:
+                stop(process)
+            return 0
         prompt = prompt_from_stdin(deadline)
         with reserve(Path(args.state), args.delivery_id) as directory:
-            cmd = [args.codex, "app-server", "--strict-config", "--listen", "stdio://"]
-            for key, value in {**SETTINGS, "model": args.model, "model_provider": "openai"}.items():
-                cmd += ["-c", key + "=" + json.dumps(value)]
             process = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             try:

@@ -45,6 +45,8 @@ for line in sys.stdin:
     elif method == "account/read":
         assert params == {"refreshToken": False}
         result = {"account": {"type": "apiKey" if mode == "api" else "chatgpt"}}
+    elif method == "account/rateLimits/read":
+        result = {"rateLimits":{"primary":{"usedPercent":18}}}
     elif method == "thread/start":
         assert params["ephemeral"] and params["sandbox"] == "read-only"
         result = {"thread": {"id": "thread-1", "turns": [], "ephemeral": True},
@@ -93,12 +95,14 @@ class Tests(unittest.TestCase):
         self.worker.write_text("#!" + sys.executable + "\n" + textwrap.dedent(WORKER))
         self.worker.chmod(0o700)
 
-    def invoke(self, mode, opt_in=True, envelope=False):
+    def invoke(self, mode, opt_in=True, envelope=False, preflight=False):
         (self.root / "mode").write_text(mode)
         cmd = [sys.executable, "-I", str(ADAPTER), "--delivery-id", "D-fixture", "--attempt-id", "a1",
                "--cwd", str(self.root), "--state", str(self.state),
                "--codex", str(self.worker), "--model", "fixture-model"]
-        if opt_in:
+        if preflight:
+            cmd.append("--preflight-only")
+        elif opt_in:
             cmd.append("--enable-trial")
         value = "VERIFY checkpoint"
         if envelope:
@@ -110,11 +114,20 @@ class Tests(unittest.TestCase):
     def read_state(self):
         return json.loads((self.state / "D-fixture/state.json").read_text())
 
+    def test_preflight_reads_account_and_limits_without_reserving_or_starting(self):
+        result = self.invoke("ok", preflight=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["rateLimits"]["primary"]["usedPercent"], 18)
+        self.assertEqual((self.root / "methods").read_text().splitlines(), [
+            "initialize", "initialized", "config/read", "account/read", "account/rateLimits/read"])
+        self.assertEqual(list(self.state.iterdir()), [])
+
     def test_receipt_omits_unproven_final_usage_and_retains_raw(self):
         result = self.invoke("ok", envelope=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(result.stdout.splitlines()), 1)
         receipt = json.loads(result.stdout)
+        self.assertEqual(receipt.pop("observed_usage")["totalTokens"], 15)
         self.assertEqual(receipt, {"type": "ieo_codex_trial_receipt", "delivery_id": "D-fixture",
                          "attempt_id": "a1", "thread_id": "thread-1", "turn_id": "turn-1",
                          "result": {"id": "turn-1", "status": "completed", "items": []}, "auth": "chatgpt"})

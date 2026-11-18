@@ -1374,7 +1374,7 @@ impl After<'_> {
             record["outcome"] =
                 json!({"stop":"Exited", "runtime":"codex-trial", "result":receipt["result"]});
             record["codex"] = json!({"thread_id":receipt["thread_id"], "turn_id":receipt["turn_id"],
-                "provider_usage":receipt["usage"]});
+                "provider_usage":receipt["usage"], "observed_usage":receipt["observed_usage"]});
             record["usage"] = json!({"run":measured, "session":measured, "cost_usd_reported":null});
             record["stream"] = json!({"path":stream_path,"bytes":stream.len(),
                 "sha256":hex::encode(Sha256::digest(stream.as_bytes()))});
@@ -1941,6 +1941,92 @@ mod tests {
             before: Value::Null,
             spare: None,
         }
+    }
+
+    #[test]
+    fn codex_trial_completed_result_and_unmeasured_usage_share_admitted_id() {
+        struct MockRole;
+        impl Adapter for MockRole {
+            fn send(
+                &self,
+                _: &RoleTarget,
+                method: &str,
+                path: &str,
+                _: Option<&Value>,
+            ) -> Result<(u16, Value), String> {
+                assert_eq!(method, "GET");
+                match path {
+                    "/v0/role/status" => Ok((
+                        200,
+                        json!({"running":null, "last":{
+                            "attempt_id":"a", "session_id":"s", "runtime":"codex-trial",
+                            "stop":"Exited", "exit_code":0, "cleanup_failed":false, "mode":"new", "elapsed_ms":7
+                        }}),
+                    )),
+                    "/v0/role/runs/a/stdout" => Ok((
+                        200,
+                        json!({"content": json!({
+                        "type":"ieo_codex_trial_receipt", "auth":"chatgpt", "delivery_id":"D-1",
+                        "attempt_id":"a", "thread_id":"th", "turn_id":"tu",
+                        "result":{"id":"tu","status":"completed"}, "observed_usage":{"totalTokens":100}
+                    }).to_string()}),
+                    )),
+                    other => panic!("unexpected {other}"),
+                }
+            }
+        }
+        let dir = std::env::temp_dir().join(format!("ieo-codex-receipt-{}", std::process::id()));
+        std::fs::create_dir(&dir).unwrap();
+        let role = RoleTarget {
+            url: String::new(),
+            adapter_token_file: PathBuf::new(),
+            max_window_seconds: Some(120),
+            share: Share {
+                max_runs: 1,
+                total_seconds: 120,
+                billable_tokens: 500,
+                cache_read_tokens: 500,
+            },
+        };
+        let running = Running {
+            _lock: std::fs::File::open("/dev/null").unwrap(),
+            plan: Plan {
+                budget: budget::named("02-05").unwrap(),
+                ledger_dir: dir.clone(),
+                roles: BTreeMap::new(),
+                first_observation: None,
+            },
+            c: Call {
+                task_id: "trial".into(),
+                role: "development".into(),
+                op: "start".into(),
+                attempt_id: "a".into(),
+                session_id: "s".into(),
+                prompt: String::new(),
+                coordinator: Value::Null,
+            },
+            target: role,
+            limits: admission(114, 500).limits(),
+            before: Value::Null,
+            recs: Vec::new(),
+            base_rec: json!({"delivery_id":"D-1", "attempt_id":"a"}),
+        };
+        let path = running.plan.records_path();
+        mark_inflight(&running.plan, &running.c, Some("D-1")).unwrap();
+        let row = running
+            .finish(&MockRole, Duration::ZERO, Duration::ZERO)
+            .unwrap();
+        let persisted: Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(persisted, row);
+        assert_eq!(row["delivery_id"], "D-1");
+        assert_eq!(row["codex"]["thread_id"], "th");
+        assert_eq!(row["codex"]["turn_id"], "tu");
+        assert_eq!(row["outcome"]["result"]["status"], "completed");
+        assert_eq!(row["codex"]["observed_usage"]["totalTokens"], 100);
+        assert_eq!(row["usage"]["run"]["state"], "unmeasured");
+        assert_eq!(row["stop_required"], true);
     }
 
     /// `lower` only lowers (review c11e734 L-1): a bound above the room or window changes

@@ -90,5 +90,9 @@ mod tests {
         assert!(receipt(&format!("{v}\n{v}"), "D-1", "a").is_err());
         v["usage"]["totalTokens"] = Value::Null;
         assert!(receipt(&v.to_string(), "D-1", "a").is_err());
+        v.as_object_mut().unwrap().remove("usage");
+        let (terminal, usage) = receipt(&v.to_string(), "D-1", "a").unwrap();
+        assert_eq!(terminal["result"]["id"], "tu");
+        assert!(usage.is_none());
     }
 }

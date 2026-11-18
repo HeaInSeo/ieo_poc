@@ -1331,7 +1331,16 @@ impl Service {
         let (mut cmd, argv, env_names) = if job.codex_trial {
             let bridge = cfg.etc.join("codex-trial-bridge");
             let state_dir = cfg.state.join("codex-trial");
-            std::fs::create_dir_all(&state_dir).map_err(|e| format!("Codex trial state: {e}"))?;
+            use std::os::unix::fs::DirBuilderExt;
+            match std::fs::DirBuilder::new().mode(0o700).create(&state_dir) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if !std::fs::symlink_metadata(&state_dir).is_ok_and(|m| m.is_dir()) {
+                        return Err("invalid Codex trial state directory".into());
+                    }
+                }
+                Err(e) => return Err(format!("Codex trial state: {e}")),
+            }
             let delivery = job.coord["delivery_id"]
                 .as_str()
                 .ok_or("missing Codex delivery ID")?;
