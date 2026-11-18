@@ -58,7 +58,7 @@ impl Drop for Permit {
 pub struct Env {
     pub _permit: Permit,
     pub addr: String,
-    pub base: Config,
+    pub base: Option<Config>,
     pub dbname: String,
     pub cfg: Config,
     pub tokens: std::collections::BTreeMap<&'static str, String>,
@@ -208,27 +208,13 @@ pub const PRINCIPALS: [PrincipalRow; 19] = [
     ),
 ];
 
-pub fn start() -> Option<Env> {
-    let base = base_config()?;
-    let permit = Permit::acquire();
-    let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or_default();
-    let dbname = format!("ieo_t_{}_{n}_{}", std::process::id(), nanos % 1_000_000_000);
-    let mut admin = base.connect(NoTls).expect("connect admin");
-    admin
-        .batch_execute(&format!("CREATE DATABASE {dbname}"))
-        .expect("create db");
-    let mut cfg = base.clone();
-    cfg.dbname(&dbname);
-    let mut db = cfg.connect(NoTls).expect("connect test db");
-    migrate(&mut db).expect("migrate");
+pub type FixtureTokens = std::collections::BTreeMap<&'static str, String>;
+
+pub fn fixture(cfg: &Config, suffix: &str) -> (App, FixtureTokens, Value) {
     let mut tokens = std::collections::BTreeMap::new();
     let mut list = Vec::new();
     for (name, kind, scopes, repos, role) in PRINCIPALS {
-        let t = format!("tok-{name}-{n}-{nanos}");
+        let t = format!("tok-{name}-{suffix}");
         let mut p = json!({"name": name, "token_sha256": token_digest(&t), "kind": kind,
                            "scopes": scopes, "repo_ids": repos});
         if let Some(r) = role {
@@ -237,7 +223,8 @@ pub fn start() -> Option<Env> {
         list.push(p);
         tokens.insert(name, t);
     }
-    let creds = Credentials::from_json(&json!({ "principals": list })).expect("creds");
+    let credentials = json!({ "principals": list });
+    let creds = Credentials::from_json(&credentials).expect("creds");
     let mut manifest: Value = serde_json::from_str(MANIFEST).expect("manifest");
     // an approved test profile for the human-input binding of repo-a
     if let Some(p) = manifest["inspection_profiles"].as_array_mut() {
@@ -266,6 +253,27 @@ pub fn start() -> Option<Env> {
         },
         creds,
     };
+    (app, tokens, credentials)
+}
+
+pub fn start() -> Option<Env> {
+    let base = base_config()?;
+    let permit = Permit::acquire();
+    let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let dbname = format!("ieo_t_{}_{n}_{}", std::process::id(), nanos % 1_000_000_000);
+    let mut admin = base.connect(NoTls).expect("connect admin");
+    admin
+        .batch_execute(&format!("CREATE DATABASE {dbname}"))
+        .expect("create db");
+    let mut cfg = base.clone();
+    cfg.dbname(&dbname);
+    let mut db = cfg.connect(NoTls).expect("connect test db");
+    migrate(&mut db).expect("migrate");
+    let (app, tokens, _) = fixture(&cfg, &format!("{n}-{nanos}"));
     let server = tiny_http::Server::http("127.0.0.1:0").expect("bind");
     let addr = server
         .server_addr()
@@ -282,7 +290,7 @@ pub fn start() -> Option<Env> {
     Some(Env {
         _permit: permit,
         addr,
-        base,
+        base: Some(base),
         dbname,
         cfg,
         tokens,
@@ -293,7 +301,9 @@ pub fn start() -> Option<Env> {
 impl Drop for Env {
     /// Each test drops its own database (the server's connections are closed by FORCE).
     fn drop(&mut self) {
-        if let Ok(mut admin) = self.base.connect(NoTls) {
+        if let Some(base) = &self.base
+            && let Ok(mut admin) = base.connect(NoTls)
+        {
             let _ = admin.batch_execute(&format!(
                 "DROP DATABASE IF EXISTS {} WITH (FORCE)",
                 self.dbname
