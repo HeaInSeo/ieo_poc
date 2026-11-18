@@ -1,0 +1,15 @@
+test_duplicate_identity (__main__.CatalogTest.test_duplicate_identity) ... ok
+test_mismatched_version_join (__main__.CatalogTest.test_mismatched_version_join) ... ok
+test_required_fields (__main__.CatalogTest.test_required_fields) ... ok
+test_scope_and_expected_trace (__main__.CatalogTest.test_scope_and_expected_trace) ... ok
+test_stale_digest (__main__.CatalogTest.test_stale_digest) ... ok
+test_unknown_revision (__main__.CatalogTest.test_unknown_revision) ... ok
+test_unpinned_repository_scope (__main__.CatalogTest.test_unpinned_repository_scope) ... ok
+test_unresolved_source (__main__.CatalogTest.test_unresolved_source) ... ok
+test_wrong_excerpt (__main__.CatalogTest.test_wrong_excerpt) ... ok
+test_wrong_profile (__main__.CatalogTest.test_wrong_profile) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.087s
+
+OK

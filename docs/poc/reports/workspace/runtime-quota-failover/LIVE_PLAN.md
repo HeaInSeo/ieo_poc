@@ -34,3 +34,15 @@ The separate approval packet must pin the disposable repository, branch and SHA,
 [The isolated delivery record](DELIVERY_INTEGRATION.md) exercises common admission, row-lock approval, supervisor HTTP, shared accounting and no-replay reconciliation with both fakes. The draft live plan still requires an approved real router and evidence mapping. Bubblewrap parity for the fakes is evidence about the test boundary only.
 
 [첫 실제 시험 준비 및 병합 원장](TRIAL_READINESS.md)에 병합 후 확인한 근거와 미충족 조건을 기록한다.
+
+## 실제 첫 시험의 전송·요청 한도
+
+상태는 `WAITING_FOR_PREREQUISITE`다. 시험 계정은 사용자가 지정한 개발 호스트의 기존 Claude 구독 로그인과 현재 Codex CLI의 ChatGPT 계정·워크스페이스다. 역할 자격의 사용 범위는 별도 운영 승인에 따른다.
+
+| 한도 | 집행·검증 기준 |
+| --- | --- |
+| 코디네이터 → 역할 실행기 | 다음 미완료 단계의 durable delivery ID 한 건으로 **Codex 전송 최대 1회**. 응답 유실 시 동일 ID를 조회하고 자동 재전송하지 않는다. |
+| 역할 실행기 → 공급자 | Claude 모델 요청 **0회**, Codex 실제 모델 요청 **최대 1회**. 단일 delivery나 `turn/start`는 이 횟수의 증거가 아니다. 내부 도구 후속 요청, 재시도, 재연결을 포함한 공급자 요청 수의 사전 집행과 독립 대조 근거가 필요하다. |
+| 시간·토큰·청구 | 정지 유예 포함 120초, 과금 토큰 4,000, 캐시 읽기 20,000, 추가 USD 0. 시간은 감독자가 집행한다. 사용량 관측 뒤 정지로는 공급자 측 토큰 상한을 보장할 수 없어 지원되는 집행 근거를 요구한다. |
+
+승인안에는 두 횟수의 집행 지점, 각각의 증거와 실패 시 처분을 포함한다. 자연 소진과 동일 시점의 Codex 가용성, 유료 대체·자동 충전·크레딧 지출 차단, 역할·권한·장부 결합 및 상한 집행이 모두 확인된 뒤에만 승인 요청을 올린다.
