@@ -1,0 +1,58 @@
+{
+  "basis": "ad7628c5f5f4342e9cd3a41a9a1785b842db77c1",
+  "independent_candidate": "2aac476e7fad82f3b36fedb14dee1ffdd4eed508",
+  "experiment_id": "P25",
+  "expect": {
+    "runs": [],
+    "evaluation_closed": false
+  },
+  "set": {
+    "execution_state": "고정 범위 실행·독립 대조",
+    "verdict": "PASS",
+    "adoption": "초기 고정 범위 수용 후보 · 03-04 검수 중",
+    "runs": [
+      {
+        "run_id": "p25-20261119-index-v021",
+        "revision": 1,
+        "observed_at": "2026-11-19T00:32:45+09:00",
+        "verdict": "FAIL",
+        "latest_report": "reports/tasks/03-04/p25-20261119/REPORT.md",
+        "evidence": [
+          "reports/tasks/03-04/p25-20261119/REVIEW.md",
+          "reports/tasks/03-04/p25-20261119/structural-checks-r2.txt"
+        ],
+        "unresolved": "eb36b50 권한 절차, 판정, 공통 버전 변형 오통과."
+      },
+      {
+        "run_id": "p25-20261119-index-v022-first",
+        "revision": 1,
+        "observed_at": "2026-11-19T00:32:45+09:00",
+        "verdict": "FAIL",
+        "latest_report": "reports/tasks/03-04/p25-20261119/REPORT.md",
+        "evidence": [
+          "reports/tasks/03-04/p25-20261119/REVIEW.md",
+          "reports/tasks/03-04/p25-20261119/structural-checks-r3.txt"
+        ],
+        "unresolved": "f91d095 활성 원본 revision과 이력 혼동."
+      },
+      {
+        "run_id": "p25-20261119-index-v022-pinned",
+        "revision": 1,
+        "observed_at": "2026-11-19T00:32:45+09:00",
+        "verdict": "PASS",
+        "latest_report": "reports/tasks/03-04/p25-20261119/REPORT.md",
+        "evidence": [
+          "reports/tasks/03-04/p25-20261119/EXPECTATIONS.md",
+          "reports/tasks/03-04/p25-20261119/artifacts.sha256",
+          "reports/tasks/03-04/p25-20261119/structural-checks-r4.txt",
+          "reports/tasks/03-04/p25-20261119/evidence/review1-rerun/actual-commands.json",
+          "reports/tasks/03-04/p25-20261119/REVIEW.md"
+        ],
+        "next_action": "최종 통합 head의 검토와 CI 확인 후 03-04 수용.",
+        "unresolved": "독립 판정은 고정 자료 범위. P23 집행과 후속 실제 활용은 별도."
+      }
+    ],
+    "latest_report": "reports/tasks/03-04/p25-20261119/REPORT.md"
+  },
+  "application_note": "현재 main validate_package.py는 모든 실험 runs가 비어 있어야 한다. 09-02 및 공통 검증기 조율 뒤 정확히 이 회차만 반영한다. 실제 P25 판정은 고정 범위 PASS, 03-04의 PR·CI 수용은 별도다."
+}
