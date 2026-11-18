@@ -47,3 +47,7 @@
 원본 아카이브에는 Kubernetes 노드·CNI·Pod·EndpointSlice 스냅샷, 클라이언트 RPC 및 주소 로그, 단항 서버 로그가 들어 있다. 실행 로그에 출력된 아카이브의 SHA-256 `06f7fc596c0ec89a4dc4f3fd737bc7e6f65c6b772014af5fc6e4f49670173cbf`를 대조했다. 이 원본으로 Pod별 분포와 관측 창, 스트림 순번, 재요청 횟수를 다시 계산해 실시간 판정과 일치함을 확인했다. [원본 아카이브](evidence/kind-evidence.tar.gz), [단계 로그](evidence/kind-run.jsonl), [재계산 결과](evidence/kind-summary.json)
 
 이 결과로 X-05의 기본 경로에는 Headless Service와 기존 tonic 변경 통지·균형 채널을 사용한다. HTTP/2 keepalive는 구성했으며 이번 장애 주입은 Pod 강제 종료였다. X-05 검수와 원장의 완료 반영은 독립 검토, 필수 CI, 승인 head 병합과 병합 SHA의 main CI 확인을 따른다.
+
+## 수용 기록 · 2026-11-18
+
+PR #97은 head `b5075384b1e1229eff4034cb7a8fb95fe9d1d7c6`의 독립 승인과 PR CI 4/4를 확인한 뒤 해당 head를 조건으로 병합했다. 병합 SHA `d27fa96504b568fd3156d6c5ac21e7d2f333ff9e`에서 main CI 4/4가 통과했다. X-05를 검수 완료로 기록한다. [PR 승인·병합 기록](https://github.com/HeaInSeo/ieo_poc/pull/97), [PR CI](https://github.com/HeaInSeo/ieo_poc/actions/runs/44303120976), [병합 SHA main CI](https://github.com/HeaInSeo/ieo_poc/actions/runs/44317465418)
