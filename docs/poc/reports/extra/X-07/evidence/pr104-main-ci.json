@@ -1,0 +1,49 @@
+{
+  "id": 44409828333,
+  "head_sha": "caad62d80b6b1255637a6dd2d71e1288d4f556ea",
+  "head_branch": "main",
+  "event": "push",
+  "run_attempt": 1,
+  "status": "completed",
+  "conclusion": "success",
+  "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44409828333",
+  "updated_at": "2026-11-18T22:23:03Z",
+  "jobs": [
+    {
+      "id": 135174663746,
+      "name": "proto buf lint and breaking",
+      "head_sha": "caad62d80b6b1255637a6dd2d71e1288d4f556ea",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44409828333/job/135174663746"
+    },
+    {
+      "id": 135174664147,
+      "name": "rust fmt clippy test",
+      "head_sha": "caad62d80b6b1255637a6dd2d71e1288d4f556ea",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44409828333/job/135174664147"
+    },
+    {
+      "id": 135174664292,
+      "name": "docs/poc package and progress validation",
+      "head_sha": "caad62d80b6b1255637a6dd2d71e1288d4f556ea",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44409828333/job/135174664292"
+    },
+    {
+      "id": 135174664316,
+      "name": "rust toolchain pin resolves",
+      "head_sha": "caad62d80b6b1255637a6dd2d71e1288d4f556ea",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/HeaInSeo/ieo_poc/actions/runs/44409828333/job/135174664316"
+    }
+  ]
+}
