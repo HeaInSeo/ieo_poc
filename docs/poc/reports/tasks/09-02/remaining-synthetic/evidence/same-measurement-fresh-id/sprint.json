@@ -1,0 +1,380 @@
+{
+  "contract_revision": 4,
+  "delegation": {
+    "allowed": [
+      "승인된 PoC 범위의 구현·검증·교정·증거/보고 생성"
+    ],
+    "approval_scope_ref": "User_Decisions_2026-11-11.md",
+    "forbidden": [
+      "자기 정책 승인",
+      "범위 밖 repo 쓰기",
+      "임의 운영 전환",
+      "Notion 실행 기록 쓰기"
+    ]
+  },
+  "digest": "db44f87bc43570be0ed25749b8ea6659e8c32339967f7dd2ce9a4ec5545141ff",
+  "exit_condition": "독립 검토된 최종 개발 스프린트·미해결·후속 연구 인계",
+  "human_validation": {
+    "criteria_ref": "Console_Coordinator_PoC_Validation_Plan.md",
+    "required": true,
+    "timing": "해당 수용 기준에서 지정한 단계"
+  },
+  "limits": {
+    "correction_attempts": null,
+    "elapsed_seconds": null,
+    "total_tokens": null,
+    "unresolved_reason": "01-03 단계별 동결(v1.3.3-A1): 토큰을 포함한 누적 한도는 자기 repo를 포함한 코디네이터의 모든 실제 실행 등록·배정 전에 바인딩한다(동결 대장 L01). 값이 null인 동안 이 명세는 draft이며 ready로 바꾸거나 등록 검사를 우회하지 않는다. 작업별 초기 상한(설계 3,600초·구현 14,400초·검토 4회·교정 3회)은 F04·F05로 외부 절차에 적용한다."
+  },
+  "plan_version": "v1.3.3",
+  "registration_state": "draft",
+  "revision": 1,
+  "schedule": {
+    "deadline_at": null,
+    "deadline_state": "undecided",
+    "entry_condition": "대상 범위의 독립 검토와 발행 승인",
+    "planned_start_at": null,
+    "timezone": "Asia/Seoul",
+    "unresolved_reason": "대상 환경의 실측과 승인 일정이 필요하다."
+  },
+  "schema_version": "console.sprint.v0",
+  "sources": [
+    {
+      "digest": "0719b992ccc10d752df6744d4c7df25becb7b4c5a5f153d4fa082122a91d10ae",
+      "kind": "provided_document",
+      "observed_at": null,
+      "ref": "02_design_sources/Console_Automation_Design_Log.md",
+      "revision": "2026-11-04"
+    },
+    {
+      "digest": "eb9eb043df17824638a1ce68036f81a4b6c58fdecae51c15eeb0dd9bc98dd26a",
+      "kind": "user_decision",
+      "observed_at": null,
+      "ref": "User_Decisions_2026-11-11.md",
+      "revision": "2026-11-11"
+    },
+    {
+      "digest": "f4223b902f8e54a19c7e5bc884cb58ca4cbfe77b8e98886e2b8a79f68ed0f946",
+      "kind": "review_change",
+      "observed_at": null,
+      "ref": "User_Review_Decisions_2026-11-12.md",
+      "revision": "2026-11-12"
+    },
+    {
+      "digest": "d179dfd672784ede96c549d04b3a0ef435c54e055fb78f5500cefc9c1f5c21f0",
+      "kind": "user_decision",
+      "observed_at": null,
+      "ref": "User_Decisions_2026-11-12_0103.md",
+      "revision": "2026-11-12"
+    },
+    {
+      "digest": "2d8892c40756d56eed5a74a0afb22db84457c6ee19849e860b7e517cd26e90bf",
+      "kind": "result_export",
+      "observed_at": "2026-11-18T12:00:00Z",
+      "ref": "input.json",
+      "revision": "1"
+    }
+  ],
+  "sprint_id": "FINAL-FIXTURE",
+  "target": {
+    "repo_id": "console-coordinator",
+    "repository_url": null
+  },
+  "tasks": [
+    {
+      "acceptance": {
+        "criteria": "검사·권한·승격 우회와 기동 실패를 차단하고 정상 후보 전환/직전 버전 복귀 뒤 상태를 대조한다.",
+        "item_ids": [
+          "08-01.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "estimate": {
+        "evidence": [],
+        "range_seconds": null,
+        "reason": "남은 작업의 비교 가능한 실측 범위가 미확정이다.",
+        "state": "unestimated"
+      },
+      "evidence": [],
+      "exit_condition": "검사·권한·승격 우회와 기동 실패를 차단하고 정상 후보 전환/직전 버전 복귀 뒤 상태를 대조한다.",
+      "kind": "구현",
+      "legacy_v1_2_id": null,
+      "outputs": [
+        {
+          "artifact_id": "90-01-output",
+          "description": "Reviewed integration evidence",
+          "required": true
+        }
+      ],
+      "prerequisites": [],
+      "references": [
+        "T09",
+        "P33",
+        "08-01",
+        "reports/tasks/09-01/result-export-20261118/fixtures/base-result.json"
+      ],
+      "requirement_ids": [
+        "POC-REQ-08-01"
+      ],
+      "status": "미착수",
+      "task_id": "90-01",
+      "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다."
+    },
+    {
+      "acceptance": {
+        "criteria": "커널·관측기·정책·Pod 주체·허용/금지 수신기·게시/pull/승격 자격과 초기 상태를 고정한다.",
+        "item_ids": [
+          "08-02.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "estimate": {
+        "evidence": [],
+        "range_seconds": null,
+        "reason": "남은 작업의 비교 가능한 실측 범위가 미확정이다.",
+        "state": "unestimated"
+      },
+      "evidence": [],
+      "exit_condition": "커널·관측기·정책·Pod 주체·허용/금지 수신기·게시/pull/승격 자격과 초기 상태를 고정한다.",
+      "kind": "구현",
+      "legacy_v1_2_id": null,
+      "outputs": [
+        {
+          "artifact_id": "90-02-output",
+          "description": "Reviewed integration evidence",
+          "required": true
+        }
+      ],
+      "prerequisites": [],
+      "references": [
+        "T09",
+        "P33",
+        "08-02",
+        "reports/tasks/09-01/result-export-20261118/fixtures/partial-result.json"
+      ],
+      "requirement_ids": [
+        "POC-REQ-08-02"
+      ],
+      "status": "미착수",
+      "task_id": "90-02",
+      "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다."
+    },
+    {
+      "acceptance": {
+        "criteria": "커널·관측기·정책·Pod 주체·허용/금지 수신기·게시/pull/승격 자격과 초기 상태를 고정한다.",
+        "item_ids": [
+          "08-02.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "estimate": {
+        "evidence": [],
+        "range_seconds": null,
+        "reason": "남은 작업의 비교 가능한 실측 범위가 미확정이다.",
+        "state": "unestimated"
+      },
+      "evidence": [],
+      "exit_condition": "커널·관측기·정책·Pod 주체·허용/금지 수신기·게시/pull/승격 자격과 초기 상태를 고정한다.",
+      "kind": "구현",
+      "legacy_v1_2_id": null,
+      "outputs": [
+        {
+          "artifact_id": "90-03-output",
+          "description": "Reviewed implementation evidence",
+          "required": true
+        }
+      ],
+      "prerequisites": [
+        {
+          "plan_version": "v1.3.3",
+          "required_state": "accepted",
+          "task_id": "90-02"
+        }
+      ],
+      "references": [
+        "T09",
+        "P33",
+        "08-02"
+      ],
+      "requirement_ids": [
+        "POC-REQ-08-02"
+      ],
+      "status": "조건 대기",
+      "task_id": "90-03",
+      "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다."
+    },
+    {
+      "acceptance": {
+        "criteria": "관측과 차단을 분리하고 허용/미적용 대조·서버 수신으로 금지 경로의 실제 효과를 확인한다.",
+        "item_ids": [
+          "08-04.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "estimate": {
+        "evidence": [],
+        "range_seconds": null,
+        "reason": "남은 작업의 비교 가능한 실측 범위가 미확정이다.",
+        "state": "unestimated"
+      },
+      "evidence": [],
+      "exit_condition": "관측과 차단을 분리하고 허용/미적용 대조·서버 수신으로 금지 경로의 실제 효과를 확인한다.",
+      "kind": "평가",
+      "legacy_v1_2_id": null,
+      "outputs": [
+        {
+          "artifact_id": "90-04-output",
+          "description": "Reviewed experiment evidence",
+          "required": true
+        }
+      ],
+      "prerequisites": [],
+      "references": [
+        "T09",
+        "P33",
+        "08-04",
+        "reports/tasks/09-01/result-export-20261118/fixtures/missing-result.json"
+      ],
+      "requirement_ids": [
+        "POC-REQ-08-04"
+      ],
+      "status": "조건 대기",
+      "task_id": "90-04",
+      "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다."
+    },
+    {
+      "acceptance": {
+        "criteria": "PSA Restricted의 정상/위반 명세와 앱의 허용/범위 밖 접근을 각각 검증한다. 두 역할 Pod 모두 Restricted로 실행하고 서로 다른 역할별 NetworkPolicy의 허용/거부를 실제 수신기로 확인한다. 파일·자격 격리는 P07 거부 증거로 대조하며 정책 선언만으로 입증하지 않는다.",
+        "item_ids": [
+          "08-05.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "estimate": {
+        "evidence": [],
+        "range_seconds": null,
+        "reason": "남은 작업의 비교 가능한 실측 범위가 미확정이다.",
+        "state": "unestimated"
+      },
+      "evidence": [],
+      "exit_condition": "PSA Restricted의 정상/위반 명세와 앱의 허용/범위 밖 접근을 각각 검증한다. 두 역할 Pod 모두 Restricted로 실행하고 서로 다른 역할별 NetworkPolicy의 허용/거부를 실제 수신기로 확인한다. 파일·자격 격리는 P07 거부 증거로 대조하며 정책 선언만으로 입증하지 않는다.",
+      "kind": "평가",
+      "legacy_v1_2_id": null,
+      "outputs": [
+        {
+          "artifact_id": "90-05-output",
+          "description": "Reviewed experiment evidence",
+          "required": true
+        }
+      ],
+      "prerequisites": [],
+      "references": [
+        "T09",
+        "P33",
+        "08-05",
+        "reports/tasks/09-01/result-export-20261118/fixtures/stale-result.json"
+      ],
+      "requirement_ids": [
+        "POC-REQ-08-05"
+      ],
+      "status": "조건 대기",
+      "task_id": "90-05",
+      "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다."
+    },
+    {
+      "acceptance": {
+        "criteria": "한 스프린트에서 재시작·이벤트 누락·교정·런타임 증거 누락·main CI/산출물/후속을 연결해 정상 진행과 잘못된 완료 차단을 확인한다.",
+        "item_ids": [
+          "08-06.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "estimate": {
+        "evidence": [],
+        "range_seconds": null,
+        "reason": "남은 작업의 비교 가능한 실측 범위가 미확정이다.",
+        "state": "unestimated"
+      },
+      "evidence": [],
+      "exit_condition": "한 스프린트에서 재시작·이벤트 누락·교정·런타임 증거 누락·main CI/산출물/후속을 연결해 정상 진행과 잘못된 완료 차단을 확인한다.",
+      "kind": "구현",
+      "legacy_v1_2_id": null,
+      "outputs": [
+        {
+          "artifact_id": "90-06-output",
+          "description": "Reviewed integration evidence",
+          "required": true
+        }
+      ],
+      "prerequisites": [],
+      "references": [
+        "T09",
+        "P33",
+        "08-06",
+        "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-result.json"
+      ],
+      "requirement_ids": [
+        "POC-REQ-08-06"
+      ],
+      "status": "조건 대기",
+      "task_id": "90-06",
+      "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다."
+    },
+    {
+      "acceptance": {
+        "criteria": "검사·권한·승격 우회와 기동 실패를 차단하고 정상 후보 전환/직전 버전 복귀 뒤 상태를 대조한다.",
+        "item_ids": [
+          "08-01.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "estimate": {
+        "evidence": [],
+        "range_seconds": null,
+        "reason": "남은 작업의 비교 가능한 실측 범위가 미확정이다.",
+        "state": "unestimated"
+      },
+      "evidence": [],
+      "exit_condition": "검사·권한·승격 우회와 기동 실패를 차단하고 정상 후보 전환/직전 버전 복귀 뒤 상태를 대조한다.",
+      "kind": "평가",
+      "legacy_v1_2_id": null,
+      "outputs": [
+        {
+          "artifact_id": "90-07-output",
+          "description": "Reviewed experiment evidence",
+          "required": true
+        }
+      ],
+      "prerequisites": [],
+      "references": [
+        "T09",
+        "P33",
+        "08-01",
+        "reports/tasks/09-01/result-export-20261118/fixtures/alternative-result.json"
+      ],
+      "requirement_ids": [
+        "POC-REQ-08-01"
+      ],
+      "status": "조건 대기",
+      "task_id": "90-07",
+      "verification": "연결된 T/P 범위·현재 문서/커밋/이미지 버전에서 원본 증거와 독립 기대값을 대조한다."
+    }
+  ],
+  "title": "Synthetic final sprint",
+  "track": "종합",
+  "unresolved_bindings": [
+    "실제 repository_url",
+    "실행 주체·역할별 자격",
+    "시간/토큰/교정 한도",
+    "실행 일정·선행 출처의 관측 시각",
+    "적용하는 Notion 정본 revision 또는 제공 문서 승인 근거",
+    "독립 검토와 발행 승인",
+    "대상 범위 실제 결과 연결(09-05)"
+  ]
+}

@@ -1,0 +1,1 @@
+Synthetic split-scope counters, no actual trial.

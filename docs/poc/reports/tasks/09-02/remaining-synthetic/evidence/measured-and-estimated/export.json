@@ -1,0 +1,3495 @@
+{
+  "actual_linkage": "pending_09-05",
+  "approval": {
+    "execution": "not_started",
+    "generation": "draft",
+    "independent_review": "pending",
+    "publication": "pending"
+  },
+  "assets": {
+    "meter": {
+      "asset_id": "meter",
+      "contract": "collector v0",
+      "dependencies": [
+        "fixture-runtime-1"
+      ],
+      "issues": [],
+      "kind": "실행 코드",
+      "origin": "synthetic fixture",
+      "ref": "reports/tasks/09-01/result-export-20261118/fixtures/collector-module.txt",
+      "remaining": "Separate target integration and regression review.",
+      "scope": "base",
+      "sha256": "eab70d985ee8fe14a2f896e80dc313f5fdf65bd68b2bf3d8f2b4ff5ae87272e2",
+      "status": "편입 대기",
+      "target": "console-coordinator",
+      "task_ids": [
+        "90-01"
+      ],
+      "usage_terms": "fixture-only",
+      "validation_result": "reports/tasks/09-01/result-export-20261118/fixtures/failure-result.json",
+      "version": "meter-1"
+    },
+    "no-provenance": {
+      "asset_id": "no-provenance",
+      "issues": [
+        "missing_ref",
+        "missing_version",
+        "missing_sha256",
+        "missing_origin",
+        "missing_usage_terms",
+        "missing_contract",
+        "missing_dependencies",
+        "missing_scope",
+        "missing_target",
+        "missing_remaining",
+        "missing_validation_result"
+      ],
+      "kind": "실행 코드",
+      "status": "보존 전용",
+      "task_ids": []
+    }
+  },
+  "authority_sha256": "c1982bf1136710ba9cd8b76086f1b77bd777ac98f531d41efdd351d15d9fe75f",
+  "budget_policies": {
+    "missing": {
+      "attempts": 3,
+      "deadline": "2026-11-19T00:00:00Z",
+      "token_fields": [
+        "input",
+        "output"
+      ],
+      "tokens": 25,
+      "wall_ms": 10000
+    },
+    "optional": {
+      "attempts": 3,
+      "deadline": "2026-11-19T00:00:00Z",
+      "token_fields": [
+        "input",
+        "output"
+      ],
+      "tokens": 25,
+      "wall_ms": 10000
+    },
+    "partial": {
+      "attempts": 3,
+      "deadline": "2026-11-19T00:00:00Z",
+      "token_fields": [
+        "input",
+        "output"
+      ],
+      "tokens": 25,
+      "wall_ms": 10000
+    },
+    "runtime": {
+      "attempts": 3,
+      "deadline": "2026-11-19T00:00:00Z",
+      "token_fields": [
+        "input",
+        "output"
+      ],
+      "tokens": 25,
+      "wall_ms": 10000
+    },
+    "stale": {
+      "attempts": 3,
+      "deadline": "2026-11-19T00:00:00Z",
+      "token_fields": [
+        "input",
+        "output"
+      ],
+      "tokens": 25,
+      "wall_ms": 10000
+    },
+    "unapproved": {
+      "attempts": 3,
+      "deadline": "2026-11-19T00:00:00Z",
+      "token_fields": [
+        "input",
+        "output"
+      ],
+      "tokens": 25,
+      "wall_ms": 10000
+    }
+  },
+  "budgets": {
+    "missing": {
+      "attempts": 1,
+      "automatic_retry": true,
+      "missing_records": [],
+      "policy": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "stop_reasons": [],
+      "summary": {
+        "by_judgment": {
+          "succeeded": 1
+        },
+        "by_role": {
+          "development": 1
+        },
+        "format": "ieo-evidence-summary/v0",
+        "records": 1,
+        "retries": 0,
+        "task_ids": [
+          "08-04"
+        ],
+        "timed_out": 0,
+        "usage": {
+          "attribution_mismatches": [],
+          "children_measured": 0,
+          "children_seen": 0,
+          "completeness": "complete",
+          "cost_usd_reported_sum": 0.0003189,
+          "measured_runs": 1,
+          "model_runs": 1,
+          "tokens_measured_sum": {
+            "cache_creation": 0,
+            "cache_read": 2549,
+            "input": 2,
+            "output": 6
+          },
+          "unmeasured": []
+        },
+        "usage_by_role": {
+          "development": {
+            "attribution_mismatches": [],
+            "children_measured": 0,
+            "children_seen": 0,
+            "completeness": "complete",
+            "cost_usd_reported_sum": 0.0003189,
+            "measured_runs": 1,
+            "model_runs": 1,
+            "tokens_measured_sum": {
+              "cache_creation": 0,
+              "cache_read": 2549,
+              "input": 2,
+              "output": 6
+            },
+            "unmeasured": []
+          }
+        },
+        "wall_ms_sum": 100
+      },
+      "tokens_measured": 8,
+      "tokens_total": 8,
+      "wall_ms": 100,
+      "wall_ms_measured": 100
+    },
+    "optional": {
+      "attempts": 1,
+      "automatic_retry": true,
+      "missing_records": [],
+      "policy": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "stop_reasons": [],
+      "summary": {
+        "by_judgment": {
+          "succeeded": 1
+        },
+        "by_role": {
+          "development": 1
+        },
+        "format": "ieo-evidence-summary/v0",
+        "records": 1,
+        "retries": 0,
+        "task_ids": [
+          "08-03"
+        ],
+        "timed_out": 0,
+        "usage": {
+          "attribution_mismatches": [],
+          "children_measured": 0,
+          "children_seen": 0,
+          "completeness": "complete",
+          "cost_usd_reported_sum": 0.0003189,
+          "measured_runs": 1,
+          "model_runs": 1,
+          "tokens_measured_sum": {
+            "cache_creation": 0,
+            "cache_read": 2549,
+            "input": 2,
+            "output": 6
+          },
+          "unmeasured": []
+        },
+        "usage_by_role": {
+          "development": {
+            "attribution_mismatches": [],
+            "children_measured": 0,
+            "children_seen": 0,
+            "completeness": "complete",
+            "cost_usd_reported_sum": 0.0003189,
+            "measured_runs": 1,
+            "model_runs": 1,
+            "tokens_measured_sum": {
+              "cache_creation": 0,
+              "cache_read": 2549,
+              "input": 2,
+              "output": 6
+            },
+            "unmeasured": []
+          }
+        },
+        "wall_ms_sum": 100
+      },
+      "tokens_measured": 8,
+      "tokens_total": 8,
+      "wall_ms": 100,
+      "wall_ms_measured": 100
+    },
+    "partial": {
+      "attempts": 1,
+      "automatic_retry": true,
+      "missing_records": [],
+      "policy": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "stop_reasons": [],
+      "summary": {
+        "by_judgment": {
+          "succeeded": 1
+        },
+        "by_role": {
+          "development": 1
+        },
+        "format": "ieo-evidence-summary/v0",
+        "records": 1,
+        "retries": 0,
+        "task_ids": [
+          "08-02"
+        ],
+        "timed_out": 0,
+        "usage": {
+          "attribution_mismatches": [],
+          "children_measured": 0,
+          "children_seen": 0,
+          "completeness": "complete",
+          "cost_usd_reported_sum": 0.0003189,
+          "measured_runs": 1,
+          "model_runs": 1,
+          "tokens_measured_sum": {
+            "cache_creation": 0,
+            "cache_read": 2549,
+            "input": 2,
+            "output": 6
+          },
+          "unmeasured": []
+        },
+        "usage_by_role": {
+          "development": {
+            "attribution_mismatches": [],
+            "children_measured": 0,
+            "children_seen": 0,
+            "completeness": "complete",
+            "cost_usd_reported_sum": 0.0003189,
+            "measured_runs": 1,
+            "model_runs": 1,
+            "tokens_measured_sum": {
+              "cache_creation": 0,
+              "cache_read": 2549,
+              "input": 2,
+              "output": 6
+            },
+            "unmeasured": []
+          }
+        },
+        "wall_ms_sum": 100
+      },
+      "tokens_measured": 8,
+      "tokens_total": 8,
+      "wall_ms": 100,
+      "wall_ms_measured": 100
+    },
+    "runtime": {
+      "attempts": 3,
+      "automatic_retry": false,
+      "missing_records": [],
+      "policy": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "stop_reasons": [
+        "attempts_limit_reached",
+        "usage_incomplete"
+      ],
+      "summary": {
+        "by_judgment": {
+          "succeeded": 3
+        },
+        "by_role": {
+          "development": 2,
+          "review": 1
+        },
+        "format": "ieo-evidence-summary/v0",
+        "records": 3,
+        "retries": 0,
+        "task_ids": [
+          "08-01"
+        ],
+        "timed_out": 0,
+        "usage": {
+          "attribution_mismatches": [],
+          "children_measured": 0,
+          "children_seen": 0,
+          "completeness": "incomplete",
+          "cost_usd_reported_sum": null,
+          "measured_runs": 2,
+          "model_runs": 3,
+          "tokens_measured_sum": {
+            "cache_creation": 0,
+            "cache_read": 5098,
+            "input": 4,
+            "output": 12
+          },
+          "unmeasured": [
+            {
+              "attempt_id": "alternative",
+              "command_id": "fixture-meter",
+              "reason": "Synthetic aborted stream",
+              "role": "development",
+              "task_id": "08-01"
+            }
+          ]
+        },
+        "usage_by_role": {
+          "development": {
+            "attribution_mismatches": [],
+            "children_measured": 0,
+            "children_seen": 0,
+            "completeness": "incomplete",
+            "cost_usd_reported_sum": null,
+            "measured_runs": 1,
+            "model_runs": 2,
+            "tokens_measured_sum": {
+              "cache_creation": 0,
+              "cache_read": 2549,
+              "input": 2,
+              "output": 6
+            },
+            "unmeasured": [
+              {
+                "attempt_id": "alternative",
+                "command_id": "fixture-meter",
+                "reason": "Synthetic aborted stream",
+                "role": "development",
+                "task_id": "08-01"
+              }
+            ]
+          },
+          "review": {
+            "attribution_mismatches": [],
+            "children_measured": 0,
+            "children_seen": 0,
+            "completeness": "complete",
+            "cost_usd_reported_sum": 0.0003189,
+            "measured_runs": 1,
+            "model_runs": 1,
+            "tokens_measured_sum": {
+              "cache_creation": 0,
+              "cache_read": 2549,
+              "input": 2,
+              "output": 6
+            },
+            "unmeasured": []
+          }
+        },
+        "wall_ms_sum": 300
+      },
+      "tokens_measured": 16,
+      "tokens_total": null,
+      "wall_ms": 300,
+      "wall_ms_measured": 300
+    },
+    "stale": {
+      "attempts": 1,
+      "automatic_retry": true,
+      "missing_records": [],
+      "policy": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "stop_reasons": [],
+      "summary": {
+        "by_judgment": {
+          "succeeded": 1
+        },
+        "by_role": {
+          "development": 1
+        },
+        "format": "ieo-evidence-summary/v0",
+        "records": 1,
+        "retries": 0,
+        "task_ids": [
+          "08-05"
+        ],
+        "timed_out": 0,
+        "usage": {
+          "attribution_mismatches": [],
+          "children_measured": 0,
+          "children_seen": 0,
+          "completeness": "complete",
+          "cost_usd_reported_sum": 0.0003189,
+          "measured_runs": 1,
+          "model_runs": 1,
+          "tokens_measured_sum": {
+            "cache_creation": 0,
+            "cache_read": 2549,
+            "input": 2,
+            "output": 6
+          },
+          "unmeasured": []
+        },
+        "usage_by_role": {
+          "development": {
+            "attribution_mismatches": [],
+            "children_measured": 0,
+            "children_seen": 0,
+            "completeness": "complete",
+            "cost_usd_reported_sum": 0.0003189,
+            "measured_runs": 1,
+            "model_runs": 1,
+            "tokens_measured_sum": {
+              "cache_creation": 0,
+              "cache_read": 2549,
+              "input": 2,
+              "output": 6
+            },
+            "unmeasured": []
+          }
+        },
+        "wall_ms_sum": 100
+      },
+      "tokens_measured": 8,
+      "tokens_total": 8,
+      "wall_ms": 100,
+      "wall_ms_measured": 100
+    },
+    "unapproved": {
+      "attempts": 1,
+      "automatic_retry": true,
+      "missing_records": [],
+      "policy": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "stop_reasons": [],
+      "summary": {
+        "by_judgment": {
+          "succeeded": 1
+        },
+        "by_role": {
+          "development": 1
+        },
+        "format": "ieo-evidence-summary/v0",
+        "records": 1,
+        "retries": 0,
+        "task_ids": [
+          "08-06"
+        ],
+        "timed_out": 0,
+        "usage": {
+          "attribution_mismatches": [],
+          "children_measured": 0,
+          "children_seen": 0,
+          "completeness": "complete",
+          "cost_usd_reported_sum": 0.0003189,
+          "measured_runs": 1,
+          "model_runs": 1,
+          "tokens_measured_sum": {
+            "cache_creation": 0,
+            "cache_read": 2549,
+            "input": 2,
+            "output": 6
+          },
+          "unmeasured": []
+        },
+        "usage_by_role": {
+          "development": {
+            "attribution_mismatches": [],
+            "children_measured": 0,
+            "children_seen": 0,
+            "completeness": "complete",
+            "cost_usd_reported_sum": 0.0003189,
+            "measured_runs": 1,
+            "model_runs": 1,
+            "tokens_measured_sum": {
+              "cache_creation": 0,
+              "cache_read": 2549,
+              "input": 2,
+              "output": 6
+            },
+            "unmeasured": []
+          }
+        },
+        "wall_ms_sum": 100
+      },
+      "tokens_measured": 8,
+      "tokens_total": 8,
+      "wall_ms": 100,
+      "wall_ms_measured": 100
+    }
+  },
+  "changes": null,
+  "converter_sha256": "b6c2d8b026f105d1db4297c6e908a424d9f1e12bb652c1e1020455f55267cfeb",
+  "extra_tasks": [
+    {
+      "evidence": [
+        "reports/extra/X-01/notion-import-20261113/REPORT.md",
+        "reports/extra/X-01/notion-import-20261113/evidence/cargo-test.log",
+        "reports/extra/X-01/notion-import-20261113/evidence/mutants.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/live-check.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/live-recheck3.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/db-backup-restore.txt",
+        "reports/extra/X-01/notion-import-20261113/evidence/target-branch.txt",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-b8b619a.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-38b671b.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-7a48a4f.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr27-74bd796.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/27",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/43425920936",
+        "reports/extra/X-01/followup-c1-c2-20261113/REPORT.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/evidence/c2-live-r3.txt",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr30-aa38041.md",
+        "reports/extra/X-01/notion-import-20261113/reviews/review-pr28-97ce523.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/30",
+        "reports/extra/X-01/followup-c1-c2-20261113/evidence/c2-live-r4.txt",
+        "reports/extra/X-01/followup-c1-c2-20261113/evidence/persistent-db-checks.txt",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr34-f0c4e87.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr35-6352413.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr36-f571d1e.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr37-784d60e.md",
+        "reports/extra/X-01/followup-c1-c2-20261113/reviews/review-pr33-a3aae40.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/34",
+        "https://github.com/HeaInSeo/ieo_poc/pull/35",
+        "https://github.com/HeaInSeo/ieo_poc/pull/36",
+        "https://github.com/HeaInSeo/ieo_poc/pull/37"
+      ],
+      "kind": "구현",
+      "last_observed_at": "2026-11-14T02:25:00+09:00",
+      "latest_report": "reports/extra/X-01/notion-import-20261113/REPORT.md",
+      "next_action": "없음(검수 완료). 이어지는 실행은 X-02(extra_tasks X-02의 next_action)",
+      "prerequisites": [
+        "02-03"
+      ],
+      "result_state": "crates/ieo-notion(읽기 전용: 연결 스냅샷·REST API) + 코디네이터 POST /v0/imports/notion(OpenAPI 0.7.0). 실제 Notion 작업 OP-OCI-RAC-OC08-20261018을 대화 연결로 읽은 비공개 스냅샷(서버에 Notion 자격 없음)으로 영속 DB에 시험 ID POCX-SORI-OC08-T01 draft 등록(201), 같은 입력 재조회(200·행 불변), 모의 변경으로 revision 2·revision 1 보존, 초안 배정·executable 승격 거부(422), Notion 읽기 실패 시 DB 불변. 실행 중 배정의 revision 고정(상한은 더 새로운 executable·검토 통과 revision 기준). 시험 165건·변이 17/17. 대상 repo HeaInSeo/sori poc/POCX-SORI-OC08-T01 = 기준 2fa7f5e(추가 커밋 0, PR 없음). DB 등록은 개발 완료가 아님. PR #27 b8b619a reject(P2 R1~R3) → 38b671b reject(P2 S1·S2) → 7a48a4f reject(P2 T1) → 74bd796 approve(X-01 검토 4/4·교정 3/3) → 병합 74b00fd · main CI success(run 43425920936). 모델 호출 0 · 후속 교정 C1·C2(사용자 결정 2026-11-13 이슈 A·B, 73·12 미산입): C1 Notion 원문 무전사 수집(변경 없음 확인), C2 서버 실행 통제 — 신뢰된 가져오기 기록(service 전용 notion:import)의 큐 차단·필수 정보로 executable 등록·배정을 판정, 사용자 승인 예외(user 전용, 시험 ID·repo·페이지·내용 digest에 묶임). PR #30 9a421b7·7afd4d1·e908a8c reject → aa38041 approve(검토 4/4·교정 3/3, P3 I1~I3 이월) → 최신화 병합 7111a73(tree 동일) → 병합 c5a3d3a. 영속 DB 재적용(c2-live-r3), 결정 ③ 예외 r4 기록. 모델 호출 0 · 후속 PR #34(I1~I3)·#35(J1~J3: 최신 가져오기를 revision 우선으로, 시계 역행 열린 실패 제거)·#36(K1~K2: 두 시험 ID 아래 이전 페이지는 닫힌 실패)·#37(L1~L3: page_id 정규형만 수용) — 각 첫 검토 approve, 병합 803d3f6·50f407e·0086b0d·7e9f5ea, main CI run 43450158305·43466926083·43469160953·43471640906 success. 시험 208건·변이 24/25(C4a 동등). 영속 코디네이터 main 7e9f5ea 재적용(c2-live-r4): 비정규 page_id 0·두 시험 ID 페이지 0, 대시 표기 page_id 400. 모델 호출 0",
+      "status": "검수 완료",
+      "task_id": "X-01",
+      "title": "Notion 작업 가져오기·초안 등록",
+      "track": "extra",
+      "unresolved": "최종 검토 74bd796 P3(담당·시점): U1 가져온 스프린트의 executable 등록은 작업·Notion 출처만 고정하고 제목·목표·위임·출처 메타·미해결 사유는 등록자가 바꿀 수 있음(큐 선행 미해제 상태의 실행 등록 차단이 서버가 아니라 등록자와 독립 의미 검토에 달림) → X-02 착수 전 조건으로 고정(executable 승격 전 큐 선행 해제 증거 또는 사용자 결정 필수, 필요하면 가드 확장). 같은 시점에 X-01 보고 §6 R6 문장('실행 가능으로 바꿀 수는 없다')·§8 T1 문장('한도·준비 상태를 바인딩')과 api.rs 거부 안내('bind only limits/readiness')를 실제 강제 범위(작업·Notion 출처만 고정)에 맞게 정정(PR #28 검토 E2); U2 소유 검사가 01-07 revision 검사보다 앞서 수정 재제출이 REVISION_* 대신 409 → 계약 검사 순서 명시는 02-05(문서 버전·배정 연결) 착수 전; U3 바인딩 sprint_id를 운영 중 기존 가져오기 시험 ID로 바꾸면 /v0/sprint-inputs가 그 스프린트에 쓸 수 있음(기동 검사 없음) → 02-04 기동 검사에 바인딩·가져오기 충돌 확인 추가; U4 T2·T5 경로 시험 미고정(변이 Z1·Z2·Z5 생존, 동작은 정상) → X-02 착수 전 시험 보강; U5 보관본 각주 렌더링 → 이 보고 PR에서 교정. 서버 직접 Notion 조회(통합 토큰)와 경로별 digest 차이는 토큰 발급 뒤 재시험",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/extra/X-02/prep-page-url-20261114/evidence/x02-url-live.txt",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr43-5457cb3.md",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr44-65d56ce.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/43",
+        "https://github.com/HeaInSeo/ieo_poc/pull/44",
+        "reports/extra/X-02/prep-page-url-20261114/reviews/review-pr45-444970e.md"
+      ],
+      "kind": "검증",
+      "last_observed_at": "2026-11-14T21:07:29+09:00",
+      "latest_report": null,
+      "next_action": "X-08 검수 완료 → OC08 최신 가져오기(revision 3)에서 파생한 executable revision 등록(결정 ① X-02 한도)·다른 사용자의 의미 검토 → poc/POCX-SORI-OC08-T01에서 X-02 예산 안 개발·검토(Sori PR 없음)",
+      "prerequisites": [
+        "X-01",
+        "02-04",
+        "X-08"
+      ],
+      "result_state": "미실행",
+      "status": "조건 대기",
+      "task_id": "X-02",
+      "title": "Notion 시험 작업의 실제 개발 세션 연결",
+      "track": "extra",
+      "unresolved": "사용자 결정 2026-11-13(User_Decisions_2026-11-13_x02.md)으로 처분: ① 모델 예산(X-02 6회·회당 3,600초·총 14,400초·3M·cache_read 30M, 추가 청구 USD 0), ② 역할 자격 재사용(값 출력 없이 유효성 확인 — 첫 예산 호출 때), ③ OC08 별도 PoC 시험 실행 허용(원 작업 담당·상태·claim·차단 사유 유지, 기본 브랜치 병합·배포 없음; 영속 DB 예외 r4로 기록), ④ Sori PR 지금 열지 않음, ⑤ Notion은 기존 MCP 연결. 남은 조건: X-08 검수 완료, executable 등록·의미 검토(02-04 수용은 2026-11-15 충족). 착수 전 확인: 영속 DB 읽기 전용 확인 재실행(c2-live-r4의 SQL), 가져온 page_id와 URL 안 페이지 ID 일치 검사는 완료(User_Decisions_2026-11-14_pr30.md §5 · PR #43 병합 42b435e·#44 병합 778ee47, 영속 코디네이터 재적용 x02-url-live: 불일치 400·행 불변). 남은 관찰: URL 호스트 허용 목록은 별도 결정, 연결·URL 경로 고정 시험(검토 65d56ce P3) · 착수 전 보고 항목(User_Decisions_2026-11-14_pr30.md §5 넷째): 예외 기록의 브랜치·기준 SHA·병합/배포 금지 범위 중 서버가 강제하는 부분(시험 ID·repo·페이지·내용 digest 결합)과 운영 규칙으로 지키는 부분(scope 필드는 기록만)을 구분해 보고 · 차단 조건(사용자 결정 2026-11-15 항목 8, 개정 A6): 선행 X-08(02-04 호출자 이월 PR #51 P1~P4·N6·F8, PR #49 L-c3-2~4, 마감 정지 시험) 검수 완료 전 착수 금지",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [
+        "reports/extra/X-03/grpc-contract-20261115/REPORT.md",
+        "reports/extra/X-03/grpc-contract-20261115/evidence/proto-checks.txt",
+        "reports/extra/X-03/grpc-contract-20261115/reviews/review-pr62-b8506fd.md",
+        "reports/extra/X-03/grpc-contract-20261115/reviews/review-pr62-0de371c.md",
+        "reports/extra/X-03/grpc-contract-20261115/reviews/review-pr62-8e3e817.md",
+        "reports/extra/X-03/grpc-contract-20261115/review-pr63-d1c86c5.md"
+      ],
+      "kind": "설계",
+      "last_observed_at": "2026-11-15T18:00:27+09:00",
+      "latest_report": "reports/extra/X-03/grpc-contract-20261115/REPORT.md",
+      "next_action": "없음(X-04로)",
+      "prerequisites": [
+        "02-03"
+      ],
+      "result_state": "계약 초안 작성: contracts/proto/ieo/internal/v0/supervisor.proto(SupervisorService RPC 5개: SubmitAgentReport·SubmitReproRequest·GetReproRequest·ReportCheckpoint·GetLatestCheckpoint), contracts/proto/buf.yaml(STANDARD lint, PACKAGE_VERSION_SUFFIX만 예외, breaking WIRE_JSON), 설명 contracts/ieo-internal-v0.md(범위·버전 호환·인증·상태 대응·ieo-error-bin·재시도·멱등·deadline·취소·전송 쪽 동작·스트림 규칙·분리 영향). buf lint·build·protoc 통과. 구현 없음. 검토 b8506fd 변경 요청(M-1 500은 결과 불명, M-2 검사 순서, M-3 크기 규칙, M-4 자동 재전송 없음·읽기 확인만, L-1~L-4) → 교정 1 → 0de371c 승인(Low N-1~N-5) → 교정 2 → 8e3e817 approve(검토 3/4·교정 2/3). 승인 head 병합 0c243ee, main CI 43696890495 success. 검수 완료(추가 작업, 73·12 미산입). 모델 호출 0",
+      "status": "검수 완료",
+      "task_id": "X-03",
+      "title": "gRPC 내부 API 계약(서비스·메시지·버전 호환·인증·상태 대응·재시도·멱등·deadline·취소)과 분리 영향 확인",
+      "track": "extra",
+      "unresolved": "업무 규칙은 기존 api::handle 재사용 전제(§3). 02-05 전에 끝내는 것이 목표(02-05의 선행 아님) · PR #41 검토 b3cb083: agent:repro는 guardrail 전용 — supervisor 주체·범위를 정할 때 재현 요청 재사용 여부 결정 · 처분(X-03 계약 설명 §3): agent:repro는 guardrail supervisor가 그대로 재사용, 새 범위 없음. 스프린트 조회는 gRPC 표면에 넣지 않음(§1.2) · 검토 8e3e817의 Low P-1·P-2와 Info I-7~I-10은 X-04 입력(보고 §7) · PR #63 검토 d1c86c5 Q-1(보고 머리 상태 행)·Q-2(resume 문구) 반영(snapshot 0037)",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/extra/X-04/grpc-path-20261115/REPORT.md",
+        "reports/extra/X-04/grpc-path-20261115/evidence/test.log",
+        "reports/extra/X-04/grpc-path-20261115/reviews/review-pr64-c6c0656.md",
+        "reports/extra/X-04/grpc-path-20261115/reviews/review-pr64-835f583.md",
+        "reports/extra/X-04/grpc-path-20261115/reviews/review-pr65-62b8fa4.md"
+      ],
+      "kind": "구현",
+      "last_observed_at": "2026-11-15T20:12:23+09:00",
+      "latest_report": "reports/extra/X-04/grpc-path-20261115/REPORT.md",
+      "next_action": "없음(02-05로). X-05·X-06은 각자의 선행대로",
+      "prerequisites": [
+        "X-03"
+      ],
+      "result_state": "구현: 작업 표(Operation·dispatch, 동작 변경 없음)·커밋 전 확인, ieo-coord --grpc-listen(tonic 0.14, protox 빌드 생성, 작업자 풀, deadline·취소·57014, ieo-error-bin, tonic-health), crate ieo-proto(상태 대응·trailer·변환), supervisor CoordinatorClient(HTTP 기본·gRPC 선택, 4xx/결과 불명 분류 한 곳, 자동 재전송 없음), HTTP·gRPC 공통 회귀(실제 PostgreSQL, 94회 동등 시나리오·교차 재전송·커밋 뒤 응답 유실·롤백·옛 세대), 계약 §12 수정(X-03 검토 P-1·P-2·I-7~I-10), CI 비필수 buf 작업. 검토 c6c0656 변경 요청(M-1 CI의 serve 시험 경합 → 직렬화, L-1 시간 여유) → 교정 1 → 835f583 approve(검토 2/4·교정 1/3). 승인 head 병합 84c9668, main CI 43707470907 success. 검수 완료(추가 작업, 73·12 미산입). 모델 호출 0",
+      "status": "검수 완료",
+      "task_id": "X-04",
+      "title": "gRPC 경로 구현(작업 표 분리·tonic 어댑터·metadata 인증)과 HTTP·gRPC 공통 회귀",
+      "track": "extra",
+      "unresolved": "공통 회귀: 인증·역할 권한, 중복 배정·멱등, 롤백, 옛 세대 보존·현재 판정 제외, 연결 중단 뒤 재전송 중복 반영 방지(전송 성공과 실제 반영의 불일치 포함) · 02-05의 선행·수용 기준은 바꾸지 않음: X-04가 준비되지 않으면 02-05는 HTTP로 진행 · supervisor 쪽 gRPC 클라이언트(02-05가 HTTP로 먼저 진행했으면 그 전환 포함)도 X-04 범위 · PR #41 검토 b3cb083: X-04 PR 설명·보고에 supervisor 클라이언트 전환을 명시(장부 수용 기준에는 없음) · X-03 계약 검토 8e3e817에서 넘긴 입력(reports/extra/X-03/grpc-contract-20261115/REPORT.md §7): P-1 빈 request_id·?·# 경로 값은 인증 뒤 404, P-2 RESOURCE_EXHAUSTED 규칙 하나로·사전 계산에 경로 값 길이·대기 사본 처리, I-7 §3의 format·순번 400, I-8 사전 계산 직렬화·from_utf8_lossy 차이, I-9 보고 §2 4번 문구, I-10 trailer 목록에 DB UNAVAILABLE. 계약 설명을 구현과 함께 고친다 · 수용 뒤 비차단(보고 §5): L-3 deadline 시험의 50ms 응답 여유, I-7 시험 기록의 기준 커밋, 교정 1 표의 L-2·I-1~I-6",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/extra/X-05/REPORT.md",
+        "reports/extra/X-05/criteria.md",
+        "reports/extra/X-05/evidence/kind-evidence.tar.gz",
+        "https://github.com/HeaInSeo/ieo_poc/pull/97",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44303120976",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44317465418"
+      ],
+      "kind": "검증",
+      "last_observed_at": "2026-11-18T22:56:21+09:00",
+      "latest_report": "reports/extra/X-05/REPORT.md",
+      "next_action": "X-06 제품 경로 검증",
+      "prerequisites": [
+        "X-03"
+      ],
+      "result_state": "X-05 검수 완료. 동결 기준 8d31eca, rootless Podman 기본 kind 4노드에서 고정 창 1,500/1,500, 편차 최대 4.0%p, 변경 중 성공 간격 최대 201ms. 스트림 14~18 연속 재개, 명시 읽기 재요청 한 번. PR #97 독립 승인 b507538, PR CI 4/4, 승인 head 병합 d27fa96, 해당 main CI 44317465418 4/4. 추가 작업으로 73·12 분모·완료 수에 미산입. 실제 모델 호출 0.",
+      "status": "검수 완료",
+      "task_id": "X-05",
+      "title": "기본 kind(Cilium 없음, 멀티 노드) gRPC 서비스 발견·분산·장애 복구 시험(시험용 서버·클라이언트)",
+      "track": "extra",
+      "unresolved": "기본 kind 시험용 경로 검증 범위. 제품 코디네이터와 DB 상태는 X-06. 물리 서버 장애와 운영 처리량은 별도 검증.",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [],
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "next_action": "X-04·X-05 뒤",
+      "prerequisites": [
+        "X-04",
+        "X-05"
+      ],
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "X-06",
+      "title": "제품 경로 kind 재검증: 실제 코디네이터 gRPC 경로의 판정·DB 상태·중복 처리",
+      "track": "extra",
+      "unresolved": "시험용 서버 결과와 실제 코디네이터 결과를 구분. 04-03·04-04의 수용 기준은 바꾸지 않음",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "next_action": "호환 환경이 있으면 X-05 뒤 순차 실행, 불가하면 이유·필요 조건 기록",
+      "prerequisites": [
+        "X-05"
+      ],
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "X-07",
+      "title": "Cilium L7 분산 경로 추가 시험(별도 kind 구성)",
+      "track": "extra",
+      "unresolved": "선택 시험. 미실행이 다른 작업을 막지 않음. 설치 여부가 아니라 활성 기능·설정과 실제 요청 분포로 판정",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/02-04/caller-carryovers-20261115/REPORT.md",
+        "reports/tasks/02-04/caller-carryovers-20261115/evidence/test.log",
+        "reports/tasks/02-04/caller-carryovers-20261115/evidence/mutants.txt",
+        "reports/tasks/02-04/caller-carryovers-20261115/reviews/review-pr67-681c1d3.md",
+        "reports/tasks/02-04/caller-carryovers-20261115/review-pr68-3724bc9.md",
+        "reports/tasks/02-04/caller-carryovers-20261115/reviews/review-pr69-d0f72ec.md",
+        "User_Decisions_2026-11-15_0205-x08.md",
+        "reports/tasks/02-04/caller-carryovers-20261115/reviews/review-pr70-4e42bef.md",
+        "reports/tasks/02-04/caller-carryovers-20261115/reviews/review-pr70-8e1ecf7.md",
+        "reports/tasks/02-04/caller-carryovers-20261115/reviews/review-pr71-b92a398.md"
+      ],
+      "kind": "구현",
+      "last_observed_at": "2026-11-15T22:24:12+09:00",
+      "latest_report": "reports/tasks/02-04/caller-carryovers-20261115/REPORT.md",
+      "next_action": "없음(수용). 실제 회차 전 운영 준비(재빌드)는 02-05 단계 8·X-02 준비에서",
+      "prerequisites": [
+        "02-04"
+      ],
+      "result_state": "교정·회귀 시험: PR #51 P1~P4·N6·F8, PR #49 L-c3-2~4, 마감 정지 시험, PR #58 P-2·Q-1·Q-2(손상 대기 파일)·고정 시험. 시험 346 통과·변이 24/24. Q-3(start의 변조 미탐지)은 고치지 않음 → 사용자 결정 대기. PR #67 검토 681c1d3 approve(검토 1/4·교정 0/3), 승인 head 병합 6e5e502, main CI 43712109183 success. 후속: L-1 P-2의 남은 두 경로(duplicate 응답, 대기 사본 채택), I-4 객체가 아닌 대기 파일 panic, I-1 잠금 fd 시험 → 후속 PR(fix/x08-followup): L-1은 코디네이터가 그 순번의 변조 기록 여부(tamper_recorded)를 중복 응답·latest로 알려 주고 supervisor는 true일 때만 대기를 지움(API·proto 필드 추가), I-4 객체가 아닌 대기 파일은 손상과 같이 처리, I-1·I-2 시험. 시험 349 통과. PR #68 검토 3724bc9 approve(검토 1/4), 병합 e0a7f8a, main CI 43714821313 success. 실제 호출 전 코디네이터(58090, 778ee47 빌드)도 이 빌드로 바꿔야 함. 모델 호출 0 · 사용자 결정 2026-11-15 반영(PR fix/x08-decisions): 손상·객체가 아닌 대기 파일은 새 탐지 없으면 start·reconnect를 409 EXTERNAL_RECONCILIATION_REQUIRED로 거절(파일 보존), Q-3은 런타임 계약 §13 항목 10의 한계로 기록, Q-2·L-c3-2·P4 유지 확인. 시험 350 통과. 남은 사용자 결정 없음 · PR #70 검토 4e42bef 변경 요청 → 교정 1 → 8e1ecf7 approve, 병합 1c21177, main CI 43718393840 success. 검수 완료(추가 작업, 73·12 미산입): PR #67·#68·#70, 사용자 결정 반영, 남은 사용자 결정 없음",
+      "status": "검수 완료",
+      "task_id": "X-08",
+      "title": "02-04 호출자 이월 교정(결정 항목 8)",
+      "track": "extra",
+      "unresolved": "수용 기준(장부 §7, 개정 A6): 02-04 수용 보고 §4·수용 기록 §3 항목 8의 호출자 이월을 처리한다: PR #51 검토 71e408a P1~P4, 12c9a21 N6, 608b367 F8, PR #49 검토 dc11612 L-c3-2·L-c3-3·L-c3-4, 마감 정지 시험. PR #58 검토의 정보성 지적(P-2·Q-2·Q-3, 기존 대기 유지·일치 분기 고정 시험)과 Q-1(바이트가 다른 대기 사본 삭제 시험)도 함께 처리한다. 항목마다 교정과 회귀 시험을 둔다. 교정하지 않을 항목이 있으면 근거를 사용자에게 보고하고 결정을 받는다(독립 검토의 동의만으로 면제하지 않는다). 마감 정지(시간 한도 도달) 경로는 가짜 런타임으로 시험한다. 모델 호출·예비 회차·실제 중간 정지·추가 결제를 쓰지 않는다. 기존 사용량·정정 이력과 역할 예산을 바꾸지 않는다. 완료 조건: 독립 검토 승인, 필수 CI 성공, 승인 head 조건 병합, 병합 SHA의 main CI 성공. 이 작업이 병합되기 전에는 X-02 착수와 모든 후속 실제 모델 호출(다른 작업의 실제 회차 포함)을 하지 않는다. · 근거: 02-04 수용 보고 §4 항목 8, 수용 기록 §3·§4, PR #60 검토 65022bc N-1 · 사용자 결정 2026-11-15로 해소(보고 §4, User_Decisions_2026-11-15_0205-x08.md) — 당시 질문: Q-3 start는 설정 변조를 탐지하지 않음 — (가) 계약의 알려진 한계로 기록(권고) / (나) start에서도 탐지(계약 §13 개정). 바꾸지 않고 시험으로 고정·기록한 동작: Q-2 더 오래된 대기 탐지가 앞섬, L-c3-2 3초 잠금 대기 유지, P4 장부 이동은 진단 문구만. 새로 찾은 잔여: 새 탐지 없이 손상된 대기 파일은 “대기 없음”으로 읽혀 재개됨 — 기록만 / EXTERNAL_RECONCILIATION_REQUIRED로 거절 · PR #68 검토 3724bc9(비차단): I-1 코디네이터 latest.tamper_recorded=true를 확인하는 시험 없음(검수 기록 때 보강 가능), I-2 보고 §3의 346은 기록 당시 값(현재 시험 기록 350), I-4 OpenAPI latest 200 응답에 스키마 없음(기존과 같음), I-5 실제 호출 전 영속 코디네이터 재빌드는 X-02 준비에 포함 · 수용 뒤(보고 §8): 검토 8e1ecf7 L-1 §4.1 절차 보완, L-2 02-05 계약 변경은 revision 11부터, 실제 회차 전 ieo-role-call·ieo-coord(58090 포함) 재빌드",
+      "verification_level": "verified"
+    }
+  ],
+  "format": "console.poc.result-export.v0",
+  "goals": {
+    "missing": {
+      "acceptance": {
+        "criteria": "관측과 차단을 분리하고 허용/미적용 대조·서버 수신으로 금지 경로의 실제 효과를 확인한다.",
+        "item_ids": [
+          "08-04.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "covered_scopes": [],
+      "goal_id": "missing",
+      "kind": "검증",
+      "missing_work_scopes": [],
+      "required": true,
+      "requirement_ids": [
+        "POC-REQ-08-04"
+      ],
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/missing-result.json"
+      ],
+      "scopes": [
+        "missing"
+      ],
+      "source_task_id": "08-04",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "tasks": [
+        "90-04"
+      ],
+      "unproven_scopes": [
+        "missing"
+      ],
+      "verified_scopes": []
+    },
+    "optional": {
+      "acceptance": {
+        "criteria": "개발/Guardrail/제품 Pod를 분리해 필수 행위·원본 이벤트·귀속·정책 적용·손실/중단 대조를 확인한다. repo/role 라벨·Pod UID·컨테이너 ID와 PID·프로세스 시작 시각·UID·세션/배정 기록을 대조해 역할별 Pod에 귀속한다.",
+        "item_ids": [
+          "08-03.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "covered_scopes": [],
+      "goal_id": "optional",
+      "kind": "검증",
+      "missing_work_scopes": [],
+      "required": false,
+      "requirement_ids": [
+        "POC-REQ-08-03"
+      ],
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/optional-result.json"
+      ],
+      "scopes": [
+        "optional"
+      ],
+      "source_task_id": "08-03",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "tasks": [],
+      "unproven_scopes": [
+        "optional"
+      ],
+      "verified_scopes": []
+    },
+    "partial": {
+      "acceptance": {
+        "criteria": "커널·관측기·정책·Pod 주체·허용/금지 수신기·게시/pull/승격 자격과 초기 상태를 고정한다.",
+        "item_ids": [
+          "08-02.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "covered_scopes": [
+        "worker"
+      ],
+      "goal_id": "partial",
+      "kind": "준비",
+      "missing_work_scopes": [],
+      "required": true,
+      "requirement_ids": [
+        "POC-REQ-08-02"
+      ],
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/partial-result.json"
+      ],
+      "scopes": [
+        "worker",
+        "restore"
+      ],
+      "source_task_id": "08-02",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "tasks": [
+        "90-02",
+        "90-03"
+      ],
+      "unproven_scopes": [
+        "restore"
+      ],
+      "verified_scopes": []
+    },
+    "runtime": {
+      "acceptance": {
+        "criteria": "검사·권한·승격 우회와 기동 실패를 차단하고 정상 후보 전환/직전 버전 복귀 뒤 상태를 대조한다.",
+        "item_ids": [
+          "08-01.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "covered_scopes": [
+        "base"
+      ],
+      "goal_id": "runtime",
+      "kind": "검증",
+      "missing_work_scopes": [],
+      "required": true,
+      "requirement_ids": [
+        "POC-REQ-08-01"
+      ],
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/alternative-result.json",
+        "reports/tasks/09-01/result-export-20261118/fixtures/base-result.json",
+        "reports/tasks/09-01/result-export-20261118/fixtures/failure-result.json"
+      ],
+      "scopes": [
+        "base"
+      ],
+      "source_task_id": "08-01",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "tasks": [
+        "90-01",
+        "90-07"
+      ],
+      "unproven_scopes": [],
+      "verified_scopes": [
+        "base"
+      ]
+    },
+    "stale": {
+      "acceptance": {
+        "criteria": "PSA Restricted의 정상/위반 명세와 앱의 허용/범위 밖 접근을 각각 검증한다. 두 역할 Pod 모두 Restricted로 실행하고 서로 다른 역할별 NetworkPolicy의 허용/거부를 실제 수신기로 확인한다. 파일·자격 격리는 P07 거부 증거로 대조하며 정책 선언만으로 입증하지 않는다.",
+        "item_ids": [
+          "08-05.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "covered_scopes": [],
+      "goal_id": "stale",
+      "kind": "검증",
+      "missing_work_scopes": [],
+      "required": true,
+      "requirement_ids": [
+        "POC-REQ-08-05"
+      ],
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/stale-result.json"
+      ],
+      "scopes": [
+        "stale"
+      ],
+      "source_task_id": "08-05",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "tasks": [
+        "90-05"
+      ],
+      "unproven_scopes": [
+        "stale"
+      ],
+      "verified_scopes": []
+    },
+    "unapproved": {
+      "acceptance": {
+        "criteria": "한 스프린트에서 재시작·이벤트 누락·교정·런타임 증거 누락·main CI/산출물/후속을 연결해 정상 진행과 잘못된 완료 차단을 확인한다.",
+        "item_ids": [
+          "08-06.accept"
+        ],
+        "profile_id": "poc-acceptance-v1.3.3",
+        "profile_revision": 4
+      },
+      "budget": {
+        "attempts": 3,
+        "deadline": "2026-11-19T00:00:00Z",
+        "token_fields": [
+          "input",
+          "output"
+        ],
+        "tokens": 25,
+        "wall_ms": 10000
+      },
+      "covered_scopes": [],
+      "goal_id": "unapproved",
+      "kind": "검증",
+      "missing_work_scopes": [],
+      "required": true,
+      "requirement_ids": [
+        "POC-REQ-08-06"
+      ],
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-result.json"
+      ],
+      "scopes": [
+        "unapproved"
+      ],
+      "source_task_id": "08-06",
+      "target": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "tasks": [
+        "90-06"
+      ],
+      "unproven_scopes": [
+        "unapproved"
+      ],
+      "verified_scopes": []
+    }
+  },
+  "input_digest": "4c6bed8f600d56ebb754e08cb334276664de08382aac13e71088276b2b7565cf",
+  "input_sha256": "5263ecd1fac3513dbddb12d5f195d59498ace3f7fd416e1cb772e579ae6be260",
+  "mode": "synthetic",
+  "plan_version": "v1.3.3",
+  "poc_tasks": [
+    {
+      "evidence": [
+        "reports/tasks/01-01/scope-20261112/Scope_and_Requirements.md",
+        "validation/review_v1.3.3.md"
+      ],
+      "group": "핵심",
+      "kind": "설계",
+      "last_observed_at": "2026-11-12T07:18:49+09:00",
+      "latest_report": "reports/tasks/01-01/scope-20261112/REPORT.md",
+      "legacy_v1_2_id": "01-01",
+      "next_action": "런타임 선택안 확인",
+      "result_state": "PASS · 설계 범위",
+      "status": "검수 완료",
+      "task_id": "01-01",
+      "title": "목표·필수 기능·선택적 방법의 범위표",
+      "track": "main",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/01-02/runtime-contract-20261112/Runtime_Contract_v0.md",
+        "reports/tasks/01-02/runtime-contract-20261112/reviews/review-pr2-38b3d4e.md",
+        "reports/tasks/01-02/runtime-contract-20261112/evidence/claude-help.txt",
+        "https://github.com/HeaInSeo/ieo_poc/pull/2"
+      ],
+      "group": "핵심",
+      "kind": "설계",
+      "last_observed_at": "2026-11-12T09:13:53+09:00",
+      "latest_report": "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
+      "legacy_v1_2_id": "01-02",
+      "next_action": "01-04 첫 probe 전 역할별 자격 방식(A/B/C) 사용자 결정",
+      "result_state": "PASS · 설계 계약(실제 지원은 01-04 probe)",
+      "status": "검수 완료",
+      "task_id": "01-02",
+      "title": "에이전트 런타임·역할·인증·재개 계약",
+      "track": "main",
+      "unresolved": "후속 S1~S5(05-03/P07/P20/P23/P24/02-06·03-07 범위) · 01-04 probe 미실행",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/01-03/staged-freeze-20261112/REPORT.md",
+        "reports/tasks/01-03/staged-freeze-20261112/freeze_register.json",
+        "reports/tasks/01-03/staged-freeze-20261112/probe_gate_table.json",
+        "reports/tasks/01-03/staged-freeze-20261112/Probe_Budget_Rules.md",
+        "reports/tasks/01-03/staged-freeze-20261112/reviews/review-pr7-814a5fb.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/7"
+      ],
+      "group": "핵심",
+      "kind": "설계",
+      "last_observed_at": "2026-11-12T14:22:39+09:00",
+      "latest_report": "reports/tasks/01-03/staged-freeze-20261112/REPORT.md",
+      "legacy_v1_2_id": "01-03",
+      "next_action": "later 항목은 각 첫 실행 전 동결 증거. L08 교정 PR(02-03 전)",
+      "result_state": "PASS · 단계별 동결(v1.3.3-A1): stage_0 F01~F08 동결, later L01~L09 담당·시점·차단 조건 인수. 후속 실험값 전체 동결 아님",
+      "status": "검수 완료",
+      "task_id": "01-03",
+      "title": "표본·독립 기대값·예산·기한",
+      "track": "main",
+      "unresolved": "L01 토큰 포함 누적 한도(정의는 사용자 결정 2026-11-16: total_tokens = input+output+cache_creation, elapsed_seconds = 회차 시간 합, 배정 전체 세대 합. 값은 미결), L02 EARLY-01 계측·기대값, L03 실험별 기대값, L04 P26 표본(NodeKit 후보 3건뿐·정책 대기 이슈·분할 후보 계수 — 07-01 동결 전 사용자 결정), L05 P36 봉인 방식·표본, L06 07-04 별도 표본, L07 D12 권한·판정 의미, L08 두 결함 교정 완료(PR #10 병합 066f5fb), L09 P12 치명적 오해 정의(F07 분리는 사용자 확인 대상)",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/01-04/remaining-probes-20261112/REPORT.md",
+        "reports/tasks/01-04/remaining-probes-20261112/ADDENDUM.md",
+        "reports/tasks/01-04/remaining-probes-20261112/PROBE_PLAN.md",
+        "reports/tasks/01-04/remaining-probes-20261112/evidence/budget.json",
+        "reports/tasks/01-04/remaining-probes-20261112/evidence/E.json",
+        "reports/tasks/01-04/remaining-probes-20261112/evidence/E1b.json",
+        "reports/tasks/01-04/remaining-probes-20261112/evidence/G.json",
+        "reports/tasks/01-04/remaining-probes-20261112/evidence/AM.json",
+        "reports/tasks/01-04/first-probes-20261112/REPORT.md",
+        "User_Decisions_2026-11-12_0104.md",
+        "User_Decisions_2026-11-12_0104b.md",
+        "reports/workspace/test-env-assets-20261112/ASSETS.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/14",
+        "reports/tasks/01-04/remaining-probes-20261112/reviews/review-pr14-a3d01ce.md",
+        "reports/tasks/01-04/remaining-probes-20261112/reviews/attest-pr14-7c365d1.md"
+      ],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": "2026-11-12T17:21:21+09:00",
+      "latest_report": "reports/tasks/01-04/remaining-probes-20261112/REPORT.md",
+      "legacy_v1_2_id": "01-04",
+      "next_action": "01-05 착수. 01-04 결과의 계약 반영 6건은 01-02 계약 개정(별도 작업)으로 처리",
+      "result_state": "첫 세 probe: P1 지원 · P2 격리 성립 확인 · P3 공유 quota 확인(분리 아님). 나머지: E 성립 확인(E1b forge 포함) · U 고정 Write(path) 미지원→사용자 결정으로 Edit(//path) 채택·지원 · G 합격 · N session-id 재개 지원(동시 재개 CLI 미차단) · L 지원 · C 4 동시 · T 세션/자식별 지원 · R 2.1.316→2.1.322 지원 · 자동 기억 비활성 2방법 확인. 모델 요청 9/30 + 27/30(B2). PR #14 검토 c20e7e3 reject → 사용자 결정 → a3d01ce approve(01-04 검토 4/4) → base 갱신 7c365d1(PR #13과 동일 차이 대조·사용자 결정) → 조건부 병합 74a1fa3 · main CI success",
+      "status": "검수 완료",
+      "task_id": "01-04",
+      "title": "시험 repo·DB·수신기·역할 자격",
+      "track": "main",
+      "unresolved": "런타임 계약 개정 항목 6건(REPORT §1: Edit(//path) 쓰기 규칙, 개발 repo CLAUDE.md 공급 경로, CLAUDE_CONFIG_DIR 정리에 projects/*/memory 포함·autoMemoryEnabled:false, 세션당 단일 실행 supervisor 보장, 이름은 재개 키 아님, 개발 Bash 허용 목록은 경계 아님). 검토 a3d01ce P3(cmd_am docstring 시점, REPORT 기동 수 24→26, E 표에 E1b 행 없음, E1b hook은 refs/heads/main 정확 일치만). F04 상한 도달로 head 변경 불가해 이월",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/01-05/baseline-20261112/REPORT.md",
+        "reports/tasks/01-05/baseline-20261112/Source_Baseline.md",
+        "reports/tasks/01-05/baseline-20261112/Policy_Responsibility_Map_v0.md",
+        "reports/tasks/01-05/baseline-20261112/Current_Operations_20261112.md",
+        "reports/tasks/01-05/baseline-20261112/evidence/fixed-source-compare.txt",
+        "reports/tasks/01-05/baseline-20261112/evidence/current-operations.txt",
+        "reports/tasks/01-05/baseline-20261112/evidence/npg-clauses-e5075aff.md",
+        "reports/tasks/01-05/baseline-20261112/reviews/review-pr17-00a7566.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/17"
+      ],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": "2026-11-12T18:08:43+09:00",
+      "latest_report": "reports/tasks/01-05/baseline-20261112/REPORT.md",
+      "legacy_v1_2_id": "01-05",
+      "next_action": "01-06 착수",
+      "result_state": "NPG 고정 e5075aff 사본 10개=고정 커밋 blob(sha256), CI 41469168311 success 재조회 일치. 정책·책임 대응표 v0 17행(직접 10·좁음 4·공백 3, 독립 기대값은 L03 연결). 현재 운영 별도 조회: timer 3 enabled·active(report bridge elapsed), NPG 작업 사본 HEAD 0d03bf6은 고정 커밋 비조상. 겹치는 외부 효과 8종 분리. PR #17 검토 efa4a5d reject(P2 report bridge 상태) → 00a7566 approve(01-05 검토 2/4) → 조건부 병합 4bcba6a · main CI success",
+      "status": "검수 완료",
+      "task_id": "01-05",
+      "title": "원본·기준선·운영 충돌 범위 기록",
+      "track": "main",
+      "unresolved": "대응표 공백·좁은 행(6·9·13·14·15·16·17)은 해당 P 독립 기대값(L03)에서 새 기준으로 정함. NPG runtime 현재 설치 상태 미조회(P27). 검토 00a7566 P3: 대응표 :43 인계 목록에 P12 누락, 현재 운영 actor 수 라벨(PR review 객체 미포함). efa4a5d 첫 조회본의 세부(포트 등)는 공개 이력에 남음(비밀 아님)",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/01-06/lab-20261112/REPORT.md",
+        "reports/tasks/01-06/lab-20261112/Lab_Procedure.md",
+        "reports/tasks/01-06/lab-20261112/evidence/verify-1.json",
+        "reports/tasks/01-06/lab-20261112/evidence/verify-2.json",
+        "reports/tasks/01-06/lab-20261112/evidence/archive-manifest.json",
+        "reports/tasks/01-06/lab-20261112/evidence/test_render_progress.txt",
+        "reports/tasks/01-06/lab-20261112/evidence/lab-guard-checks.txt",
+        "reports/tasks/01-06/lab-20261112/evidence/viewing-paths.txt",
+        "reports/tasks/01-06/lab-20261112/reviews/review-pr19-f873fa4.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/19"
+      ],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": "2026-11-12T19:33:17+09:00",
+      "latest_report": "reports/tasks/01-06/lab-20261112/REPORT.md",
+      "legacy_v1_2_id": "01-06",
+      "next_action": "02-01 착수",
+      "result_state": "시험실 보관(sha256 a26b7290…, 자격 제외)→정리→초기화→대조, 재정리→재초기화→대조 모두 기대 일치(E 16·E1b 7, check-init 통과). 생성기 render_progress.py 일괄 교체·남은 임시 파일 탐지 보강, 시험 26건 PASS(CI 실행). STATUS 고정 경로·GitHub 익명 200, 사용자 실제 열람 미확인. PR #19 검토 b301843 approve·자동 검토 P1/P2 교정 → f873fa4 approve(01-06 검토 2/4) → 조건부 병합 c0f93d7 · main CI success",
+      "status": "검수 완료",
+      "task_id": "01-06",
+      "title": "시험실 초기화·증거 보존 경로",
+      "track": "main",
+      "unresolved": "검토 f873fa4 P3: 저장소 안 보관 거부가 실행 중인 checkout만 봄(다른 worktree·공유 작업공간 미포함), reset --archived가 오래된 MANIFEST도 허용, E 거부 표식이 거부 원인을 보지 않음(E1 main 불변 검사 없음), verify-1·2는 이전 lab.py(25검사) 산출. 보관본은 호스트 로컬. 사용자 실제 열람 미확인",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/01-07/spec-contract-20261112/Registration_Contract_v0.md",
+        "reports/tasks/01-07/spec-contract-20261112/reviews/review-pr4-ddbef27.md",
+        "reports/tasks/01-07/spec-contract-20261112/evidence/cargo-test.log",
+        "reports/tasks/01-07/spec-contract-20261112/evidence/check-manifest-draft.txt",
+        "https://github.com/HeaInSeo/ieo_poc/pull/4"
+      ],
+      "group": "핵심",
+      "kind": "설계",
+      "last_observed_at": "2026-11-12T09:28:54+09:00",
+      "latest_report": "reports/tasks/01-07/spec-contract-20261112/REPORT.md",
+      "legacy_v1_2_id": null,
+      "next_action": "01-08 PR",
+      "result_state": "PASS · 등록 검사 계약·참조 구현(ieo-spec)",
+      "status": "검수 완료",
+      "task_id": "01-07",
+      "title": "스프린트 명세 v0·등록 검사 계약",
+      "track": "main",
+      "unresolved": "후속 N1(02-03: 옛 revision executable 등록 순서), N2~N5(P3), §1.4 공백 G1~G8 contract revision 결정",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/01-08/report-api-contract-20261112/Report_API_Contract_v0.md",
+        "reports/tasks/01-08/report-api-contract-20261112/evidence/openapi-validate.log",
+        "reports/tasks/01-08/report-api-contract-20261112/reviews/review-pr5-f75ea87.md",
+        "reports/tasks/01-08/report-api-contract-20261112/evidence/cargo-test-workspace.log",
+        "https://github.com/HeaInSeo/ieo_poc/pull/5"
+      ],
+      "group": "핵심",
+      "kind": "설계",
+      "last_observed_at": "2026-11-12T09:52:31+09:00",
+      "latest_report": "reports/tasks/01-08/report-api-contract-20261112/REPORT.md",
+      "legacy_v1_2_id": null,
+      "next_action": "후속 N1·N2를 02-03 구현 전에 반영",
+      "result_state": "PASS · 보고 v0·API 계약·참조 구현(ieo-report)",
+      "status": "검수 완료",
+      "task_id": "01-08",
+      "title": "진행 보고 v0·등록/조회 API 계약",
+      "track": "main",
+      "unresolved": "N1 늦은 옛 세대 결과 보존(409 폐기 대신 귀속 저장)·멱등 재생 우선·에이전트 재조회, N2 completion_summary 전체 범위 표시, P3 N3~N7, 공백 RG1~RG3",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/02-01/collector-20261112/REPORT.md",
+        "reports/tasks/02-01/collector-20261112/result.json",
+        "reports/tasks/02-01/collector-20261112/evidence/crosscheck-0104.txt",
+        "reports/tasks/02-01/collector-20261112/evidence/replay-0104-summary.json",
+        "reports/tasks/02-01/collector-20261112/evidence/runs-summary.json",
+        "reports/tasks/02-01/collector-20261112/evidence/runs-cli.txt",
+        "reports/tasks/02-01/collector-20261112/evidence/build.txt",
+        "reports/tasks/02-01/collector-20261112/reviews/review-pr21-2df3c35.md",
+        "reports/tasks/02-01/collector-20261112/reviews/review-pr21-273907b.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/21",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/43222844640"
+      ],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": "2026-11-12T22:00:15+09:00",
+      "latest_report": "reports/tasks/02-01/collector-20261112/REPORT.md",
+      "legacy_v1_2_id": "02-01",
+      "next_action": "02-02 착수",
+      "result_state": "ieo-evidence(실행·원본 로그 가림 뒤 저장·SHA-256·판정·사용량·합산)와 기록 형식 evidence-record-v0. 종료 코드 0만으로 성공 처리 안 함, 미계측은 unmeasured(합은 null). 01-04 실제 stream 35개 재생 독립 대조 35/35(32 계측·P2c·N4b·L2 미계측) — 재개 세션 modelUsage 누적 발견 → 회차 몫 규칙(계약 rev 7 §11 항목 7). 시험 32·작업공간 110·생성기 28 PASS, 실제 실행 10건 기대대로. 모델 호출 0. PR #21 검토 2df3c35 reject(P2×4) → 97b7231 교정·273907b approve(02-01 검토 2/4·교정 1/3) → 조건부 병합 a0c59fd · main CI success(run 43222844640). F05 약 5,100초/14,400초",
+      "status": "검수 완료",
+      "task_id": "02-01",
+      "title": "명령 실행·증거 수집·비용 계측기",
+      "track": "main",
+      "unresolved": "토큰 총량 정의(네 항목 중 무엇을 셀지)는 L01/L02 동결 항목. 새 claude -p 실시간 실행 미확인(모델 호출 0) — 02-04 또는 승인 예산 회차. 검토 273907b P3-1(정상 종료 뒤 즉시 KILL로 늦은 출력이 잘려도 succeeded, KILL은 사유에 기록)·P3-2(stderr 대기 200 ms) → 02-02 사용 전 계측기 수정. 검토 2df3c35 P3-7(summarize 중복 입력) → 같은 수정. setsid로 그룹을 벗어나 관을 닫은 자손은 기록되지 않음 · [02-02에서 교정 091e099: 273907b P3-1·P3-2, 2df3c35 P3-7 — PR #23 병합 dca7911]",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/02-02/eval-20261112/REPORT.md",
+        "reports/tasks/02-02/eval-20261112/result.json",
+        "reports/tasks/02-02/eval-20261112/freeze/manifest.json",
+        "reports/tasks/02-02/eval-20261112/manifest-results.json",
+        "reports/tasks/02-02/eval-20261112/results/SUMMARY.md",
+        "reports/tasks/02-02/eval-20261112/results/leak-check.md",
+        "reports/tasks/02-02/eval-20261112/AUTHOR_NOTES.md",
+        "reports/tasks/02-02/eval-20261112/reviews/review-pr23-f46818a.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/23",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/43234135722"
+      ],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": "2026-11-12T23:10:02+09:00",
+      "latest_report": "reports/tasks/02-02/eval-20261112/REPORT.md",
+      "legacy_v1_2_id": "02-02",
+      "next_action": "02-03 착수 전 L07·L08·01-08 N2·PR #10 P3 확인",
+      "result_state": "수용 기준 rev 6(개정 A2). 후보 ieo-evidence @1785cb7을 독립 담당(같은 모델 하위 에이전트, 개발 맥락 없음) 기대값과 대조: public 5/5·authoring 14/14·validation 33/34(V-22는 사례 작성 오류로 독립 담당 분류·검토 재채점 확인), 미확정 사례 1·필드 74 제외. 첫 평가 전 manifest 동결 61a27aa. 누출 검사(현재 범위) 통과. 모의 시계·02-01 이월 교정. **개발 계정의 정답 접근 차단은 미검증**(강한 봉인 04-07 전으로 이월) — 대조 통과는 봉인 검증·개발 전체 정확성 보장이 아님. 실측 약 2,350초(준비 작업 상한 미정). PR #23 f46818a approve(02-02 검토 1/4) → 병합 dca7911 · main CI success(run 43234135722)",
+      "status": "검수 완료",
+      "task_id": "02-02",
+      "title": "독립 기대값·모의 시계·평가 자료",
+      "track": "main",
+      "unresolved": "검토 f46818a P3: freeze push 증거가 로컬 reflog뿐(다음 동결은 ls-remote·CI 기록 보존), summarize 중복 거부의 crate 시험 없음(계측기 다음 수정), 기대 필드 59/930이 개발 쪽 요약(이월 교정·종료 코드)에 근거해 독립성이 낮음, validate_package가 개정 revision 순서·스프린트 revision 증가를 단언하지 않음, 01-03 정정 뒤 문장 흐름. 독립 담당 사용량 미계측 · 검토 f46818a P3-2: result.json cost.elapsed_seconds는 null로 남김(실측 약 2,350초는 REPORT 머리·이 원장 result_state에 기록)",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/02-03/coordinator-20261113/REPORT.md",
+        "reports/tasks/02-03/coordinator-20261113/result.json",
+        "reports/tasks/02-03/coordinator-20261113/evidence/cargo-test.log",
+        "reports/tasks/02-03/coordinator-20261113/evidence/mutants.txt",
+        "reports/tasks/02-03/coordinator-20261113/evidence/startup-smoke.txt",
+        "reports/tasks/02-03/coordinator-20261113/reviews/review-pr25-1e98f17.md",
+        "reports/tasks/02-03/coordinator-20261113/reviews/review-pr25-0fa839d.md",
+        "reports/tasks/02-03/coordinator-20261113/reviews/review-pr25-4bc8081.md",
+        "reports/tasks/02-03/coordinator-20261113/reviews/review-pr25-66958e2.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/25",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/43395168058"
+      ],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": "2026-11-13T17:43:37+09:00",
+      "latest_report": "reports/tasks/02-03/coordinator-20261113/REPORT.md",
+      "legacy_v1_2_id": "02-03",
+      "next_action": "02-04 착수(선행 02-03 충족)",
+      "result_state": "수용 기준 rev 4(02-03.accept). crates/ieo-coord: PostgreSQL 17 스키마(이력 표 추가 전용 트리거)·Bearer 인증(토큰 digest만)·요청당 트랜잭션(비2xx 롤백)·(repo, role) 소유권 머리 CAS·권한 세대·스프린트별 커밋 순서 사건·커서·증거 입력(GitHub·02-01 실행 기록)·판정+outbox+판정 행 한 트랜잭션·verified/claim 분리 조회. 등록(형식)과 독립 의미 검토 분리, 판정 입력은 GitHub/실행 증거. 기동 확인(/v0/health)은 liveness만이며 P04 아님. 선행: L07 판정 정책 contracts/judgment-policy-v0.json 0.4.0(digest 7b54ae55…, 숫자 값 없음)으로 고정, L08 재사용, 01-08 N2·PR #10 N1~N5 반영. 시험 142건(실DB·실HTTP 28)·변이 32개 중 31 검출(M13 동등). 실제 GitHub·에이전트 연결 없음(고정 입력). PR #25 검토 1e98f17 reject(P1 F1·F2) → 0fa839d reject(P2 N1) → 4bc8081 reject(P2 R1) → 66958e2 approve(02-03 검토 4/4·교정 3/3) → 병합 de1dd4d · main CI success(run 43395168058). 측정 경과: 측정 시작 07:25:10Z~마지막 교정 efad0ee 약 3,800초, 병합 de1dd4d까지 약 4,565초(시작 전 읽기 몇 분 제외, 상한 14,400초 이내). 모델 호출 0",
+      "status": "검수 완료",
+      "task_id": "02-03",
+      "title": "DB 스키마·API·소유권·사건 기록",
+      "track": "main",
+      "unresolved": "후속(P3)과 담당·시점: F3 잔여(개발 머리가 다른 작업으로 넘어간 뒤 앞 작업 판정) → 02-07 착수 시 판정 머리 규칙 결정; F4(GitHub 검토 author 신원)·N5(이전 SHA changes_requested와 PR 상태 차이) → 02-05 착수 전 실제 수집기 규칙 결정(수집기 구현 02-04); N2(sprint_id 선점·존재 노출) → 02-05 착수 시 repo별 sprint 바인딩; S1(G1이 outputs 배열 전체 비교 — 선택 산출물 설명·순서 변경도 무효, 엄격 방향) → 02-05 착수 전 정책 다음 버전에서 필수 산출물 artifact_id만 비교할지 결정(문서 revision 변경을 처음 다루는 작업); S2(mutants.txt 재지정 M27 표기) → 이 보고 PR에서 정정 완료(evidence/mutants.txt 끝 줄); S3(acceptance·exit_condition·requirement_ids 개별 제거, judgments 외래 키 제거 변이 미검출) → 02-07 수용 전 판정 시험 보강(필드별), 외래 키는 04-04 원자성 시험; F5(등록·배정 경쟁 자동 시험 없음)·registry 전역 잠금 직렬화 성능 미측정 → 04-04 착수 시. 범위 밖: 판정·outbox 원자 기록 검증·보고 대기 → 02-07, 재현 실행기 → 02-06, P04 판정 → 04-03·04-04 · PR #26 승인 검토 84a123a P3(보관: reports/tasks/02-03/coordinator-20261113/reviews/review-pr26-84a123a.md): D1 mutants.py의 M27 정의가 넓은 형태로 남음(표기·검출 영향 없음) → 02-07 수용 전 S3 시험 보강과 함께 M27을 비교만 `AND true`로 바꾸는 좁은 형태(Y1)로 재정의 · D2 F3 문구 정정(이번 갱신에서 '(02-04에 이어짐)' 제거)",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/02-04/supervisor-core-20261113/PROGRESS.md",
+        "reports/tasks/02-04/supervisor-core-20261113/reviews/review-pr31-bc55edf.md",
+        "reports/tasks/02-04/supervisor-core-20261113/reviews/review-pr32-aeab3d9.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/31",
+        "https://github.com/HeaInSeo/ieo_poc/pull/32",
+        "reports/tasks/02-04/run-guard-20261114/PROGRESS.md",
+        "reports/tasks/02-04/run-guard-20261114/evidence/mutants.txt",
+        "reports/tasks/02-04/run-guard-20261114/evidence/cargo-test.log",
+        "reports/tasks/02-04/run-guard-20261114/reviews/review-pr40-23fee80.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/40",
+        "reports/tasks/02-04/run-guard-20261114/reviews/review-pr42-2d8b488.md",
+        "reports/tasks/02-04/role-container-20261114/PROGRESS.md",
+        "reports/tasks/02-04/role-container-20261114/evidence/run-fake.log",
+        "reports/tasks/02-04/role-container-20261114/evidence/cargo-test.log",
+        "reports/tasks/02-04/role-container-20261114/reviews/review-pr47-88a4535.md",
+        "reports/tasks/02-04/role-container-20261114/reviews/review-pr47-6975d5f.md",
+        "reports/tasks/02-04/role-container-20261114/reviews/review-pr47-475b409.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/47",
+        "reports/tasks/02-04/real-sessions-20261115/PROGRESS.md",
+        "reports/tasks/02-04/real-sessions-20261115/RUN_PLAN.md",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/dry-run.log",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/mutants.txt",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/cargo-test.log",
+        "reports/tasks/02-04/real-sessions-20261115/reviews/review-pr49-c4620d2.md",
+        "reports/tasks/02-04/real-sessions-20261115/reviews/review-pr49-f90f5b5.md",
+        "reports/tasks/02-04/real-sessions-20261115/reviews/review-pr49-dc11612.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/49",
+        "reports/tasks/02-04/child-usage-20261115/PROGRESS.md",
+        "reports/tasks/02-04/child-usage-20261115/evidence/d3-reevaluation-preview.json",
+        "reports/tasks/02-04/child-usage-20261115/evidence/crosscheck-0104.txt",
+        "reports/tasks/02-04/child-usage-20261115/evidence/dry-run.log",
+        "reports/tasks/02-04/child-usage-20261115/reviews/review-pr51-608b367.md",
+        "reports/tasks/02-04/child-usage-20261115/reviews/review-pr51-12c9a21.md",
+        "reports/tasks/02-04/child-usage-20261115/reviews/review-pr51-71e408a.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/51",
+        "reports/tasks/02-04/real-sessions-20261115/RESULTS.md",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/real/records.jsonl",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/real/budget-final.txt",
+        "User_Decisions_2026-11-15_d3.md",
+        "reports/tasks/02-04/real-sessions-20261115/SUPPLEMENT.md",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/supplement/ops-log-20261114T2312Z.txt",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/supplement/requery.txt",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/real-v2/D3.json",
+        "reports/tasks/02-04/real-sessions-20261115/test_summarize.py",
+        "reports/tasks/02-04/real-sessions-20261115/reviews/review-pr52-29690b5.md",
+        "reports/tasks/02-04/real-sessions-20261115/evidence/supplement/ops-log-20261114T1736Z.txt",
+        "reports/tasks/02-04/images-20261115/PROGRESS.md",
+        "reports/tasks/02-04/images-20261115/evidence/images-fake.log",
+        "reports/tasks/02-04/images-20261115/evidence/build-images.txt",
+        "reports/tasks/02-04/images-20261115/evidence/cargo-test.log",
+        "reports/tasks/02-04/real-sessions-20261115/reviews/review-pr53-56882cb.md",
+        "reports/tasks/02-04/real-sessions-20261115/reviews/review-pr53-5f4fc7f.md",
+        "reports/tasks/02-04/real-sessions-20261115/reviews/review-pr53-1729c9e.md",
+        "reports/tasks/02-04/acceptance-20261115/REPORT.md",
+        "reports/tasks/02-04/acceptance-20261115/evidence/images-fake-6aaf427.log",
+        "reports/tasks/02-04/acceptance-20261115/evidence/build-images-6aaf427.txt",
+        "reports/tasks/02-04/images-20261115/reviews/review-pr54-adf760e.md",
+        "reports/tasks/02-04/images-20261115/reviews/review-pr54-fa39d86.md",
+        "reports/tasks/02-04/acceptance-20261115/reviews/review-pr55-d80560b.md",
+        "reports/tasks/02-04/acceptance-20261115/reviews/review-pr55-c0ad207.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/54",
+        "User_Decisions_2026-11-15_0204-acceptance.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/PROGRESS.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/PREVENTION.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/evidence/images-fake-a1cfe78.log",
+        "reports/tasks/02-04/provider-checkpoint-20261115/evidence/build-images-a1cfe78.txt",
+        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr57-48b1d0e.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr57-accd6c8.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr57-802e4a1.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr58-704330f.md",
+        "reports/tasks/02-04/acceptance-20261115/ACCEPTANCE.md",
+        "reports/tasks/02-04/provider-checkpoint-20261115/reviews/review-pr58-ae65f0c.md",
+        "reports/tasks/02-04/acceptance-20261115/reviews/review-pr59-62acc7e.md",
+        "reports/tasks/02-04/acceptance-20261115/reviews/review-pr60-65022bc.md",
+        "reports/tasks/02-04/acceptance-20261115/reviews/review-pr61-86e966d.md",
+        "reports/tasks/02-04/acceptance-20261115/reviews/review-pr61-79b40da.md"
+      ],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": "2026-11-15T14:31:05+09:00",
+      "latest_report": "reports/tasks/02-04/acceptance-20261115/ACCEPTANCE.md",
+      "legacy_v1_2_id": "02-04",
+      "next_action": "X-03 착수(승인 순서 X-03 → X-04 → 02-05). 항목 8은 X-08(첫 실제 호출 전). 02-04 이월은 담당 작업의 unresolved에 기록됨",
+      "result_state": "진행 기록 1(수용 아님): crates/ieo-supervisor — 역할 인자(Edit(//…)만, session_id 재개), 허용 목록 환경, CLAUDE_CONFIG_DIR 지시성 digest·변조 탐지·정리(링크·특수 파일·읽기 오류 닫힌 실패), flock 세션 잠금, §5-1 체크포인트·재연결 결정, 결정 ① 예산 가드(미계측·넘침 중지, 추가 과금 없음 조건 미확인 시 보류). 시험 20건. PR #31 bc55edf approve(검토 3/4·교정 2/3) → 병합 0f446d6, PR #32 aeab3d9 approve(검토 2/4·교정 1/3) → 병합 3426c77, main CI run 43441103331(0f446d6)·43442655596(3426c77) success. 모델 호출 0(02-04 예산 사용 0) · 진행 기록 2(수용 아님): 실행 중 예산 집행 run::run(회차·전체 시간 마감과 그룹 정리, 관측 사용량·추가 사용량 신호 정지, 정지 뒤 출력 복사, kill 실패 보고)과 run::charge(guard가 멈춘 회차는 언제나 미계측), Limits::for_next(budget::next 감쌈). 모델 없는 시험 25건·변이 27/27. 한계: 관측 후 정지이며 공급자 측 제한 아님, 관측 사용량은 하한, 최종값은 result에서만. PR #40 3103933·d2989f7·5136d66 changes requested → 23fee80 approve(검토 4/4·교정 3/3) → 병합 ccf7291, main CI run 43590448077 success. 모델 호출 0 · 진행 기록 3(수용 아님): 역할 컨테이너의 supervisor 서비스(PID 1) — 어댑터 start/reconnect/stop/status(Bearer 해시 인증), 매 실행 전 CLAUDE_CONFIG_DIR 정리, 체크포인트 3단계(takeover·after_run·error, fsync)와 끝나지 않은 회차 재개 거부, 세션당 단일 실행, SIGTERM 처리·고아 거두기, 역할별 예산 몫(개발 8회·9,600초·1M·10M, Guardrail 4회·4,800초·0.5M·5M, 합 = 승인)과 닫힌 회차 기록, stop grace 6초. 가짜 Claude 컨테이너 시험(U3 배치·(a) 정리·(c) 재개·볼륨 복원·(b) 변조·단일 실행·stop·Guardrail 인자·실행 중 SIGTERM·가장 느린 정지 8.4초) 통과, 작업 공간 시험 252건. PR #47 88a4535·6975d5f changes requested → 475b409 approve(검토 3/4·교정 2/3) → 병합 2d13d16, main CI run 43613181714 success. 모델 호출 0 · 진행 기록 4(수용 아님): 컨테이너 밖 예산 집행 호출자 ieo-role-call(두 역할 전체 기록을 닫힌 쪽으로 읽음, 역할 몫·회당 창 축소, 무추가결제 세 출처(과거 관측 stream·자격 형식과 실행 환경·이번 실행 신호, 시점별), 진행 중 표식·서비스 마지막 회차와 체크포인트 회차 대조, 계측기와 run::charge_reported, 미계측·실패·결과 실패는 stop_required, 자동 재시도 없음)와 실제 회차 계획 RUN_PLAN(D1·G1·R1·D2~D6, 모델 호출 7회·예비 5회). 컨테이너 예행(가짜 Claude·가짜 자격) 8개 확인과 거부 3건 통과, 호출자 변이 11/11, 작업 공간 시험 273건. PR #49 c4620d2·f90f5b5 changes requested → dc11612 approve(검토 3/4·교정 2/3) → 병합 ca08c76, main CI run 43621679774 success. 모델 호출 0 · 진행 기록 5(수용 아님): 실제 D3(자식이 있는 재개)가 사용량 미계측으로 중단 → 원인 tool_use_result.usage = 자식 마지막 응답만(CLI 2.1.322) → 사용자 결정 2026-11-15(세션 증가분 차감, 집계 교정 먼저) → 자식 전사의 응답별 확정 사용량 합으로 교정(런타임 계약 revision 8 §12), 정정 줄·읽을 때 재집계 검증, D3 재생 consistent 10/224/2,613/35,662. PR #51 608b367 approve·12c9a21 changes requested·71e408a approve(검토 3/4·교정 2/3) → 병합 d41e70f, main CI 43651860463 success. 모델 호출 0 · 진행 기록 6(실제 세션 시험 결과, 수용 판단 전): D1·G1·R1·D2·D4·D5·D6 합격, D3 답 기대값 불충족(3 대신 4, Read 표시와 기대값 모호함으로 봄, 기대값·실패 보존). §10 항목 1~3·§11 항목 7 실제 확인(D1~D5 몫 합 = D5 누적), 항목 4·5·실행 중 정지는 모의. 예산 7/12회·40.666초(셈 45초)·billable 33,948·cache_read 121,189, 모든 회차 overageStatus rejected · 진행 기록 7(보완, 수용 판단 전, 모델 호출 0): D3 요약의 잘못된 “자식 없음”을 summarize.py v2로 교정(present·confirmed_none·unknown, 출처·생성기 버전), 회귀 시험 CI 편입, 일곱 요약 v2 재생성(v1 유지). D4 압축 예외 근거(부모 0·자식 없음·차이 모두 0 이상, 귀속하지 못한 몫은 압축 가능성이 크나 호출별 기록 없음), D1~D5 합 검산은 귀속 입증이 아님. 실행 바이너리·이미지·재시작 가드·체크포인트를 당시 작업 기록 발췌와 현재 재조회로 연결(재빌드 해시 재현은 미확인), 다섯 재개 조건 표. D3 답 불충족은 계획 기준 불충족으로 유지, 계약 §10 항목 3 (c) 판정에는 영향 없다고 판단(최종은 수용 검토). 실행 중 실제 정지는 04-05(P05-R) 범위로 정리하고 결정안 작성 · 진행 기록 8(수용 아님, 모델 호출 0): 코디네이터 PID 1 종료 처리·DB 비밀 파일·기동 검사(X-01 U3), repo 범위 상태·정지(계약 §7, 각 역할 안전 종료 보고, 자식·외부 요청은 not_tracked로 미확인), supervisor safe_shutdown 보고와 §7 상태 항목, 코디네이터·역할별 이미지(커밋·바이너리 해시 라벨)와 별도 시험 환경 컨테이너 시험(가짜 Claude), charge 비객체 미계측·Y1/Y4/Y7 시험, 이월 항목 정리(닫음·남음·담당·수용 영향) · 수용 보고(판단 전): 02-04.accept 조건별 상태(supervisor·U3·공유 볼륨 충족, 코디네이터 PID 1 충족(모의), 외부 영속 저장소 복원(코디네이터 쪽 없음)·어댑터 연결·§7 repo 범위 stop·status 항목 부분 충족, 02-03 이월 미충족(이동 제안 확인 전)), 계약 §10·§11 충족(항목 4·5는 모의), D3 답 불충족 유지, 사용자 결정 9건(02-03 이월 이동 제안 등). PR #54 adf760e changes requested → fa39d86 approve(검토 2/4·교정 1/3) → 병합 6aaf427, main CI 43657932256 success. 병합 커밋 이미지 재시험(바이너리 해시가 검토 커밋과 같음) · 진행 기록 9(수용 아님, 사용자 결정 2026-11-15 (나)): 항목 4 공급자 상태 값 대응(available·usage_limit·auth_or_billing·unknown, 출처·관측 시각·신선도, 실행 중 실시간·재시작 뒤 unknown)과 quota_group_id 필수·공유 그룹 전파, 항목 9 체크포인트 순번·digest·변조의 코디네이터 보고·저장(role_checkpoints·role_tamper_events, 배정·세대·sprint revision·명세 digest·대상 SHA 연결)과 기동 전 로컬↔중앙 대조·코디네이터 재개 판단. 실제 DB·가짜 런타임 시험(정상·중복·간격·충돌·불일치·변조·낡은 세대·코디네이터·역할 재시작·늦은 보고), 이미지 a1cfe78 컨테이너 시험(교정 2 반영). 런타임 계약 revision 9(§13 항목 9·10). 재발 방지 대응표. 모델 호출 0 · PR #57 검토 48b1d0e·accd6c8 request changes → 교정 2회 → 802e4a1 approve(검토 3/4·교정 2/3) → 병합 12bf34f, main CI 43679480078 success. 비차단 지적 N-1~N-3·I-1~I-4는 후속 PR(진행 기록 9 §9) · PR #58(비차단 후속) 704330f approve(회귀 P-1 지적) → 교정 1회 → ae65f0c approve(검토 2/4·교정 1/3) → 병합 31cfd5b, main CI 43681078230 success · 수용(검수 완료): 사용자 결정 2026-11-15 (나) §6 조건 충족 — 항목 4·9 구현·시험·독립 검토·병합, 나머지 항목 인계(진행 기록 9 §4, 수용 기록 §3), 추가 차단 사유 없음. D3 답 불충족 기록 유지(계약 조건과 분리). 보완 모델 호출 0, 예산 7/12회·33,948·121,189 불변",
+      "status": "검수 완료",
+      "task_id": "02-04",
+      "title": "PID 1·역할별 기동·체크포인트·재개",
+      "track": "main",
+      "unresolved": "수용 기록 §3·§4(ACCEPTANCE.md): 승인된 이동 — 1a 배정 수준 한도 → 02-05, 1b 실제 GitHub 수집·F4·N5 → GH1~GH5 뒤 연결 작업·EARLY-01, 1c 판정 머리 F3 → 02-07, 2 코디네이터 start·reconnect → 02-05, 3 안전 종료(자식 04-05·외부 요청 02-05, 그때까지 미확인), 6 실제 정지 → 04-05(실행 전 결정안), 7 예비 회차 개발 2·Guardrail 3 미사용 유지, 8 호출자 이월 → 담당 X-08(개정 A6), 병합 전 X-02·모든 후속 실제 호출 금지(차단). 이월은 완료가 아님. 남은 한계: 실제 회차가 항목 4·9 경로를 지나지 않음, 공급자 거부·인증 오류 출력은 가정, 같은 UID 체크포인트 변경 가능, worktree·자식·외부 요청 미추적. 정보성: PR #58 검토 P-2·Q-2·Q-3, I-2 전용 시험 없음(Q-1) → X-08에서 함께 처리(다음 실제 호출 전). 수용 보고 §7의 그 밖의 열린 이월. D3 답 불충족(기대 3·답 4) 유지. 원장 정정(PR #59 검토 62acc7e L-1·L-2·I-1·I-2): 1b를 04-07·05-01~05-03에, 항목 8 차단을 02-05에 적음. 원장 정정(PR #60 검토 65022bc N-1~N-3): 항목 8 담당 X-08(개정 A6), 수용 기록 §3 끝 문장에 받는 작업 전체, resume.next_action 갱신. PR #61 검토 86e966d L-2: 수용 보고 §7의 “다음 supervisor 정비” 두 건(f73ac13 P3 빈 memory 디렉터리 digest, bc55edf R5 정리 코드 시험)은 X-08 범위가 아니다. 02-05의 첫 supervisor 변경 PR에서 함께 처리하며 어느 작업의 선행 조건도 아니다(비차단). PR #61 검토 79b40da N-1·N-3: X-08 근거 절을 §4로, resume.current_work의 PR 지칭을 고침(snapshot 0035).",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/02-05/plan-20261115/PLAN.md",
+        "reports/tasks/02-05/plan-20261115/reviews/review-pr66-3f9909f.md",
+        "reports/tasks/02-05/plan-20261115/reviews/review-pr66-3c017a4.md",
+        "reports/tasks/02-05/step1-u2-c2-20261115/REPORT.md",
+        "reports/tasks/02-05/step1-u2-c2-20261115/evidence/test.log",
+        "reports/tasks/02-05/step1-u2-c2-20261115/reviews/review-pr72-23877c1.md",
+        "reports/tasks/02-05/step2-supervisor-ops-20261115/REPORT.md",
+        "reports/tasks/02-05/step2-supervisor-ops-20261115/evidence/test.log",
+        "reports/tasks/02-05/step2-supervisor-ops-20261115/reviews/review-pr73-a349dc6.md",
+        "reports/tasks/02-05/step3-delivery-20261115/REPORT.md",
+        "reports/tasks/02-05/step3-delivery-20261115/evidence/test.log",
+        "reports/tasks/02-05/step3-delivery-20261115/reviews/review-pr74-c11e734.md",
+        "reports/tasks/02-05/step3-delivery-20261115/reviews/review-pr74-fe924b7.md",
+        "reports/tasks/02-05/step4-chain-20261116/REPORT.md",
+        "reports/tasks/02-05/step4-chain-20261116/evidence/test.log",
+        "reports/tasks/02-05/step4-chain-20261116/reviews/review-pr75-5dbb3d8.md",
+        "reports/tasks/02-05/step4-chain-20261116/reviews/review-pr75-debf413.md",
+        "reports/tasks/02-05/step4-chain-20261116/reviews/review-pr76-43f08ed.md",
+        "reports/tasks/02-05/step5-limits-20261116/REPORT.md",
+        "reports/tasks/02-05/step5-limits-20261116/evidence/test.log",
+        "reports/tasks/02-05/step5-limits-20261116/reviews/review-pr77-97ff0bc.md",
+        "reports/tasks/02-05/step5-limits-20261116/reviews/review-pr77-1548061.md",
+        "reports/tasks/02-05/step5-limits-20261116/reviews/review-pr77-af68c93.md",
+        "reports/tasks/02-05/step6-external-20261116/REPORT.md",
+        "reports/tasks/02-05/step6-external-20261116/evidence/test.log",
+        "reports/tasks/02-05/step6-external-20261116/reviews/review-pr78-1b362ec.md",
+        "reports/tasks/02-05/step6-external-20261116/reviews/review-pr78-6e0ad85.md",
+        "reports/tasks/02-05/step7-github-20261116/REPORT.md",
+        "reports/tasks/02-05/step7-github-20261116/evidence/test.log",
+        "reports/tasks/02-05/step7-github-20261116/reviews/review-pr79-0fd1f64.md",
+        "reports/tasks/02-05/step7-github-20261116/reviews/review-pr79-47e4e3f.md",
+        "reports/tasks/02-05/step7b-recovery-20261117/REPORT.md",
+        "reports/tasks/02-05/step7b-recovery-20261117/evidence/test.log",
+        "reports/tasks/02-05/step7b-recovery-20261117/reviews/review-pr80-185d12b.md",
+        "reports/tasks/02-05/step7b-recovery-20261117/reviews/review-pr80-d336849.md",
+        "reports/tasks/02-05/budget-0205-20261117/REPORT.md",
+        "reports/tasks/02-05/budget-0205-20261117/evidence/test.log",
+        "reports/tasks/02-05/budget-0205-20261117/reviews/review-pr81-b38e8df.md",
+        "reports/tasks/02-05/budget-0205-20261117/reviews/review-pr81-291a9b0.md",
+        "reports/tasks/02-05/pre-step8-20261117/REPORT.md",
+        "reports/tasks/02-05/pre-step8-20261117/evidence/test.log",
+        "reports/tasks/02-05/pre-step8-20261117/reviews/review-pr82-63fefc1.md",
+        "reports/tasks/02-05/pre-step8-20261117/reviews/review-pr82-4531772.md",
+        "reports/tasks/02-05/step8-runbook-20261117/RUNBOOK.md",
+        "reports/tasks/02-05/step8-runbook-20261117/evidence/test.log",
+        "reports/tasks/02-05/step8-runbook-20261117/reviews/review-pr83-67b5cae.md",
+        "reports/tasks/02-05/step8-runbook-20261117/reviews/review-pr83-8336044.md",
+        "reports/tasks/02-05/step8-runbook-20261117/evidence/test-pre8c.log",
+        "reports/tasks/02-05/step8-runbook-20261117/evidence/ci-44003424073-attempt1-failed.log",
+        "reports/tasks/02-05/step8-runbook-20261117/reviews/review-pr84-b291d7c.md",
+        "reports/tasks/02-05/step8-runbook-20261117/evidence/test-pre8d.log",
+        "reports/tasks/02-05/step8-runbook-20261117/reviews/review-pr85-5b21540.md",
+        "reports/tasks/02-05/step8-plan-20261117/EXECUTION_PLAN.md",
+        "reports/tasks/02-05/step8-plan-20261117/evidence/dry-run.log",
+        "reports/tasks/02-05/step8-plan-20261117/reviews/review-pr86-3e4e3d6.md",
+        "reports/tasks/02-05/step8-plan-20261117/reviews/review-pr86-a5f9402.md",
+        "reports/tasks/02-05/step8-plan-20261117/RESUME_PLAN.md",
+        "https://github.com/HeaInSeo/ieo_poc/pull/91"
+      ],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": "2026-11-18T20:57:52+09:00",
+      "latest_report": "reports/tasks/02-05/step8-plan-20261117/RESUME_PLAN.md",
+      "legacy_v1_2_id": "02-05",
+      "next_action": "02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다.",
+      "result_state": "계획 작성·병합(PLAN.md): 이월 C1~C14, 착수 전 규칙 결정(F4 사용자 결정, N5 개발자 권한·보고, S1 사용자 확인, U2·T1 개발자 권한), 단계 0~9(모델 호출 없는 1~7·9, 실제 호출 8은 사용자 결정·X-08 검수 완료 뒤(PR #69 검토 d0f72ec L-1)), 02-05 예산 결정 요청 초안(가 실제 호출 없음 / 나 3회+예비 1). 검토 3f9909f 변경 요청(M-1 U2 위치, M-2 착수 전 조건 유지, M-3 X-08은 단계 8만의 관문) → 교정 1 → 3c017a4 approve(검토 2/4·교정 1/3), 병합 fda0f2b. 규칙 결정에 C2(sprint_id 예약, 개발자 결정) 포함. 모델 호출 0 · 단계 1 PR(feat/0205-s1): U2 등록 검사 순서(멱등 재조회 → sprint repo(RG2·C2) → 01-07 → 가져오기 소유 → notion_gate → 저장/저장된 결과, 소유·관문은 모든 비거부 결과에 적용), C2 바인딩 sprint_id 예약과 시작 검사, OpenAPI 0.9.0. 첫 거부 코드가 바뀐 경우 10건(거부 집합 같음, 409→200 없음), C2는 계획대로 거부 추가. 시험 357 통과. 검토 23877c1 approve, 병합 089fb95 · 단계 2 PR(feat/0205-s2): supervisor 작업 getOwnAssignment·recordFirstAction·reportSessionStatus(HTTP·gRPC, checkpoint:report 범위, claim 저장), OpenAPI 0.10.0, proto RPC 셋, C13 닫음. 시험 358 통과. 검토 a349dc6 approve, 병합 3701f6b · 단계 3 PR(feat/0205-s3): deliverAssignment(roles:control, HTTP 전용, 요청 기록 → compare → 공유 예산 검사 → start/reconnect → 결과 또는 unknown, 읽기 전용 재조회), 공유 예산 검사 라이브러리(caller::admit/start/finish, 02-04 호출자 동작 유지), supervisor 같은 attempt 재전송·현재 배정 대조, 런타임 계약 revision 11, OpenAPI 0.11.0. C8·C12 닫음, C1 단계 3 몫. 시험 365 통과·변이 16/16. 검토 c11e734 변경 요청(M-1 new_session이 끝나지 않은 옛 세대 위에서 start) → 교정 1: compare가 끝나지 않은(takeover·error) 옛 세대를 external_reconciliation_required로 판단(02-04 판단의 닫힌 쪽 변경), 전달은 after_run 옛 세대에서만 new_session start, Admission::lower 시험, 예산 계획 역할 = 설정 역할, 잠금 뒤 재판단, 진행 중 같은 키 409 DELIVERY_IN_PROGRESS. 시험 367 통과·변이 23/24(남은 1은 결정적 재현 불가 창, 보고 §7.3) · 단계 3 검토 fe924b7(검토 2/4·교정 1/3) approve, 병합 375f21f, main CI 43732975756 success. 수용된 02-04 compareCheckpoint 판단 하나를 닫는 쪽으로 바꿈(같은 배정 낮은 세대의 마지막 기록이 takeover·error면 external_reconciliation_required), 사용자에게 보고 · 단계 4 PR #75(feat/0205-s4): takeover 체크포인트의 delivery_id·attempt_id로 전달과 그 호출에 묶고 같은 트랜잭션에서 인수 행(role_takeovers, 전달 하나에 인수 하나), 전달 없는 takeover 409 DELIVERY_REQUIRED·맞지 않으면 409 DELIVERY_MISMATCH(행 불변), supervisor 첫 행동 감지(init 뒤 첫 assistant의 tool_use·text, 자기 세션만)와 recordFirstAction·after_run 채움(없으면 \"none\"), last_actual_action_at = 첫 행동 시각(C14 일부), 전달 행 cause(operator, 02-08 준비), getAssignmentChain(HTTP 전용, verified와 claim 구분, 세션 상태 포함), 에이전트 보고 0건에서도 판정 진행(판정은 G3의 현재 guardrail_review claim만 읽음, 필수 아님), C1 닫음, 단계 2 recordFirstAction 500 교정, 런타임 계약 revision 12, OpenAPI 0.12.0. 수용된 02-04 동작 변경(닫는 쪽): 전달 없는 takeover 거부(코디네이터 중앙 기록 supervisor에 ieo-role-call로 직접 보낸 start는 실행되지 않음, 02-04 예비 5회도 이 경로로는 못 씀), last_actual_action_at 뜻, 새 필드 형식 400. 시험 376 통과·변이 21/21. 검토 5dbb3d8 변경 요청(M-1 인수가 전달의 호출에 묶이지 않음, L-1 판정 입력 문구, L-2 채움 조건 시험) → 교정 1 → debf413 approve(검토 2/4·교정 1/3), 병합 1b5bc1f, main CI 43780803494 success. 모델 호출 0 · 원장 기록 PR #76(검토 43f08ed approve, 검토 1/4) 병합 7dcb2fb, main CI 43799695460 success · 단계 5 PR(feat/0205-s5): 배정 수준 시간·토큰 한도(C7). 사용자 결정 2026-11-16(L01 정의 (가)·시간 (i)): total_tokens = input+output+cache_creation, elapsed_seconds = 회차 시간 합, 배정 모든 세대 합산. issueAssignment 선택 limits(명세 값 초과 422 LIMITS_ABOVE_SPEC), 회차 사용량을 예산 원장에서 다음 전달 때 옮김(원장이 권한), 미계측 회차·남은 양 없음이면 전달 409(상태 불변), 다음 회차 limits = min(배정 남은 양, 예산 남은 양, 역할 몫(시험 고정값)), HTTP statement_timeout 10초(검토 fe924b7 I-5), 연결 조회 사용량 절, 검토 debf413 L-3 시험·변이 F. OpenAPI 0.13.0. 수용된 동작 변경: 모든 HTTP 작업의 문장 10초 상한(넘으면 500·저장 없음), issueAssignment가 limits 필드를 받음. 시험 379 통과·변이 13/13. 검토 97ff0bc 변경 요청(M-1 원장 기록이 잠시 없으면 배정 사용량이 영구히 0이 됨, 재현) → 교정 1: 보낸 호출의 기록이 없으면 missing으로 이전 값 유지·배정 정지(409 ASSIGNMENT_USAGE_UNMEASURED), 해제는 기록 복귀·정정·model_request:false 항목뿐, 행에 순번과 원장 신원(예산 이름·디렉터리), 다른 원장이면 409, 120초 창을 80초 호출 기한으로 강제(넘으면 not_called), 원장이 아는 attempt_id 409 ATTEMPT_ID_CONFLICT, coordinator_record.limits = 배정 유효 한도. 시험 379 통과·변이 22/23. 검토 1548061 변경 요청(N-M1 결과 트랜잭션을 잃은 전달의 회차가 배정에 청구되지 않음, 재현) → 교정 2: 결과가 accepted·unknown이거나 결과 없이 120초 지난 전달도 attempt·role로 원장 대조, 기록 없으면 missing(정지), 뒤에 보낸 것 없음이 확인되면 withdrawn으로 닫음, 연결 조회가 설정 원장 기준, 호출 기한 75초(시험용 환경 변수로 줄일 수 있음, deadline+45 ≤ in-flight일 때만). 시험 380 통과·변이 28/28. 모델 호출 0 · 단계 5 검토 af68c93 approve(검토 3/4·교정 2/3), 병합 de1336c, main CI 43821085760 success · 단계 6 PR(feat/0205-s6): 외부 요청 추적(C9). supervisor가 답을 모르는 코디네이터 요청(체크포인트 보고·대기 takeover·첫 행동 보고)을 역할 볼륨의 목록으로 유지(재시작에도 남음), 답(2xx·4xx)이나 다음 start·reconnect 전 재조회로 지움, 상태·체크포인트에 실제 목록(요청 id·종류·보낸 시각·대상), 재조회 뒤에도 남거나 목록을 읽을 수 없으면 reconnect 409 EXTERNAL_RECONCILIATION_REQUIRED, 모델의 직접 네트워크 요청은 direct_network_requests: not_observable. 코디네이터 repo 정지가 결과 불명 전달을 사유로 나열, 자식 미추적이라 안전 정지는 계속 미확인(사용자 결정 항목 3). 검토 af68c93 C-1(상한 재정의는 기본값 이하만·기동 기록)·C-2(sent 경로 시험). 런타임 계약 revision 13, OpenAPI 0.14.0. 수용된 동작 변경: supervisor 상태·체크포인트의 pending_external_requests가 실제 목록, reconnect 거부 조건 추가, stopRepo가 정지 뒤 DB 읽기 1회·사유 추가(교정 1 뒤: 읽기 실패에도 정지 보고 유지, unreadable·미확인). 시험 384 통과·변이 13/13. 검토 1b362ec 변경 요청(M-1 DB 읽기 실패 시 이미 역할을 정지한 stopRepo가 정지 보고 없이 500, 재현) → 교정 1: 정지 보고 유지·coordinator_pending_external_requests unreadable·미확인, 목록에 넣을 수 없는 요청은 보내지 않음(체크포인트 503 EXTERNAL_REQUEST_NOT_TRACKED, takeover면 실행 없음, 목록을 읽거나 쓸 수 없으면 start도 실행 없음 — 수용된 start의 닫는 쪽 변경), 같은 UID 한계 명시, 시험 3건(R2·R3·R6), 단계 5 limits_e2e의 시간 의존 시험 경쟁 제거(코드 경쟁 아님). 시험 388 통과·변이 20/20. 모델 호출 0 · 단계 6 검토 6e0ad85 approve(검토 2/4·교정 1/3), 병합 9b66300, main CI 43836416165 success · 사용자 결정 2026-11-16 충돌 복구 (나): 공식 복구 작업을 02-05 단계 7b 별도 PR로(사람 운영 주체만 승인, 단계 7 GitHub head 대조 재사용, 실행 중·확인 불가면 보류, 승인 하나에 실행 하나, 사용량·미계측 유지, 예산 초기화 아님) · 단계 7 PR(feat/0205-s7): GitHub SHA·CI 대조를 재개의 최종 근거로(C10). 새 증거 종류 branch_head(evidence:ingest 신뢰 입력, 실제 수집 아님), issueAssignment 선택 branch_ref, supervisor 체크포인트에 worktree_head·branch_ref·pushed_sha(.git ref 파일만 읽고 git 실행 안 함), 개발 compare는 배정 브랜치 최신 branch_head = pushed_sha(push 없으면 target_sha)일 때만 resume_allowed, 다르면 external_reconciliation_required, 기록·branch_ref 없으면 not_observed, CI는 그 head SHA의 ci_run만 기록(차단 안 함)·에이전트 CI 주장 불일치 기록, Guardrail 검토 대상이 현재 개발 target_sha가 아니면 stale_target(호출 없음). 검토 6e0ad85 L-a(목록 읽기·쓰기 불가면 202 전에 409, 파일 경로 표시)·I-a·I-b·I-c. 런타임 계약 revision 14, OpenAPI 0.15.0. 수용된 동작 변경: 개발 compare가 GitHub 기록 없으면 재개 안 함(branch_ref 없는 기존 배정은 not_observed), Guardrail compare 새 값 stale_target, worktree_head 뜻(none → SHA 또는 not_observed), supervisor 상태 능력 공백 1개 제거·목록 파일 필드, start·reconnect가 깨진 목록이면 409. 시험 392 통과·변이 25/25. 검토 0fd1f64 변경 요청(M-1 같은 세대 명시적 새 세션도 GitHub 대조에 막히는데 문서는 start 불변이라 함) → 교정 1: 개발자 결정 (b) 닫는 쪽 유지 — resume_allowed에서 고른 모든 호출(같은 세대 new_session start 포함)을 GitHub 대조로 막고 계약·OpenAPI·보고·시험을 맞춤, 새 세대 새 세션과 no_checkpoint start는 대조 없음. 체크포인트 branch_ref가 배정과 다르면 mismatch, push 출처 기록, gitref .. 경로 시험, 재판단 결과의 github 사용. 시험 392 통과·변이 28/28. 모델 호출 0 · 단계 7 검토 47e4e3f approve(검토 2/4·교정 1/3), 필수 검사 'rust fmt clippy test'가 47e4e3f에서 이 PR이 건드리지 않은 gRPC 시간 시험(grpc.rs:1994)으로 실패 → 실패 작업만 1회 재실행해 통과(run 43895157928), 병합 78d7fe5, main CI 43898119170 success · 단계 7b PR(feat/0205-s7b): 공식 충돌 복구(사용자 결정 2026-11-16 (나)). approveRecovery·getRecovery(HTTP 전용), 추가 전용 표 role_recoveries·role_recovery_uses. 승인은 roles:control이고 자격 종류 user인 주체만(서비스 403 HUMAN_APPROVAL_REQUIRED, 역할 자격 403, DB CHECK approver_kind=user). 기록: 승인자·종류·사유·시각·배정·세대·체크포인트 순번·digest·phase·읽은 사실·GitHub 대조(수집 기록 기반 신뢰 입력, 실제 수집 아님). 실행 중이면 409 RECOVERY_RUNNING, 대상 불일치 409(기록 없음), supervisor 미관측·로컬≠중앙·대기 외부 요청·결과 불명 전달·GitHub 대조 match 아님이면 needs_confirmation 보류 기록(사용 불가). deliverAssignment recovery_id는 매 판단(예산 잠금 아래 포함)에 다시 대조하고 recovery_allowed면 새 세션 start만(재개 아님), 사용은 호출 직전에 기록, 승인 하나·체크포인트 하나에 사용 하나(중복·응답 유실·재시작에도 실행 하나). 한도·예산 검사 그대로(미계측이면 거부, 사용량 불변). supervisor start는 끝나지 않은 체크포인트 위면 recovery_id 필요(local_only 포함). 단계 7 이월: I-3 push한 충돌 회차는 mismatch → needs_confirmation 보류(사람이 브랜치 대조 뒤 다시 승인), L-4 브랜치 없는 체크포인트의 pushed_sha 무시, grpc.rs 간헐 실패는 실제 코드 경쟁(tonic 시간 제한 층과 서버 상한이 같은 순간) → 층을 상한+1초로. 런타임 계약 revision 15, OpenAPI 0.16.0. 수용된 동작 변경: supervisor start가 끝나지 않은 체크포인트 위에서 recovery_id 없으면 409(local_only 포함), gRPC 서버의 클라이언트 기한 없는 시간 제한이 상한+1초. 시험 395 통과·변이 19/19. 검토 185d12b 변경 요청(M-1 아무것도 실행하지 않은 사용이 체크포인트를 영구히 막고 문서는 새 승인이 된다고 함, 재현) → 교정 1: 실행하지 않은 사용(refused·not_called·재조회로 미지 확인)은 체크포인트를 소비하지 않고, accepted·unknown·결과 없음이면 새 승인·사용은 보류, 이미 소비된 체크포인트 승인은 바로 보고, 코디네이터 모드 takeover가 그 전달의 복구 id를 대조(L-1), ieo-role-call --recovery-id(L-2), 예산 잠금 뒤 재대조·로컬≠중앙 보류·Guardrail 대상 시험(L-3). 시험 395 통과·변이 27/27. 모델 호출 0 · 단계 7b 검토 d336849 approve(검토 2/4·교정 1/3, 첫 검토자 메시지 실패로 새 검토자), 병합 e336161, main CI 43964837089 success · 02-05 예산 코드 PR(feat/0205-budget): BUDGET_0205 \"02-05\"(사용자 결정 2026-11-15 §2.1 그대로: 4회, 회당 600초, 2,400초, 과금 토큰 200,000, cache_read 2,000,000, 역할 몫 개발 3·1,800·150,000·1,500,000 / Guardrail 1·600·50,000·500,000, 합이 예산과 같음), 역할 몫은 승인 값에서(설정 값은 생략 또는 정확히 같아야 함), 원장 하나에 예산 하나(다른 예산 기록이 있는 원장 거부), 원장 전환 시 기존 배정은 409(사용량 이전 없음). 사용자 결정 2026-11-17 예비 (나): 개발 세 번째 회차는 사유·대체 시도 id 표식과 이 예산의 실패한 개발 회차가 있어야 함(예비는 실패한 계획 회차 다음, 표식이 가리킨 stop_required만 해제 — 개발자 해석, 결정 기록 §3), 예비 1회·Guardrail 없음. 검토 d336849 L-a(인수 체크포인트·배정·세대에 묶음)·L-b(error 경로 시험)·L-c(계약 item 27 기록). 런타임 계약 revision 16, OpenAPI 0.17.0. 기본으로 켜지는 실제 호출 없음. 수용된 동작 변경: 공유 예산 검사가 다른 예산 기록이 있는 원장 거부, reportCheckpoint 복구 검사 강화, 예비 표식이 가리킨 stop_required는 막지 않음(예비 있는 예산만). 시험 401 통과·변이 29/29. 검토 b38e8df 변경 요청(M-1 예비 표식이 사람 확인 정지를 푸는데 서비스 자격도 붙일 수 있음) → 사용자 결정 2026-11-17 두 번째 답(해석 ①② 승인과 조건, 결정 기록 §4) → 교정 1: 표식은 인증된 사람(kind=user) 자격의 deliverAssignment로만(서비스 403 HUMAN_APPROVAL_REQUIRED, 호스트 호출자 ieo-role-call은 예비 인자를 거부), 표식에 사유·대체 회차·evidence_ref 필수, 승인자·승인 시각은 코디네이터가 기록, 표식은 이름 붙인 회차 자신의 결과로 생긴 멈춤만 해제하고 그 회차 사용량이 계측돼 있어야 함(미계측·초과/한도 신호·정리 실패·답 유실·원장 불일치는 계속 막음), 정정된 기록으로 실패 판정(L-1), 실패한 예비는 다시 멈춤, 중복 요청은 실행·기록 추가 없음. 시험 405 통과·변이 47/47. 모델 호출 0 · 예산 PR 검토 291a9b0 approve(검토 2/4·교정 1/3), 병합 0a3d2a3, main CI 43985814742 success · 단계 8 전 PR(feat/0205-pre8): 검토 291a9b0 N-1(사람 → deliverAssignment → 02-05 예비 경로 종단 시험 spare_e2e: R1 실패 → 표식 없음 거부 → 서비스 표식 403 → 사람 표식으로 R1 재시험(by·approved_at·evidence_ref 기록, 원 기록 보존) → 같은 요청 재전송은 저장된 답 → 두 번째 예비 거부 → R2 → 계획 회차 소진), N-2(결과가 아닌 정지 사유는 결과 사유로 읽히지 않게), N-3(approved_at = 코디네이터 처리 시각), I-8(직접 첫 행동 보고도 그 시도를 부른 전달에 연결된 인수만). 런타임 계약 revision 18, OpenAPI 0.17.1. 수용된 동작 변경: recordFirstAction 직접 보고의 연결 조건(409), 결과가 아닌 정지 사유 문자열 정규화. 단계 8 준비 점검표(보고 §6, 코드·문서에서만, 실제 확인은 실행 전). 시험 407 통과·변이 8/9(P7 동등). 검토 63fefc1 변경 요청(M-1 단계 8 점검표 누락 (a)~(e)) → 교정 1: 점검표 항목 11~15(실행 중 재시작 금지와 재시작 전 확인 4가지, 예비 보내는 방식, 관측 신선도·경로·branch_ref·한도 여유, 코디네이터만 시작 경로, 새 표 사전 존재 확인), (a)의 코드 교정 — SIGTERM 때 새 전달은 503 COORDINATOR_STOPPING, 받아들인 회차의 마무리를 최대 720초 기다림(강제 종료는 여전히 기록 유실, 점검표 11), I-1 승인자 종류 실제 값, L-1 세대 불일치 시험. 수용된 동작 변경 추가: 코디네이터 종료 처리(실행 중이면 최대 720초 계속 서비스). 시험 408 통과·변이 14/15(P7 동등). 모델 호출 0 · 단계 8 전 PR 검토 4531772 approve(검토 2/4·교정 1/3), 병합 5d69102, main CI 43995607411 success · 단계 8 전 후속 PR(feat/0205-pre8b): 검토 4531772 L-2(점검표의 error·takeover → recovery_id + 예비 경로는 불가: 미계측이라 관문 거부 → 예비 불가·사람 보고로 정정, 관문 전제 명시), L-3(종료 대기 기본 780초 = 600 + 2×60 + 60, 진행 중 회차의 더 긴 창이면 그 한도까지, podman stop -t 780), L-4(멈춤 검사 전 전달 셈, main 재대기), 단계 8 절차서 RUNBOOK(읽기 전용 사전 확인 10개, [실 시스템 변경] 단계 표시와 건별 승인, 예비 결정 트리, 멈춤·재시작·중단 규칙). 절차서가 드러낸 사용자 결정: 단계 8 sprint revision의 한도 값(L01 값 미결, 실제 sprint는 total_tokens=null). 시험 408 통과·변이 7/8(R4 결정적 재현 불가). 검토 67b5cae 변경 요청(M-1 session_id가 UUID여야 함을 절차서가 요구하지 않음, M-2 예비 요청·재시작이 실 시스템 변경·건별 승인으로 표시되지 않음) → 교정 1: 절차서에 새 소문자 UUID 요구, start의 session_id가 UUID가 아니면 코디네이터가 부르지 않음(not_called), 예비는 사용자의 건별 승인(원인 보고·대체 회차·연산, R2는 세션이 있으면 reconnect 기본), 재시작 표시와 -t 900, 778ee47 정지 설명, 준비 절(토큰·sprint 등록·의미 검토·바인딩), 사용자 결정·승인 목록, 멈춤 직전 재확인. 수용 전 작업의 동작 변경: UUID가 아닌 start는 not_called, 멈추는 중 호출 직전이면 not_called. 시험 409 통과·변이 11/13(R4·U3 신호 시점 경쟁, 닫는 쪽). 모델 호출 0 · 단계 8 절차서 PR 검토 8336044 approve(검토 2/4·교정 1/3), 병합 ad96116. main CI 44003424073 첫 시도 실패(recovery_e2e gRPC 변형 'the coordinator did not start', 20초 상태 대기) → 실패 작업만 1회 재실행해 성공. 원인 조사(후속 PR): 재시작이 아니라 gRPC 시험의 첫 기동, 원인 미확정(병합 뒤 정정, PR #84 검토 b291d7c L-1: 바깥 연결이 포트를 차지했다는 처음 설명은 Linux 포트 홀짝 규칙상 거의 불가능, 더 그럴듯한 후보는 같은 시험의 다른 bind(0)이 풀린 포트를 가져감) → 시험 포트를 임시 범위 밖으로, 코디네이터 stderr를 보존해 다음 실패에 원인이 보이게. 재현 중 실제 결함 발견: SIGTERM 뒤 gRPC 쪽이 열린 HTTP/2 연결이 닫힐 때까지 기다려 멈추지 않음(X-04부터) → 진행 중 호출만 최대 16초 기다리고 서버를 내림 · 단계 8 전 후속 PR 2(feat/0205-pre8c): 검토 8336044 L-A(멈춤 재확인을 복구 사용 기록 앞으로, 승인 소모 방지), L-B(절차서: sprint 등록·의미 검토는 재배포 뒤, 의미 검토 본문 {decision, reason, digest}, 바인딩 선택), I-A·I-B·I-C·I-D·I-E·I-F, gRPC 멈춤 상한 16초, 시험 포트·진단. 수용된 동작 변경: 코디네이터 SIGTERM의 gRPC 쪽 대기(연결이 남아도 최대 16초). 시험 410 통과·변이 16/19(R4·W1 신호 시점, G2 gRPC 호출 진행 중 멈춤 시험 없음). 모델 호출 0 · 후속 PR 2 검토 b291d7c approve(검토 1/4), 병합 83bc84d, main CI 44010481541 success · 후속 PR 3(feat/0205-pre8d): 검토 b291d7c L-1(원인 설명 정정·미확정), L-2(free_port를 tests/common 하나로, 모든 코디네이터 자식 시험에 적용), L-3(L-A 남은 구간 설명 정정), I-1(코디네이터 로그를 시험 디렉터리에), I-2, I-3(gRPC 멈춤 의미를 내부 계약에, 멈춤을 가로지르는 호출 시험), I-4(등록은 재배포 뒤 권함), I-5 기록. 시험 411 통과(세 번 전체 실행)·변이 2/2. 모델 호출 0 · 후속 PR 3 검토 5b21540 approve(검토 1/4), 병합 05cf16e, main CI 44016542138 success · 사용자 결정 2026-11-17(User_Decisions_2026-11-17_step8-l01.md): 단계 8 L01 값 개발 1,800초·150,000, Guardrail 600초·50,000 승인, 예산·USD 0 유지, 구체 실행안과 묶음 승인 요청 작성 지시 · 단계 8 실행안 PR(plan/0205-step8): EXECUTION_PLAN(대상 HeaInSeo/ieo_poc_test main 2ab9d876, repo_id ieo-poc-test, sprint POC-S8-01 r1, task 90-01, 배정 S8-DEV-A1·S8-GR-A1, R1/R2/G1 읽기·답하기 지시문, 주체 7개(사용자=독립 의미 검토·예비), pg_dump 백업 ieo_poc-data/backups, 재배포 순서·되돌리기·실패 대응, 묶음 승인 요청), sprint 명세(로컬 검사 201), 단계 8 역할 실행기(checkpoint_central, 02-05 예산, 대상 커밋 파일만 읽기 전용, Read/Grep/Glob만, slirp4netns allow_host_loopback), 가짜 claude·시험 코디네이터(55432 시험 DB)로 전체 건식 실행 21/21 통과. 첫 관측 기한 2026-11-21T23:14Z. 검토 3e4e3d6 변경 요청(M-1 개발 도구 제한이 실제로 강제되지 않음, M-2 자동 되돌리기가 영속 DB를 지우고 복원, M-3 이전 프로세스의 인자·환경 보존 없음, M-4 실제 실행이 문장뿐) → 교정 1: supervisor에 선택적 읽기 전용 개발 역할(tools: read_only → --tools Read,Grep,Glob, 작업 트리로 읽기 범위 제한, supervisor 경로 거부; 선택 사항이라 수용된 동작 변경 없음, ieo-supervisor 151 통과·변이 4/4) + settings deny + 회차 뒤 도구 점검, 되돌리기는 DB 복원 없이 778ee47을 DB 그대로 재기동(DB 복원은 별도 결정·새 DB 이름), 백업 복원·이전 예행(rehearse-migration), 인자·환경 0600 보존(coord-switch), 실제 실행 스크립트 run-step8.sh(모든 멈춤 조건·기한 검사·G1 지시문 조립), sprint sources에 두 결정(digest a8d97f12…). 건식 실행이 같은 스크립트로 21/21(778ee47 → 백업·예행 → 전환 → 회차 → 되돌리기). 검토 a5f9402 변경 요청(N-1 coord-switch가 환경을 줄바꿈으로 나눠 여러 줄 셸 함수가 있으면 새 기동과 되돌리기 기동이 모두 실패(재현), DB 암호가 잠시 명령줄에, 작업 디렉터리 미보존) → 교정 2: NUL 경계 보존, BASH_FUNC 제외, 셸 내장 export로만 복원(명령줄에 값 없음), cwd 보존과 상대 경로 확인, 읽기 전용 규칙을 02-04에서 검증된 형태로(L-8), 예행에 실제 바인딩·새 tokens(L-9), cgroup 확인(L-10), 단계 순서(L-11). 전체 시험 412 통과, 건식 실행 23/23(여러 줄 함수·상대 경로 사례 포함, 되돌리기 기동 성공). 실제 환경 변경·모델 호출 0",
+      "status": "조건 대기",
+      "task_id": "02-05",
+      "title": "문서 버전·배정·실제 인수 연결",
+      "track": "main",
+      "unresolved": "런타임 계약 rev 6 §10 항목 5: 02-04·02-05의 매핑 레코드가 재개에 session_id만 쓴다(코드 검토) — PR #18 검토 P3-1 · 02-03 이월: sprint_id를 repo별 승인 바인딩으로 미리 묶음(ieo-coord는 첫 등록 repo가 소유, 재검토 0fa839d N2) · 02-03 이월(02-05 착수 전): GitHub 검토 author 신원 확인 규칙(F4), 이전 SHA changes_requested와 GitHub PR 상태 차이 처리(N5), G1 판정 관련 필드 중 outputs를 필수 산출물 artifact_id만으로 좁힐지 정책 다음 버전 결정(S1) · X-01 이월(02-05 착수 전): 가져온 스프린트 소유 검사와 01-07 revision 검사의 순서를 계약에 명시(X-01 최종 검토 U2) · 02-04 수용 이월(사용자 결정 2026-11-15, 02-04 수용 기록 §3): 배정 수준 시간·토큰 한도 집행, 코디네이터의 start·reconnect 호출(중앙 체크포인트 compare 경유), 외부 요청 추적(repo 범위 안전 종료), GitHub SHA·CI 대조로 재개 최종 근거 — 02-05 수용 전 필수 · 구분: 위 02-03 이월의 F4·N5는 규칙 결정(02-05 착수 전)이고, 실제 수집·신원·검토 상태 연결(02-04 이월 1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01 · 차단 조건(02-04 결정 항목 8): 호출자 이월(PR #51 P1~P4·N6·F8, PR #49 L-c3-2~4, 마감 정지 시험)을 처리·검토하기 전에는 실제 모델 호출을 하지 않는다(02-05의 실제 인수 시험 포함). 항목 8의 담당은 X-08(개정 A6). X-08 검수 완료 전에는 02-05의 실제 모델 호출을 하지 않는다. 02-05의 모델 호출 없는 부분(코디네이터 start·reconnect 호출, 배정 한도 집행 등의 가짜 런타임 시험)은 X-08을 기다리지 않는다 · 비차단 참고(PR #61 검토 79b40da N-2): 02-04 수용 보고 §7의 f73ac13 P3(빈 memory 디렉터리 digest)·bc55edf R5(정리 코드 시험)를 02-05의 첫 supervisor 변경 PR에서 함께 처리한다. 02-05의 선행·수용 조건이 아니다 · 계획(PLAN.md §2·§4): 사용자 결정 2026-11-15로 해소 — F4(GitHub 검토 author 신원, 정책 G3 의미, 1b에서 반영), S1(정책 0.6.0 유지 확인), 02-05 실제 회차 예산((가)/(나)). 개발자 결정 — N5(G3 유지, PR 수준 상태는 별도 입력, 02-06·02-07), U2(소유 검사를 01-07 검사 뒤로), T1(supervisor만 코디네이터 자격). “02-05 착수 전” 조건(PR #66 검토 3f9909f M-2)은 사용자 답(F4 승인·S1 유지·바로 착수)으로 충족됐다. C2(sprint_id 예약, 개발자 결정) · PR #66 검토 3c017a4(비차단): N-1 U2 재배치로 X-01 시험 an_imported_draft_with_unresolved_reasons_cannot_execute의 기대가 409 IMPORT_GATED → 422 UNBOUND_DRAFT로 바뀐다(거부 집합은 같음, X-01 C2가 정한 순서를 뒤집음 → 사용자 보고에 포함, 단계 1 PR에 명시). N-2 notion_gate도 AlreadyRegistered·Superseded에 적용해야 거부 집합이 같고, 순서 문장에 RG2·예약 SPRINT_REPO_CONFLICT 검사 위치를 적는다(단계 1). N-3 예산 답은 착수 조건이 아니다(착수 조건은 F4·S1뿐). N-5 02-06·02-07 인계는 원장에 이미 적음 · 사용자 결정 2026-11-15(User_Decisions_2026-11-15_0205-x08.md): F4 (다) 승인(정책 G3 새 버전은 1b 작업에서, 02-05 코드 무변경), S1 정책 0.6.0 유지 확인, 02-05 바로 착수, 실제 회차 예산 (나) 승인 — 계획 3회(개발 2·Guardrail 1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, 추가 청구 USD 0, 자동 재시도 없음, X-08 검수 완료 전 실행 금지, 02-04·X-02·01-04 예산 사용·전용 금지, 02-04 예비 회차 계속 미사용. 단계 8 전에 예산 이름·상한 코드 PR 필요 · 런타임 계약 번호(PR #70 검토 8e1ecf7 L-2): X-08이 revision 10을 썼으므로 02-05의 계약 변경(PLAN.md의 “revision 10”)은 revision 11부터 쓴다 · PR #72 검토 23877c1: L-2 재배치 전 비공개 바인딩과 영속 DB sprint 소유(sprint_revisions·notion_imports)의 읽기 전용 대조(단계 8 준비), I-1 checkpoint_e2e gRPC 변형의 500ms 대기 한 번 실패(재실행 통과) · PR #73 검토 a349dc6 L-2(단계 2에서 미룬 것): 세션 상태 조회 경로는 단계 4의 연결 조회로, 자기 배정 조회의 last_delivery_id·이미지·프로파일 기대값은 단계 3에서 닫음 · 단계 3에서 정한 것(검토로 확인): 명시적 new_session, 답 유실 뒤 읽기 전용 재조회(재전송 아님), 답 유실이면 그 예산은 사람 대조까지 정지, 회차 중 코디네이터 재시작이면 진행 중 표식이 다음 전달을 막음 · PR #74 검토 fe924b7: L-1·I-2·I-6은 단계 4에서 처리(단계 4 보고 §9), I-5는 단계 5에서 처리(statement_timeout 10초), 남은 것 I-4 supervisor 직접 start의 미완료 체크포인트(단계 4 전달 요구로 실제 차단, 남은 틈은 단계 6) · PR #75 검토 debf413: L-3 연결 조회 \"none\" 링크의 시도 조건 시험(단계 5 PR에서 처리, 변이 F), I-8 직접 첫 행동 보고와 채움 조건 차이(단계 6 또는 8), I-9 바이트가 같은 베낀 start도 refused(단계 6), 5dbb3d8 I-3 실제 stream의 다른 행동 블록 종류(server_tool_use 등)는 단계 8 확인 항목, I-4 실행 중 죽은 회차의 첫 행동은 재시작 상태에서 사라짐(코디네이터 기록에는 남음) · 단계 5 남김(보고 §8): 승인 예산 (나)의 역할 몫 연결은 예산 이름·상한 코드 PR, 한도 도달 시 decision_request 자동 생성 없음(정책 G5 새 버전 필요), 원장 정정 경로(새 사용량 행)는 종단 시험 없음, 한도는 배정 id 단위(새 배정 id는 0부터, 예산·역할 몫이 상한), 실제 스프린트 total_tokens=null(L01 값 미결) · PR #76 검토 43f08ed I-1~I-4 처리(이 snapshot) · 단계 5 교정 1 남김: 같은 attempt_id를 가진 다른 원장 시험 없음, 결과를 잃은 전달은 120초 지난 뒤에야 배정에 반영(그 전 전달은 예산·역할 몫이 상한), 예산 (나) 원장으로 바꾸면 기존 배정은 409로 정지(예산 연결 PR이 처리 결정), 새 세대 발급으로 정지된 배정을 다시 여는 데 결정 기록이 필요 없음(바꾸려면 정책 G5 확장) · 단계 5 검토 af68c93: C-1·C-2는 단계 6에서 처리, C-3 이중 장애 한계(단계 5 보고 §13) · 단계 6 남김(보고 §8): I-4 남은 틈(코디네이터 모드는 닫힘, 대신 충돌 뒤 복구 경로 없음 → 사용자 결정 2026-11-16 (나) 공식 복구 작업, 02-05 단계 7b), I-8(직접 첫 행동 보고와 채움의 인수 조건 차이, 단계 8 전), I-9(바이트가 같은 베낀 start의 refused 기록, 신뢰 경계 안, 기록만), 에이전트 보고·재현 요청은 supervisor 경유 코드 경로가 아직 없음, 관측 불가 직접 요청이 안전 정지를 막을지는 04-05 · 단계 6 교정 1 남김: takeover 거부로 실행되지 않은 회차도 전달 경로 원장에 unmeasured로 남아 사람 대조가 필요(닫는 쪽, 02-05 단계 9), supervisor 경유 진행 보고 경로 없음(02-05 단계 9 결정), 재현 요청 경로 01-08 API·02-06 실행 · 단계 6 검토 6e0ad85: L-a·I-a·I-b·I-c는 단계 7에서 처리, I-d 원장 문구 정정(이 snapshot), 실행되지 않은 회차의 unmeasured 기록은 목록 깨짐 원인만 제거되고 나머지(takeover 거부·유실)는 02-05 단계 9 · 단계 7 남김(보고 §7·§8): GitHub 대조는 evidence:ingest 신뢰 입력(실제 수집은 1b), branch_ref 없는 배정은 재개 닫힘, push 감지는 origin 원격 추적 ref, start(새 세션)는 GitHub 대조 없음, 영속 DB 스키마 이전은 재배치 때 · 단계 7 검토 0fd1f64 남김: I-1 branch_head '최신'은 수집 순서(관측 시각 순서는 1b), I-3 충돌한 체크포인트의 pushed_sha는 실행 전 값이라 push한 충돌 회차는 늘 mismatch — 단계 7b가 그 뜻을 정함, I-4 비현재 진행 보고의 CI 주장 시험 없음 · 단계 7 검토 47e4e3f: L-4·grpc 간헐 실패는 단계 7b에서 처리, I-9 비현재 진행 보고 CI 주장 시험 없음(I-4와 같음) · 단계 7b 남김(보고 §6·§8): 사람 확인은 자격 파일의 kind 선언(단일 토큰, MFA 없음 → 1b·F4), Guardrail 복구는 구현했으나 종단 시험은 개발 역할만, 동시 사용 시험 없음(DB 유일 제약이 막음), local_only의 recovery_id는 어댑터 호출자의 주장, '확인된 head로 승인'은 정식 설계 후속, 자동 복구 가능 조건과 사람 판단 조건의 연결(보고 §6), I-8 · 단계 7b 검토 d336849: L-a·L-b는 예산 PR에서 처리, L-c(받아들여졌지만 실행되지 않은 start가 체크포인트를 계속 소비) 해제 경로는 02-05 단계 9, I-a 기록 · 예산 PR 남김(보고 §8): 단계 8 전제 — 다른 배정의 중앙 체크포인트가 있는 역할은 새 배정을 시작할 수 없어 깨끗한 repo·역할 필요(공식 배정 전환 경로는 사용자 결정 사항), supervisor 백스톱은 볼륨 전체를 세므로 02-04에 쓴 볼륨은 02-05를 거부해 새 역할 볼륨 필요 · I-8은 단계 8 전 · 예산 PR 검토 b38e8df: I-1(복구 배정 조건은 중복 방어층) 기록, I-3 실제 02-04 원장이 02-04 기록만 담는지는 다음 02-04 호출 전에 원장 담당이 읽기 전용 확인 · 예비 회차는 코디네이터 경로에서만(호스트 호출자 실행은 실패 뒤 멈춤), 실제 실패 때의 건별 예비 승인은 사람이 원인·근거를 확인해 따로 함(규칙 승인이 건별 승인이 아님) · 예산 PR 검토 291a9b0: N-1·N-2·N-3은 단계 8 전 PR에서 처리, I-3(02-04 원장 내용 확인) 이월 · 단계 8 전 PR 남김: 점검표는 실제 시스템에서 확인 전, spare_e2e는 HTTP만(예비 경로가 HTTP뿐), I-9·L-c 기록 유지 · 단계 8 전 PR 검토 63fefc1: 강제 종료(SIGKILL)는 회차 기록을 잃음 — 단계 8 실행 절차(podman stop -t 720)와 구조적으로 02-05 단계 9, I-2(N-2 guard는 관례), I-3(예비+recovery_id 종단 시험 없음) · 단계 8 전 PR 검토 4531772: L-2·L-3·L-4는 후속 PR에서 처리 · 단계 8 절차서 PR 검토 8336044: L-A·L-B·Info는 후속 PR 2에서 처리 · main CI 44003424073 첫 시도 실패의 원인은 유력 추정(포트 충돌)이며 확정 못 함 — 다음 실패 때 보존된 stderr로 확인 · G2(gRPC 호출 진행 중 멈춤) 시험 없음 · 후속 PR 3 검토 5b21540: L-1 내부 계약 §7.3a 문구(gRPC는 마무리 대기 동안 계속 서비스함), L-2 멈춤 시험의 7초 상한이 변이 M1을 살려 둠 — 다음 코드 PR · 02-05 단계 8은 ce0f852 기준 기존 조건부 승인으로 대기. 2026-11-22 17:00 KST 이후 실제 역할 Claude 계정의 한도 여유·크레딧 꺼짐, 파일 해시, 역할·코디네이터 유휴, 장부와 R1 관측을 실행 직전 다시 확인한다. R1b는 2026-11-24 21:09:49 KST 전에 사용자가 전송한다. 어느 조건이든 미충족·미확인이면 다음 전송을 멈추며 재시도하지 않는다.",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "02-06",
+      "next_action": "02-05 검수 완료 뒤 착수",
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "02-06",
+      "title": "현재 SHA 검토·교정·timeout 연결",
+      "track": "main",
+      "unresolved": "02-03 이월: ieo-coord는 재현 요청 접수·조회(queued)까지만, 실행기와 상태 전이는 02-06 · 02-05 계획 N5(개발자 결정, PLAN.md §2.2): 정책 G3(현재 SHA 기준)는 그대로 두고, PR 수준 미해결 changes_requested(수집기가 준 reviewDecision과 검토자 목록)를 별도 입력으로 받아 병합을 요청하지 않는다. 실제 수집은 1b",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "02-07",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "02-07",
+      "title": "완료 판정·보고 대기·현황 조회",
+      "track": "main",
+      "unresolved": "02-03 이월: 판정+outbox+판정 행 한 트랜잭션 모델과 결함 주입 롤백 시험은 있음, 보고 대기·에이전트 완료 메시지 없는 정상 회차 판정·전달 확인은 02-07 · 02-03 이월: 착수 시 판정 머리 규칙 결정(개발 머리가 다른 작업으로 넘어간 뒤 앞 작업 판정, F3 잔여), 수용 전 G1 판정 관련 필드별(acceptance·exit_condition·requirement_ids) 제거 변이를 검출하는 시험 보강(S3) · PR #26 검토 84a123a D1(02-07 수용 전): reports/tasks/02-03/coordinator-20261113/evidence/mutants.py의 M27을 좁은 형태(G1 비교만 `AND true`)로 재정의하고 다시 실행 · 02-04 수용 이월(사용자 결정 2026-11-15): 02-03 F3 판정 머리 — 02-07 수용 전 필수 · 02-05 계획 N5(개발자 결정, PLAN.md §2.2): 정책 G3(현재 SHA 기준)는 그대로 두고, PR 수준 미해결 changes_requested(수집기가 준 reviewDecision과 검토자 목록)를 별도 입력으로 받아 판정 문구에 “외부 상태 불일치”로 표시한다(판정 결과·G3 입력 집합은 바꾸지 않음). 실제 수집은 1b",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "02-08",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "02-08",
+      "title": "후속 DAG 대조·외부 감시기",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/03-01/catalog-contract-20261118/artifacts.sha256",
+        "reports/tasks/03-01/catalog-contract-20261118/verification.txt",
+        "https://github.com/HeaInSeo/ieo_poc/commit/33f4503634f54c6e7d4b61dd54db115fd22431c6",
+        "https://github.com/HeaInSeo/ieo_poc/commit/ea2b777411b48bcd3a2fc7ba0595f91142a6e32b",
+        "https://github.com/HeaInSeo/ieo_poc/commit/c3553cbe5e5b2b7b54ea4eb19b629e585ab7bb8c",
+        "https://github.com/HeaInSeo/ieo_poc/commit/bedd4d95463c7c77e54a339ad946266d2b312d65",
+        "https://github.com/HeaInSeo/ieo_poc/pull/96",
+        "https://github.com/HeaInSeo/ieo_poc/commit/e215c4bf79e92267d8690e1432eda25667e9ce43",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44300730785",
+        "https://github.com/HeaInSeo/ieo_poc/commit/a7d386b4a851a6fc28bc9e904dc327538e842b98",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44301972127"
+      ],
+      "group": "핵심",
+      "kind": "설계",
+      "last_observed_at": "2026-11-18T21:22:33+09:00",
+      "latest_report": "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
+      "legacy_v1_2_id": "03-01",
+      "next_action": "03-02 공통 정책·역할·GitHub 기준 문서 작성에 인계",
+      "result_state": "PASS · 계약 v0.1.0 · 표적 시험 13/13 · 독립 승인 및 main CI",
+      "status": "검수 완료",
+      "task_id": "03-01",
+      "title": "카탈로그 계약·색인·원본 대응표",
+      "track": "main",
+      "verification_level": "verified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/03-01/catalog-contract-20261118/ACCEPTANCE.md",
+        "reports/tasks/03-02/common-policy-20261118/REPORT.md",
+        "reports/tasks/03-02/common-policy-20261118/artifacts.sha256",
+        "reports/tasks/03-02/common-policy-20261118/isolated-test.log",
+        "reports/tasks/03-02/common-policy-20261118/verification.txt",
+        "reports/tasks/03-02/common-policy-20261118/verify-isolated.sh",
+        "reports/tasks/03-02/common-policy-20261118/final-base-recheck.txt"
+      ],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": "2026-11-18T23:11:44+09:00",
+      "latest_report": "reports/tasks/03-02/common-policy-20261118/REPORT.md",
+      "legacy_v1_2_id": "03-02",
+      "next_action": "중앙에서 최종 로컬 head를 독립 재검토한 뒤 PR·CI 절차 진행",
+      "result_state": "c831f32 독립 승인 이력 보존 · 최신 main 통합 뒤 격리 재검증 10/10 · 최종 head 검토 대기",
+      "status": "검수 중",
+      "task_id": "03-02",
+      "title": "공통 정책·역할·GitHub 기준 문서",
+      "track": "main",
+      "unresolved": "최종 통합 head의 독립 검토·PR CI·병합 및 병합 SHA main CI 대기.",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "03-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "03-03",
+      "title": "Go·Rust 상세 항목과 실행 예",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "03-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "03-04",
+      "title": "자료의 충실도·정확성 독립 검증",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "03-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "03-05",
+      "title": "정책 내장 이미지·프로파일 후보",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "03-06",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "03-06",
+      "title": "공통 이미지 기본 실행·권한·재현성",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "03-07",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "03-07",
+      "title": "이미지·필수 품질 프로파일 강제",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "03-08",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "03-08",
+      "title": "통합/언어별 이미지 비용 비교",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-01",
+      "title": "구현 전 설계 오류 발견",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-02",
+      "title": "정본·실행 문서 변경과 구버전 차단",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-03",
+      "title": "실제 에이전트·API·DB·PR 연결",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-04",
+      "title": "원자성·중복·잠금·repo 권한",
+      "track": "main",
+      "unresolved": "02-03 이월(04-04 착수 시): 등록·배정 경쟁(F5) 재현 시험, judgments (sprint_id, sprint_revision) 외래 키 제거를 검출하는 시험(S3), 등록·의미 검토·배정의 전역 registry 잠금 직렬화가 독립 repo 진행에 주는 영향 측정",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-05",
+      "title": "PID 1·두 역할의 재시작과 상태 복원",
+      "track": "main",
+      "unresolved": "02-04 수용 이월(사용자 결정 2026-11-15): 자식 추적(repo 범위 안전 종료), 실행 중 실제 정지 — 실제 실행 전 시험 계획·미측정 사용량 처리·재개 조건 결정안 보고와 승인(초안 02-04 진행 기록 7 §5)",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-06",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-06",
+      "title": "외부 결과 유실·격리·자동 재개",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-07",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-07",
+      "title": "현재 SHA·숨긴 결함·검토 정지",
+      "track": "main",
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH1·GH2·GH3 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음 · 런타임 계약 rev 6 §10 항목 6(개발 Bash 허용 목록을 P07 위협 모형의 경계로 세지 않음) · 개정 A2 이월(02-02): 비공개 평가 세트의 강한 봉인·OS 권한으로 개발 계정의 정답 접근 차단 실증을 P07 숨긴 결함 회차 착수 전에 처리. 평가 목적·위협 범위에 맞는 최소 구성을 그때 검토하고 기존 개발 서버 권한 개편(kind·sudo)을 전제로 삼지 않음. 보류된 안: reports/tasks/02-02/eval-vault-plan-20261112/PLAN.md · 02-04 수용 이월 1b(사용자 결정 2026-11-15): 실제 GitHub 증거 수집·PR 작성자 신원(F4)·PR 수준 검토 상태(N5)의 실제 연결은 GH1~GH5 충족 뒤 이 연결 작업(04-07·05-01~05-03)과 EARLY-01에서 한다. GH1~GH5 미충족이면 착수하지 않는다 · F4 규칙(사용자 결정 2026-11-15, User_Decisions_2026-11-15_0205-x08.md §2.1): GitHub 검토 독립성은 숫자 user id로 대조하고, “변경 작성자”는 PR 작성자 id와 그 repo 개발 역할 GitHub 신원(App 봇 id 포함)의 집합이다. 실제 수집 연결 때 판정 정책 G3 새 버전(digest·독립 검토)과 증거 review의 reviewer_id·author_id, 코디네이터 설정의 repo별 역할 GitHub 신원을 함께 반영",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-08",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-08",
+      "title": "완료와 보고 수신의 분리",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-09",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-09",
+      "title": "최소 현황·보고의 사람 이해도",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-10",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-10",
+      "title": "NPG 기준선·책임·정책 이전",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-11",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-11",
+      "title": "직접 후속 전부 처분·이월·인수",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "04-12",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-12",
+      "title": "별도 감시의 정지·정상 대기·회복",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": null,
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-13",
+      "title": "세 스프린트·세션·컨테이너 지속성",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": null,
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-14",
+      "title": "자식의 역할 경계·부모 복원·비용",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": null,
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-15",
+      "title": "공유 공급자 한도·해소와 자동 재개",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": null,
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "04-16",
+      "title": "표준 형식의 작성과 결정 지원 비교",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "구현",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "05-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "05-01",
+      "title": "보호된 CI 실행·검사 발행 후보",
+      "track": "main",
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH3·GH5 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음 · 02-04 수용 이월 1b(사용자 결정 2026-11-15): 실제 GitHub 증거 수집·PR 작성자 신원(F4)·PR 수준 검토 상태(N5)의 실제 연결은 GH1~GH5 충족 뒤 이 연결 작업(04-07·05-01~05-03)과 EARLY-01에서 한다. GH1~GH5 미충족이면 착수하지 않는다 · F4 규칙(사용자 결정 2026-11-15, User_Decisions_2026-11-15_0205-x08.md §2.1): GitHub 검토 독립성은 숫자 user id로 대조하고, “변경 작성자”는 PR 작성자 id와 그 repo 개발 역할 GitHub 신원(App 봇 id 포함)의 집합이다. 실제 수집 연결 때 판정 정책 G3 새 버전(digest·독립 검토)과 증거 review의 reviewer_id·author_id, 코디네이터 설정의 repo별 역할 GitHub 신원을 함께 반영",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "05-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "05-02",
+      "title": "Actions의 정상/거짓 성공 대조",
+      "track": "main",
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH3(05-01 경유) 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음 · 02-04 수용 이월 1b(사용자 결정 2026-11-15): 실제 GitHub 증거 수집·PR 작성자 신원(F4)·PR 수준 검토 상태(N5)의 실제 연결은 GH1~GH5 충족 뒤 이 연결 작업(04-07·05-01~05-03)과 EARLY-01에서 한다. GH1~GH5 미충족이면 착수하지 않는다 · F4 규칙(사용자 결정 2026-11-15, User_Decisions_2026-11-15_0205-x08.md §2.1): GitHub 검토 독립성은 숫자 user id로 대조하고, “변경 작성자”는 PR 작성자 id와 그 repo 개발 역할 GitHub 신원(App 봇 id 포함)의 집합이다. 실제 수집 연결 때 판정 정책 G3 새 버전(digest·독립 검토)과 증거 review의 reviewer_id·author_id, 코디네이터 설정의 repo별 역할 GitHub 신원을 함께 반영",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "05-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "05-03",
+      "title": "저장소 설정·브랜치·App·권한",
+      "track": "main",
+      "unresolved": "착수 조건(시험 환경 reports/workspace/test-env-assets-20261112/ASSETS.md §3): GH1·GH2·GH4·GH5 연결 필요 — GH1 개발 GitHub App 단기 토큰, GH2 Guardrail 자격, GH3 독립 판정 필수 체크, GH4 main 보호에 GH3 추가·승인 수 0/허용 액션 all 처분, GH5 설정 승인 주체·제안자 분리. HeaInSeo/ieo_poc_test의 repository-smoke는 연결 확인용이며 독립 판정 아님. App·자격 발급은 사용자. 저장소 준비는 완료 수에 넣지 않음 · 02-04 수용 이월 1b(사용자 결정 2026-11-15): 실제 GitHub 증거 수집·PR 작성자 신원(F4)·PR 수준 검토 상태(N5)의 실제 연결은 GH1~GH5 충족 뒤 이 연결 작업(04-07·05-01~05-03)과 EARLY-01에서 한다. GH1~GH5 미충족이면 착수하지 않는다 · F4 규칙(사용자 결정 2026-11-15, User_Decisions_2026-11-15_0205-x08.md §2.1): GitHub 검토 독립성은 숫자 user id로 대조하고, “변경 작성자”는 PR 작성자 id와 그 repo 개발 역할 GitHub 신원(App 봇 id 포함)의 집합이다. 실제 수집 연결 때 판정 정책 G3 새 버전(digest·독립 검토)과 증거 review의 reviewer_id·author_id, 코디네이터 설정의 repo별 역할 GitHub 신원을 함께 반영",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": null,
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "05-04",
+      "title": "카탈로그 없는 최소 이미지·승인 검사 재현",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "05-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "05-05",
+      "title": "씨앗 v0·외부 실행/복귀 절차 고정",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "06-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "06-01",
+      "title": "자기 repo의 실제 한 변경 조율",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "06-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "06-02",
+      "title": "후보 GHCR 게시·pull·digest 연결",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "06-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "06-03",
+      "title": "Go 새 repo의 카탈로그 활용 비교",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "06-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "06-04",
+      "title": "Rust 새 repo의 카탈로그 활용 비교",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "06-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "06-05",
+      "title": "Go 내장 정책의 수정·재검증 루프",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "06-06",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "06-06",
+      "title": "Rust 내장 정책의 수정·재검증 루프",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "07-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "07-01",
+      "title": "실제 표본 환경·프로파일·독점 범위",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "07-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "07-02",
+      "title": "NodeKit 실제 표본의 무개입 산출",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "07-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "07-03",
+      "title": "Sori 실제 표본의 무개입 산출",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "07-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "07-04",
+      "title": "실제 현황·제품 과업의 사람 평가",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "07-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "07-05",
+      "title": "실제 실행 범위의 후속·외부 감시",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "07-06",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "07-06",
+      "title": "현 운영 조사·격리 전환/복귀 연습",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "핵심",
+      "kind": "연결 검수",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "07-07",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "07-07",
+      "title": "승인 범위 실제 이전·인수·복귀",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-01",
+      "title": "후보 자기 변경 차단·격리 전환/복귀",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-02",
+      "title": "클러스터·노드 관측·시험 서버 준비",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-03",
+      "title": "행동 관측·Pod 귀속·관측 누락",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-04",
+      "title": "정책 위반 탐지와 실제 연결 차단",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-05",
+      "title": "배포 정책·애플리케이션 권한",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-06",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-06",
+      "title": "클러스터 종단·병합 이후·후속 실증",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-07",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-07",
+      "title": "검증된 digest의 Kubernetes 승격",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "확장",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "08-08",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "08-08",
+      "title": "eBPF 추가 가치·Aya 필요성 평가",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/09-01/result-export-20261118/REPORT.md",
+        "reports/tasks/09-01/result-export-20261118/evidence/pr98-review1-recheck.txt",
+        "https://github.com/HeaInSeo/ieo_poc/pull/98",
+        "https://github.com/HeaInSeo/ieo_poc/commit/9a6f48586451d7a6582879cc8dc9ba03fd0f692d",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44319728265",
+        "https://github.com/HeaInSeo/ieo_poc/commit/fcf1060dd0307a6c2b1005cac1a07f25f99a582f",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44321144168"
+      ],
+      "group": "종합",
+      "kind": "구현",
+      "last_observed_at": "2026-11-18T23:11:44+09:00",
+      "latest_report": "reports/tasks/09-01/result-export-20261118/REPORT.md",
+      "legacy_v1_2_id": "02-09",
+      "next_action": "정확한 병합 SHA의 main CI 결과 대조 뒤 09-01 수용 여부 확인",
+      "result_state": "합성 CLI 22/22 · PR #98 독립 승인 및 PR CI 4/4 · 병합 SHA main CI 미확정",
+      "status": "검수 중",
+      "task_id": "09-01",
+      "title": "결과 처분·자산 목록·문서 변환기",
+      "track": "main",
+      "unresolved": "fcf1060의 main CI 미확정. P33 독립 판정 및 09-05 실제 자료 연결은 후속 범위.",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [
+        "reports/tasks/09-02/final-independent/REPORT.md",
+        "reports/tasks/09-02/final-independent/frozen.txt",
+        "reports/tasks/09-02/final-independent/scope-and-package.txt"
+      ],
+      "group": "종합",
+      "kind": "검증",
+      "last_observed_at": "2026-11-18T23:45:44+09:00",
+      "latest_report": "reports/tasks/09-02/final-independent/REPORT.md",
+      "legacy_v1_2_id": "05-04",
+      "next_action": "교정 범위 인수. 나머지 P33 독립 대조와 09-05 실제 연결은 별도.",
+      "result_state": "APPROVE · 교정 773c975 · 동결 대조 32/32 · 최초 28/32 보존",
+      "status": "검수 중",
+      "task_id": "09-02",
+      "title": "처분·자산·진척·변환의 합성 검증",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "종합",
+      "kind": "종합",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "11-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "09-03",
+      "title": "원본 결과·처분·후속 영향 동결",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "종합",
+      "kind": "종합",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "11-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "09-04",
+      "title": "재사용 자산·제품화 보완 목록",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "종합",
+      "kind": "검증",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "11-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "09-05",
+      "title": "실제 보고→진척→스프린트 연결 검증",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "종합",
+      "kind": "종합",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "11-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "09-06",
+      "title": "최종 개발 스프린트 초안과 공수",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "종합",
+      "kind": "종합",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "11-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "09-07",
+      "title": "독립 검토 반영·최종 보고 인계",
+      "track": "main",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": null,
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F01",
+      "title": "Graphify 고정 원본·코드 전용 최소 실행",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": null,
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F02",
+      "title": "Graphify 유무의 실제 개발 과업 비교",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "09-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F03",
+      "title": "실제 개발 기록의 정규화·독립 평가 분할",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "09-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F04",
+      "title": "SkillOps 원본·계약/관계 연결",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "10-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F05",
+      "title": "SkillOps 계약·관계·유지보수 평가",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "09-04",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F06",
+      "title": "SkillOpt 원본·실행/점수 연결",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "10-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F07",
+      "title": "SkillOpt 제한 수정·독립 최종 평가",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "09-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F08",
+      "title": "Harness² 원본·최소 연결",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "10-01",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F09",
+      "title": "Harness² 독립 효과·비용 비교",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "준비",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "09-03",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F10",
+      "title": "Trace2Skill 이용 조건·v5/코드 차이·기록 입력",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "10-02",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F11",
+      "title": "Trace2Skill 생성·준비 검증·새 repo 평가",
+      "track": "followup",
+      "verification_level": "unverified"
+    },
+    {
+      "evidence": [],
+      "group": "후속",
+      "kind": "평가",
+      "last_observed_at": null,
+      "latest_report": null,
+      "legacy_v1_2_id": "10-05",
+      "next_action": null,
+      "result_state": "미실행",
+      "status": "미착수",
+      "task_id": "F12",
+      "title": "선택 조합·새 버전의 편입 처분",
+      "track": "followup",
+      "verification_level": "unverified"
+    }
+  ],
+  "previous": null,
+  "product_completion": "unverified",
+  "progress": {
+    "followup": {
+      "accepted": 0,
+      "total": 12
+    },
+    "historical": {
+      "accepted": 0,
+      "source": "01_plan_and_review/Console_Coordinator_PoC_Validation_Plan_v1.2.md",
+      "total": 76,
+      "version": "v1.2"
+    },
+    "ledger_sha256": "1e8f377fb180cfb252bee9456f239139e889368975824dfcde2f8f2d42d7b1ff",
+    "main": {
+      "accepted": 13,
+      "total": 73
+    },
+    "snapshot_id": "v1.3.3-EXEC-0061-03-02-fcf1060-09-02-final-proposal"
+  },
+  "registration": {
+    "http_status": 201,
+    "outcome": {
+      "computed_digest": "15a95fd9ce33a2f4c4fdf8bfe87357354ff4f6b4e4b234f4e57470e9b9266806",
+      "rejections": [],
+      "state": "ACCEPTED_FOR_SEMANTIC_REVIEW"
+    }
+  },
+  "required_goals_unresolved": [
+    "missing",
+    "partial",
+    "stale",
+    "unapproved"
+  ],
+  "revision": 1,
+  "runs": [
+    {
+      "adopted_scopes": [],
+      "adoption": "미판정",
+      "candidate": "alternative",
+      "current": true,
+      "disposition": null,
+      "disposition_ref": null,
+      "evidence_issues": {},
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-runtime",
+      "goal_id": "runtime",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "issues": [],
+      "missing_evidence": [],
+      "observed": {
+        "covered_scopes": [
+          "base"
+        ],
+        "validated_assets": []
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/alternative/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "PASS",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/alternative-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/alternative-review.json",
+      "revision": 1,
+      "run_id": "alternative",
+      "task_id": "08-01",
+      "validated_assets": [],
+      "verdict": "PASS",
+      "verified_scopes": [
+        "base"
+      ]
+    },
+    {
+      "adopted_scopes": [
+        "base"
+      ],
+      "adoption": "채택",
+      "candidate": "base",
+      "current": true,
+      "disposition": {
+        "decision": "채택",
+        "owner": "fixture-owner",
+        "proposed_by": "fixture-author",
+        "reason": "Synthetic evaluation rationale",
+        "recheck_at": "2026-11-19T00:00:00Z",
+        "result_sha256": "6e54adfbc8a8e6d85c436d336c5c92080353e939d6bd502914f715c212eda01b",
+        "resume_condition": "Recover missing scope evidence",
+        "scopes": [
+          "base"
+        ]
+      },
+      "disposition_ref": "reports/tasks/09-01/result-export-20261118/fixtures/base-disposition.json",
+      "evidence_issues": {},
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-runtime",
+      "goal_id": "runtime",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "issues": [],
+      "missing_evidence": [],
+      "observed": {
+        "covered_scopes": [
+          "base"
+        ],
+        "validated_assets": []
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/base/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "PASS",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/base-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/base-review.json",
+      "revision": 1,
+      "run_id": "base",
+      "task_id": "08-01",
+      "validated_assets": [],
+      "verdict": "PASS",
+      "verified_scopes": [
+        "base"
+      ]
+    },
+    {
+      "adopted_scopes": [],
+      "adoption": "기각",
+      "candidate": "failure",
+      "current": true,
+      "disposition": {
+        "decision": "기각",
+        "owner": "fixture-owner",
+        "proposed_by": "fixture-author",
+        "reason": "Synthetic evaluation rationale",
+        "recheck_at": "2026-11-19T00:00:00Z",
+        "result_sha256": "e5f53543b0bba80b1c9ac66ab6c094253e0f10a24032348f1e655004a961a83a",
+        "resume_condition": "Recover missing scope evidence",
+        "scopes": []
+      },
+      "disposition_ref": "reports/tasks/09-01/result-export-20261118/fixtures/failure-disposition.json",
+      "evidence_issues": {},
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-runtime",
+      "goal_id": "runtime",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "issues": [],
+      "missing_evidence": [],
+      "observed": {
+        "covered_scopes": [],
+        "validated_assets": [
+          {
+            "asset_id": "meter",
+            "contract": "collector v0",
+            "scope": "base",
+            "sha256": "eab70d985ee8fe14a2f896e80dc313f5fdf65bd68b2bf3d8f2b4ff5ae87272e2",
+            "version": "meter-1"
+          }
+        ]
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/failure/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "FAIL",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/failure-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/failure-review.json",
+      "revision": 1,
+      "run_id": "failure",
+      "task_id": "08-01",
+      "validated_assets": [
+        {
+          "asset_id": "meter",
+          "contract": "collector v0",
+          "scope": "base",
+          "sha256": "eab70d985ee8fe14a2f896e80dc313f5fdf65bd68b2bf3d8f2b4ff5ae87272e2",
+          "version": "meter-1"
+        }
+      ],
+      "verdict": "FAIL",
+      "verified_scopes": []
+    },
+    {
+      "adopted_scopes": [
+        "worker"
+      ],
+      "adoption": "부분 채택",
+      "candidate": "partial",
+      "current": true,
+      "disposition": {
+        "decision": "부분 채택",
+        "owner": "fixture-owner",
+        "proposed_by": "fixture-author",
+        "reason": "Synthetic evaluation rationale",
+        "recheck_at": "2026-11-19T00:00:00Z",
+        "result_sha256": "6d0eb9accdff24596eed29f5df298f5160ba74ed5bdb954f3f2761278c658ec0",
+        "resume_condition": "Recover missing scope evidence",
+        "scopes": [
+          "worker"
+        ]
+      },
+      "disposition_ref": "reports/tasks/09-01/result-export-20261118/fixtures/partial-disposition.json",
+      "evidence_issues": {},
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-partial",
+      "goal_id": "partial",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "issues": [],
+      "missing_evidence": [],
+      "observed": {
+        "covered_scopes": [
+          "worker"
+        ],
+        "validated_assets": []
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/partial/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "PASS",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/partial-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/partial-review.json",
+      "revision": 1,
+      "run_id": "partial",
+      "task_id": "08-02",
+      "validated_assets": [],
+      "verdict": "PASS",
+      "verified_scopes": [
+        "worker"
+      ]
+    },
+    {
+      "adopted_scopes": [],
+      "adoption": "기각",
+      "candidate": "optional",
+      "current": true,
+      "disposition": {
+        "decision": "기각",
+        "owner": "fixture-owner",
+        "proposed_by": "fixture-author",
+        "reason": "Synthetic evaluation rationale",
+        "recheck_at": "2026-11-19T00:00:00Z",
+        "result_sha256": "e1b263b66eeb02cc7804ab3dd2eb30b14b583084bb112123ac426a045d1143ad",
+        "resume_condition": "Recover missing scope evidence",
+        "scopes": []
+      },
+      "disposition_ref": "reports/tasks/09-01/result-export-20261118/fixtures/optional-disposition.json",
+      "evidence_issues": {},
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-optional",
+      "goal_id": "optional",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "issues": [],
+      "missing_evidence": [],
+      "observed": {
+        "covered_scopes": [
+          "optional"
+        ],
+        "validated_assets": []
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/optional/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "PASS",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/optional-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/optional-review.json",
+      "revision": 1,
+      "run_id": "optional",
+      "task_id": "08-03",
+      "validated_assets": [],
+      "verdict": "PASS",
+      "verified_scopes": [
+        "optional"
+      ]
+    },
+    {
+      "adopted_scopes": [],
+      "adoption": "보류",
+      "candidate": "missing",
+      "current": true,
+      "disposition": {
+        "decision": "보류",
+        "owner": "fixture-owner",
+        "proposed_by": "fixture-author",
+        "reason": "Synthetic evaluation rationale",
+        "recheck_at": "2026-11-19T00:00:00Z",
+        "result_sha256": "257087fa6572be78953edae44a0d362a998230d5b5ad079c5bde63b40b302d1d",
+        "resume_condition": "Recover missing scope evidence",
+        "scopes": []
+      },
+      "disposition_ref": "reports/tasks/09-01/result-export-20261118/fixtures/missing-disposition.json",
+      "evidence_issues": {
+        "reports/tasks/09-01/result-export-20261118/fixtures/absent.txt": "unreadable_evidence"
+      },
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-missing",
+      "goal_id": "missing",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "issues": [
+        "unreadable_evidence"
+      ],
+      "missing_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/absent.txt"
+      ],
+      "observed": {
+        "covered_scopes": [],
+        "validated_assets": []
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/absent.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/missing/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "PASS",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/missing-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/missing-review.json",
+      "revision": 1,
+      "run_id": "missing",
+      "task_id": "08-04",
+      "validated_assets": [],
+      "verdict": "INCONCLUSIVE",
+      "verified_scopes": []
+    },
+    {
+      "adopted_scopes": [],
+      "adoption": "미판정",
+      "candidate": "stale",
+      "current": true,
+      "disposition": {
+        "decision": "채택",
+        "owner": "fixture-owner",
+        "proposed_by": "fixture-author",
+        "reason": "Synthetic evaluation rationale",
+        "recheck_at": "2026-11-19T00:00:00Z",
+        "result_sha256": "c037a36d23bbfcd87bd44ee9e7d805639fc37a3fd289424d9b7dba4a107dd363",
+        "resume_condition": "Recover missing scope evidence",
+        "scopes": [
+          "stale"
+        ]
+      },
+      "disposition_ref": "reports/tasks/09-01/result-export-20261118/fixtures/stale-disposition.json",
+      "evidence_issues": {},
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-stale",
+      "goal_id": "stale",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-old"
+      },
+      "issues": [
+        "target_version_mismatch",
+        "adoption_scope_unproven"
+      ],
+      "missing_evidence": [],
+      "observed": {
+        "covered_scopes": [
+          "stale"
+        ],
+        "validated_assets": []
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/stale/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "PASS",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/stale-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/stale-review.json",
+      "revision": 1,
+      "run_id": "stale",
+      "task_id": "08-05",
+      "validated_assets": [],
+      "verdict": "INCONCLUSIVE",
+      "verified_scopes": []
+    },
+    {
+      "adopted_scopes": [],
+      "adoption": "미판정",
+      "candidate": "unapproved",
+      "current": true,
+      "disposition": {
+        "decision": "채택",
+        "owner": "fixture-owner",
+        "proposed_by": "fixture-author",
+        "reason": "Synthetic evaluation rationale",
+        "recheck_at": "2026-11-19T00:00:00Z",
+        "result_sha256": "a5253ba87301d6f8f51a693bb757eeea39908f4a3132705fc4e3ff8e2345f126",
+        "resume_condition": "Recover missing scope evidence",
+        "scopes": [
+          "unapproved"
+        ]
+      },
+      "disposition_ref": "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-disposition.json",
+      "evidence_issues": {},
+      "expected": "Frozen plan criterion",
+      "experiment_id": "SIM-unapproved",
+      "goal_id": "unapproved",
+      "inputs": {
+        "image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "model_runtime_versions": [],
+        "profile_revision": "poc-acceptance-v1.3.3 rev 4",
+        "repo_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "spec_revision": "fixture-spec-1"
+      },
+      "issues": [
+        "independent_result_review_missing",
+        "disposition_approval_missing"
+      ],
+      "missing_evidence": [],
+      "observed": {
+        "covered_scopes": [
+          "unapproved"
+        ],
+        "validated_assets": []
+      },
+      "original_evidence": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt",
+        "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt"
+      ],
+      "plan_version": "v1.3.3",
+      "records": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/unapproved/record.json"
+      ],
+      "reported_adoption": "미판정",
+      "reported_cost": {
+        "elapsed_seconds": null,
+        "parent_child_tokens": null,
+        "quota_group_ids": [],
+        "quota_stop_count": null,
+        "quota_wait_seconds": null,
+        "review_pending_dev_idle_seconds": null,
+        "unmeasured_reason": "Use stage evidence records."
+      },
+      "reported_verdict": "PASS",
+      "result": "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-result.json",
+      "review": "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-review.json",
+      "revision": 1,
+      "run_id": "unapproved",
+      "task_id": "08-06",
+      "validated_assets": [],
+      "verdict": "INCONCLUSIVE",
+      "verified_scopes": []
+    }
+  ],
+  "source_digests": {
+    "01_plan_and_review/Console_Coordinator_PoC_Validation_Plan_v1.2.md": "d0defe7ad23de4de0a595399db2b4e731344b95e5259c8ee38c57bda5dbaa464",
+    "Console_Coordinator_Sprints_v0.json": "ae5c1e7f230b0101ccfa759ccd1050868d218cced28653a7b84c48a51bfe4e85",
+    "Followup_Execution_v1.3.3.json": "e6a7b1c6f4df19fe361cb6c433b32adce24256af4d51a2fc81a78783d882d7c1",
+    "progress/state.json": "1e8f377fb180cfb252bee9456f239139e889368975824dfcde2f8f2d42d7b1ff",
+    "reports/p33-remaining-fixtures/remaining-work-estimate.txt": "8ad9cfedefea8c19b8e053037567b6f4a28ad8b1d73a41dd86d2f6ab0daaf82f",
+    "reports/tasks/09-01/result-export-20261118/fixtures/alternative-result.json": "0c7f82c1232c682ec07e0ad0d62135e70206aac63f82895c2c7fa7e189d85251",
+    "reports/tasks/09-01/result-export-20261118/fixtures/alternative-review.json": "f0557151241bdac0933628ae3ae6d4c41953061ae29aa5bd654b4e8e84bafc4b",
+    "reports/tasks/09-01/result-export-20261118/fixtures/alternative/record.json": "460fb2da72d0dd085fb1d9000355128db8463960117713e16d7e79435c1ba6d0",
+    "reports/tasks/09-01/result-export-20261118/fixtures/base-disposition.json": "98219a7e93f0aa979000541f9b501d564c01c5adaad05d7ce2c341665561c8c7",
+    "reports/tasks/09-01/result-export-20261118/fixtures/base-result.json": "6e54adfbc8a8e6d85c436d336c5c92080353e939d6bd502914f715c212eda01b",
+    "reports/tasks/09-01/result-export-20261118/fixtures/base-review.json": "8305383d1aac248958f898fdfb9337f2e112fd02b44e8f1bd22c5429d38a3540",
+    "reports/tasks/09-01/result-export-20261118/fixtures/base/record.json": "a86a63e5c94080fbe6d7c60a3d470bbced2443b1462d417fcf68bc1cca67a44f",
+    "reports/tasks/09-01/result-export-20261118/fixtures/collector-module.txt": "eab70d985ee8fe14a2f896e80dc313f5fdf65bd68b2bf3d8f2b4ff5ae87272e2",
+    "reports/tasks/09-01/result-export-20261118/fixtures/failure-disposition.json": "08478dd22b6bf6f680481672d3cb72150d2cff69e12837cdd8619e7e8844238c",
+    "reports/tasks/09-01/result-export-20261118/fixtures/failure-result.json": "e5f53543b0bba80b1c9ac66ab6c094253e0f10a24032348f1e655004a961a83a",
+    "reports/tasks/09-01/result-export-20261118/fixtures/failure-review.json": "4ed31fa40c3628e5d18fd53b486932221c9ed3e13a5890ba24683c9d53d1d5d7",
+    "reports/tasks/09-01/result-export-20261118/fixtures/failure/record.json": "8cf41f5560bdede667d77a14447c35ff18174c19ec0e30bf1ff262387cf742d3",
+    "reports/tasks/09-01/result-export-20261118/fixtures/missing-disposition.json": "f8c1c5fdfd3c8fe3f02142731163159d7d416b186657adce8d8fdcf6082afec1",
+    "reports/tasks/09-01/result-export-20261118/fixtures/missing-result.json": "257087fa6572be78953edae44a0d362a998230d5b5ad079c5bde63b40b302d1d",
+    "reports/tasks/09-01/result-export-20261118/fixtures/missing-review.json": "7cdefbbd2ba24ea4a9fe51e29f00fe2b8cb0cc1a2cf2c2be491cc989ee8e1490",
+    "reports/tasks/09-01/result-export-20261118/fixtures/missing/record.json": "4a4577827c8cf7da2d8f233dd62c895383d66bae896b6f796851e5b291b03d5f",
+    "reports/tasks/09-01/result-export-20261118/fixtures/observations.txt": "b2d5b412466c9f1dacaf14e363cc5836abc83b1bb89c7e4259232c1304763ca7",
+    "reports/tasks/09-01/result-export-20261118/fixtures/optional-disposition.json": "663757e2b89b670cd3f8014c7e5f58601bc5982460681c593cee6806396548d5",
+    "reports/tasks/09-01/result-export-20261118/fixtures/optional-result.json": "e1b263b66eeb02cc7804ab3dd2eb30b14b583084bb112123ac426a045d1143ad",
+    "reports/tasks/09-01/result-export-20261118/fixtures/optional-review.json": "03d1437165060e21aea5e4c35da6c23f84960e89550503d3586356f140d2c23f",
+    "reports/tasks/09-01/result-export-20261118/fixtures/optional/record.json": "c5cfed2be3d90724be980a26eaf9ec4d1972c8ee695844d9be58e2a9497679d6",
+    "reports/tasks/09-01/result-export-20261118/fixtures/partial-disposition.json": "cc3ca0123c27d3fad2b2ec94612b8b8f0dfa4e6b1008df6a8864ff66280aae5e",
+    "reports/tasks/09-01/result-export-20261118/fixtures/partial-result.json": "6d0eb9accdff24596eed29f5df298f5160ba74ed5bdb954f3f2761278c658ec0",
+    "reports/tasks/09-01/result-export-20261118/fixtures/partial-review.json": "93faff6405dccafde26a14c92afb3d6a204cf8ba38ce56c069fd91ee7395943a",
+    "reports/tasks/09-01/result-export-20261118/fixtures/partial/record.json": "01f462736027486b9e4b79ece7abe601b456b101075296abb78d6a419d016c99",
+    "reports/tasks/09-01/result-export-20261118/fixtures/stale-disposition.json": "67ed877a18c049e357dafa17c3f6cf52704aa7f7ee9a626ebdc1746da2f0c796",
+    "reports/tasks/09-01/result-export-20261118/fixtures/stale-result.json": "c037a36d23bbfcd87bd44ee9e7d805639fc37a3fd289424d9b7dba4a107dd363",
+    "reports/tasks/09-01/result-export-20261118/fixtures/stale-review.json": "51a12e2e45b268e8d9e7d5bad7556471d9bd49ef2ea220806c8f3968c44c27a4",
+    "reports/tasks/09-01/result-export-20261118/fixtures/stale/record.json": "44814a0043addef689b8f15e4103224db316502a5127b9a35bae4e92035b1621",
+    "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-disposition.json": "c41a2be344aa2972fd82b3eb0b31c898538c97078b50574740204711c44d7ab0",
+    "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-result.json": "a5253ba87301d6f8f51a693bb757eeea39908f4a3132705fc4e3ff8e2345f126",
+    "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-review.json": "904371eb8b2a25d71b1147b467f12a86eae4cc50f2ef050e01861cc405f26e6d",
+    "reports/tasks/09-01/result-export-20261118/fixtures/unapproved/record.json": "40c1be26ca9091d34a4e73b5daf654640695d78ae27a924e6be7370c2277f1a5",
+    "reports/templates/result.template.json": "ee0b3851f2c5c123d7bb5892ce5fce6e6262a6f6f900b81e1141df5e317753ea"
+  },
+  "sprint_digest": "15a95fd9ce33a2f4c4fdf8bfe87357354ff4f6b4e4b234f4e57470e9b9266806",
+  "sprint_id": "FINAL-FIXTURE",
+  "work": {
+    "90-01": {
+      "after": [],
+      "asset_ids": [
+        "meter"
+      ],
+      "candidate": "base",
+      "estimate": {
+        "evidence": [
+          "reports/p33-remaining-fixtures/remaining-work-estimate.txt"
+        ],
+        "range_seconds": {
+          "max": 2345,
+          "min": 1234
+        },
+        "reason": null,
+        "state": "measured"
+      },
+      "followup": null,
+      "goal_id": "runtime",
+      "issues": [],
+      "output": "Reviewed integration evidence",
+      "purpose": "integration",
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/base-result.json"
+      ],
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "base",
+      "state": "편입 대기",
+      "task_id": "90-01"
+    },
+    "90-02": {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "partial",
+      "followup": null,
+      "goal_id": "partial",
+      "issues": [],
+      "output": "Reviewed integration evidence",
+      "purpose": "integration",
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/partial-result.json"
+      ],
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "worker",
+      "state": "편입 대기",
+      "task_id": "90-02"
+    },
+    "90-03": {
+      "after": [
+        "90-02"
+      ],
+      "asset_ids": [],
+      "candidate": null,
+      "followup": null,
+      "goal_id": "partial",
+      "issues": [
+        "required_scope_unproven",
+        "prerequisite_pending:90-02"
+      ],
+      "output": "Reviewed implementation evidence",
+      "purpose": "implementation",
+      "results": [],
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "restore",
+      "state": "조건 대기",
+      "task_id": "90-03"
+    },
+    "90-04": {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "missing",
+      "followup": {
+        "change": "Use a new sample",
+        "control": "Frozen baseline",
+        "hypothesis": "Recover the missing observation",
+        "pass_condition": "Same approved criteria",
+        "resume_condition": "Evidence available",
+        "stop_condition": "Stop at the family ceiling"
+      },
+      "goal_id": "missing",
+      "issues": [
+        "resume_evidence_pending"
+      ],
+      "output": "Reviewed experiment evidence",
+      "purpose": "experiment",
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/missing-result.json"
+      ],
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "missing",
+      "state": "조건 대기",
+      "task_id": "90-04"
+    },
+    "90-05": {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "stale",
+      "followup": {
+        "change": "Use a new sample",
+        "control": "Frozen baseline",
+        "hypothesis": "Recover the missing observation",
+        "pass_condition": "Same approved criteria",
+        "resume_condition": "Evidence available",
+        "stop_condition": "Stop at the family ceiling"
+      },
+      "goal_id": "stale",
+      "issues": [
+        "resume_evidence_pending"
+      ],
+      "output": "Reviewed experiment evidence",
+      "purpose": "experiment",
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/stale-result.json"
+      ],
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "stale",
+      "state": "조건 대기",
+      "task_id": "90-05"
+    },
+    "90-06": {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "unapproved",
+      "followup": null,
+      "goal_id": "unapproved",
+      "issues": [
+        "adoption_unproven"
+      ],
+      "output": "Reviewed integration evidence",
+      "purpose": "integration",
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/unapproved-result.json"
+      ],
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "unapproved",
+      "state": "조건 대기",
+      "task_id": "90-06"
+    },
+    "90-07": {
+      "after": [],
+      "asset_ids": [],
+      "candidate": "alternative",
+      "followup": {
+        "change": "Use a new sample",
+        "control": "Frozen baseline",
+        "hypothesis": "Recover the missing observation",
+        "pass_condition": "Same approved criteria",
+        "resume_condition": "Evidence available",
+        "stop_condition": "Stop at the family ceiling"
+      },
+      "goal_id": "runtime",
+      "issues": [
+        "attempts_limit_reached",
+        "usage_incomplete"
+      ],
+      "output": "Reviewed experiment evidence",
+      "purpose": "experiment",
+      "results": [
+        "reports/tasks/09-01/result-export-20261118/fixtures/alternative-result.json"
+      ],
+      "role": "development",
+      "rollback": "Retain the baseline and report failure.",
+      "scope": "base",
+      "state": "조건 대기",
+      "task_id": "90-07"
+    }
+  },
+  "work_ids": {
+    "90-01": [
+      "08-01",
+      "runtime",
+      "integration",
+      "base"
+    ],
+    "90-02": [
+      "08-02",
+      "partial",
+      "integration",
+      "worker"
+    ],
+    "90-03": [
+      "08-02",
+      "partial",
+      "implementation",
+      "restore"
+    ],
+    "90-04": [
+      "08-04",
+      "missing",
+      "experiment",
+      "missing"
+    ],
+    "90-05": [
+      "08-05",
+      "stale",
+      "experiment",
+      "stale"
+    ],
+    "90-06": [
+      "08-06",
+      "unapproved",
+      "integration",
+      "unapproved"
+    ],
+    "90-07": [
+      "08-01",
+      "runtime",
+      "experiment",
+      "base"
+    ]
+  }
+}
