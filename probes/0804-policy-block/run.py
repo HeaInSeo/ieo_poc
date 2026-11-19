@@ -169,10 +169,17 @@ def run(config, evidence):
                          namespace="kube-system")
         (out / f"{tag}-{dev_node}-metrics.txt").write_text(result.stdout)
 
-    def policy_specs(tag, expected):
-        active = network_specs(get("networkpolicies")["items"])
-        require(active == expected, f"unexpected active NetworkPolicy in {tag}")
-        save(f"{tag}-networkpolicies.json", active)
+    def policy_specs(tag, intended):
+        response = get("networkpolicies")
+        save(f"{tag}-networkpolicies-active.json", response)
+        save(f"{tag}-networkpolicies-expected.json", intended)
+        active, expected = network_specs(response["items"]), network_specs(intended)
+        differences = sorted(name for name in active.keys() | expected.keys()
+                             if active.get(name) != expected.get(name))
+        save(f"{tag}-networkpolicies-comparison.json", {
+            "active": active, "expected": expected, "differences": differences,
+        })
+        require(not differences, f"unexpected active NetworkPolicy in {tag}: {', '.join(differences)}")
 
     last_logs = {}
 
@@ -200,7 +207,7 @@ def run(config, evidence):
         save(f"{label}-result.json", row)
         return row, frames
 
-    baseline = network_specs(p for p in items if p["kind"] == "NetworkPolicy")
+    baseline = [p for p in items if p["kind"] == "NetworkPolicy"]
     policy_specs("open", baseline)
     snapshot("before")
     open_case, open_frames = one(0)
@@ -237,7 +244,7 @@ def run(config, evidence):
     save("detection.json", {**detected, "loss_delta": loss, "execs": starts, "hooks": hooks})
 
     replaced = [p for p in actor_egress(True) if p["metadata"]["name"] == "egress-development"]
-    expected = {**baseline, **network_specs(replaced)}
+    expected = [p for p in baseline if p["metadata"]["name"] != "egress-development"] + replaced
     save("enforced-policy.json", replaced[0])
     rows = [open_case, allowed_case]
     try:
