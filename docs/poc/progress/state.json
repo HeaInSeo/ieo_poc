@@ -1,8 +1,8 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "08-04-acceptance-20261119",
-  "snapshot_created_at": "2026-11-19T21:30:41+09:00",
+  "snapshot_id": "08-04-acceptance-08-05-scoped-20261119",
+  "snapshot_created_at": "2026-11-19T21:42:11+09:00",
   "last_actual_work_observed_at": "2026-11-19T21:30:41+09:00",
   "reporting_owner": "개발 에이전트 (Claude Code 대화 세션 · 제품 런타임 승인 아님)",
   "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 검수 완료(fcf1060 main CI 4/4) · 03-02 검수 완료(#99, 28c8b40 main CI 4/4) · X-06 검수 완료(#100, 298053b main CI 4/4) · 03-03 첫 반려 교정·격리 19/19 · 03-03 교정 후보 독립 승인(98503f0), 원장 통합 head 재검토 대기 · 03-03 검수 완료(#101, ad7628c main CI 4/4) · 03-04 검수 완료(#102, 0d8d74b main CI 4/4) · 03-05 로컬 후보 이미지 3개·격리 13/13 · 검수 중 · 03-05 검수 완료(#103, ed15dab main CI 4/4) · 09-02 교정 코드 독립 승인 및 통합 검수 중 · 09-02 검수 완료(#105, 72347b6 main CI 4/4) · 03-06 P22-B 격리 40/40 · 통합 head 검토 대기 · 03-06 검수 완료(#106, 9e220a4 main CI 4/4) · 03-08 P22-C 비용 로컬 비교 · 03-08 검수 완료(#107, 7920687 main CI 4/4) · 08-02 검수 완료(#109, 4508bcb main CI 4/4) · 08-03 관측 검증 준비 착수",
@@ -1271,13 +1271,22 @@
       "track": "main",
       "group": "확장",
       "kind": "검증",
-      "status": "준비됨",
-      "last_observed_at": "2026-11-19T19:37:46+09:00",
-      "latest_report": null,
-      "result_state": "미실행",
+      "status": "조건 대기",
+      "last_observed_at": "2026-11-19T21:01:26+09:00",
+      "latest_report": "reports/tasks/08-05/p11-boundaries-20261119/REPORT.md",
+      "result_state": "격리 부분 실측 · PSA 4/4, 역할별 네트워크 12/12, 합성 앱 12/12. #113 독립 승인 dc782f3, PR CI 4/4, 조건 병합 36e8ebc, 동일 SHA main CI 4/4. P07 파일·자격 거부 증거 대기.",
       "verification_level": "unverified",
-      "evidence": [],
-      "next_action": "08-02·01-01 수용 근거로 P11의 배포와 앱 권한 대조 준비."
+      "evidence": [
+        "reports/tasks/08-05/p11-boundaries-20261119/REPORT.md",
+        "reports/tasks/08-05/p11-boundaries-20261119/evidence/isolated-p11.tar.gz",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44516157756",
+        "https://github.com/HeaInSeo/ieo_poc/pull/113",
+        "https://github.com/HeaInSeo/ieo_poc/commit/36e8ebc9b0f3c5dd0cb9be8576a60e91279495fb",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44517538380",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44518850154"
+      ],
+      "next_action": "04-07/P07의 역할별 파일·자격 격리 거부 원본 확보 후 전체 검수",
+      "unresolved": "P07 파일·자격 격리 미검증. 합성 앱 결과의 적용 범위는 이번 fixture."
     },
     {
       "task_id": "08-06",
@@ -1834,12 +1843,32 @@
       "task_ids": [
         "08-05"
       ],
-      "execution_state": "미실행",
+      "execution_state": "격리 합성 부분 회차 1건 · P07 대기",
       "verdict": "미판정",
       "evaluation_closed": false,
       "adoption": "미판정",
-      "runs": [],
-      "latest_report": null
+      "runs": [
+        {
+          "run_id": "P11-08-05-44516157756",
+          "revision": 1,
+          "execution_kind": "synthetic",
+          "verdict": "PASS",
+          "checks": "28/28",
+          "latest_report": "reports/tasks/08-05/p11-boundaries-20261119/REPORT.md",
+          "candidate_sha": "5cdc60a32390f21e2084a5d61ab470b13dedddac",
+          "verification_scope": "PSA·역할별 네트워크·합성 앱에 한정. P07 및 P11 전체 수용은 대기.",
+          "evidence": [
+            "reports/tasks/08-05/p11-boundaries-20261119/REPORT.md",
+            "reports/tasks/08-05/p11-boundaries-20261119/evidence/isolated-p11.tar.gz",
+            "https://github.com/HeaInSeo/ieo_poc/actions/runs/44516157756",
+            "https://github.com/HeaInSeo/ieo_poc/pull/113",
+            "https://github.com/HeaInSeo/ieo_poc/commit/36e8ebc9b0f3c5dd0cb9be8576a60e91279495fb",
+            "https://github.com/HeaInSeo/ieo_poc/actions/runs/44517538380",
+            "https://github.com/HeaInSeo/ieo_poc/actions/runs/44518850154"
+          ]
+        }
+      ],
+      "latest_report": "reports/tasks/08-05/p11-boundaries-20261119/REPORT.md"
     },
     {
       "experiment_id": "P12",
@@ -3706,6 +3735,22 @@
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/44519648688",
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/44520476538"
       ]
+    },
+    {
+      "event_id": "08-05-P11-SCOPED-20261119",
+      "event_revision": 1,
+      "task_id": "08-05",
+      "observed_at": "2026-11-19T21:01:26+09:00",
+      "state": "격리 부분 실측 · PSA 4/4, 역할별 네트워크 12/12, 합성 앱 12/12. #113 독립 승인 dc782f3, PR CI 4/4, 조건 병합 36e8ebc, 동일 SHA main CI 4/4. P07 파일·자격 거부 증거 대기.",
+      "evidence": [
+        "reports/tasks/08-05/p11-boundaries-20261119/REPORT.md",
+        "reports/tasks/08-05/p11-boundaries-20261119/evidence/isolated-p11.tar.gz",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44516157756",
+        "https://github.com/HeaInSeo/ieo_poc/pull/113",
+        "https://github.com/HeaInSeo/ieo_poc/commit/36e8ebc9b0f3c5dd0cb9be8576a60e91279495fb",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44517538380",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/44518850154"
+      ]
     }
   ],
   "resume": {
@@ -3785,7 +3830,8 @@
       "reports/tasks/08-02/cluster-baseline-20261119/REPORT.md",
       "reports/tasks/08-03/p09-observation-20261119/EXPECTATIONS.md",
       "reports/tasks/08-03/p09-observation-20261119/REPORT.md",
-      "reports/tasks/08-04/p10-defensive-20261119/REPORT.md"
+      "reports/tasks/08-04/p10-defensive-20261119/REPORT.md",
+      "reports/tasks/08-05/p11-boundaries-20261119/REPORT.md"
     ],
     "pending_index_updates": "08-04 수용 결과를 이 원장과 생성 화면에 반영.",
     "next_action": "P07 선행 조건을 확인한다. 08-06·08-08은 각각 남은 선행 검수 뒤 착수한다.",

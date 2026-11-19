@@ -1,6 +1,6 @@
 # 실험·후속 후보 결과
 
-계획 v1.3.3 · snapshot `08-04-acceptance-20261119` · 원장 SHA-256 `7b30074c0db57d228c38e8abf9a12926944f42dd531e65048fed32e5d8710e36`
+계획 v1.3.3 · snapshot `08-04-acceptance-08-05-scoped-20261119` · 원장 SHA-256 `491352964457288b1e7b1c32072def5eff2d28b09e55547b0d00b339ab2fc54f`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -149,11 +149,23 @@
 
 ### P11 · 선언 정책과 애플리케이션 권한 경계
 
-연결 작업: ["08-05"] · 실행 미실행 · 판정 미판정 · 평가 종료 False · 처분 미판정
+연결 작업: ["08-05"] · 실행 격리 합성 부분 회차 1건 · P07 대기 · 판정 미판정 · 평가 종료 False · 처분 미판정
 
-최근 보고: 없음 · 미실행
+최근 보고: [보고](../reports/tasks/08-05/p11-boundaries-20261119/REPORT.md)
 
-회차 없음 · 미실행
+#### 회차 P11-08-05-44516157756 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P11-08-05-44516157756 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | PASS |
+| checks | 28/28 |
+| latest_report | [보고](../reports/tasks/08-05/p11-boundaries-20261119/REPORT.md) |
+| candidate_sha | 5cdc60a32390f21e2084a5d61ab470b13dedddac |
+| verification_scope | PSA·역할별 네트워크·합성 앱에 한정. P07 및 P11 전체 수용은 대기. |
+| evidence | ["reports/tasks/08-05/p11-boundaries-20261119/REPORT.md","reports/tasks/08-05/p11-boundaries-20261119/evidence/isolated-p11.tar.gz","https://github.com/HeaInSeo/ieo_poc/actions/runs/44516157756","https://github.com/HeaInSeo/ieo_poc/pull/113","https://github.com/HeaInSeo/ieo_poc/commit/36e8ebc9b0f3c5dd0cb9be8576a60e91279495fb","https://github.com/HeaInSeo/ieo_poc/actions/runs/44517538380","https://github.com/HeaInSeo/ieo_poc/actions/runs/44518850154"] |
 
 ### P12 · 사용자 과업과 보고 이해도
 
