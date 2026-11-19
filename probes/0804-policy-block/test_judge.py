@@ -1,6 +1,12 @@
+from copy import deepcopy
+from pathlib import Path
+import sys
 import unittest
 
 from judge import MARKER, connection, detection
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "0802-cluster-baseline"))
+from manifests import initial, network_specs
 
 
 class JudgeTests(unittest.TestCase):
@@ -43,6 +49,17 @@ class JudgeTests(unittest.TestCase):
         for args in ((True, True, ["matched"], []), (True, True, ["matched"], ["foreign"]),
                      (False, True, ["matched"], ["matched"]), (True, False, ["matched"], ["matched"])):
             self.assertEqual(detection(*args), {"verdict": "INCONCLUSIVE", "completion_eligible": False})
+
+
+    def test_policy_api_may_omit_empty_rules_only(self):
+        desired = [item for item in initial() if item["kind"] == "NetworkPolicy"]
+        server = deepcopy(desired)
+        receiver = next(policy for policy in server if policy["metadata"]["name"] == "egress-receiver")
+        receiver["spec"].pop("egress")
+        self.assertEqual(network_specs(server), network_specs(desired))
+        actor = next(policy for policy in server if policy["metadata"]["name"] == "egress-development")
+        actor["spec"].pop("egress")
+        self.assertNotEqual(network_specs(server), network_specs(desired))
 
 
 if __name__ == "__main__":
