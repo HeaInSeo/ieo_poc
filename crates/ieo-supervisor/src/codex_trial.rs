@@ -63,6 +63,33 @@ pub(crate) fn receipt(
     ))
 }
 
+/// Billing observations are short-lived and cannot extend the central approval.
+pub(crate) fn approval_expiry(approval: &Value, now: u64) -> Result<u64, String> {
+    const BILLING_FRESH_SECONDS: u64 = 300;
+    let billing = &approval["billing"];
+    let expiry = approval["expires_unix"]
+        .as_u64()
+        .zip(billing["verified_unix"].as_u64().filter(|t| *t <= now))
+        .and_then(|(approval_end, observed)| {
+            observed
+                .checked_add(BILLING_FRESH_SECONDS)
+                .map(|billing_end| approval_end.min(billing_end))
+        });
+    match expiry {
+        Some(end)
+            if now < end
+                && approval["max_dispatches"] == 1
+                && approval["additional_usd"] == 0
+                && billing["auto_reload_disabled"] == true
+                && billing["paid_paths_blocked"] == true
+                && billing["api_fallback_blocked"] == true =>
+        {
+            Ok(end)
+        }
+        _ => Err("expired or unverified USD 0 controls for the assigned role".into()),
+    }
+}
+
 pub(crate) fn check_subscription(v: &Value, limit_id: &str, now: u64) -> Result<(), String> {
     let bucket = &v["rateLimitsByLimitId"][limit_id];
     let credits = &bucket["credits"];
@@ -96,6 +123,22 @@ pub(crate) fn check_subscription(v: &Value, limit_id: &str, now: u64) -> Result<
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn codex_trial_billing_is_time_bounded() {
+        let mut approval = json!({"expires_unix":1000, "max_dispatches":1, "additional_usd":0,
+            "billing":{"verified_unix":400, "auto_reload_disabled":true, "paid_paths_blocked":true,
+                       "api_fallback_blocked":true}});
+        assert!(approval_expiry(&approval, 399).is_err());
+        assert_eq!(approval_expiry(&approval, 400), Ok(700));
+        assert_eq!(approval_expiry(&approval, 699), Ok(700));
+        assert!(approval_expiry(&approval, 700).is_err());
+        approval["expires_unix"] = json!(600);
+        assert_eq!(approval_expiry(&approval, 599), Ok(600));
+        assert!(approval_expiry(&approval, 600).is_err());
+        approval["billing"]["verified_unix"] = Value::Null;
+        assert!(approval_expiry(&approval, 450).is_err());
+    }
 
     #[test]
     fn codex_trial_preflight_refuses_wrong_auth_quota_or_credits() {

@@ -1065,7 +1065,14 @@ pub fn deliver(
             ));
         }
         // The supervisor's own-assignment GET is read-only and takeover runs asynchronously.
-        let result = adm.start_with(&plan, &call, &caller::Http, &extra);
+        let result = adm.start_with_fence(
+            &plan,
+            &call,
+            &caller::Http,
+            &extra,
+            || !STOPPING.load(Ordering::SeqCst) && begun.elapsed() <= Duration::from_secs(deadline),
+            |body| sent = body.clone(),
+        );
         drop(fence);
         Ok(result)
     })();
@@ -1118,6 +1125,11 @@ pub fn deliver(
                     Err(e) => eprintln!("ieo-coord: delivery attempt {a}: record failed: {e}"),
                 }
             });
+        }
+        Ok(Sent::NotSent(why)) => {
+            o = base("not_called");
+            o.op = None;
+            o.reasons = json!([why]);
         }
         Ok(Sent::Refused { status, body, .. }) => {
             o.outcome = "refused";

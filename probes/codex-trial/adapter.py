@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import selectors
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -87,6 +88,60 @@ def reserve(root, delivery):
         os.close(lock)
 
 
+def immutable_auth(path, expected):
+    """Reject writable aliases: the mount pins the inode and fs-verity pins its bytes."""
+    require(re.fullmatch(r"[0-9a-f]{64}", expected or ""), "missing assigned credential digest")
+    require(sys.platform == "linux" and os.uname().machine in {"x86_64", "aarch64"},
+            "immutable credential verification is unavailable")
+    require(path.parent.resolve(strict=True) == path.parent, "credential home must be canonical")
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as file:
+        require(stat.S_ISREG(os.fstat(file.fileno()).st_mode), "credential must be a regular file")
+        fdinfo = Path(f"/proc/self/fdinfo/{file.fileno()}").read_bytes()
+        mount = re.search(rb"^mnt_id:\s+([0-9]+)$", fdinfo, re.MULTILINE)
+        require(mount is not None, "credential mount cannot be identified")
+        mountinfo = Path("/proc/self/mountinfo").read_bytes().splitlines()
+        entry = next((line.split() for line in mountinfo if line.split()[0] == mount[1]), [])
+        mount_path = re.sub(rb"\\([0-7]{3})", lambda m: bytes([int(m[1], 8)]), entry[4]) if entry else b""
+        require(entry and mount_path == os.fsencode(path) and b"ro" in entry[5].split(b","),
+                "credential must be pinned by an exact read-only file mount")
+        require(os.statvfs(path.parent).f_flag & os.ST_RDONLY,
+                "credential home must be mounted read-only")
+        # Linux generic _IOWR('f', 134, struct fsverity_digest); this is an
+        # inspection operation over the open inode, never a verity enable operation.
+        measurement = bytearray(struct.pack("=HH", 0, 64) + bytes(64))
+        try:
+            fcntl.ioctl(file, 0xC0046686, measurement, True)
+        except OSError:
+            raise TrialError("credential inode is not protected by fs-verity") from None
+        digest = hashlib.sha256()
+        while chunk := file.read(65536):
+            digest.update(chunk)
+        require(digest.hexdigest() == expected, "assigned credential digest differs")
+
+
+def launch_guard(args, home):
+    codex_home = Path(home["CODEX_HOME"])
+    require(not os.path.lexists(codex_home / "config.toml"), "unapproved credential home config")
+    immutable_auth(codex_home / "auth.json", args.auth_sha256)
+    check_approval(args)
+
+
+def approval_current(args):
+    return int(time.time()) < (args.authorization_expires_unix or 0)
+
+
+def check_approval(args):
+    if not args.enable_trial:
+        return
+    require(approval_current(args), "trial authorization or billing observation expired")
+    pin = args.approval_sha256
+    require(args.approval and re.fullmatch(r"[0-9a-f]{64}", pin or ""),
+            "missing assigned approval digest")
+    require(hashlib.sha256(Path(args.approval).read_bytes()).hexdigest() == pin,
+            "assigned approval changed")
+    require(approval_current(args), "trial authorization or billing observation expired")
+
+
 class Pipe:
     def __init__(self, process, deadline):
         self.rx = process.stdout.fileno()
@@ -102,11 +157,12 @@ class Pipe:
             remaining = self.deadline - time.monotonic()
             require(remaining > 0 and poll.select(remaining), "stdio deadline expired")
 
-    def send(self, message):
+    def send(self, message, may_send=lambda: True):
         wire = memoryview(json.dumps(message, separators=(",", ":")).encode() + b"\n")
         require(len(wire) <= MAX_FRAME, "oversize outbound frame")
         while wire:
             self.wait(self.tx, selectors.EVENT_WRITE)
+            require(may_send(), "trial authorization or billing observation expired")
             try:
                 wire = wire[os.write(self.tx, wire):]
             except BlockingIOError:
@@ -257,7 +313,7 @@ def observe(pipe, root, state):
                             and params["item"].get("type") in SAFE_ITEMS, "unbound or disallowed item")
 
 
-def trial(process, directory, delivery, attempt, cwd, model, prompt, deadline):
+def trial(process, directory, delivery, attempt, cwd, model, prompt, deadline, args, home):
     pipe = Pipe(process, deadline)
     thread = prepare(pipe, cwd, model)
     state = {"delivery_id": delivery, "attempt_id": attempt, "thread_id": thread,
@@ -267,11 +323,17 @@ def trial(process, directory, delivery, attempt, cwd, model, prompt, deadline):
     sync_directory(directory.parent)
     store(directory / "state.json", state)
     try:
+        launch_guard(args, home)
+
+        def current():
+            check_approval(args)
+            return True
+
         pipe.send({"id": state["rpc_id"], "method": "turn/start", "params": {
             "threadId": thread, "clientUserMessageId": delivery,
             "input": [{"type": "text", "text": prompt}],
             "approvalPolicy": "never", "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
-        }})
+        }}, current)
         turn, observed = observe(pipe, directory, state)
         receipt = {"type": "ieo_codex_trial_receipt", "delivery_id": delivery, "attempt_id": attempt,
                    "thread_id": thread, "turn_id": state["turn_id"], "result": turn, "auth": "chatgpt",
@@ -331,6 +393,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("delivery-id", "attempt-id", "cwd", "state", "codex", "model"):
         parser.add_argument("--" + name, required=True)
+    parser.add_argument("--auth-sha256")
+    parser.add_argument("--approval")
+    parser.add_argument("--approval-sha256")
+    parser.add_argument("--authorization-expires-unix", type=int)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--enable-trial", action="store_true")
     modes.add_argument("--preflight-only", action="store_true")
@@ -351,6 +417,8 @@ def main():
         for key, value in {**SETTINGS, "model": args.model, "model_provider": "openai"}.items():
             cmd += ["-c", key + "=" + json.dumps(value)]
         if args.preflight_only:
+            if args.auth_sha256 is not None:
+                launch_guard(args, home)
             process = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             try:
@@ -365,11 +433,12 @@ def main():
             return 0
         prompt = prompt_from_stdin(deadline)
         with reserve(Path(args.state), args.delivery_id) as directory:
+            launch_guard(args, home)
             process = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             try:
                 receipt = trial(process, directory, args.delivery_id, args.attempt_id,
-                                cwd, args.model, prompt, deadline)
+                                cwd, args.model, prompt, deadline, args, home)
             finally:
                 stop(process)
         print(json.dumps(receipt, separators=(",", ":")), flush=True)

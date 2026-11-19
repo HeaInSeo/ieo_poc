@@ -600,7 +600,7 @@ impl Service {
     }
 
     /// Handle one request. `bearer` is the token from `Authorization: Bearer …`.
-    fn codex_preflight(&self) -> Result<Value, String> {
+    fn codex_preflight(&self, approval: &TrialApproval) -> Result<u64, String> {
         let cfg = &self.cfg;
         let bridge = cfg.etc.join("codex-trial-bridge");
         if !matches!(
@@ -614,34 +614,9 @@ impl Service {
         {
             return Err("no isolated Codex trial role".into());
         }
-        let approval: Value = serde_json::from_slice(
-            &std::fs::read(cfg.etc.join("codex-trial-approval.json"))
-                .map_err(|_| "trial approval is unavailable")?,
-        )
-        .map_err(|_| "invalid trial approval")?;
-        let now = crate::provider::now_unix();
-        let expires = approval["expires_unix"]
-            .as_u64()
-            .ok_or("missing approval expiry")?;
-        // These attestations must come from the approved isolated role's administrator.
-        // Account/rateLimits/read cannot attest an account's billing controls.
-        if expires <= now
-            || approval["max_dispatches"] != 1
-            || approval["additional_usd"] != 0
-            || approval["billing"]["auto_reload_disabled"] != true
-            || approval["billing"]["paid_paths_blocked"] != true
-            || approval["billing"]["api_fallback_blocked"] != true
-            || approval["billing"]["verified_unix"]
-                .as_u64()
-                .is_none_or(|t| t > now)
-        {
-            return Err("expired or unverified USD 0 controls for the assigned role".into());
-        }
-        let model = approval["model"]
-            .as_str()
-            .filter(|x| !x.is_empty())
-            .ok_or("missing trial model")?;
-        let limit_id = approval["limit_id"]
+        let expires =
+            crate::codex_trial::approval_expiry(&approval.value, crate::provider::now_unix())?;
+        let limit_id = approval.value["limit_id"]
             .as_str()
             .filter(|x| !x.is_empty())
             .ok_or("missing trial limit bucket")?;
@@ -650,18 +625,6 @@ impl Service {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound)
         {
             return Err("assigned Codex credential home contains unapproved configuration".into());
-        }
-        let auth = home.join("auth.json");
-        let auth_digest = || {
-            std::fs::read(&auth)
-                .map(|b| crate::central::sha256(&b))
-                .map_err(|_| "assigned subscription credential is unavailable")
-        };
-        let before = auth_digest()?;
-        if approval["auth_sha256"] != before {
-            return Err(
-                "assigned subscription credential did not match the approved account".into(),
-            );
         }
         let invocation = Command::new("/usr/bin/timeout")
             .args(["--kill-after=1s", "8s"])
@@ -675,7 +638,9 @@ impl Service {
                 "--codex",
                 "/usr/bin/codex",
                 "--model",
-                model,
+                &approval.model,
+                "--auth-sha256",
+                &approval.auth_sha256,
                 "--cwd",
             ])
             .arg(cfg.cwd())
@@ -690,17 +655,15 @@ impl Service {
             .stderr(std::process::Stdio::null())
             .output()
             .map_err(|_| "could not run Codex read-only preflight")?;
-        if !invocation.status.success() || auth_digest()? != before {
-            return Err("Codex lookup failed or the role credential changed".into());
+        if !invocation.status.success() {
+            return Err("Codex lookup failed or the role credential is not immutable".into());
         }
         let observation: Value = serde_json::from_slice(&invocation.stdout)
             .map_err(|_| "invalid Codex preflight response")?;
+        let now = crate::provider::now_unix();
         crate::codex_trial::check_subscription(&observation, limit_id, now)?;
-        Ok(
-            json!({"authorized": true, "assignment_id": approval["assignment_id"],
-            "generation": approval["generation"], "target_sha": approval["target_sha"],
-            "checkpoint_sha256": approval["checkpoint_sha256"], "expires_unix": expires}),
-        )
+        approval.recheck(&cfg.etc, now)?;
+        Ok(expires)
     }
 
     pub fn handle(
@@ -716,10 +679,22 @@ impl Service {
         let segs: Vec<&str> = path.trim_matches('/').split('/').collect();
         match (method, segs.as_slice()) {
             ("GET", ["v0", "role", "status"]) => resp(200, self.status()),
-            ("GET", ["v0", "role", "codex-preflight"]) => match self.codex_preflight() {
-                Ok(v) => resp(200, v),
-                Err(e) => err(409, "CODEX_TRIAL_PREFLIGHT", &e),
-            },
+            ("GET", ["v0", "role", "codex-preflight"]) => {
+                let checked = TrialApproval::read(&self.cfg.etc).and_then(|approval| {
+                    let expires = self.codex_preflight(&approval)?;
+                    let a = &approval.value;
+                    Ok(
+                        json!({"authorized":true, "assignment_id":a["assignment_id"],
+                        "generation":a["generation"], "target_sha":a["target_sha"],
+                        "checkpoint_sha256":a["checkpoint_sha256"], "expires_unix":expires,
+                        "approval_sha256":approval.digest}),
+                    )
+                });
+                match checked {
+                    Ok(v) => resp(200, v),
+                    Err(e) => err(409, "CODEX_TRIAL_PREFLIGHT", &e),
+                }
+            }
             ("POST", ["v0", "role", "stop"]) => {
                 let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
                 match &st.stop {
@@ -1244,50 +1219,30 @@ impl Service {
                 "delivery runtime changed or was not pinned",
             );
         }
-        let mut codex_model = None;
+        let mut codex_approval = None;
         if codex_trial {
-            let approved = self.cfg.etc.join("codex-trial-approval.json");
-            let approval = std::fs::read(approved)
-                .ok()
-                .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .ok()
-                .map(|t| t.as_secs());
-            if !approval.as_ref().is_some_and(|a| {
-                a["assignment_id"] == assignment_id
-                    && a["generation"] == generation
-                    && a["target_sha"] == req["target_sha"]
-                    && a["checkpoint_sha256"] == req["expected_checkpoint_sha256"]
-                    && a["expires_unix"]
-                        .as_u64()
-                        .zip(now)
-                        .is_some_and(|(expires, now)| now < expires)
-                    && a["max_dispatches"] == 1
-                    && a["additional_usd"] == 0
-            }) {
-                return err(
-                    409,
-                    "CODEX_TRIAL_APPROVAL",
-                    "missing, expired or mismatched trial approval",
-                );
-            }
-            codex_model = approval
-                .as_ref()
-                .and_then(|a| a["model"].as_str())
-                .filter(|m| {
-                    !m.is_empty()
-                        && m.len() <= 64
-                        && m.bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
-                })
-                .map(str::to_owned);
-            if let Err(e) = self.codex_preflight() {
+            let approval = match TrialApproval::read(&self.cfg.etc) {
+                Ok(a)
+                    if req["codex_approval_sha256"] == a.digest
+                        && a.value["assignment_id"] == assignment_id
+                        && a.value["generation"] == generation
+                        && a.value["target_sha"] == req["target_sha"]
+                        && a.value["checkpoint_sha256"] == req["expected_checkpoint_sha256"] =>
+                {
+                    a
+                }
+                _ => {
+                    return err(
+                        409,
+                        "CODEX_TRIAL_APPROVAL",
+                        "missing or mismatched trial approval",
+                    );
+                }
+            };
+            if let Err(e) = self.codex_preflight(&approval) {
                 return err(409, "CODEX_TRIAL_PREFLIGHT", &e);
             }
-            if codex_model.is_none() {
-                return err(409, "CODEX_TRIAL_APPROVAL", "missing pinned trial model");
-            }
+            codex_approval = Some(approval);
         }
         let credential = if codex_trial {
             String::new()
@@ -1355,7 +1310,7 @@ impl Service {
             limits,
             credential,
             codex_trial,
-            codex_model,
+            codex_approval,
             coord: json!({"generation": generation, "assignment_id": assignment_id,
                 "sprint_id": sprint_id, "sprint_revision": sprint_revision,
                 "spec_digest": spec_digest, "image_digest": image_digest,
@@ -1452,6 +1407,11 @@ impl Service {
             return Ok(v);
         }
         let (mut cmd, argv, env_names) = if job.codex_trial {
+            let approval = job
+                .codex_approval
+                .as_ref()
+                .ok_or("missing pinned trial approval")?;
+            let expires = approval.recheck(&cfg.etc, crate::provider::now_unix())?;
             let bridge = cfg.etc.join("codex-trial-bridge");
             let state_dir = cfg.state.join("codex-trial");
             use std::os::unix::fs::DirBuilderExt;
@@ -1479,7 +1439,18 @@ impl Service {
                 "--codex".into(),
                 "/usr/bin/codex".into(),
                 "--model".into(),
-                job.codex_model.clone().ok_or("missing pinned model")?,
+                approval.model.clone(),
+                "--auth-sha256".into(),
+                approval.auth_sha256.clone(),
+                "--approval".into(),
+                cfg.etc
+                    .join("codex-trial-approval.json")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--approval-sha256".into(),
+                approval.digest.clone(),
+                "--authorization-expires-unix".into(),
+                expires.to_string(),
                 "--enable-trial".into(),
             ];
             // The trial admits only one start even if a different key is later presented.
@@ -2021,6 +1992,53 @@ fn s_of(v: &Value, k: &str) -> Option<String> {
     v[k].as_str().map(str::to_string)
 }
 
+struct TrialApproval {
+    digest: String,
+    value: Value,
+    model: String,
+    auth_sha256: String,
+}
+
+impl TrialApproval {
+    fn bytes(etc: &Path) -> Result<Vec<u8>, String> {
+        std::fs::read(etc.join("codex-trial-approval.json"))
+            .map_err(|_| "trial approval is unavailable".into())
+    }
+
+    fn read(etc: &Path) -> Result<Self, String> {
+        let bytes = Self::bytes(etc)?;
+        let value: Value = serde_json::from_slice(&bytes).map_err(|_| "invalid trial approval")?;
+        let model = value["model"]
+            .as_str()
+            .filter(|m| {
+                !m.is_empty()
+                    && m.len() <= 64
+                    && m.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+            })
+            .ok_or("missing pinned trial model")?
+            .to_owned();
+        let auth_sha256 = value["auth_sha256"]
+            .as_str()
+            .filter(|pin| pin.len() == 64 && pin.bytes().all(|b| b.is_ascii_hexdigit()))
+            .ok_or("missing pinned trial credential")?
+            .to_ascii_lowercase();
+        Ok(Self {
+            digest: crate::central::sha256(&bytes),
+            value,
+            model,
+            auth_sha256,
+        })
+    }
+
+    fn recheck(&self, etc: &Path, now: u64) -> Result<u64, String> {
+        if crate::central::sha256(&Self::bytes(etc)?) != self.digest {
+            return Err("trial approval changed".into());
+        }
+        crate::codex_trial::approval_expiry(&self.value, now)
+    }
+}
+
 struct Job {
     expected_checkpoint: Option<Value>,
     attempt: String,
@@ -2030,7 +2048,7 @@ struct Job {
     limits: Limits,
     credential: String,
     codex_trial: bool,
-    codex_model: Option<String>,
+    codex_approval: Option<TrialApproval>,
     coord: Value,
     tamper: Option<Value>,
     stop: Arc<AtomicBool>,
@@ -2339,7 +2357,7 @@ mod tests {
             },
             credential: "c".into(),
             codex_trial: false,
-            codex_model: None,
+            codex_approval: None,
             coord: json!({}),
             tamper: None,
             stop: Arc::new(AtomicBool::new(true)),

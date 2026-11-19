@@ -1,4 +1,5 @@
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -6,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 
 ADAPTER = Path(__file__).with_name("adapter.py")
@@ -48,6 +50,12 @@ for line in sys.stdin:
     elif method == "account/rateLimits/read":
         result = {"rateLimits":{"primary":{"usedPercent":18}}}
     elif method == "thread/start":
+        if mode == "change_approval":
+            with open(home + "/approval.json", "w") as file:
+                file.write("changed")
+        if mode == "change_auth":
+            with open(home + "/auth.json", "w") as file:
+                file.write("changed")
         assert params["ephemeral"] and params["sandbox"] == "read-only"
         result = {"thread": {"id": "thread-1", "turns": [], "ephemeral": True},
                   "cwd": params["cwd"], "model": params["model"],
@@ -95,15 +103,33 @@ class Tests(unittest.TestCase):
         self.worker.write_text("#!" + sys.executable + "\n" + textwrap.dedent(WORKER))
         self.worker.chmod(0o700)
 
-    def invoke(self, mode, opt_in=True, envelope=False, preflight=False):
+        self.auth = self.root / "auth.json"
+        self.auth.write_text("synthetic credential")
+        self.approval = self.root / "approval.json"
+        self.approval.write_text("synthetic approval")
+        self.entry = self.root / "test-entry.py"
+        # The mock subprocess can only simulate kernel immutability. It still checks
+        # that the adapter uses the approved credential digest at both boundaries.
+        self.entry.write_text(
+            "import hashlib,runpy,sys\n"
+            f"main=runpy.run_path({str(ADAPTER)!r})['main']\n"
+            "def fixture_auth(path, expected):\n"
+            "    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:\n"
+            "        raise main.__globals__['TrialError']('fixture credential changed')\n"
+            "main.__globals__['immutable_auth']=fixture_auth\n"
+            "sys.exit(main())\n")
+    def invoke(self, mode, opt_in=True, envelope=False, preflight=False, real_guard=False, expired=False):
         (self.root / "mode").write_text(mode)
-        cmd = [sys.executable, "-I", str(ADAPTER), "--delivery-id", "D-fixture", "--attempt-id", "a1",
+        cmd = [sys.executable, "-I", str(ADAPTER if real_guard else self.entry), "--delivery-id", "D-fixture", "--attempt-id", "a1",
                "--cwd", str(self.root), "--state", str(self.state),
                "--codex", str(self.worker), "--model", "fixture-model"]
         if preflight:
             cmd.append("--preflight-only")
         elif opt_in:
-            cmd.append("--enable-trial")
+            cmd += ["--enable-trial", "--auth-sha256", hashlib.sha256(self.auth.read_bytes()).hexdigest(),
+                    "--approval", str(self.approval), "--approval-sha256",
+                    hashlib.sha256(self.approval.read_bytes()).hexdigest(),
+                    "--authorization-expires-unix", str(int(time.time()) + (-1 if expired else 60))]
         value = "VERIFY checkpoint"
         if envelope:
             value = {"type": "user", "message": {"content": [{"type": "text", "text": value}]}}
@@ -113,6 +139,27 @@ class Tests(unittest.TestCase):
 
     def read_state(self):
         return json.loads((self.state / "D-fixture/state.json").read_text())
+
+    def test_unmounted_credential_refuses_before_child(self):
+        result = self.invoke("ok", real_guard=True)
+        self.assertIn("exact read-only file mount", result.stderr)
+        self.assertFalse((self.root / "worker-launches").exists())
+
+    def test_expired_billing_refuses_before_child(self):
+        result = self.invoke("ok", expired=True)
+        self.assertIn("billing observation expired", result.stderr)
+        self.assertFalse((self.root / "worker-launches").exists())
+
+    def test_credential_or_approval_change_before_turn_refuses(self):
+        for mode in ("change_auth", "change_approval"):
+            with self.subTest(mode=mode):
+                result = self.invoke(mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("turn/start", (self.root / "methods").read_text())
+                self.assertEqual(self.read_state()["status"], "unknown")
+                for path in (self.state / "D-fixture").iterdir():
+                    path.unlink()
+                (self.state / "D-fixture").rmdir()
 
     def test_preflight_reads_account_and_limits_without_reserving_or_starting(self):
         result = self.invoke("ok", preflight=True)
