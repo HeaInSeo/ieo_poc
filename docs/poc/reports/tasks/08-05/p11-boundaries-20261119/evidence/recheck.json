@@ -1,0 +1,7 @@
+{
+  "application": 12,
+  "file_credential_isolation": "UNVERIFIED_NO_P07_EVIDENCE",
+  "network": 12,
+  "psa": 4,
+  "result": "PASS"
+}
