@@ -574,7 +574,13 @@ impl Service {
         if self.cfg.central == crate::central::Central::LocalOnly {
             gaps.push("central checkpoint comparison off (local_only)");
         }
-        json!({"role": self.cfg.role_name(), "repo": self.cfg.repo,
+        let runtime = if std::fs::symlink_metadata(self.cfg.etc.join("codex-trial-bridge")).is_ok()
+        {
+            "codex-trial"
+        } else {
+            "claude"
+        };
+        json!({"role": self.cfg.role_name(), "repo": self.cfg.repo, "runtime": runtime,
                "running": st.running, "last": st.last, "checkpoint": cp, "safe_shutdown": safe,
                "checkpoint_seq": cp_seq,
                "checkpoint_sha256": raw.as_ref().map(|b| crate::central::sha256(b)),
@@ -594,6 +600,79 @@ impl Service {
     }
 
     /// Handle one request. `bearer` is the token from `Authorization: Bearer …`.
+    fn codex_preflight(&self, approval: &TrialApproval) -> Result<u64, String> {
+        let cfg = &self.cfg;
+        let bridge = cfg.etc.join("codex-trial-bridge");
+        if !matches!(
+            cfg.role,
+            Role::Development {
+                read_only: true,
+                ..
+            }
+        ) || !matches!(cfg.central, crate::central::Central::Coordinator(_))
+            || !std::fs::symlink_metadata(&bridge).is_ok_and(|m| m.is_file())
+        {
+            return Err("no isolated Codex trial role".into());
+        }
+        let expires = approval.recheck(&cfg.etc, crate::provider::now_unix())?;
+        let limit_id = approval.value["limit_id"]
+            .as_str()
+            .filter(|x| !x.is_empty())
+            .ok_or("missing trial limit bucket")?;
+        let home = cfg.cred.join("codex-home");
+        if !matches!(std::fs::symlink_metadata(home.join("config.toml")),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound)
+        {
+            return Err("assigned Codex credential home contains unapproved configuration".into());
+        }
+        let invocation = Command::new("/usr/bin/timeout")
+            .args(["--kill-after=1s", "8s"])
+            .arg(bridge)
+            .args([
+                "--preflight-only",
+                "--delivery-id",
+                "D-preflight",
+                "--attempt-id",
+                "preflight",
+                "--codex",
+                "/usr/bin/codex",
+                "--model",
+                &approval.model,
+                "--auth-sha256",
+                &approval.auth_sha256,
+                "--cwd",
+            ])
+            .arg(cfg.cwd())
+            .args(approval.bridge_args(&cfg.etc, expires))
+            .arg("--state")
+            .arg(cfg.state.join("codex-trial"))
+            .current_dir(cfg.cwd())
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("HOME", cfg.home())
+            .env("CODEX_HOME", home)
+            .stdin(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .map_err(|_| "could not run Codex read-only preflight")?;
+        if !invocation.status.success() {
+            return Err("Codex lookup failed or the role credential is not immutable".into());
+        }
+        let observation: Value = serde_json::from_slice(&invocation.stdout)
+            .map_err(|_| "invalid Codex preflight response")?;
+        let now = crate::provider::now_unix();
+        crate::codex_trial::check_subscription(&observation, limit_id, now)?;
+        let expiry = observation["authorization_expires_unix"]
+            .as_u64()
+            .filter(|end| now < *end && *end <= expires)
+            .ok_or("missing or expired prerequisite review at preflight")?;
+        if observation["workspace_id"] != approval.value["workspace_id"] {
+            return Err("preflight workspace does not match the approval".into());
+        }
+        approval.recheck(&cfg.etc, now)?;
+        Ok(expiry)
+    }
+
     pub fn handle(
         self: &Arc<Self>,
         method: &str,
@@ -607,6 +686,22 @@ impl Service {
         let segs: Vec<&str> = path.trim_matches('/').split('/').collect();
         match (method, segs.as_slice()) {
             ("GET", ["v0", "role", "status"]) => resp(200, self.status()),
+            ("GET", ["v0", "role", "codex-preflight"]) => {
+                let checked = TrialApproval::read(&self.cfg.etc).and_then(|approval| {
+                    let expires = self.codex_preflight(&approval)?;
+                    let a = &approval.value;
+                    Ok(
+                        json!({"authorized":true, "assignment_id":a["assignment_id"],
+                        "generation":a["generation"], "target_sha":a["target_sha"],
+                        "checkpoint_sha256":a["checkpoint_sha256"], "expires_unix":expires,
+                        "approval_sha256":approval.digest}),
+                    )
+                });
+                match checked {
+                    Ok(v) => resp(200, v),
+                    Err(e) => err(409, "CODEX_TRIAL_PREFLIGHT", &e),
+                }
+            }
             ("POST", ["v0", "role", "stop"]) => {
                 let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
                 match &st.stop {
@@ -1099,14 +1194,76 @@ impl Service {
         {
             return err(500, "INTERNAL", &format!("pending tamper: {e}"));
         }
-        let credential = match std::fs::read_to_string(self.cfg.cred.join("oauth_token")) {
-            Ok(c) if !c.trim().is_empty() => c.trim().to_string(),
-            _ => {
-                return err(
-                    503,
-                    "CREDENTIAL_UNAVAILABLE",
-                    "the role credential file is missing",
-                );
+        let codex_bridge = self.cfg.etc.join("codex-trial-bridge");
+        let codex_trial = match std::fs::symlink_metadata(&codex_bridge) {
+            Ok(meta) if meta.is_file() => true,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+            _ => return err(503, "CREDENTIAL_UNAVAILABLE", "invalid Codex trial bridge"),
+        };
+        if codex_trial
+            && (!matches!(
+                self.cfg.role,
+                Role::Development {
+                    read_only: true,
+                    ..
+                }
+            ) || !matches!(self.cfg.central, crate::central::Central::Coordinator(_))
+                || resume
+                || delivery_id.is_none()
+                || expected_checkpoint.is_none()
+                || limits.timeout.saturating_add(limits.grace) > Duration::from_secs(120))
+        {
+            return err(
+                409,
+                "CODEX_TRIAL_SCOPE",
+                "trial requires a pinned, centrally admitted new read-only delivery within 120 seconds",
+            );
+        }
+        if codex_trial != (req["expected_runtime"] == "codex-trial") {
+            return err(
+                409,
+                "CODEX_TRIAL_SCOPE",
+                "delivery runtime changed or was not pinned",
+            );
+        }
+        let mut codex_approval = None;
+        if codex_trial {
+            let approval = match TrialApproval::read(&self.cfg.etc) {
+                Ok(a)
+                    if req["codex_approval_sha256"] == a.digest
+                        && a.value["assignment_id"] == assignment_id
+                        && a.value["generation"] == generation
+                        && a.value["target_sha"] == req["target_sha"]
+                        && a.value["checkpoint_sha256"] == req["expected_checkpoint_sha256"] =>
+                {
+                    a
+                }
+                _ => {
+                    return err(
+                        409,
+                        "CODEX_TRIAL_APPROVAL",
+                        "missing or mismatched trial approval",
+                    );
+                }
+            };
+            let expiry = match self.codex_preflight(&approval) {
+                Ok(expiry) => expiry,
+                Err(e) => return err(409, "CODEX_TRIAL_PREFLIGHT", &e),
+            };
+            codex_approval = Some((approval, expiry));
+        }
+        let credential = if codex_trial {
+            String::new()
+        } else {
+            match std::fs::read_to_string(self.cfg.cred.join("oauth_token")) {
+                Ok(c) if !c.trim().is_empty() => c.trim().to_string(),
+                _ => {
+                    return err(
+                        503,
+                        "CREDENTIAL_UNAVAILABLE",
+                        "the role credential file is missing",
+                    );
+                }
             }
         };
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -1160,6 +1317,8 @@ impl Service {
             prompt,
             limits,
             credential,
+            codex_trial,
+            codex_approval,
             coord: json!({"generation": generation, "assignment_id": assignment_id,
                 "sprint_id": sprint_id, "sprint_revision": sprint_revision,
                 "spec_digest": spec_digest, "image_digest": image_digest,
@@ -1255,15 +1414,84 @@ impl Service {
             );
             return Ok(v);
         }
-        let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
-        let mut cmd = Command::new(&cfg.claude);
+        let (mut cmd, argv, env_names) = if job.codex_trial {
+            let (approval, preflight_expiry) = job
+                .codex_approval
+                .as_ref()
+                .ok_or("missing pinned trial approval")?;
+            let now = crate::provider::now_unix();
+            let expires = approval.recheck(&cfg.etc, now)?.min(*preflight_expiry);
+            if expires <= now {
+                return Err("trial prerequisite review expired before launch".into());
+            }
+            let bridge = cfg.etc.join("codex-trial-bridge");
+            let state_dir = cfg.state.join("codex-trial");
+            use std::os::unix::fs::DirBuilderExt;
+            match std::fs::DirBuilder::new().mode(0o700).create(&state_dir) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if !std::fs::symlink_metadata(&state_dir).is_ok_and(|m| m.is_dir()) {
+                        return Err("invalid Codex trial state directory".into());
+                    }
+                }
+                Err(e) => return Err(format!("Codex trial state: {e}")),
+            }
+            let delivery = job.coord["delivery_id"]
+                .as_str()
+                .ok_or("missing Codex delivery ID")?;
+            let mut argv = vec![
+                "--delivery-id".into(),
+                delivery.into(),
+                "--attempt-id".into(),
+                job.attempt.clone(),
+                "--cwd".into(),
+                cfg.cwd().to_string_lossy().into_owned(),
+                "--state".into(),
+                state_dir.to_string_lossy().into_owned(),
+                "--codex".into(),
+                "/usr/bin/codex".into(),
+                "--model".into(),
+                approval.model.clone(),
+                "--auth-sha256".into(),
+                approval.auth_sha256.clone(),
+                "--enable-trial".into(),
+            ];
+            argv.extend(approval.bridge_args(&cfg.etc, expires));
+            // The trial admits only one start even if a different key is later presented.
+            // Persist the reservation before launching the subprocess and never clear it here.
+            use std::io::Write;
+            let mut reservation = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(state_dir.join("supervisor-reservation"))
+                .map_err(|e| format!("Codex trial already reserved or unavailable: {e}"))?;
+            writeln!(reservation, "{delivery}").map_err(|e| e.to_string())?;
+            reservation.sync_all().map_err(|e| e.to_string())?;
+            std::fs::File::open(&state_dir)
+                .and_then(|d| d.sync_all())
+                .map_err(|e| e.to_string())?;
+            let mut cmd = Command::new(bridge);
+            cmd.env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env("HOME", cfg.home())
+                .env("CODEX_HOME", cfg.cred.join("codex-home"));
+            (
+                cmd,
+                argv,
+                vec!["CODEX_HOME".into(), "HOME".into(), "PATH".into()],
+            )
+        } else {
+            let argv = args::build(&cfg.role, &cfg.repo, &job.session_id, job.resume);
+            let mut cmd = Command::new(&cfg.claude);
+            let env = crate::env::build(
+                &cfg.home().to_string_lossy(),
+                &cfg.config_dir().to_string_lossy(),
+                &job.credential,
+            );
+            crate::env::apply(&mut cmd, &env)?;
+            (cmd, argv, crate::env::names(&env))
+        };
         cmd.args(&argv).current_dir(cfg.cwd());
-        let env = crate::env::build(
-            &cfg.home().to_string_lossy(),
-            &cfg.config_dir().to_string_lossy(),
-            &job.credential,
-        );
-        crate::env::apply(&mut cmd, &env)?;
         let opts = Options {
             kill: cfg.kill.clone(),
             stdin: Some(prompt_message(&job.prompt)),
@@ -1280,14 +1508,44 @@ impl Service {
                     return Err(format!("run: {e}"));
                 }
             };
-        let children = self.keep_child_transcripts(job, &stdout, &dir);
+        let exited = outcome.stop == Stop::Exited;
+        let codex_tokens =
+            if job.codex_trial && exited && outcome.exit_code == Some(0) && !outcome.cleanup_failed
+            {
+                let delivery = job.coord["delivery_id"]
+                    .as_str()
+                    .ok_or("missing Codex delivery ID")?;
+                std::fs::read_to_string(&stdout).ok().and_then(|stream| {
+                    crate::codex_trial::receipt(&stream, delivery, &job.attempt)
+                        .ok()
+                        .and_then(|(_, tokens)| tokens)
+                })
+            } else {
+                None
+            };
+        let children = if job.codex_trial {
+            json!([])
+        } else {
+            self.keep_child_transcripts(job, &stdout, &dir)
+        };
         self.write_checkpoint(
             job,
             &report.digest,
             Some(&stdout),
-            outcome.stop == Stop::Exited,
+            exited && (!job.codex_trial || codex_tokens.is_some()),
             "after_run",
         )?;
+        let observed = if job.codex_trial {
+            codex_tokens.map_or(Value::Null, |t| json!({
+                "billable_lower_bound": t.input.saturating_add(t.output).saturating_add(t.cache_creation),
+                "cache_read_lower_bound": t.cache_read
+            }))
+        } else {
+            json!({"billable_lower_bound": outcome.observed.billable,
+                "cache_read_lower_bound": outcome.observed.cache_read,
+                "messages": outcome.observed.messages,
+                "incomplete_lines": outcome.observed.incomplete_lines})
+        };
         let v = json!({"attempt_id": job.attempt, "session_id": job.session_id,
             "mode": if job.resume { "resume" } else { "new" },
             "stop": format!("{:?}", outcome.stop),
@@ -1297,17 +1555,15 @@ impl Service {
                 &std::fs::read_to_string(&stdout).unwrap_or_default(),
                 &job.attempt, &job.started_at, Some(&ieo_evidence::time::now())),
             "exit_code": outcome.exit_code, "elapsed_ms": outcome.elapsed.as_millis() as u64,
-            "observed": {"billable_lower_bound": outcome.observed.billable,
-                         "cache_read_lower_bound": outcome.observed.cache_read,
-                         "messages": outcome.observed.messages,
-                         "incomplete_lines": outcome.observed.incomplete_lines},
+            "observed": observed,
             "cleanup_failed": outcome.cleanup_failed,
             "children": children,
             "config_cleanup": {"digest": report.digest, "removed": report.removed.len(),
                                "credentials_removed": report.credentials_removed},
             "tamper": job.tamper,
             "first_action": first_action_json(job, true),
-            "argv": argv, "env_names": crate::env::names(&env)});
+            "argv": argv, "env_names": env_names,
+            "runtime": if job.codex_trial { "codex-trial" } else { "claude" }});
         let _ = std::fs::write(
             dir.join("outcome.json"),
             serde_json::to_vec_pretty(&v).unwrap_or_default(),
@@ -1740,6 +1996,79 @@ fn s_of(v: &Value, k: &str) -> Option<String> {
     v[k].as_str().map(str::to_string)
 }
 
+struct TrialApproval {
+    digest: String,
+    value: Value,
+    model: String,
+    auth_sha256: String,
+}
+
+impl TrialApproval {
+    fn bytes(etc: &Path) -> Result<Vec<u8>, String> {
+        std::fs::read(etc.join("codex-trial-approval.json"))
+            .map_err(|_| "trial approval is unavailable".into())
+    }
+
+    fn read(etc: &Path) -> Result<Self, String> {
+        let bytes = Self::bytes(etc)?;
+        let value: Value = serde_json::from_slice(&bytes).map_err(|_| "invalid trial approval")?;
+        let model = value["model"]
+            .as_str()
+            .filter(|m| {
+                !m.is_empty()
+                    && m.len() <= 64
+                    && m.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+            })
+            .ok_or("missing pinned trial model")?
+            .to_owned();
+        let auth_sha256 = value["auth_sha256"]
+            .as_str()
+            .filter(|pin| pin.len() == 64 && pin.bytes().all(|b| b.is_ascii_hexdigit()))
+            .ok_or("missing pinned trial credential")?
+            .to_ascii_lowercase();
+        Ok(Self {
+            digest: crate::central::sha256(&bytes),
+            value,
+            model,
+            auth_sha256,
+        })
+    }
+
+    fn bridge_args(&self, etc: &Path, expires: u64) -> [String; 8] {
+        [
+            "--approval".into(),
+            etc.join("codex-trial-approval.json")
+                .to_string_lossy()
+                .into_owned(),
+            "--approval-sha256".into(),
+            self.digest.clone(),
+            "--prerequisites".into(),
+            etc.join("codex-trial-prerequisites.json")
+                .to_string_lossy()
+                .into_owned(),
+            "--authorization-expires-unix".into(),
+            expires.to_string(),
+        ]
+    }
+
+    fn recheck(&self, etc: &Path, now: u64) -> Result<u64, String> {
+        if crate::central::sha256(&Self::bytes(etc)?) != self.digest {
+            return Err("trial approval changed".into());
+        }
+        let pin = self.value["prerequisites_sha256"]
+            .as_str()
+            .filter(|pin| pin.len() == 64 && pin.bytes().all(|b| b.is_ascii_hexdigit()))
+            .ok_or("missing pinned prerequisite review")?;
+        let review = std::fs::read(etc.join("codex-trial-prerequisites.json"))
+            .map_err(|_| "trial prerequisite review is unavailable")?;
+        if crate::central::sha256(&review) != pin {
+            return Err("trial prerequisite review changed".into());
+        }
+        crate::codex_trial::approval_expiry(&self.value, now)
+    }
+}
+
 struct Job {
     expected_checkpoint: Option<Value>,
     attempt: String,
@@ -1748,6 +2077,8 @@ struct Job {
     prompt: String,
     limits: Limits,
     credential: String,
+    codex_trial: bool,
+    codex_approval: Option<(TrialApproval, u64)>,
     coord: Value,
     tamper: Option<Value>,
     stop: Arc<AtomicBool>,
@@ -2021,6 +2352,41 @@ mod tests {
     /// A stop requested before the worker spawns: nothing is started, no takeover checkpoint is
     /// written over the previous one, and the outcome says so (review 6975d5f N6).
     #[test]
+    fn codex_trial_requires_the_pinned_prerequisite_file() {
+        let root =
+            std::env::temp_dir().join(format!("ieo-trial-prerequisites-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let review = b"synthetic review bytes";
+        let approved = json!({
+            "model":"fixture-model", "auth_sha256":"a".repeat(64),
+            "prerequisites_sha256":crate::central::sha256(review),
+            "expires_unix":900, "max_dispatches":1, "additional_usd":0,
+            "billing":{"verified_unix":400,"auto_reload_disabled":true,
+                       "paid_paths_blocked":true,"api_fallback_blocked":true}
+        });
+        std::fs::write(root.join("codex-trial-approval.json"), approved.to_string()).unwrap();
+        let snapshot = TrialApproval::read(&root).unwrap();
+        assert!(
+            snapshot
+                .recheck(&root, 401)
+                .unwrap_err()
+                .contains("unavailable")
+        );
+        let path = root.join("codex-trial-prerequisites.json");
+        std::fs::write(&path, b"wrong").unwrap();
+        assert!(
+            snapshot
+                .recheck(&root, 401)
+                .unwrap_err()
+                .contains("changed")
+        );
+        std::fs::write(&path, review).unwrap();
+        assert_eq!(snapshot.recheck(&root, 401), Ok(700));
+        // Only the trusted bridge parses the reviewed bytes and attests their semantic expiry.
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn a_stop_before_the_spawn_starts_nothing() {
         let root = std::env::temp_dir().join(format!("ieo-serve-unit-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -2055,6 +2421,8 @@ mod tests {
                 grace: Duration::from_secs(1),
             },
             credential: "c".into(),
+            codex_trial: false,
+            codex_approval: None,
             coord: json!({}),
             tamper: None,
             stop: Arc::new(AtomicBool::new(true)),

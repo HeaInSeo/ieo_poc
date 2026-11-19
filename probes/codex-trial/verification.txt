@@ -1,0 +1,12 @@
+test_busy_delivery_lock_refuses_without_process (__main__.Tests.test_busy_delivery_lock_refuses_without_process) ... ok
+test_fail_closed_on_ambiguous_or_failed_turn (__main__.Tests.test_fail_closed_on_ambiguous_or_failed_turn) ... ok
+test_lost_reply_preserves_unknown_and_prevents_second_send (__main__.Tests.test_lost_reply_preserves_unknown_and_prevents_second_send) ... ok
+test_no_opt_in_no_process (__main__.Tests.test_no_opt_in_no_process) ... ok
+test_partial_intent_directory_is_conservatively_never_reused (__main__.Tests.test_partial_intent_directory_is_conservatively_never_reused) ... ok
+test_receipt_omits_unproven_final_usage_and_retains_raw (__main__.Tests.test_receipt_omits_unproven_final_usage_and_retains_raw) ... ok
+test_wrong_config_or_auth_prevents_turn (__main__.Tests.test_wrong_config_or_auth_prevents_turn) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.203s
+
+OK

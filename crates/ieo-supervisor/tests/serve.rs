@@ -2377,6 +2377,22 @@ fn a_start_is_checked_against_the_coordinators_current_assignment(transport: &'s
     assert_eq!(runs(), 1);
 }
 
+#[test]
+fn codex_trial_bridge_is_rejected_outside_a_pinned_central_role() {
+    let _serial = serial();
+    let (t, svc) = setup("codex-trial-scope");
+    std::fs::write(t.0.join("etc/codex-trial-bridge"), "must never run").unwrap();
+    let (status, body) = call(
+        &svc,
+        "POST",
+        "/v0/role/start",
+        &req("a1", "hi", json!({"session_id":"s1", "delivery_id":"D-1"})),
+    );
+    assert_eq!(status, 409, "{body}");
+    assert_eq!(body["code"], "CODEX_TRIAL_SCOPE");
+    assert!(!t.0.join("state/runs/a1").exists());
+}
+
 // --- 02-05 step 4: the delivery id and the first action on the run's checkpoints ---
 
 #[test]
