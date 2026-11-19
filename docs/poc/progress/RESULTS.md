@@ -1,6 +1,6 @@
 # 실험·후속 후보 결과
 
-계획 v1.3.3 · snapshot `08-03-acceptance-08-05-scoped-20261119` · 원장 SHA-256 `77afb484192f4ddc4662d2384a4b505b6a91163ed2216b0938788fabb2937c29`
+계획 v1.3.3 · snapshot `08-04-acceptance-08-05-scoped-20261119` · 원장 SHA-256 `491352964457288b1e7b1c32072def5eff2d28b09e55547b0d00b339ab2fc54f`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -117,11 +117,35 @@
 
 ### P10 · 보안 위반 탐지와 실제 차단
 
-연결 작업: ["08-04"] · 실행 미실행 · 판정 미판정 · 평가 종료 False · 처분 미판정
+연결 작업: ["08-04"] · 실행 격리 합성 회차 2건 기록 · 판정 PASS · 평가 종료 True · 처분 미판정
 
-최근 보고: 없음 · 미실행
+최근 보고: [보고](../reports/tasks/08-04/p10-defensive-20261119/REPORT.md)
 
-회차 없음 · 미실행
+#### 회차 P10-08-04-44519648688 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P10-08-04-44519648688 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | FAIL |
+| candidate_sha | 955244841295d515a49adc2d1252d45f03ac2130 |
+| verification_scope | 정책 비교에서 중단. 시도 0건. |
+| latest_report | [보고](../reports/tasks/08-04/p10-defensive-20261119/REPORT.md) |
+| evidence | ["https://github.com/HeaInSeo/ieo_poc/actions/runs/44519648688","reports/tasks/08-04/p10-defensive-20261119/evidence/44519648688-evidence.tar.gz"] |
+
+#### 회차 P10-08-04-44520476538 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P10-08-04-44520476538 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | PASS |
+| candidate_sha | b0ddefaf7882118a1fa1e69e22d38b2a46fb3c12 |
+| verification_scope | 7/7 · 격리 합성 TCP 탐지·차단. |
+| latest_report | [보고](../reports/tasks/08-04/p10-defensive-20261119/REPORT.md) |
+| evidence | ["https://github.com/HeaInSeo/ieo_poc/actions/runs/44520476538","reports/tasks/08-04/p10-defensive-20261119/evidence/44520476538-evidence.tar.gz"] |
 
 ### P11 · 선언 정책과 애플리케이션 권한 경계
 
