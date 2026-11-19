@@ -78,7 +78,7 @@ def network_specs(items):
     # The Kubernetes API omits empty ingress/egress rule slices. Policy types still select deny.
     return {item["metadata"]["name"]: {
         key: value for key, value in item["spec"].items()
-        if key not in ("ingress", "egress") or value
+        if key not in ("ingress", "egress") or value != []
     } for item in items}
 
 def actor_egress(enforce):

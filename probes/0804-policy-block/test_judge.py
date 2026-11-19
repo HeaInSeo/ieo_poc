@@ -57,6 +57,9 @@ class JudgeTests(unittest.TestCase):
         receiver = next(policy for policy in server if policy["metadata"]["name"] == "egress-receiver")
         receiver["spec"].pop("egress")
         self.assertEqual(network_specs(server), network_specs(desired))
+        receiver["spec"]["egress"] = None
+        self.assertNotEqual(network_specs(server), network_specs(desired))
+        receiver["spec"].pop("egress")
         actor = next(policy for policy in server if policy["metadata"]["name"] == "egress-development")
         actor["spec"].pop("egress")
         self.assertNotEqual(network_specs(server), network_specs(desired))
