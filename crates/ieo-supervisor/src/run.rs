@@ -81,8 +81,19 @@ impl Limits {
         records: &[Value],
         observation: Option<crate::budget::Observation<'_>>,
     ) -> Result<Limits, crate::budget::Decision> {
+        Self::from_decision(
+            budget,
+            records,
+            crate::budget::next(budget, records, observation),
+        )
+    }
+
+    pub(crate) fn from_decision(
+        budget: &crate::budget::Budget,
+        records: &[Value],
+        decision: crate::budget::Decision,
+    ) -> Result<Limits, crate::budget::Decision> {
         use crate::budget::Decision;
-        let decision = crate::budget::next(budget, records, observation);
         let Decision::Start { timeout_seconds } = decision else {
             return Err(decision);
         };

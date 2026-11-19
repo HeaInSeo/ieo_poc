@@ -198,6 +198,20 @@ pub trait Adapter {
         path: &str,
         body: Option<&Value>,
     ) -> Result<(u16, Value), String>;
+
+    /// None proves the POST was never attempted.
+    fn post_fenced(
+        &self,
+        role: &RoleTarget,
+        path: &str,
+        body: &Value,
+        may_send: &dyn Fn() -> bool,
+    ) -> Result<Option<(u16, Value)>, String> {
+        if !may_send() {
+            return Ok(None);
+        }
+        self.send(role, "POST", path, Some(body)).map(Some)
+    }
 }
 
 pub struct Http;
@@ -210,13 +224,44 @@ impl Adapter for Http {
         path: &str,
         body: Option<&Value>,
     ) -> Result<(u16, Value), String> {
+        Self::request(role, method, path, body, &|| true)?.ok_or("request not sent".into())
+    }
+
+    fn post_fenced(
+        &self,
+        role: &RoleTarget,
+        path: &str,
+        body: &Value,
+        may_send: &dyn Fn() -> bool,
+    ) -> Result<Option<(u16, Value)>, String> {
+        Self::request(role, "POST", path, Some(body), may_send)
+    }
+}
+
+impl Http {
+    fn request(
+        role: &RoleTarget,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+        may_send: &dyn Fn() -> bool,
+    ) -> Result<Option<(u16, Value)>, String> {
         let token = std::fs::read_to_string(&role.adapter_token_file)
             .map_err(|e| format!("adapter token file: {}", e.kind()))?;
         let req = ureq::request(method, &format!("{}{path}", role.url))
             .timeout(Duration::from_secs(30))
             .set("Authorization", &format!("Bearer {}", token.trim()));
-        let r = match body {
-            Some(b) => req.send_json(b.clone()),
+        let bytes = body.map(Value::to_string);
+        let req = if bytes.is_some() {
+            req.set("Content-Type", "application/json")
+        } else {
+            req
+        };
+        if !may_send() {
+            return Ok(None);
+        }
+        let r = match bytes {
+            Some(b) => req.send_bytes(b.as_bytes()),
             None => req.call(),
         };
         let resp = match r {
@@ -228,7 +273,7 @@ impl Adapter for Http {
         let v: Value = resp
             .into_json()
             .map_err(|e| format!("response body: {}", e.kind()))?;
-        Ok((status, v))
+        Ok(Some((status, v)))
     }
 }
 
@@ -621,10 +666,6 @@ fn observation(plan: &Plan, recs: &[Value]) -> Result<Option<(String, u64)>, Str
 
 /// Limits for this call: the budget decision, then the role's share.
 pub fn limits_for(plan: &Plan, role: &str, recs: &[Value]) -> Result<Limits, String> {
-    let target = plan
-        .roles
-        .get(role)
-        .ok_or(format!("role {role} not in the plan"))?;
     let obs = observation(plan, recs)?;
     let l = Limits::for_next(
         &plan.budget,
@@ -635,6 +676,14 @@ pub fn limits_for(plan: &Plan, role: &str, recs: &[Value]) -> Result<Limits, Str
         }),
     )
     .map_err(|d| format!("{d:?}"))?;
+    role_limits(plan, role, recs, l)
+}
+
+fn role_limits(plan: &Plan, role: &str, recs: &[Value], l: Limits) -> Result<Limits, String> {
+    let target = plan
+        .roles
+        .get(role)
+        .ok_or(format!("role {role} not in the plan"))?;
     let mine: Vec<Value> = recs.iter().filter(|r| r["role"] == role).cloned().collect();
     let s = budget::spent(&mine);
     let sh = target.share;
@@ -735,7 +784,7 @@ pub fn call_with_extra(
         Err(why) => return Ok(Called::NotStarted(why)),
     };
     match adm.start_with(plan, c, adapter, extra)? {
-        Sent::Refused { why, .. } => Ok(Called::NotStarted(why)),
+        Sent::Refused { why, .. } | Sent::NotSent(why) => Ok(Called::NotStarted(why)),
         Sent::Lost(r) => Ok(Called::Recorded(r)),
         Sent::Accepted { running, .. } => {
             running.finish(adapter, poll, margin).map(Called::Recorded)
@@ -1033,17 +1082,26 @@ pub fn admit_with(
     if recs.iter().any(|r| r["attempt_id"] == attempt_id) {
         return Ok(Err(format!("attempt {attempt_id} already recorded")));
     }
-    let limits = match limits_for(plan, role, &recs) {
-        Ok(l) => l,
-        Err(why) => return Ok(Err(why)),
-    };
-    // every service's state before the run (the target's checkpoint is the resume base
-    // candidate)
     let mut statuses = match services_clear(plan, &recs, adapter, role)? {
         Ok(s) => s,
         Err(why) => return Ok(Err(why)),
     };
     let before = statuses.remove(role).unwrap_or_default();
+    let limits = if before["runtime"] == "codex-trial" {
+        Limits::from_decision(
+            &plan.budget,
+            &recs,
+            budget::next_with_provider_check(&plan.budget, &recs, || Ok(())),
+        )
+        .map_err(|d| format!("{d:?}"))
+        .and_then(|l| role_limits(plan, role, &recs, l))
+    } else {
+        limits_for(plan, role, &recs)
+    };
+    let limits = match limits {
+        Ok(l) => l,
+        Err(why) => return Ok(Err(why)),
+    };
     Ok(Ok(Admission {
         lock,
         recs,
@@ -1056,6 +1114,8 @@ pub fn admit_with(
 /// What sending an admitted call did.
 #[derive(Debug)]
 pub enum Sent {
+    /// Local preflight or send fence refused before any POST.
+    NotSent(String),
     /// The service answered with a refusal: nothing started, nothing recorded.
     Refused {
         status: u16,
@@ -1146,6 +1206,19 @@ impl Admission {
         adapter: &dyn Adapter,
         extra: &Value,
     ) -> Result<Sent, String> {
+        self.start_with_fence(plan, c, adapter, extra, || true, |_| {})
+    }
+
+    /// Recheck the coordinator's stop/deadline after slow preflight and at the POST boundary.
+    pub fn start_with_fence(
+        self,
+        plan: &Plan,
+        c: &Call,
+        adapter: &dyn Adapter,
+        extra: &Value,
+        may_send: impl Fn() -> bool,
+        observe_body: impl FnOnce(&Value),
+    ) -> Result<Sent, String> {
         let target = plan
             .roles
             .get(&c.role)
@@ -1161,6 +1234,41 @@ impl Admission {
         {
             body[k] = v.clone();
         }
+        let mut expiry = None;
+        if self.before["runtime"] == "codex-trial" {
+            body["expected_runtime"] = json!("codex-trial");
+            let attestation = adapter.send(&target, "GET", "/v0/role/codex-preflight", None);
+            let approval = match attestation {
+                Ok((200, v))
+                    if v["authorized"] == true
+                        && v["assignment_id"] == c.coordinator["assignment_id"]
+                        && v["generation"] == c.coordinator["generation"]
+                        && v["target_sha"] == body["target_sha"]
+                        && body["expected_checkpoint_sha256"]
+                            .as_str()
+                            .is_some_and(|pin| !pin.is_empty())
+                        && v["checkpoint_sha256"] == body["expected_checkpoint_sha256"]
+                        && v["expires_unix"].as_u64().is_some_and(|t| unix_now() < t)
+                        && v["approval_sha256"]
+                            .as_str()
+                            .is_some_and(|pin| !pin.is_empty()) =>
+                {
+                    v
+                }
+                _ => {
+                    return Ok(Sent::NotSent(
+                        "Codex role preflight is missing, stale, or mismatched".into(),
+                    ));
+                }
+            };
+            expiry = approval["expires_unix"].as_u64();
+            body["codex_approval_sha256"] = approval["approval_sha256"].clone();
+        }
+        let check = || may_send() && expiry.is_none_or(|t| unix_now() < t);
+        let refused = || Sent::NotSent("send window closed before POST".into());
+        if !check() {
+            return Ok(refused());
+        }
         let base_rec = json!({"format": RECORD_FORMAT, "task_id": c.task_id, "budget": plan.budget.name,
             "attempt_id": c.attempt_id, "command_id": format!("{}-{}", c.role, c.op), "role": c.role,
             "model_request": true, "started_at": ieo_evidence::time::now(),
@@ -1174,9 +1282,14 @@ impl Admission {
         if let Some(id) = delivery_id {
             base_rec["delivery_id"] = json!(id);
         }
+        observe_body(&body);
         mark_inflight(plan, c, delivery_id)?;
-        match adapter.send(&target, "POST", &format!("/v0/role/{}", c.op), Some(&body)) {
-            Ok((202, answer)) => Ok(Sent::Accepted {
+        match adapter.post_fenced(&target, &format!("/v0/role/{}", c.op), &body, &check) {
+            Ok(None) => {
+                clear_inflight(plan)?;
+                Ok(refused())
+            }
+            Ok(Some((202, answer))) => Ok(Sent::Accepted {
                 answer,
                 running: Box::new(Running {
                     _lock: self.lock,
@@ -1189,7 +1302,7 @@ impl Admission {
                     base_rec,
                 }),
             }),
-            Ok((st, b)) => {
+            Ok(Some((st, b))) => {
                 // refused: nothing started by this call. A 200 `replayed` is the stored answer
                 // of the same attempt accepted earlier — by a caller on another ledger, since
                 // `admit` refuses an attempt this ledger knows (review c11e734 I-4); this call
@@ -1343,6 +1456,47 @@ impl After<'_> {
             .join("streams")
             .join(format!("{}.jsonl", c.attempt_id));
         write_private(&stream_path, stream.as_bytes()).map_err(|e| format!("stream save: {e}"))?;
+        if last["runtime"] == "codex-trial" {
+            let mut record = base_rec;
+            let delivery = record["delivery_id"]
+                .as_str()
+                .ok_or("missing admitted delivery ID")?;
+            if stop_sent
+                || last["stop"] != "Exited"
+                || last["exit_code"] != 0
+                || last["cleanup_failed"] != false
+                || last["mode"] != "new"
+            {
+                return Err(
+                    "the Codex trial did not exit cleanly; receipt requires reconciliation".into(),
+                );
+            }
+            let (receipt, tokens) = crate::codex_trial::receipt(&stream, delivery, &c.attempt_id)?;
+            let measured = match tokens {
+                Some(tokens) => Measure::Measured {
+                    tokens,
+                    source: "codex-trial-receipt".into(),
+                },
+                None => Measure::unmeasured("no authoritative final Codex usage"),
+            };
+            record["ended_at"] = json!(ieo_evidence::time::now());
+            record["ended_unix"] = json!(unix_now());
+            record["duration_ms"] =
+                json!(last["elapsed_ms"].as_u64().ok_or("missing elapsed time")?);
+            record["session"] = json!({"mode":"new", "session_id":last["session_id"]});
+            record["outcome"] =
+                json!({"stop":"Exited", "runtime":"codex-trial", "result":receipt["result"]});
+            record["codex"] = json!({"thread_id":receipt["thread_id"], "turn_id":receipt["turn_id"],
+                "provider_usage":receipt["usage"], "observed_usage":receipt["observed_usage"]});
+            record["usage"] = json!({"run":measured, "session":measured, "cost_usd_reported":null});
+            record["stream"] = json!({"path":stream_path,"bytes":stream.len(),
+                "sha256":hex::encode(Sha256::digest(stream.as_bytes()))});
+            record["stop_required"] = json!(true);
+            record["stop_reason"] = json!(
+                "isolated Codex trial ended; reconcile usage, repository effects and billing"
+            );
+            return Ok(record);
+        }
         // the children's transcripts (a child's total comes only from its transcript)
         let mut transcripts = std::collections::BTreeMap::new();
         let mut children = Vec::new();
@@ -1900,6 +2054,235 @@ mod tests {
             before: Value::Null,
             spare: None,
         }
+    }
+
+    #[test]
+    fn codex_trial_mismatched_preflight_never_posts() {
+        struct WrongAssignment;
+        impl Adapter for WrongAssignment {
+            fn send(
+                &self,
+                _: &RoleTarget,
+                method: &str,
+                path: &str,
+                _: Option<&Value>,
+            ) -> Result<(u16, Value), String> {
+                assert_eq!((method, path), ("GET", "/v0/role/codex-preflight"));
+                Ok((
+                    200,
+                    json!({"authorized":true,"assignment_id":"wrong",
+                                "expires_unix":unix_now()+60}),
+                ))
+            }
+        }
+        let mut admitted = admission(114, 500);
+        admitted.before = json!({"runtime":"codex-trial"});
+        let role = RoleTarget {
+            url: String::new(),
+            adapter_token_file: PathBuf::new(),
+            share: Share {
+                max_runs: 1,
+                total_seconds: 120,
+                billable_tokens: 500,
+                cache_read_tokens: 500,
+            },
+            max_window_seconds: Some(120),
+        };
+        let plan = Plan {
+            budget: budget::named("02-05").unwrap(),
+            ledger_dir: PathBuf::new(),
+            roles: BTreeMap::from([("development".into(), role)]),
+            first_observation: None,
+        };
+        let call = Call {
+            task_id: "trial".into(),
+            role: "development".into(),
+            op: "start".into(),
+            attempt_id: "a".into(),
+            session_id: "s".into(),
+            prompt: String::new(),
+            coordinator: json!({"assignment_id":"approved","generation":1}),
+        };
+        assert!(matches!(
+            admitted.start(&plan, &call, &WrongAssignment).unwrap(),
+            Sent::NotSent(_)
+        ));
+    }
+
+    #[test]
+    fn codex_trial_send_fence_rechecks_after_preflight_and_at_post() {
+        use std::cell::Cell;
+        struct Preflight<'a>(&'a Cell<bool>, bool);
+        impl Adapter for Preflight<'_> {
+            fn send(
+                &self,
+                _: &RoleTarget,
+                method: &str,
+                _: &str,
+                _: Option<&Value>,
+            ) -> Result<(u16, Value), String> {
+                assert_eq!(method, "GET", "POST after closure");
+                if self.1 {
+                    self.0.set(false);
+                }
+                Ok((
+                    200,
+                    json!({"authorized":true,"assignment_id":"approved","generation":1,
+                    "target_sha":"head","checkpoint_sha256":"checkpoint",
+                    "approval_sha256":"approval","expires_unix":unix_now()+60}),
+                ))
+            }
+        }
+
+        let path =
+            std::env::temp_dir().join(format!("ieo-codex-send-fence-{}", std::process::id()));
+        std::fs::create_dir(&path).unwrap();
+        let plan = Plan {
+            budget: budget::named("02-05").unwrap(),
+            ledger_dir: path.clone(),
+            roles: BTreeMap::from([(
+                "development".into(),
+                RoleTarget {
+                    url: String::new(),
+                    adapter_token_file: PathBuf::new(),
+                    share: Share {
+                        max_runs: 1,
+                        total_seconds: 120,
+                        billable_tokens: 500,
+                        cache_read_tokens: 500,
+                    },
+                    max_window_seconds: Some(120),
+                },
+            )]),
+            first_observation: None,
+        };
+        let call = Call {
+            task_id: "trial".into(),
+            role: "development".into(),
+            op: "start".into(),
+            attempt_id: "a".into(),
+            session_id: "s".into(),
+            prompt: String::new(),
+            coordinator: json!({"assignment_id":"approved","generation":1}),
+        };
+        for closed_in_get in [true, false] {
+            let mut admitted = admission(114, 500);
+            admitted.before = json!({"runtime":"codex-trial"});
+            let open = Cell::new(true);
+            let observed = Cell::new(false);
+            let result = admitted
+                .start_with_fence(
+                    &plan,
+                    &call,
+                    &Preflight(&open, closed_in_get),
+                    &json!({"target_sha":"head", "expected_checkpoint_sha256":"checkpoint"}),
+                    || open.get() && !inflight_path(&plan).exists(),
+                    |body| {
+                        assert_eq!(body["codex_approval_sha256"], "approval");
+                        observed.set(true);
+                    },
+                )
+                .unwrap();
+            assert!(
+                matches!(result, Sent::NotSent(why) if why == "send window closed before POST")
+            );
+            assert_eq!(observed.get(), !closed_in_get);
+            assert!(!inflight_path(&plan).exists() && !plan.records_path().exists());
+        }
+        std::fs::remove_dir(path).unwrap();
+    }
+
+    #[test]
+    fn codex_trial_completed_result_and_unmeasured_usage_share_admitted_id() {
+        struct MockRole;
+        impl Adapter for MockRole {
+            fn send(
+                &self,
+                _: &RoleTarget,
+                method: &str,
+                path: &str,
+                _: Option<&Value>,
+            ) -> Result<(u16, Value), String> {
+                assert_eq!(method, "GET");
+                match path {
+                    "/v0/role/status" => Ok((
+                        200,
+                        json!({"running":null, "last":{
+                            "attempt_id":"a", "session_id":"s", "runtime":"codex-trial",
+                            "stop":"Exited", "exit_code":0, "cleanup_failed":false, "mode":"new", "elapsed_ms":7
+                        }}),
+                    )),
+                    "/v0/role/runs/a/stdout" => Ok((
+                        200,
+                        json!({"content": json!({
+                        "type":"ieo_codex_trial_receipt", "auth":"chatgpt", "delivery_id":"D-1",
+                        "attempt_id":"a", "thread_id":"th", "turn_id":"tu",
+                        "result":{"id":"tu","status":"completed"}, "observed_usage":{"totalTokens":100}
+                    }).to_string()}),
+                    )),
+                    other => panic!("unexpected {other}"),
+                }
+            }
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "ieo-codex-receipt-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let role = RoleTarget {
+            url: String::new(),
+            adapter_token_file: PathBuf::new(),
+            max_window_seconds: Some(120),
+            share: Share {
+                max_runs: 1,
+                total_seconds: 120,
+                billable_tokens: 500,
+                cache_read_tokens: 500,
+            },
+        };
+        let running = Running {
+            _lock: std::fs::File::open("/dev/null").unwrap(),
+            plan: Plan {
+                budget: budget::named("02-05").unwrap(),
+                ledger_dir: dir.clone(),
+                roles: BTreeMap::new(),
+                first_observation: None,
+            },
+            c: Call {
+                task_id: "trial".into(),
+                role: "development".into(),
+                op: "start".into(),
+                attempt_id: "a".into(),
+                session_id: "s".into(),
+                prompt: String::new(),
+                coordinator: Value::Null,
+            },
+            target: role,
+            limits: admission(114, 500).limits(),
+            before: Value::Null,
+            recs: Vec::new(),
+            base_rec: json!({"delivery_id":"D-1", "attempt_id":"a"}),
+        };
+        let path = running.plan.records_path();
+        mark_inflight(&running.plan, &running.c, Some("D-1")).unwrap();
+        let row = running
+            .finish(&MockRole, Duration::ZERO, Duration::ZERO)
+            .unwrap();
+        let persisted: Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(persisted, row);
+        assert_eq!(row["delivery_id"], "D-1");
+        assert_eq!(row["codex"]["thread_id"], "th");
+        assert_eq!(row["codex"]["turn_id"], "tu");
+        assert_eq!(row["outcome"]["result"]["status"], "completed");
+        assert_eq!(row["codex"]["observed_usage"]["totalTokens"], 100);
+        assert_eq!(row["usage"]["run"]["state"], "unmeasured");
+        assert_eq!(row["stop_required"], true);
     }
 
     /// `lower` only lowers (review c11e734 L-1): a bound above the room or window changes
