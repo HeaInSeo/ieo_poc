@@ -1,0 +1,12 @@
+{
+  "bootstrap_echoes": 2,
+  "cilium_ready": 4,
+  "fixture_ready": 8,
+  "namespace_secrets": 0,
+  "nodes_ready": 4,
+  "observer_enabled": 4,
+  "receiver_initially_empty": 4,
+  "result": "PASS",
+  "synthetic_checks": 24,
+  "tetragon_ready": 4
+}
