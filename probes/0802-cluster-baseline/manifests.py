@@ -49,7 +49,10 @@ def pod(name, role, uid, node, server=False):
     }
     volumes = [{"name": "fixture", "configMap": {"name": "fixture"}}]
     if server:
-        container["readinessProbe"] = {"exec": {"command": SCRIPT + ["ready"]}}
+        container["readinessProbe"] = {
+            "exec": {"command": ["/bin/busybox", "test", "-f", "/run/fixture/ready"]},
+            "timeoutSeconds": 5,
+        }
         container["volumeMounts"].append({"name": "ready", "mountPath": "/run/fixture"})
         volumes.append({"name": "ready", "emptyDir": {"sizeLimit": "1Mi"}})
     return obj("Pod", name, labels=labels, spec={

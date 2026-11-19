@@ -77,7 +77,7 @@ def accept_one(listener):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("idle", "serve", "ready"):
+    for action in ("idle", "serve"):
         sub.add_parser(action)
     for action in ("open", "exec", "connect"):
         command = sub.add_parser(action)
@@ -88,8 +88,6 @@ def main():
     if args.action == "idle":
         signal.pause()
         return 0
-    if args.action == "ready":
-        return 0 if READY.is_file() else 1
     if args.action == "serve":
         with socket.create_server(("0.0.0.0", PORT)) as listener:
             READY.touch()

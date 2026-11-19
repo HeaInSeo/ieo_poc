@@ -46,6 +46,7 @@ cleanup() {
         "${k[@]}" get pods,daemonsets -A -o wide > "$evidence/pods-final.txt" 2>&1
         "${k[@]}" get events -A --sort-by=.lastTimestamp > "$evidence/events-final.txt" 2>&1
         "${k[@]}" -n kube-system logs -l app.kubernetes.io/name=tetragon -c tetragon --tail=60 --prefix > "$evidence/tetragon-agent-final.txt" 2>&1
+        "${k[@]}" -n "$cluster" logs -l fixture-kind=receiver --tail=30 --prefix > "$evidence/receivers-final.txt" 2>&1
     fi
     {
         kind delete cluster --name "$cluster" --kubeconfig "$cfg"
