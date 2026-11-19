@@ -131,6 +131,13 @@ def run(config, evidence):
 
     bound = wait(pods, "fixture Pods")
     save("pods-before.json", bound)
+
+    def ready_endpoints():
+        endpoints = get("ciliumendpoints")["items"]
+        return endpoints if {e["metadata"]["name"] for e in endpoints
+                             if e.get("status", {}).get("state") == "ready"} == NAMES else None
+
+    save("cilium-endpoints-before.json", wait(ready_endpoints, "fixture Cilium endpoint readiness"))
     dev_node = bound["development"]["spec"]["nodeName"]
 
     def current_agent():

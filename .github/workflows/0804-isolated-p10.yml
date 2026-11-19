@@ -1,0 +1,51 @@
+name: 08-04 isolated P10 defensive policy
+
+on:
+  push:
+    branches: [verify/0804-p10-isolated-0d15659]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: 0804-p10-isolated-0d15659
+  cancel-in-progress: false
+
+jobs:
+  isolated-kind:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fetch fixed kind and kubectl tools
+        run: |
+          bin="$RUNNER_TEMP/0802-bin"
+          mkdir "$bin"
+          curl -fsSL --retry 3 -o "$bin/kind" https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-amd64
+          printf '%s  %s\n' eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa "$bin/kind" | sha256sum -c
+          url=https://dl.k8s.io/release/v1.35.0/bin/linux/amd64
+          curl -fsSL --retry 3 -o "$bin/kubectl" "$url/kubectl"
+          curl -fsSL --retry 3 -o "$bin/kubectl.sha256" "$url/kubectl.sha256"
+          printf '%s  %s\n' "$(cat "$bin/kubectl.sha256")" "$bin/kubectl" | sha256sum -c
+          chmod 0755 "$bin/kind" "$bin/kubectl"
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: Verify P10 observation and defensive NetworkPolicy
+        run: bash probes/0802-cluster-baseline/run-lab.sh "$RUNNER_TEMP/0802-lab" --p10
+      - name: Package raw observations and teardown evidence
+        if: always()
+        run: |
+          dir="$RUNNER_TEMP/0802-lab"
+          mkdir -p "$dir/evidence"
+          git rev-parse HEAD > "$dir/evidence/source-commit.txt"
+          tar -C "$dir" -czf "$RUNNER_TEMP/0804-p10-evidence.tar.gz" evidence
+          sha256sum "$RUNNER_TEMP/0804-p10-evidence.tar.gz"
+      - name: Upload fixture evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: 0804-p10-evidence
+          path: ${{ runner.temp }}/0804-p10-evidence.tar.gz
+          retention-days: 7
+          if-no-files-found: error
