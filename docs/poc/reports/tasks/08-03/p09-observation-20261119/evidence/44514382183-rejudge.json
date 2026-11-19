@@ -1,0 +1,336 @@
+{
+  "healthy_coverage": true,
+  "loss": {
+    "ieo-0802-control-plane": {
+      "added": {},
+      "missing": [],
+      "samples": {
+        "tetragon_events_export_failed_total": 0.0,
+        "tetragon_export_ratelimit_events_dropped_total": 0.0,
+        "tetragon_observer_ringbuf_events_lost_total": 0.0,
+        "tetragon_observer_ringbuf_queue_events_lost_total": 0.0
+      }
+    },
+    "ieo-0802-worker": {
+      "added": {},
+      "missing": [],
+      "samples": {
+        "tetragon_events_export_failed_total": 0.0,
+        "tetragon_export_ratelimit_events_dropped_total": 0.0,
+        "tetragon_observer_ringbuf_events_lost_total": 0.0,
+        "tetragon_observer_ringbuf_queue_events_lost_total": 0.0
+      }
+    },
+    "ieo-0802-worker2": {
+      "added": {},
+      "missing": [],
+      "samples": {
+        "tetragon_events_export_failed_total": 0.0,
+        "tetragon_export_ratelimit_events_dropped_total": 0.0,
+        "tetragon_observer_ringbuf_events_lost_total": 0.0,
+        "tetragon_observer_ringbuf_queue_events_lost_total": 0.0
+      }
+    },
+    "ieo-0802-worker3": {
+      "added": {},
+      "missing": [],
+      "samples": {
+        "tetragon_events_export_failed_total": 0.0,
+        "tetragon_export_ratelimit_events_dropped_total": 0.0,
+        "tetragon_observer_ringbuf_events_lost_total": 0.0,
+        "tetragon_observer_ringbuf_queue_events_lost_total": 0.0
+      }
+    }
+  },
+  "observer_outage_verified": true,
+  "role_identity_stable": true,
+  "rows": {
+    "development-allowed": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNTE4NTQ5MDE0NDoxMjA1OQ==",
+          12059,
+          "2026-11-19T11:25:49.282051561Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNTE4NTQ5MDE0NDoxMjA1OQ==",
+          12059,
+          "2026-11-19T11:25:49.282051561Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-2",
+      "verdict": "PASS"
+    },
+    "development-comparator": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNTk0Nzc3MjI4NzoxMjA4NQ==",
+          12085,
+          "2026-11-19T11:25:50.044333786Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNTk0Nzc3MjI4NzoxMjA4NQ==",
+          12085,
+          "2026-11-19T11:25:50.044333786Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-3",
+      "verdict": "PASS"
+    },
+    "development-post": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNjY1NDc2MDg3MDoxMjExMA==",
+          12110,
+          "2026-11-19T11:25:50.751322024Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNjY1NDc2MDg3MDoxMjExMA==",
+          12110,
+          "2026-11-19T11:25:50.751322024Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-4",
+      "verdict": "PASS"
+    },
+    "development-pre": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNDQ4Njg1MTQ2OToxMjAzMw==",
+          12033,
+          "2026-11-19T11:25:48.583412929Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIyNDQ4Njg1MTQ2OToxMjAzMw==",
+          12033,
+          "2026-11-19T11:25:48.583412929Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-1",
+      "verdict": "PASS"
+    },
+    "foreign-event": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMzM1NDkyNTg5NDQ6MTI0NDQ=",
+          12444,
+          "2026-11-19T11:25:57.645820187Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMzM1NDkyNTg5NDQ6MTI0NDQ=",
+          12444,
+          "2026-11-19T11:25:57.645820187Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-2",
+      "verdict": "PASS"
+    },
+    "foreign-substitution": {
+      "marker": "0802-p09-14382183-1-2",
+      "verdict": "REJECTED_FOREIGN_POD"
+    },
+    "guardrail-allowed": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjc5NjMzNDQ1MjA6MTIxNjI=",
+          12162,
+          "2026-11-19T11:25:52.059905854Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjc5NjMzNDQ1MjA6MTIxNjI=",
+          12162,
+          "2026-11-19T11:25:52.059905854Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-6",
+      "verdict": "PASS"
+    },
+    "guardrail-comparator": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjg2NjM5Njg0NTE6MTIxODc=",
+          12187,
+          "2026-11-19T11:25:52.760529781Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjg2NjM5Njg0NTE6MTIxODc=",
+          12187,
+          "2026-11-19T11:25:52.760529781Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-7",
+      "verdict": "PASS"
+    },
+    "guardrail-post": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjkzNjQxMTc2Nzg6MTIyMTI=",
+          12212,
+          "2026-11-19T11:25:53.460678959Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjkzNjQxMTc2Nzg6MTIyMTI=",
+          12212,
+          "2026-11-19T11:25:53.460678959Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-8",
+      "verdict": "PASS"
+    },
+    "guardrail-pre": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjcyNzIyMDA1MjI6MTIxMzY=",
+          12136,
+          "2026-11-19T11:25:51.368762177Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMjoyMjcyNzIyMDA1MjI6MTIxMzY=",
+          12136,
+          "2026-11-19T11:25:51.368762177Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-5",
+      "verdict": "PASS"
+    },
+    "observer-offline": {
+      "exec": [],
+      "hooks": [],
+      "marker": "0802-p09-14382183-1-16",
+      "verdict": "INCONCLUSIVE_OBSERVER_OFFLINE"
+    },
+    "outage-post": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjI2NDk3NTI2NzE4ODoxMzgyNA==",
+          13824,
+          "2026-11-19T11:26:29.071828389Z"
+        ]
+      ],
+      "hooks": [],
+      "marker": "0802-p09-14382183-1-17",
+      "verdict": "FAIL"
+    },
+    "outage-pre": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIzNDI1OTIzOTM2NDoxMjQ3MA==",
+          12470,
+          "2026-11-19T11:25:58.355800886Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIzNDI1OTIzOTM2NDoxMjQ3MA==",
+          12470,
+          "2026-11-19T11:25:58.355800886Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-15",
+      "verdict": "PASS"
+    },
+    "outside-policy": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyOjIzMjkwMjUyMjUyODoxMjQxNw==",
+          12417,
+          "2026-11-19T11:25:56.999083796Z"
+        ]
+      ],
+      "hooks": [],
+      "marker": "0802-p09-14382183-1-13",
+      "verdict": "INCONCLUSIVE_POLICY_SCOPE"
+    },
+    "product-allowed": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzA3MjMzMjczOTA6MTIyNjU=",
+          12265,
+          "2026-11-19T11:25:54.819888558Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzA3MjMzMjczOTA6MTIyNjU=",
+          12265,
+          "2026-11-19T11:25:54.819888558Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-10",
+      "verdict": "PASS"
+    },
+    "product-comparator": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzE0Mjc0NTc5OTY6MTIyOTA=",
+          12290,
+          "2026-11-19T11:25:55.524019179Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzE0Mjc0NTc5OTY6MTIyOTA=",
+          12290,
+          "2026-11-19T11:25:55.524019179Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-11",
+      "verdict": "PASS"
+    },
+    "product-post": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzIxOTQ5NTIyOTI6MTIzMTU=",
+          12315,
+          "2026-11-19T11:25:56.291513910Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzIxOTQ5NTIyOTI6MTIzMTU=",
+          12315,
+          "2026-11-19T11:25:56.291513910Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-12",
+      "verdict": "PASS"
+    },
+    "product-pre": {
+      "exec": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzAwNTAzMTI3MTY6MTIyMzk=",
+          12239,
+          "2026-11-19T11:25:54.146874113Z"
+        ]
+      ],
+      "hooks": [
+        [
+          "aWVvLTA4MDItd29ya2VyMzoyMzAwNTAzMTI3MTY6MTIyMzk=",
+          12239,
+          "2026-11-19T11:25:54.146874113Z"
+        ]
+      ],
+      "marker": "0802-p09-14382183-1-9",
+      "verdict": "PASS"
+    }
+  },
+  "verdict": "FAIL"
+}

@@ -1,6 +1,6 @@
 # 실험·후속 후보 결과
 
-계획 v1.3.3 · snapshot `v1.3.3-EXEC-0075-0803-inputs` · 원장 SHA-256 `96f3d7516eced99ecaf9d3651a8af091cb09071859328953b4991e01e66a6ebe`
+계획 v1.3.3 · snapshot `08-03-acceptance-20261119` · 원장 SHA-256 `6fb263e46ea9359406406df6c2ac48d780b7b8fb2c3fc6d5ddd3c401eabd62e6`
 
 자동 생성 화면 · 원본은 state.json · 손편집 금지
 
@@ -72,11 +72,48 @@
 
 ### P09 · eBPF 관측과 출처 확인
 
-연결 작업: ["08-03"] · 실행 미실행 · 판정 미판정 · 평가 종료 False · 처분 미판정
+연결 작업: ["08-03"] · 실행 격리 합성 회차 3건 기록 · 판정 PASS · 평가 종료 True · 처분 미판정
 
-최근 보고: 없음 · 미실행
+최근 보고: [보고](../reports/tasks/08-03/p09-observation-20261119/REPORT.md)
 
-회차 없음 · 미실행
+#### 회차 P09-08-03-44514382183 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P09-08-03-44514382183 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | FAIL |
+| candidate_sha | 28fb685e18587e023b4c0e3e8b19fe117882f142 |
+| verification_scope | 초기 판정 실패 |
+| latest_report | [보고](../reports/tasks/08-03/p09-observation-20261119/REPORT.md) |
+| evidence | ["https://github.com/HeaInSeo/ieo_poc/actions/runs/44514382183","reports/tasks/08-03/p09-observation-20261119/evidence/44514382183-fail.tar.gz"] |
+
+#### 회차 P09-08-03-44515801821 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P09-08-03-44515801821 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | PASS |
+| candidate_sha | f7c7766638c39276d28907d3dc327c4443438261 |
+| verification_scope | 18/18 · 독립 검토 반려 |
+| latest_report | [보고](../reports/tasks/08-03/p09-observation-20261119/REPORT.md) |
+| evidence | ["https://github.com/HeaInSeo/ieo_poc/actions/runs/44515801821","reports/tasks/08-03/p09-observation-20261119/evidence/44515801821-pass-intermediate.tar.gz"] |
+
+#### 회차 P09-08-03-44516175173 / revision 1
+
+| 필드 | 실제 기록 |
+| --- | --- |
+| run_id | P09-08-03-44516175173 |
+| revision | 1 |
+| execution_kind | synthetic |
+| verdict | PASS |
+| candidate_sha | 0d23d73d73e1237de86657eb64dad01b5145fbd4 |
+| verification_scope | 18/18 · 독립 검토 승인 |
+| latest_report | [보고](../reports/tasks/08-03/p09-observation-20261119/REPORT.md) |
+| evidence | ["https://github.com/HeaInSeo/ieo_poc/actions/runs/44516175173","reports/tasks/08-03/p09-observation-20261119/evidence/44516175173-pass.tar.gz"] |
 
 ### P10 · 보안 위반 탐지와 실제 차단
 
