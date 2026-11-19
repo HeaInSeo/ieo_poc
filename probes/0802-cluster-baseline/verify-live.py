@@ -14,7 +14,7 @@ from manifests import IMAGE, NS, ROLES, SCRIPT, actor_egress, initial, observe
 NODES = {f"{NS}-{part}" for part in ("control-plane", "worker", "worker2", "worker3")}
 
 
-def verify(config, evidence):
+def verify(config, evidence, *, fixture_items=None):
     k = ["kubectl", "--kubeconfig", str(config), "--context", f"kind-{NS}", "--request-timeout=15s"]
 
     def invoke(*args, timeout=25):
@@ -60,7 +60,7 @@ def verify(config, evidence):
     assert ready["cilium"] == ready["tetragon"] == 4 and "kube-proxy" not in ready and "kindnet" not in ready
     write("system-daemonsets.json", system)
 
-    apply("initial", initial())
+    apply("initial", initial() if fixture_items is None else fixture_items)
     kubectl("-n", NS, "wait", "--request-timeout=0", "--for=condition=Ready", "pod", "--all", "--timeout=120s", timeout=130)
     fixture = get("pods", "-n", NS)
     expected = {*ROLES, "control", *(f"receiver-{route}" for route in (*ROLES, "denied"))}
