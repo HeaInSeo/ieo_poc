@@ -10,6 +10,7 @@ import re
 import signal
 import socket
 import subprocess
+import sys
 import time
 
 
@@ -76,7 +77,7 @@ def accept_one(listener):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("idle", "serve"):
+    for action in ("idle", "serve", "ready"):
         sub.add_parser(action)
     for action in ("open", "exec", "connect"):
         command = sub.add_parser(action)
@@ -87,6 +88,8 @@ def main():
     if args.action == "idle":
         signal.pause()
         return 0
+    if args.action == "ready":
+        return 0 if READY.is_file() else 1
     if args.action == "serve":
         with socket.create_server(("0.0.0.0", PORT)) as listener:
             READY.touch()
@@ -108,7 +111,7 @@ def main():
             finally:
                 os.close(directory)
         else:
-            subprocess.run(["/bin/true"], check=True)
+            subprocess.run([sys.executable, "-I", "-B", "-c", "pass"], check=True)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         emit("result", action=args.action, request_id=args.id, ok=False, error=type(error).__name__)
         return 1
