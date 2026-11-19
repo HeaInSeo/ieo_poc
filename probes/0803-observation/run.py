@@ -65,17 +65,22 @@ def run(config, evidence):
     stamp = f"{stamp}-{attempt}"
     path = f"/fixture/p09-{stamp}.txt"
     items = initial()
+    assignments = {}
     for item in items:
         if item["kind"] == "ConfigMap" and item["metadata"]["name"] == "fixture":
             item["data"][Path(path).name] = "p09 known fixture\n"
         if item["kind"] == "Pod" and item["metadata"]["name"] in (*ROLES, "control"):
             role = item["metadata"]["name"]
-            item["metadata"]["labels"].update({
+            identity = {
                 "fixture-repo": "ieo-poc-fixture",
                 "fixture-assignment": f"p09-{stamp}-{role}",
                 "fixture-generation": "1",
-            })
-            item["metadata"].setdefault("annotations", {})["ieo-poc/session"] = f"p09-{stamp}-{role}"
+                "fixture-role": role,
+                "fixture-session": f"p09-{stamp}-{role}",
+            }
+            item["metadata"]["labels"].update(identity)
+            item["metadata"].setdefault("annotations", {})["ieo-poc/session"] = identity["fixture-session"]
+            assignments[role] = identity
     runpy.run_path(str(BASE / "verify-live.py"))["verify"](config, evidence, fixture_items=items)
 
     output = evidence / "p09"
@@ -140,7 +145,7 @@ def run(config, evidence):
             raise ValueError("receiver is outside the fixture Pod network")
         marker = marker or f"0802-p09-{stamp[-10:]}-{len(cases) + 1}"
         case = {"label": label, "role": role, "action": action,
-                "destination": dest, "marker": marker, "receiver": receiver}
+                "destination": dest, "marker": marker, "receiver": receiver, "identity": assignments[role]}
         cases.append(case)
         write_json(output / "cases.json", cases)
         result = request("exec", "-i", role, "--", "python3", "-I", "-B", "-", marker, action, dest, stdin=body)

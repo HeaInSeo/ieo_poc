@@ -45,7 +45,7 @@ def bounds(process, pod, action, marker):
             or process.get("uid") != action["uid"] or not binary_matches
             or marker not in process.get("arguments", "").split()
             or any(labels.get(k) != metadata["labels"][k] for k in (
-                "fixture-role", "fixture-repo", "fixture-assignment", "fixture-generation"
+                "fixture-role", "fixture-repo", "fixture-assignment", "fixture-generation", "fixture-session"
             )) or type(process.get("pid")) is not int or not process.get("exec_id")
             or not process.get("start_time")):
         return None
@@ -97,6 +97,28 @@ def metrics(path):
     return observed
 
 
+def loss_delta(directory, start, end, node):
+    a = metrics(directory / f"{start}-{node}-metrics.txt")
+    b = metrics(directory / f"{end}-{node}-metrics.txt")
+    return {
+        "samples": {key: b[key] - a[key] for key in sorted(a.keys() & b.keys())},
+        "added": {key: b[key] for key in sorted(b.keys() - a.keys())},
+        "missing": sorted(a.keys() - b.keys()),
+        "missing_metrics": sorted(set(LOSS_METRICS) - {key.split("{", 1)[0] for key in a.keys() & b.keys()}),
+    }
+
+
+def loss_clear(delta):
+    return (not delta["missing"] and not delta["missing_metrics"]
+            and all(value == 0 for value in (*delta["samples"].values(), *delta["added"].values())))
+
+
+def assignment_matches(pod, identity):
+    metadata = pod["metadata"]
+    return (all(metadata["labels"].get(key) == value for key, value in identity.items())
+            and metadata.get("annotations", {}).get("ieo-poc/session") == identity["fixture-session"])
+
+
 def judge(directory):
     cases = document(directory / "cases.json")
     pods = document(directory / "pods-before.json")
@@ -105,18 +127,18 @@ def judge(directory):
     healthy = document(directory / "healthy-agents.json")
     outage = document(directory / "outage-agents.json")
     outage_after = document(directory / "outage-after-action-agents.json")
+    restored = document(directory / "restored-agents.json")
     recovered = document(directory / "recovered-agents.json")
     by_node = {node: lines(directory / f"healthy-{node}-events.jsonl") for node in healthy}
     selector = document(directory / "policy.json")["spec"]["podSelector"]["matchLabels"]
-    loss = {}
-    for node in healthy:
-        a = metrics(directory / f"before-{node}-metrics.txt")
-        b = metrics(directory / f"healthy-{node}-metrics.txt")
-        loss[node] = {
-            "samples": {key: b[key] - a[key] for key in sorted(a.keys() & b.keys())},
-            "added": {key: b[key] for key in sorted(b.keys() - a.keys())},
-            "missing": sorted(a.keys() - b.keys()),
-        }
+    loss = {node: loss_delta(directory, "before", "healthy", node) for node in healthy}
+    dev_node = pods["development"]["spec"]["nodeName"]
+    recovery_loss = loss_delta(directory, "restored", "recovered", dev_node)
+    recovery_coverage = (
+        dev_node in restored and dev_node in recovered
+        and restored[dev_node]["metadata"]["uid"] == recovered[dev_node]["metadata"]["uid"]
+        and loss_clear(recovery_loss)
+    )
     roles_stable = all(
         later_pods[role]["metadata"]["uid"] == pods[role]["metadata"]["uid"]
         and container_id(later_pods[role]) == container_id(pods[role])
@@ -126,11 +148,8 @@ def judge(directory):
     coverage = (
         set(before) == set(healthy) == set(recovered) and len(healthy) == 4
         and all(before[node]["metadata"]["uid"] == healthy[node]["metadata"]["uid"] for node in healthy)
-        and all(data["samples"] and not data["missing"] and all(value == 0 for value in (
-            *data["samples"].values(), *data["added"].values()
-        )) for data in loss.values())
+        and all(loss_clear(data) for data in loss.values())
     )
-    dev_node = pods["development"]["spec"]["nodeName"]
     outage_verified = (
         set(outage) == set(outage_after) == set(healthy) - {dev_node}
         and recovered[dev_node]["metadata"]["uid"] != healthy[dev_node]["metadata"]["uid"]
@@ -140,7 +159,9 @@ def judge(directory):
         label, actor = case["label"], pods[case["role"]]
         start, result = lines(directory / f"{label}.jsonl")
         attributes = set(start) - {"phase"}
-        known = (start["phase"] == "attempt" and result["phase"] == "result"
+        known = (assignment_matches(actor, case["identity"])
+                 and assignment_matches(later_pods[case["role"]], case["identity"])
+                 and start["phase"] == "attempt" and result["phase"] == "result"
                  and all(result.get(key) == start[key] for key in attributes)
                  and all(start[key] == case[key] for key in ("marker", "action", "destination"))
                  and start["role"] == case["role"] and start["pod_uid"] == actor["metadata"]["uid"]
@@ -165,6 +186,8 @@ def judge(directory):
             verdict = "INCONCLUSIVE_POLICY_SCOPE" if known and not selected and len(starts) == 1 and not hooks else "FAIL"
         elif label == "observer-offline":
             verdict = "INCONCLUSIVE_OBSERVER_OFFLINE" if known and selected and outage_verified and not starts and not hooks else "FAIL"
+        elif not coverage or (label == "outage-post" and not recovery_coverage):
+            verdict = "INCONCLUSIVE_LOSS_COVERAGE"
         else:
             verdict = "PASS" if known and selected and len(starts) == 1 and hooks == starts else "FAIL"
         rows[label] = {"verdict": verdict, "exec": starts, "hooks": hooks, "marker": case["marker"]}
@@ -187,7 +210,7 @@ def judge(directory):
                      "observer-offline": "INCONCLUSIVE_OBSERVER_OFFLINE", "outage-post": "PASS"})
     ok = roles_stable and coverage and outage_verified and {name: row["verdict"] for name, row in rows.items()} == expected
     return {"verdict": "PASS" if ok else "FAIL", "role_identity_stable": roles_stable,
-            "healthy_coverage": coverage, "observer_outage_verified": outage_verified, "loss": loss, "rows": rows}
+            "healthy_coverage": coverage, "recovery_coverage": recovery_coverage, "recovery_loss": recovery_loss, "observer_outage_verified": outage_verified, "loss": loss, "rows": rows}
 
 
 if __name__ == "__main__":
