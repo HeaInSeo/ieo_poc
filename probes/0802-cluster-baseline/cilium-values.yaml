@@ -1,0 +1,11 @@
+ipam:
+  mode: kubernetes
+kubeProxyReplacement: true
+socketLB:
+  hostNamespaceOnly: true
+operator:
+  replicas: 1
+hubble:
+  enabled: false
+envoy:
+  enabled: false
