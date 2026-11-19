@@ -614,8 +614,7 @@ impl Service {
         {
             return Err("no isolated Codex trial role".into());
         }
-        let expires =
-            crate::codex_trial::approval_expiry(&approval.value, crate::provider::now_unix())?;
+        let expires = approval.recheck(&cfg.etc, crate::provider::now_unix())?;
         let limit_id = approval.value["limit_id"]
             .as_str()
             .filter(|x| !x.is_empty())
@@ -644,6 +643,7 @@ impl Service {
                 "--cwd",
             ])
             .arg(cfg.cwd())
+            .args(approval.bridge_args(&cfg.etc, expires))
             .arg("--state")
             .arg(cfg.state.join("codex-trial"))
             .current_dir(cfg.cwd())
@@ -662,8 +662,15 @@ impl Service {
             .map_err(|_| "invalid Codex preflight response")?;
         let now = crate::provider::now_unix();
         crate::codex_trial::check_subscription(&observation, limit_id, now)?;
+        let expiry = observation["authorization_expires_unix"]
+            .as_u64()
+            .filter(|end| now < *end && *end <= expires)
+            .ok_or("missing or expired prerequisite review at preflight")?;
+        if observation["workspace_id"] != approval.value["workspace_id"] {
+            return Err("preflight workspace does not match the approval".into());
+        }
         approval.recheck(&cfg.etc, now)?;
-        Ok(expires)
+        Ok(expiry)
     }
 
     pub fn handle(
@@ -1239,10 +1246,11 @@ impl Service {
                     );
                 }
             };
-            if let Err(e) = self.codex_preflight(&approval) {
-                return err(409, "CODEX_TRIAL_PREFLIGHT", &e);
-            }
-            codex_approval = Some(approval);
+            let expiry = match self.codex_preflight(&approval) {
+                Ok(expiry) => expiry,
+                Err(e) => return err(409, "CODEX_TRIAL_PREFLIGHT", &e),
+            };
+            codex_approval = Some((approval, expiry));
         }
         let credential = if codex_trial {
             String::new()
@@ -1407,11 +1415,15 @@ impl Service {
             return Ok(v);
         }
         let (mut cmd, argv, env_names) = if job.codex_trial {
-            let approval = job
+            let (approval, preflight_expiry) = job
                 .codex_approval
                 .as_ref()
                 .ok_or("missing pinned trial approval")?;
-            let expires = approval.recheck(&cfg.etc, crate::provider::now_unix())?;
+            let now = crate::provider::now_unix();
+            let expires = approval.recheck(&cfg.etc, now)?.min(*preflight_expiry);
+            if expires <= now {
+                return Err("trial prerequisite review expired before launch".into());
+            }
             let bridge = cfg.etc.join("codex-trial-bridge");
             let state_dir = cfg.state.join("codex-trial");
             use std::os::unix::fs::DirBuilderExt;
@@ -1427,7 +1439,7 @@ impl Service {
             let delivery = job.coord["delivery_id"]
                 .as_str()
                 .ok_or("missing Codex delivery ID")?;
-            let argv = vec![
+            let mut argv = vec![
                 "--delivery-id".into(),
                 delivery.into(),
                 "--attempt-id".into(),
@@ -1442,17 +1454,9 @@ impl Service {
                 approval.model.clone(),
                 "--auth-sha256".into(),
                 approval.auth_sha256.clone(),
-                "--approval".into(),
-                cfg.etc
-                    .join("codex-trial-approval.json")
-                    .to_string_lossy()
-                    .into_owned(),
-                "--approval-sha256".into(),
-                approval.digest.clone(),
-                "--authorization-expires-unix".into(),
-                expires.to_string(),
                 "--enable-trial".into(),
             ];
+            argv.extend(approval.bridge_args(&cfg.etc, expires));
             // The trial admits only one start even if a different key is later presented.
             // Persist the reservation before launching the subprocess and never clear it here.
             use std::io::Write;
@@ -2031,9 +2035,35 @@ impl TrialApproval {
         })
     }
 
+    fn bridge_args(&self, etc: &Path, expires: u64) -> [String; 8] {
+        [
+            "--approval".into(),
+            etc.join("codex-trial-approval.json")
+                .to_string_lossy()
+                .into_owned(),
+            "--approval-sha256".into(),
+            self.digest.clone(),
+            "--prerequisites".into(),
+            etc.join("codex-trial-prerequisites.json")
+                .to_string_lossy()
+                .into_owned(),
+            "--authorization-expires-unix".into(),
+            expires.to_string(),
+        ]
+    }
+
     fn recheck(&self, etc: &Path, now: u64) -> Result<u64, String> {
         if crate::central::sha256(&Self::bytes(etc)?) != self.digest {
             return Err("trial approval changed".into());
+        }
+        let pin = self.value["prerequisites_sha256"]
+            .as_str()
+            .filter(|pin| pin.len() == 64 && pin.bytes().all(|b| b.is_ascii_hexdigit()))
+            .ok_or("missing pinned prerequisite review")?;
+        let review = std::fs::read(etc.join("codex-trial-prerequisites.json"))
+            .map_err(|_| "trial prerequisite review is unavailable")?;
+        if crate::central::sha256(&review) != pin {
+            return Err("trial prerequisite review changed".into());
         }
         crate::codex_trial::approval_expiry(&self.value, now)
     }
@@ -2048,7 +2078,7 @@ struct Job {
     limits: Limits,
     credential: String,
     codex_trial: bool,
-    codex_approval: Option<TrialApproval>,
+    codex_approval: Option<(TrialApproval, u64)>,
     coord: Value,
     tamper: Option<Value>,
     stop: Arc<AtomicBool>,
@@ -2321,6 +2351,41 @@ mod tests {
 
     /// A stop requested before the worker spawns: nothing is started, no takeover checkpoint is
     /// written over the previous one, and the outcome says so (review 6975d5f N6).
+    #[test]
+    fn codex_trial_requires_the_pinned_prerequisite_file() {
+        let root =
+            std::env::temp_dir().join(format!("ieo-trial-prerequisites-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let review = b"synthetic review bytes";
+        let approved = json!({
+            "model":"fixture-model", "auth_sha256":"a".repeat(64),
+            "prerequisites_sha256":crate::central::sha256(review),
+            "expires_unix":900, "max_dispatches":1, "additional_usd":0,
+            "billing":{"verified_unix":400,"auto_reload_disabled":true,
+                       "paid_paths_blocked":true,"api_fallback_blocked":true}
+        });
+        std::fs::write(root.join("codex-trial-approval.json"), approved.to_string()).unwrap();
+        let snapshot = TrialApproval::read(&root).unwrap();
+        assert!(
+            snapshot
+                .recheck(&root, 401)
+                .unwrap_err()
+                .contains("unavailable")
+        );
+        let path = root.join("codex-trial-prerequisites.json");
+        std::fs::write(&path, b"wrong").unwrap();
+        assert!(
+            snapshot
+                .recheck(&root, 401)
+                .unwrap_err()
+                .contains("changed")
+        );
+        std::fs::write(&path, review).unwrap();
+        assert_eq!(snapshot.recheck(&root, 401), Ok(700));
+        // Only the trusted bridge parses the reviewed bytes and attests their semantic expiry.
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn a_stop_before_the_spawn_starts_nothing() {
         let root = std::env::temp_dir().join(format!("ieo-serve-unit-{}", std::process::id()));

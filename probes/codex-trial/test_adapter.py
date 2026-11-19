@@ -43,6 +43,8 @@ for line in sys.stdin:
         result = {"config": {"forced_login_method": "chatgpt", "sandbox_mode": "read-only",
                  "approval_policy": "never", "web_search": "disabled", "mcp_servers": {},
                  "model": "fixture-model", "model_provider": "openai",
+                 "forced_chatgpt_workspace_id": "wrong" if mode == "wrong_workspace" else
+                    json.loads(settings.get("forced_chatgpt_workspace_id", "null")),
                  "features": {"shell_tool": mode == "bad_config", "plugins": False}}}
     elif method == "account/read":
         assert params == {"refreshToken": False}
@@ -56,6 +58,12 @@ for line in sys.stdin:
         if mode == "change_auth":
             with open(home + "/auth.json", "w") as file:
                 file.write("changed")
+        if mode == "change_prerequisites":
+            with open(home + "/prerequisites.json", "w") as file:
+                file.write("changed")
+        if mode == "reset_during_thread":
+            with open(home + "/clock-offset", "w") as file:
+                file.write("90")
         assert params["ephemeral"] and params["sandbox"] == "read-only"
         result = {"thread": {"id": "thread-1", "turns": [], "ephemeral": True},
                   "cwd": params["cwd"], "model": params["model"],
@@ -106,19 +114,52 @@ class Tests(unittest.TestCase):
         self.auth = self.root / "auth.json"
         self.auth.write_text("synthetic credential")
         self.approval = self.root / "approval.json"
-        self.approval.write_text("synthetic approval")
+        self.prerequisites = self.root / "prerequisites.json"
         self.entry = self.root / "test-entry.py"
         # The mock subprocess can only simulate kernel immutability. It still checks
         # that the adapter uses the approved credential digest at both boundaries.
         self.entry.write_text(
-            "import hashlib,runpy,sys\n"
+            "import hashlib,os,runpy,sys,time,types\n"
             f"main=runpy.run_path({str(ADAPTER)!r})['main']\n"
             "def fixture_auth(path, expected):\n"
             "    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:\n"
             "        raise main.__globals__['TrialError']('fixture credential changed')\n"
             "main.__globals__['immutable_auth']=fixture_auth\n"
+            "offset=os.path.join(os.environ['HOME'], 'clock-offset')\n"
+            "main.__globals__['time']=types.SimpleNamespace(monotonic=time.monotonic, "
+            "time=lambda: time.time() + (int(open(offset).read()) if os.path.exists(offset) else 0))\n"
             "sys.exit(main())\n")
-    def invoke(self, mode, opt_in=True, envelope=False, preflight=False, real_guard=False, expired=False):
+
+    def central_fixture(self, mutation=None):
+        now = int(time.time())
+        scope = {
+            "assignment_id": "synthetic-assignment", "generation": 1, "target_sha": "a" * 40,
+            "checkpoint_sha256": "b" * 64, "model": "fixture-model", "limit_id": "codex",
+            "auth_sha256": hashlib.sha256(self.auth.read_bytes()).hexdigest(),
+            "workspace_id": "12345678-1234-1234-1234-123456789012",
+            "claude_account_id": "synthetic-claude", "claude_quota_group_id": "synthetic-group",
+            "claude_window_id": "synthetic-weekly",
+        }
+        record = {"evidence_sha256": "c" * 64, "observed_unix": now, "valid_until_unix": now + 600}
+        review = {
+            "schema": "ieo.codex-trial-prerequisites/v1", "scope": scope.copy(),
+            "workspace_credit_spend": {**record, "state": "verified_blocked", "source": "workspace_admin_policy"},
+            "concurrent_credit_changes": {**record, "state": "verified_excluded",
+                                          "source": "account_wide_enforced_freeze"},
+            "claude_quota": {**record, "state": "naturally_exhausted", "source": "operator_usage_screen",
+                             "limit_kind": "included_subscription", "extra_usage": "disabled", "reset_unix": now + 180},
+        }
+        if mutation:
+            mutation(review, now)
+        self.prerequisites.write_text(json.dumps(review))
+        approval = {**scope, "expires_unix": now + 600, "additional_usd": 0, "max_dispatches": 1,
+                    "billing": {"verified_unix": now, "auto_reload_disabled": True,
+                                "paid_paths_blocked": True, "api_fallback_blocked": True},
+                    "prerequisites_sha256": hashlib.sha256(self.prerequisites.read_bytes()).hexdigest()}
+        self.approval.write_text(json.dumps(approval))
+
+    def invoke(self, mode, opt_in=True, envelope=False, preflight=False, real_guard=False, expired=False,
+               mutation=None, missing_review=False, approved_preflight=False):
         (self.root / "mode").write_text(mode)
         cmd = [sys.executable, "-I", str(ADAPTER if real_guard else self.entry), "--delivery-id", "D-fixture", "--attempt-id", "a1",
                "--cwd", str(self.root), "--state", str(self.state),
@@ -126,7 +167,12 @@ class Tests(unittest.TestCase):
         if preflight:
             cmd.append("--preflight-only")
         elif opt_in:
-            cmd += ["--enable-trial", "--auth-sha256", hashlib.sha256(self.auth.read_bytes()).hexdigest(),
+            cmd.append("--enable-trial")
+        if (opt_in and not preflight) or approved_preflight:
+            self.central_fixture(mutation)
+            if missing_review:
+                self.prerequisites.unlink()
+            cmd += ["--prerequisites", str(self.prerequisites), "--auth-sha256", hashlib.sha256(self.auth.read_bytes()).hexdigest(),
                     "--approval", str(self.approval), "--approval-sha256",
                     hashlib.sha256(self.approval.read_bytes()).hexdigest(),
                     "--authorization-expires-unix", str(int(time.time()) + (-1 if expired else 60))]
@@ -151,7 +197,7 @@ class Tests(unittest.TestCase):
         self.assertFalse((self.root / "worker-launches").exists())
 
     def test_credential_or_approval_change_before_turn_refuses(self):
-        for mode in ("change_auth", "change_approval"):
+        for mode in ("change_auth", "change_approval", "change_prerequisites", "reset_during_thread"):
             with self.subTest(mode=mode):
                 result = self.invoke(mode)
                 self.assertNotEqual(result.returncode, 0)
@@ -160,6 +206,39 @@ class Tests(unittest.TestCase):
                 for path in (self.state / "D-fixture").iterdir():
                     path.unlink()
                 (self.state / "D-fixture").rmdir()
+
+    def test_prerequisite_gaps_never_send(self):
+        cases = {
+            "no workspace credit proof": lambda r, n: r.pop("workspace_credit_spend"),
+            "no concurrent freeze": lambda r, n: r.pop("concurrent_credit_changes"),
+            "no Claude exhaustion": lambda r, n: r.pop("claude_quota"),
+            "stale Claude observation": lambda r, n: r["claude_quota"].update(observed_unix=n-301),
+            "Claude still available": lambda r, n: r["claude_quota"].update(state="available"),
+            "Claude paid fallback unknown": lambda r, n: r["claude_quota"].update(extra_usage="unknown"),
+            "past reset": lambda r, n: r["claude_quota"].update(reset_unix=n-1),
+            "start too late to finish before reset": lambda r, n: r["claude_quota"].update(reset_unix=n+120),
+            "freeze ends during run": lambda r, n: r["concurrent_credit_changes"].update(valid_until_unix=n+119),
+            "workspace changed": lambda r, n: r["scope"].update(workspace_id="other"),
+            "Claude window changed": lambda r, n: r["scope"].update(claude_window_id="other"),
+        }
+        for label, mutation in cases.items():
+            with self.subTest(label=label):
+                result = self.invoke("ok", mutation=mutation)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(result.stdout)
+                self.assertFalse((self.root / "worker-launches").exists())
+        result = self.invoke("ok", missing_review=True)
+        self.assertIn("missing or unreadable prerequisite review", result.stderr)
+        self.assertFalse((self.root / "worker-launches").exists())
+
+    def test_approved_preflight_proves_current_workspace_without_turn(self):
+        result = self.invoke("ok", preflight=True, approved_preflight=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads(result.stdout)
+        self.assertEqual(receipt["workspace_id"], "12345678-1234-1234-1234-123456789012")
+        self.assertGreater(receipt["authorization_expires_unix"], int(time.time()))
+        self.assertNotIn("turn/start", (self.root / "methods").read_text())
+        self.assertFalse((self.state / "D-fixture").exists())
 
     def test_preflight_reads_account_and_limits_without_reserving_or_starting(self):
         result = self.invoke("ok", preflight=True)
@@ -216,7 +295,7 @@ class Tests(unittest.TestCase):
         self.assertFalse((self.root / "worker-launches").exists())
 
     def test_wrong_config_or_auth_prevents_turn(self):
-        for mode in ("bad_config", "api"):
+        for mode in ("bad_config", "api", "wrong_workspace"):
             with self.subTest(mode=mode):
                 self.assertNotEqual(self.invoke(mode).returncode, 0)
                 self.assertNotIn("turn/start", (self.root / "methods").read_text())

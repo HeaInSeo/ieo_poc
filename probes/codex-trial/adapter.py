@@ -4,11 +4,13 @@
 import argparse
 from contextlib import contextmanager
 import fcntl
+from functools import cache
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import runpy
 import selectors
 import stat
 import struct
@@ -120,26 +122,34 @@ def immutable_auth(path, expected):
 
 
 def launch_guard(args, home):
+    approval = check_approval(args) if args.approval or args.enable_trial else None
     codex_home = Path(home["CODEX_HOME"])
     require(not os.path.lexists(codex_home / "config.toml"), "unapproved credential home config")
     immutable_auth(codex_home / "auth.json", args.auth_sha256)
-    check_approval(args)
+    return approval
 
 
-def approval_current(args):
-    return int(time.time()) < (args.authorization_expires_unix or 0)
+@cache
+def prerequisite_contract():
+    # Isolated Python strips the script directory from sys.path.
+    return runpy.run_path(str(Path(__file__).resolve().with_name("prerequisites.py")))
 
 
 def check_approval(args):
-    if not args.enable_trial:
-        return
-    require(approval_current(args), "trial authorization or billing observation expired")
-    pin = args.approval_sha256
-    require(args.approval and re.fullmatch(r"[0-9a-f]{64}", pin or ""),
-            "missing assigned approval digest")
-    require(hashlib.sha256(Path(args.approval).read_bytes()).hexdigest() == pin,
-            "assigned approval changed")
-    require(approval_current(args), "trial authorization or billing observation expired")
+    contract = prerequisite_contract()
+    try:
+        load = contract["pinned_json"]
+        approval = load(args.approval, args.approval_sha256, "assigned approval")
+        review = load(args.prerequisites, approval.get("prerequisites_sha256"), "prerequisite review")
+        require(approval.get("auth_sha256") == args.auth_sha256
+                and approval.get("model") == args.model, "approved credential or model changed")
+        now = int(time.time())
+        end, workspace = contract["verify"](approval, review, now)
+        require(args.authorization_expires_unix is not None
+                and now < args.authorization_expires_unix, "trial authorization or billing observation expired")
+        return min(end, args.authorization_expires_unix), workspace
+    except contract["InvalidPrerequisites"] as error:
+        raise TrialError(str(error)) from None
 
 
 class Pipe:
@@ -215,7 +225,7 @@ class Pipe:
                     f"unexpected item during {method}")
 
 
-def verify_subscription(pipe, cwd, model):
+def verify_subscription(pipe, cwd, model, workspace=None):
     pipe.call(1, "initialize", {"clientInfo": {"name": "ieo-codex-trial", "version": "0.1"}})
     pipe.send({"method": "initialized"})
     config = pipe.call(2, "config/read", {"cwd": cwd, "includeLayers": False})["config"]
@@ -224,14 +234,16 @@ def verify_subscription(pipe, cwd, model):
             and all(config.get("features", {}).get(key) is False for key in ("shell_tool", "plugins"))
             and not config.get("mcp_servers") and config.get("model") == model
             and config.get("model_provider") == "openai", "effective configuration differs from trial policy")
+    require(workspace is None or config.get("forced_chatgpt_workspace_id") == workspace,
+            "effective ChatGPT workspace differs from approval")
     account = pipe.call(3, "account/read", {"refreshToken": False}).get("account")
     require(isinstance(account, dict) and account.get("type") == "chatgpt",
             "ChatGPT subscription identity not confirmed")
     return account
 
 
-def prepare(pipe, cwd, model):
-    verify_subscription(pipe, cwd, model)
+def prepare(pipe, cwd, model, workspace):
+    verify_subscription(pipe, cwd, model, workspace)
     response = pipe.call(4, "thread/start", {"cwd": cwd, "model": model, "modelProvider": "openai",
                          "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": True})
     thread = response["thread"]
@@ -313,9 +325,9 @@ def observe(pipe, root, state):
                             and params["item"].get("type") in SAFE_ITEMS, "unbound or disallowed item")
 
 
-def trial(process, directory, delivery, attempt, cwd, model, prompt, deadline, args, home):
+def trial(process, directory, delivery, attempt, cwd, model, prompt, deadline, args, home, workspace):
     pipe = Pipe(process, deadline)
-    thread = prepare(pipe, cwd, model)
+    thread = prepare(pipe, cwd, model, workspace)
     state = {"delivery_id": delivery, "attempt_id": attempt, "thread_id": thread,
              "turn_id": None, "rpc_id": "turn-" + delivery, "status": "intent",
              "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest()}
@@ -396,6 +408,7 @@ def main():
     parser.add_argument("--auth-sha256")
     parser.add_argument("--approval")
     parser.add_argument("--approval-sha256")
+    parser.add_argument("--prerequisites")
     parser.add_argument("--authorization-expires-unix", type=int)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--enable-trial", action="store_true")
@@ -414,20 +427,31 @@ def main():
         require(all(v and Path(v).is_absolute() for v in home.values()), "launcher must set isolated homes")
         env = {**home, "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
         cmd = [args.codex, "app-server", "--strict-config", "--listen", "stdio://"]
-        for key, value in {**SETTINGS, "model": args.model, "model_provider": "openai"}.items():
+        settings = {**SETTINGS, "model": args.model, "model_provider": "openai"}
+        workspace = None
+        if args.enable_trial:
+            require(not os.path.lexists(Path(args.state) / args.delivery_id),
+                    "existing delivery intent; reconcile only")
+        if args.auth_sha256 is not None or args.approval or args.enable_trial:
+            checked = launch_guard(args, home)
+            if checked is not None:
+                _, workspace = checked
+                settings["forced_chatgpt_workspace_id"] = workspace
+        for key, value in settings.items():
             cmd += ["-c", key + "=" + json.dumps(value)]
         if args.preflight_only:
-            if args.auth_sha256 is not None:
-                launch_guard(args, home)
             process = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             try:
                 pipe = Pipe(process, deadline)
-                account = verify_subscription(pipe, cwd, args.model)
+                account = verify_subscription(pipe, cwd, args.model, workspace)
                 limits = pipe.call(4, "account/rateLimits/read", None)
-                print(json.dumps({"account": {k: account.get(k) for k in ("type", "planType")},
-                                  "rateLimits": limits.get("rateLimits"),
-                                  "rateLimitsByLimitId": limits.get("rateLimitsByLimitId")}))
+                result = {"account": {k: account.get(k) for k in ("type", "planType")},
+                          "rateLimits": limits.get("rateLimits"),
+                          "rateLimitsByLimitId": limits.get("rateLimitsByLimitId")}
+                if workspace is not None:
+                    result["authorization_expires_unix"], result["workspace_id"] = check_approval(args)
+                print(json.dumps(result))
             finally:
                 stop(process)
             return 0
@@ -438,7 +462,7 @@ def main():
                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             try:
                 receipt = trial(process, directory, args.delivery_id, args.attempt_id,
-                                cwd, args.model, prompt, deadline, args, home)
+                                cwd, args.model, prompt, deadline, args, home, workspace)
             finally:
                 stop(process)
         print(json.dumps(receipt, separators=(",", ":")), flush=True)
