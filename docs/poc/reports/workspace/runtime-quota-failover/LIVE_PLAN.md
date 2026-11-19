@@ -1,48 +1,28 @@
-# Claude and Codex live fixture trial, approval required
+# Claude → Codex 격리 전환 시험안
 
-This is a proposed follow-up to the isolated PoC. Use a new sandbox repository, assignment, budget and quota-group bindings. Keep the 02-05 step 8 environment, approvals and ledger out of the trial.
+상태는 `WAITING_FOR_PREREQUISITE`다. 별도 실행 승인을 받고 기존 격리 시험 저장소·배정·공유 장부를 사용한다. 개발 호스트의 지정 Claude 구독 로그인과 현재 Codex CLI의 지정 ChatGPT 계정·워크스페이스를 사용한다. 02-05 단계 8에는 해당 작업의 기존 재개안과 승인 절차를 적용한다.
 
-## Prerequisites
+## 집행 조건과 관측 기준
 
-1. Obtain supported read-only subscription observations for each actual account, including per-window limits, timestamp, account/group and confirmation that usage credits or any metered fallback are disabled. Collect sanitized real Codex samples and validate the mapping. Claude's current classifier is based on runtime events, so after restart it does not establish fresh available status on its own. If either provider lacks a safe read-only observation path, keep its status unknown and block the corresponding trial. Do not spend quota or send probes just to manufacture an exhausted or recovered state.
-2. Bind each runtime to an authenticated role target and demonstrate equivalent enforcement for filesystem scope, network access, tool allow/deny, identity and independent review. Exercise those restrictions using harmless repository fixtures. Validate actual CLI session creation and resume inputs. The portable checkpoint includes task, branch/head, verified stage and evidence references. Reconcile working tree or staged changes as well as pushed effects; an unknown side effect is a hard stop.
-3. Integrate with the coordinator's current assignment generation, semantic and evidence review, shared budget lock, role ceilings, durable attempt/delivery ledger and trusted measured usage. Confirm non-overage credentials, reserve the remaining budget before dispatch and enforce time/token limits with the runtime guard. Correlate provider usage, UTC timestamps and effects to the exact delivery; an HTTP success or a local process exit does not establish acceptance or completion.
-4. Prepare a separate run request with the exact settings and digests, test repo and role, snapshot/rollback, number of authorized model calls, common time/token limits, evidence retention and additional charges capped at USD 0. Get explicit approval before creating any live dispatch. No 02-05 permissions or configuration are copied into this trial.
-
-## Proposed first trial after separate approval
-
-The first trial is **Claude → Codex only**, on one disposable repository and its development role. Use a known checkpoint from a verified, already completed read-only preparation stage. Allow at most **one** actual model dispatch, on Codex for the remaining stage. Claude performs no trial model request. The proposed ceilings are 120 seconds including stop grace, 4,000 billable tokens, 20,000 cache-read tokens, and **USD 0** in additional charges. Use only the separately approved account/role bindings and snapshot. Reverse direction and a post-recovery invocation require a different trial approval.
-
-1. Bind the exact approved subscription accounts and model/bucket applicability to the two role targets. Apply and verify equivalent policy digests and effective permissions in the trial sandbox.
-2. After the quota event occurs naturally, an operator opens Claude Code `/usage` in the bound account. Record sanitized applicable window, exhaustion evidence, reset timestamp/time zone, usage credits off, actual role binding, observation time and verifier. This is manual evidence, distinct from automatic quota detection. If the display is stale, ambiguous or for another account, stop. No prompt to force a quota event.
-3. For the bound Codex subscription, call the documented App Server `account/read` and `account/rateLimits/read` without starting a thread or turn. Match identity and quota group, check the bucket/window coverage for the specific model, its fresh available state and reset. Independently verify from the bound workspace’s Usage & Billing or enforceable administrator policy that paid fallback, credit spend and auto-reload cannot charge for the trial. A zero credit flag alone is insufficient. Preserve only sanitized evidence. An unconfirmed window or billing control is `UNKNOWN` and blocks dispatch.
-4. Revalidate the same review, development-role authorization, assignment generation, branch/head, checkpoint and actual stage evidence. Under shared admission, reserve the bounded allowance and persist the delivery/attempt ID before sending the one Codex new-session POST. Require verified usage and repository effect under that same ID. If either quota condition never occurs, record zero dispatches and report the trial as unexercised.
-5. Stop on unknown acceptance or effects, quota or role drift, unconfirmed usage, missing evidence or an unexpected cost. Preserve the ledger. No re-POST, paid reset, test call to probe a window, or second model call is authorized by this proposal.
-
-## Read-only findings and proposed fixture binding
-
-See [the quota-read record](QUOTA_READ.md). Codex has a supported machine read for quota windows. Claude has a verified operator screen. Keep live dispatch disabled until the trial accounts are explicitly bound to their provider observations and both USD 0 settings are verified. The existing developer-host Claude.ai Max and ChatGPT Codex logins are candidates for read-only verification only. They have no approved runner credential binding. An operator-assisted trial could use fresh Claude screen evidence with account, window, reset, credits-off and timestamp attestation. An unattended trial needs a supported machine-readable Claude source. An account with non-disableable paid fallback is ineligible.
-
-The separate approval packet must pin the disposable repository, branch and SHA, approved account references, quota groups, effective policy digests and current review generation. Use subscription authentication without API-key fallback. The developer-host snapshots in the quota-read record are historical and must not be reused for this trial.
-
-## Coordinator integration to prepare in isolation
-
-- **Role parity fixture.** Use one canonical read-only role policy. Pin equivalent repository roots, branch/head, tool allowlist, network denial, no push, no unapproved external operation, and the independent review generation. Run equivalent harmless access and denial fixtures for each candidate policy. An adapter must attest the effective restrictions and runtime/account identity. A matching string by itself is insufficient. The current tests cover role mismatch, revision revocation during observation, and checkpoint drift.
-- **Shared lock and accounting.** Keep runtime selection and provider observation read-only. Re-enter coordinator admission through the existing `delivery` flow for the same repo, assignment generation and policy. Under the budget's existing `caller.lock`, read effective records, settle assignment usage, recompute role/common room, lower the run window/token limits, and persist the intent or in-flight marker for the coordinator delivery key before handing it to the selected adapter. The same admission path must cover every caller using that budget. Do not run the fixture journal alongside the live ledger as a second authority. The isolated PoC uses the existing `budget::spent` accounting and demonstrates combined ceilings; it does not connect a live adapter to `caller::Admission`.
-- **Submission and reconciliation.** Fence authorization and effective runner identity against concurrent changes at submission, with the approval revision and checkpoint in the request. Use the coordinator delivery ID end to end; use separate provider session IDs. After a timeout, consult the delivery row, adapter attempt status and actual repo state. A confirmed no-send closes the intent without charging a model run; a send with unmeasured usage or unverifiable effects blocks the next one. Preserve observations and timestamps apart from credentials. Before live integration, rerun the same two-runtime fixture through a disposable database and ledger to prove lock ownership, a persisted delivery ID, combined accounting, the authorization fence and no duplicate POST after lost acknowledgment.
-
-[The isolated delivery record](DELIVERY_INTEGRATION.md) exercises common admission, row-lock approval, supervisor HTTP, shared accounting and no-replay reconciliation with both fakes. The draft live plan still requires an approved real router and evidence mapping. Bubblewrap parity for the fakes is evidence about the test boundary only.
-
-[첫 실제 시험 준비 및 병합 원장](TRIAL_READINESS.md)에 병합 후 확인한 근거와 미충족 조건을 기록한다.
-
-## 실제 첫 시험의 전송·요청 한도
-
-상태는 `WAITING_FOR_PREREQUISITE`다. 시험 계정은 사용자가 지정한 개발 호스트의 기존 Claude 구독 로그인과 현재 Codex CLI의 ChatGPT 계정·워크스페이스다. 역할 자격의 사용 범위는 별도 운영 승인에 따른다.
-
-| 한도 | 집행·검증 기준 |
+| 항목 | 첫 시험 |
 | --- | --- |
-| 코디네이터 → 역할 실행기 | 다음 미완료 단계의 durable delivery ID 한 건으로 **Codex 전송 최대 1회**. 응답 유실 시 동일 ID를 조회하고 자동 재전송하지 않는다. |
-| 역할 실행기 → 공급자 | Claude 모델 요청 **0회**, Codex 실제 모델 요청 **최대 1회**. 단일 delivery나 `turn/start`는 이 횟수의 증거가 아니다. 내부 도구 후속 요청, 재시도, 재연결을 포함한 공급자 요청 수의 사전 집행과 독립 대조 근거가 필요하다. |
-| 시간·토큰·청구 | 정지 유예 포함 120초, 과금 토큰 4,000, 캐시 읽기 20,000, 추가 USD 0. 시간은 감독자가 집행한다. 사용량 관측 뒤 정지로는 공급자 측 토큰 상한을 보장할 수 없어 지원되는 집행 근거를 요구한다. |
+| Claude 모델 요청 | 0회 |
+| 코디네이터 → Codex | 검증된 체크포인트의 다음 미완료 단계 1건, 전송 최대 1회, 자동 재전송 0회 |
+| 시간 | 종료 유예 포함 120초. 감독자가 로컬 실행과 정지 유예를 이 안에서 집행 |
+| 내부 모델 요청 수 | 확인 가능한 공급자 또는 런타임 증거로 실제 횟수를 계측. 전송 1회와 내부 모델 요청 횟수를 독립 기록 |
+| 토큰 | 과금 4,000, 캐시 읽기 20,000은 관측 기준. 현재 경로에서 공급자 측 사전 강제는 불가능하며 취소 전에 초과할 수 있다. 관측값, 초과 여부 및 계측 한계를 보고 |
+| 추가 청구 | USD 0. 유료 전환 및 자동 충전 차단을 해당 워크스페이스의 설정 또는 집행 가능한 관리자 정책으로 확인하고 크레딧 지출 경로도 확인 |
 
-승인안에는 두 횟수의 집행 지점, 각각의 증거와 실패 시 처분을 포함한다. 자연 소진과 동일 시점의 Codex 가용성, 유료 대체·자동 충전·크레딧 지출 차단, 역할·권한·장부 결합 및 상한 집행이 모두 확인된 뒤에만 승인 요청을 올린다.
+## 단일 승인 요청에 넣을 증거
+
+1. Claude 자연 소진 시 지정 계정에서 `/usage` 화면을 열어 적용 기간의 소진, 재설정(시간대 포함), 추가 크레딧 상태와 관측 시각을 기록한다. 운영자 관측 경로로 기록한다. 같은 시점에 Codex App Server `account/read` 및 `account/rateLimits/read`로 계정·워크스페이스 결합, 선택 모델의 적용 기간과 가용성을 확인한다. 시험 모델 요청, 강제 소진, 유료 초기화는 사용하지 않는다. 재설정 뒤에는 새 소진 관측이 필요하다.
+2. 실제 실행 역할 안에서 구독 로그인·워크스페이스·quota group을 대조하고 API 키 대체 경로를 배제한다. 읽기 전용 파일 범위, 승인·도구 정책, 모델 도구의 네트워크 차단과 런타임의 공급자 전용 통신, 정책 digest를 격리 환경에서 검증한다. 호스트 관측과 계정 미연결 샌드박스 시험은 각각 보조 증거다.
+3. 계정/워크스페이스 소유자 화면 또는 관리자 정책에서 유료 대체, 자동 충전, 크레딧 지출 차단을 각각 확인한다. 개인 플랜에서 별도 스위치가 제공되지 않으면 공식 과금 경로와 역할의 실제 통제 증거를 대조한다. 예를 들어 자동 충전 꺼짐과 크레딧 0을 함께 재확인하고, 구독 인증만 허용하며, 역할과 어댑터에서 구매·유료 리셋·플랜 변경·API 인증 경로의 차단을 확인한다. 동시 크레딧 상태 변경을 배제할 근거도 필요하다. 크레딧 잔액·가용성은 별도 증거다. 확인하지 못한 항목은 `UNKNOWN`으로 남기고 실행 승인 요청을 보류한다.
+4. 고정된 격리 저장소·브랜치·커밋, 배정 세대·검토, 검증 완료 단계·체크포인트 digest, 선행 시도와 다음 작업을 대조한다. 동일 `caller.lock`에서 실행 여유를 확인하고 전송 ID/실행 중 기록을 내구성 있게 저장한다. 어댑터가 이 ID를 Codex thread/turn 및 실행 증거에 결합하는지 시험한다. 샘플 관측 통지와 단일 turn만으로 내부 요청 횟수나 최종 계측을 확정하지 않는다.
+5. 위 조건과 시간 집행, 호출·토큰 계측 근거를 한 묶음으로 제출해 실제 Codex 전송 1회를 승인받는다. 전송 직전에 계정·권한·한도·과금·체크포인트·공유 장부를 다시 대조하고 달라졌거나 불분명하면 중단한다.
+
+## 통과·중단 판정
+
+코디네이터가 검증된 체크포인트의 다음 미완료 단계만 Codex에 한 번 전송하고 동일 전송 ID로 실제 결과, 저장소 반영 및 사용량을 공유 장부에 기록하면 통과다. 시간 제한을 넘기거나, 결과·저장소 반영·사용량 또는 추가 과금이 불명확하면 해당 ID의 전달 행·어댑터 상태·저장소를 조회하고 실행을 중단한다. 애매한 결과는 미계측으로 남기며 자동 재전송은 0건이다. 확정 사용량을 이미 사용한 공통 예산과 대조하고 토큰 관측 기준 초과는 별도 기록한다.
+
+[격리 전달 증거](DELIVERY_INTEGRATION.md) · [읽기 전용 조회](QUOTA_READ.md) · [준비 원장](TRIAL_READINESS.md)
