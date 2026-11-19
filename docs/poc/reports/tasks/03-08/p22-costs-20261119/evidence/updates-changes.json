@@ -1,0 +1,50 @@
+{
+  "common-A": {
+    "images_changed": [
+      "combined"
+    ],
+    "new_oci_bytes": 15803,
+    "build_seconds": 0.679,
+    "stacks_reverified": [
+      "go",
+      "rust"
+    ],
+    "verify_seconds": 12.012
+  },
+  "common-B": {
+    "images_changed": [
+      "go",
+      "rust"
+    ],
+    "new_oci_bytes": 24410,
+    "build_seconds": 1.441,
+    "stacks_reverified": [
+      "go",
+      "rust"
+    ],
+    "verify_seconds": 12.198
+  },
+  "go-A": {
+    "images_changed": [
+      "combined"
+    ],
+    "new_oci_bytes": 10465,
+    "build_seconds": 0.618,
+    "stacks_reverified": [
+      "go",
+      "rust"
+    ],
+    "verify_seconds": 12.044
+  },
+  "go-B": {
+    "images_changed": [
+      "go"
+    ],
+    "new_oci_bytes": 9712,
+    "build_seconds": 0.583,
+    "stacks_reverified": [
+      "go"
+    ],
+    "verify_seconds": 10.758
+  }
+}
