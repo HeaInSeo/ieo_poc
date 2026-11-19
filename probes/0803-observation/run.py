@@ -18,7 +18,7 @@ BASE = HERE.parent / "0802-cluster-baseline"
 sys.path.insert(0, str(BASE))
 from manifests import ACTOR, NS, ROLES, initial, obj
 
-from evaluate import judge
+from evaluate import evidence_matches, judge, lines
 
 
 def write_json(path, obj):
@@ -181,9 +181,23 @@ def run(config, evidence):
                         "template": {"spec": {"nodeSelector": {"p09-observer": None}}}}}
     (output / "observer-start.txt").write_text(
         k("patch", "daemonset", "tetragon", "--type=merge", "-p", json.dumps(restore), system=True))
-    snapshot("restored", nodes)
+    restored = snapshot("restored", nodes)
     run_case("outage-post", "development", "open")
-    snapshot("recovered", nodes)
+    recovery_case = cases[-1]
+    recovery_action = lines(output / "outage-post.jsonl")[0]
+    observer = restored[dev_node]["metadata"]["name"]
+
+    def recovery_exported():
+        raw = k("logs", observer, "-c", "export-stdout", system=True)
+        events = [json.loads(line) for line in raw.splitlines() if line]
+        starts, hooks = evidence_matches(events, pods["development"], recovery_case, recovery_action)
+        return len(starts) == 1 and hooks == starts
+
+    # A loaded policy can emit before its event has reached the stdout exporter.
+    try:
+        wait_for(recovery_exported, "restored observation export")
+    finally:
+        snapshot("recovered", nodes)
 
     for name in ("development", "guardrail", "product", "denied"):
         receiver = f"receiver-{name}"

@@ -33,10 +33,16 @@ def bounds(process, pod, action, marker):
     container = live.get("container") or {}
     metadata = pod["metadata"]
     labels = live.get("pod_labels") or {}
+    observed_id = container.get("id", "").removeprefix("containerd://")
+    # Tetragon records the invoked path, while /proc/self/exe resolves the image symlink.
+    binary = process.get("binary")
+    binary_matches = binary == action["binary"] or (
+        binary == "/usr/local/bin/python3" and action["binary"] == "/usr/local/bin/python3.13"
+    )
     if (live.get("uid") != metadata["uid"] or live.get("namespace") != metadata["namespace"]
-            or live.get("name") != metadata["name"] or container.get("id") != container_id(pod)
+            or live.get("name") != metadata["name"] or observed_id != container_id(pod)
             or container.get("name") != "fixture" or container.get("pid") != action["pid"]
-            or process.get("uid") != action["uid"] or process.get("binary") != action["binary"]
+            or process.get("uid") != action["uid"] or not binary_matches
             or marker not in process.get("arguments", "").split()
             or any(labels.get(k) != metadata["labels"][k] for k in (
                 "fixture-role", "fixture-repo", "fixture-assignment", "fixture-generation"
