@@ -1,0 +1,4 @@
+using docker due to KIND_EXPERIMENTAL_PROVIDER
+Deleting cluster "ieo-0802" ...
+Deleted nodes: ["ieo-0802-worker" "ieo-0802-worker3" "ieo-0802-worker2" "ieo-0802-control-plane"]
+nodes_remaining=

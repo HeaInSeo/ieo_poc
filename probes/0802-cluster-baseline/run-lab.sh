@@ -93,6 +93,7 @@ helm install tetragon "$run_dir/tetragon.tgz" --kubeconfig "$cfg" --kube-context
 
 case "${2:-}" in
     --p09) python3 -B "$probe/../0803-observation/run.py" "$cfg" "$evidence" ;;
+    --p10) python3 -B "$probe/../0804-policy-block/run.py" "$cfg" "$evidence" ;;
     "") python3 -B "$probe/verify-live.py" "$cfg" "$evidence" ;;
     *) echo "unknown fixture phase" >&2; exit 2 ;;
 esac

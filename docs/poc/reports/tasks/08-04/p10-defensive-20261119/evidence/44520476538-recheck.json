@@ -1,0 +1,87 @@
+{
+  "blocking": "PASS",
+  "cases": {
+    "enforced-allowed": {
+      "accepted": 1,
+      "pass": true,
+      "received": 1
+    },
+    "enforced-denied": {
+      "accepted": 0,
+      "pass": true,
+      "received": 0
+    },
+    "open-allowed": {
+      "accepted": 1,
+      "pass": true,
+      "received": 1
+    },
+    "open-denied": {
+      "accepted": 1,
+      "pass": true,
+      "received": 1
+    },
+    "restored-denied": {
+      "accepted": 1,
+      "pass": true,
+      "received": 1
+    },
+    "unapplied-after": {
+      "accepted": 1,
+      "pass": true,
+      "received": 1
+    },
+    "unapplied-before": {
+      "accepted": 1,
+      "pass": true,
+      "received": 1
+    }
+  },
+  "detection": {
+    "completion_eligible": false,
+    "execs": [
+      [
+        "aWVvLTA4MDItd29ya2VyOjM2NjExMDM2MDc3NjoxMTQ4OA==",
+        11488,
+        "2026-11-19T12:07:02.378439016Z"
+      ]
+    ],
+    "hooks": [
+      [
+        "aWVvLTA4MDItd29ya2VyOjM2NjExMDM2MDc3NjoxMTQ4OA==",
+        11488,
+        "2026-11-19T12:07:02.378439016Z"
+      ]
+    ],
+    "loss_delta": {
+      "added": {},
+      "missing": [],
+      "missing_metrics": [],
+      "samples": {
+        "tetragon_events_export_failed_total": 0.0,
+        "tetragon_export_ratelimit_events_dropped_total": 0.0,
+        "tetragon_observer_ringbuf_events_lost_total": 0.0,
+        "tetragon_observer_ringbuf_queue_events_lost_total": 0.0
+      }
+    },
+    "verdict": "VIOLATION"
+  },
+  "nodes_remaining_zero": true,
+  "observer_loss_clear": true,
+  "policies": {
+    "enforced": {
+      "differences": [],
+      "matches": true
+    },
+    "open": {
+      "differences": [],
+      "matches": true
+    },
+    "restored": {
+      "differences": [],
+      "matches": true
+    }
+  },
+  "source": "b0ddefaf7882118a1fa1e69e22d38b2a46fb3c12",
+  "verdict": "PASS"
+}
