@@ -1,0 +1,8 @@
+fixture pods 8; expected egress cases 32/32 (manifest semantics only)
+namespaced observe-only selector; destination guard cases 5/5
+only the synthetic promoter can update the empty promotion marker by fixture RBAC
+local loopback request, exact echo and accept/receive evidence PASS
+CLI rejected non-lab IPv4 before any socket creation (exit 2).
+Tetragon 1.8.0 CRD structural schema PASS.
+Official Cilium and Tetragon chart archives matched their Helm index checksums.
+Cilium/Tetragon offline chart rendering PASS; namespace JSON export and Unix socket verified.

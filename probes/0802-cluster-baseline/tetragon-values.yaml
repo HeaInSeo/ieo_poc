@@ -1,0 +1,19 @@
+tetragon:
+  image:
+    override: quay.io/cilium/tetragon@sha256:5ed9088a1582131d71b06c98e0d549a37a71ae63ab13aabefc7a47553c822a9d
+  clusterName: ieo-0802
+  enableK8sAPI: true
+  enablePolicyFilter: true
+  enableProcessCred: true
+  grpc:
+    address: unix:///var/run/tetragon/tetragon.sock
+  exportAllowList: |-
+    {"namespace":["ieo-0802"],"event_set":["PROCESS_EXEC","PROCESS_EXIT","PROCESS_KPROBE","PROCESS_TRACEPOINT"]}
+tetragonOperator:
+  image:
+    override: quay.io/cilium/tetragon-operator@sha256:af2b6f0a8609d66190f1d5bbdea38a160d5460f2ea416beea42a615aadd8b35a
+export:
+  stdout:
+    enabled: true
+    image:
+      override: quay.io/cilium/hubble-export-stdout@sha256:cf701f96d1c8de30231792e35733e1ab07451e11751ef4f676f482836759da06
