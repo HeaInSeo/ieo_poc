@@ -91,7 +91,11 @@ helm install tetragon "$run_dir/tetragon.tgz" --kubeconfig "$cfg" --kube-context
 "${k[@]}" -n kube-system rollout status --request-timeout=0 deployment/tetragon-operator --timeout=180s
 "${k[@]}" wait --request-timeout=0 --for=condition=Established crd/tracingpoliciesnamespaced.cilium.io --timeout=120s
 
-python3 -B "$probe/verify-live.py" "$cfg" "$evidence"
+case "${2:-}" in
+    --p09) python3 -B "$probe/../0803-observation/run.py" "$cfg" "$evidence" ;;
+    "") python3 -B "$probe/verify-live.py" "$cfg" "$evidence" ;;
+    *) echo "unknown fixture phase" >&2; exit 2 ;;
+esac
 for node in "${nodes[@]}"; do
     docker exec "$node" crictl images -o json > "$evidence/$node-images.json"
     jq -e --arg repo "$CANDIDATE_REPO" '[.images[] | (.repoTags[]?,.repoDigests[]?) | select(startswith($repo))] | length == 0' \
