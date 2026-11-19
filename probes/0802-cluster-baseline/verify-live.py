@@ -8,7 +8,7 @@ import sys
 import time
 from urllib.parse import urlsplit
 
-from manifests import IMAGE, NS, ROLES, SCRIPT, actor_egress, initial, observe
+from manifests import IMAGE, NS, ROLES, SCRIPT, actor_egress, initial, network_specs, observe
 
 
 NODES = {f"{NS}-{part}" for part in ("control-plane", "worker", "worker2", "worker3")}
@@ -36,13 +36,6 @@ def verify(config, evidence, *, fixture_items=None):
         path = evidence / f"{name}.json"
         write(path.name, {"apiVersion": "v1", "kind": "List", "items": items})
         (evidence / f"{name}-apply.txt").write_text(kubectl("apply", "-f", str(path), *flags))
-
-    def network_specs(items):
-        # The Kubernetes API omits empty ingress/egress rule slices. Policy types still select deny.
-        return {item["metadata"]["name"]: {
-            key: value for key, value in item["spec"].items()
-            if key not in ("ingress", "egress") or value
-        } for item in items}
 
     context = json.loads(kubectl("config", "view", "--minify", "-o", "json"))["clusters"][0]
     assert context["name"] == f"kind-{NS}" and urlsplit(context["cluster"]["server"]).hostname == "127.0.0.1"

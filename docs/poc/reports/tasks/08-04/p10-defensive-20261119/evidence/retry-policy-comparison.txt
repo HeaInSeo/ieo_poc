@@ -1,0 +1,4 @@
+P10 failed archive: raw expected fixture present, raw live policy absent.
+P11 raw API comparison, P10 overlap: egress-control, egress-development, egress-receiver, ingress-receiver
+Only raw spec difference: {"expected": {"egress": [], "podSelector": {"matchLabels": {"fixture": "ieo-0802", "fixture-kind": "receiver"}}, "policyTypes": ["Egress"]}, "p11_api": {"podSelector": {"matchLabels": {"fixture": "ieo-0802", "fixture-kind": "receiver"}}, "policyTypes": ["Egress"]}}
+The narrow empty-array normalization preserves exact equality for the four-policy overlap.

@@ -1,0 +1,6 @@
+Infra Lab managed environments: empty.
+Infra Lab managed and unmanaged VM inventory: empty.
+Local libvirt qemu:///system read-only enumeration: polkit authentication agent unavailable.
+Local kind inventory with the pinned Docker provider: docker executable unavailable.
+P09/P11 evidence is from a prior disposable run; it does not identify a reachable existing VM.
+No cluster commands, packet sends, model calls, provisioning, or cleanup ran.
