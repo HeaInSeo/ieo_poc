@@ -14,7 +14,7 @@ from judge import MARKER, connection, detection
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "0802-cluster-baseline"))
-from manifests import IMAGE, NS, actor_egress, initial, observe
+from manifests import IMAGE, NS, actor_egress, initial, network_specs, observe
 
 sys.path.insert(0, str(HERE.parent / "0803-observation"))
 from evaluate import container_id, evidence_matches, loss_clear, loss_delta
@@ -170,7 +170,7 @@ def run(config, evidence):
         (out / f"{tag}-{dev_node}-metrics.txt").write_text(result.stdout)
 
     def policy_specs(tag, expected):
-        active = {entry["metadata"]["name"]: entry["spec"] for entry in get("networkpolicies")["items"]}
+        active = network_specs(get("networkpolicies")["items"])
         require(active == expected, f"unexpected active NetworkPolicy in {tag}")
         save(f"{tag}-networkpolicies.json", active)
 
@@ -200,7 +200,7 @@ def run(config, evidence):
         save(f"{label}-result.json", row)
         return row, frames
 
-    baseline = {p["metadata"]["name"]: p["spec"] for p in items if p["kind"] == "NetworkPolicy"}
+    baseline = network_specs(p for p in items if p["kind"] == "NetworkPolicy")
     policy_specs("open", baseline)
     snapshot("before")
     open_case, open_frames = one(0)
@@ -237,7 +237,7 @@ def run(config, evidence):
     save("detection.json", {**detected, "loss_delta": loss, "execs": starts, "hooks": hooks})
 
     replaced = [p for p in actor_egress(True) if p["metadata"]["name"] == "egress-development"]
-    expected = {**baseline, "egress-development": replaced[0]["spec"]}
+    expected = {**baseline, **network_specs(replaced)}
     save("enforced-policy.json", replaced[0])
     rows = [open_case, allowed_case]
     try:

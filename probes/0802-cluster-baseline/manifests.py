@@ -74,6 +74,13 @@ def network(name, selector, direction, peer=None):
     })
 
 
+def network_specs(items):
+    # The Kubernetes API omits empty ingress/egress rule slices. Policy types still select deny.
+    return {item["metadata"]["name"]: {
+        key: value for key, value in item["spec"].items()
+        if key not in ("ingress", "egress") or value
+    } for item in items}
+
 def actor_egress(enforce):
     # Replace each role's rule by name. A second egress policy would union the allowed peers.
     return [network(f"egress-{role}", {**SOURCE, "fixture-role": role}, "Egress",
