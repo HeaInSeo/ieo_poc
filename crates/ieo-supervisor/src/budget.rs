@@ -473,6 +473,14 @@ pub fn stream_stop(line: &str) -> Option<String> {
 
 /// May the next run of `budget` start?
 pub fn next(budget: &Budget, records: &[Value], observation: Option<Observation<'_>>) -> Decision {
+    next_with_provider_check(budget, records, || observation_check(observation))
+}
+
+pub(crate) fn next_with_provider_check(
+    budget: &Budget,
+    records: &[Value],
+    provider_check: impl FnOnce() -> Result<(), String>,
+) -> Decision {
     let s = spent(records);
     if !s.unclassified_records.is_empty() {
         return Decision::Stop {
@@ -525,7 +533,7 @@ pub fn next(budget: &Budget, records: &[Value], observation: Option<Observation<
             ),
         };
     }
-    if let Err(why) = observation_check(observation) {
+    if let Err(why) = provider_check() {
         return Decision::Hold { reason: why };
     }
     Decision::Start {

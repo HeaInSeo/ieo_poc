@@ -63,10 +63,66 @@ pub(crate) fn receipt(
     ))
 }
 
+pub(crate) fn check_subscription(v: &Value, limit_id: &str, now: u64) -> Result<(), String> {
+    let bucket = &v["rateLimitsByLimitId"][limit_id];
+    let credits = &bucket["credits"];
+    let available = |w: &Value| {
+        w["usedPercent"].as_u64().is_some_and(|n| n < 100)
+            && w["resetsAt"].as_u64().is_some_and(|t| now < t)
+    };
+    if v["account"]["type"] != "chatgpt"
+        || bucket["limitId"] != limit_id
+        || !available(&bucket["primary"])
+        || !bucket
+            .get("secondary")
+            .is_some_and(|w| w.is_null() || available(w))
+        || !bucket
+            .get("rateLimitReachedType")
+            .is_some_and(Value::is_null)
+        || credits["hasCredits"] != false
+        || credits["unlimited"] != false
+        || credits["balance"]
+            .as_str()
+            .and_then(|s| s.parse::<f64>().ok())
+            != Some(0.0)
+        || bucket["spendControlReached"] != false
+    {
+        return Err("Codex requires a fresh available ChatGPT bucket with zero credits".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn codex_trial_preflight_refuses_wrong_auth_quota_or_credits() {
+        let good = json!({"account":{"type":"chatgpt"},"rateLimitsByLimitId":{"codex":{
+            "limitId":"codex","primary":{"usedPercent":19,"resetsAt":200},
+            "secondary":null,"rateLimitReachedType":null,"spendControlReached":false,
+            "credits":{"hasCredits":false,"unlimited":false,"balance":"0"}
+        }}});
+        assert!(check_subscription(&good, "codex", 100).is_ok());
+        assert!(check_subscription(&good, "other", 100).is_err());
+        assert!(check_subscription(&good, "codex", 200).is_err());
+        let mut bad = good.clone();
+        bad["account"]["type"] = json!("apiKey");
+        assert!(check_subscription(&bad, "codex", 100).is_err());
+        for (field, value) in [
+            ("balance", json!("1")),
+            ("hasCredits", json!(true)),
+            ("unlimited", json!(true)),
+        ] {
+            let mut bad = good.clone();
+            bad["rateLimitsByLimitId"]["codex"]["credits"][field] = value;
+            assert!(check_subscription(&bad, "codex", 100).is_err());
+        }
+        let mut bad = good;
+        bad["rateLimitsByLimitId"]["codex"]["primary"]["usedPercent"] = json!(100);
+        assert!(check_subscription(&bad, "codex", 100).is_err());
+    }
 
     #[test]
     fn codex_trial_only_charges_a_bound_complete_receipt() {

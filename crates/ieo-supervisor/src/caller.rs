@@ -621,10 +621,6 @@ fn observation(plan: &Plan, recs: &[Value]) -> Result<Option<(String, u64)>, Str
 
 /// Limits for this call: the budget decision, then the role's share.
 pub fn limits_for(plan: &Plan, role: &str, recs: &[Value]) -> Result<Limits, String> {
-    let target = plan
-        .roles
-        .get(role)
-        .ok_or(format!("role {role} not in the plan"))?;
     let obs = observation(plan, recs)?;
     let l = Limits::for_next(
         &plan.budget,
@@ -635,6 +631,14 @@ pub fn limits_for(plan: &Plan, role: &str, recs: &[Value]) -> Result<Limits, Str
         }),
     )
     .map_err(|d| format!("{d:?}"))?;
+    role_limits(plan, role, recs, l)
+}
+
+fn role_limits(plan: &Plan, role: &str, recs: &[Value], l: Limits) -> Result<Limits, String> {
+    let target = plan
+        .roles
+        .get(role)
+        .ok_or(format!("role {role} not in the plan"))?;
     let mine: Vec<Value> = recs.iter().filter(|r| r["role"] == role).cloned().collect();
     let s = budget::spent(&mine);
     let sh = target.share;
@@ -1033,17 +1037,26 @@ pub fn admit_with(
     if recs.iter().any(|r| r["attempt_id"] == attempt_id) {
         return Ok(Err(format!("attempt {attempt_id} already recorded")));
     }
-    let limits = match limits_for(plan, role, &recs) {
-        Ok(l) => l,
-        Err(why) => return Ok(Err(why)),
-    };
-    // every service's state before the run (the target's checkpoint is the resume base
-    // candidate)
     let mut statuses = match services_clear(plan, &recs, adapter, role)? {
         Ok(s) => s,
         Err(why) => return Ok(Err(why)),
     };
     let before = statuses.remove(role).unwrap_or_default();
+    let limits = if before["runtime"] == "codex-trial" {
+        Limits::from_decision(
+            &plan.budget,
+            &recs,
+            budget::next_with_provider_check(&plan.budget, &recs, || Ok(())),
+        )
+        .map_err(|d| format!("{d:?}"))
+        .and_then(|l| role_limits(plan, role, &recs, l))
+    } else {
+        limits_for(plan, role, &recs)
+    };
+    let limits = match limits {
+        Ok(l) => l,
+        Err(why) => return Ok(Err(why)),
+    };
     Ok(Ok(Admission {
         lock,
         recs,
@@ -1160,6 +1173,24 @@ impl Admission {
             .filter(|(k, _)| *k != "spare")
         {
             body[k] = v.clone();
+        }
+        if self.before["runtime"] == "codex-trial" {
+            body["expected_runtime"] = json!("codex-trial");
+            let attestation = adapter.send(&target, "GET", "/v0/role/codex-preflight", None);
+            if !matches!(attestation, Ok((200, ref v)) if v["authorized"] == true
+                && v["assignment_id"] == c.coordinator["assignment_id"]
+                && v["generation"] == c.coordinator["generation"]
+                && v["target_sha"] == body["target_sha"]
+                && body["expected_checkpoint_sha256"].as_str().is_some_and(|pin| !pin.is_empty())
+                && v["checkpoint_sha256"] == body["expected_checkpoint_sha256"]
+                && v["expires_unix"].as_u64().is_some_and(|t| unix_now() < t))
+            {
+                return Ok(Sent::Refused {
+                    status: 409,
+                    body: json!({"code":"CODEX_TRIAL_PREFLIGHT"}),
+                    why: "Codex role preflight is missing, stale, or mismatched".into(),
+                });
+            }
         }
         let base_rec = json!({"format": RECORD_FORMAT, "task_id": c.task_id, "budget": plan.budget.name,
             "attempt_id": c.attempt_id, "command_id": format!("{}-{}", c.role, c.op), "role": c.role,
@@ -1944,6 +1975,59 @@ mod tests {
     }
 
     #[test]
+    fn codex_trial_mismatched_preflight_never_posts() {
+        struct WrongAssignment;
+        impl Adapter for WrongAssignment {
+            fn send(
+                &self,
+                _: &RoleTarget,
+                method: &str,
+                path: &str,
+                _: Option<&Value>,
+            ) -> Result<(u16, Value), String> {
+                assert_eq!((method, path), ("GET", "/v0/role/codex-preflight"));
+                Ok((
+                    200,
+                    json!({"authorized":true,"assignment_id":"wrong",
+                                "expires_unix":unix_now()+60}),
+                ))
+            }
+        }
+        let mut admitted = admission(114, 500);
+        admitted.before = json!({"runtime":"codex-trial"});
+        let role = RoleTarget {
+            url: String::new(),
+            adapter_token_file: PathBuf::new(),
+            share: Share {
+                max_runs: 1,
+                total_seconds: 120,
+                billable_tokens: 500,
+                cache_read_tokens: 500,
+            },
+            max_window_seconds: Some(120),
+        };
+        let plan = Plan {
+            budget: budget::named("02-05").unwrap(),
+            ledger_dir: PathBuf::new(),
+            roles: BTreeMap::from([("development".into(), role)]),
+            first_observation: None,
+        };
+        let call = Call {
+            task_id: "trial".into(),
+            role: "development".into(),
+            op: "start".into(),
+            attempt_id: "a".into(),
+            session_id: "s".into(),
+            prompt: String::new(),
+            coordinator: json!({"assignment_id":"approved","generation":1}),
+        };
+        assert!(matches!(
+            admitted.start(&plan, &call, &WrongAssignment).unwrap(),
+            Sent::Refused { status: 409, .. }
+        ));
+    }
+
+    #[test]
     fn codex_trial_completed_result_and_unmeasured_usage_share_admitted_id() {
         struct MockRole;
         impl Adapter for MockRole {
@@ -1975,7 +2059,14 @@ mod tests {
                 }
             }
         }
-        let dir = std::env::temp_dir().join(format!("ieo-codex-receipt-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "ieo-codex-receipt-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         std::fs::create_dir(&dir).unwrap();
         let role = RoleTarget {
             url: String::new(),

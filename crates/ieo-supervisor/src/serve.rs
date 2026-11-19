@@ -574,7 +574,13 @@ impl Service {
         if self.cfg.central == crate::central::Central::LocalOnly {
             gaps.push("central checkpoint comparison off (local_only)");
         }
-        json!({"role": self.cfg.role_name(), "repo": self.cfg.repo,
+        let runtime = if std::fs::symlink_metadata(self.cfg.etc.join("codex-trial-bridge")).is_ok()
+        {
+            "codex-trial"
+        } else {
+            "claude"
+        };
+        json!({"role": self.cfg.role_name(), "repo": self.cfg.repo, "runtime": runtime,
                "running": st.running, "last": st.last, "checkpoint": cp, "safe_shutdown": safe,
                "checkpoint_seq": cp_seq,
                "checkpoint_sha256": raw.as_ref().map(|b| crate::central::sha256(b)),
@@ -594,6 +600,109 @@ impl Service {
     }
 
     /// Handle one request. `bearer` is the token from `Authorization: Bearer …`.
+    fn codex_preflight(&self) -> Result<Value, String> {
+        let cfg = &self.cfg;
+        let bridge = cfg.etc.join("codex-trial-bridge");
+        if !matches!(
+            cfg.role,
+            Role::Development {
+                read_only: true,
+                ..
+            }
+        ) || !matches!(cfg.central, crate::central::Central::Coordinator(_))
+            || !std::fs::symlink_metadata(&bridge).is_ok_and(|m| m.is_file())
+        {
+            return Err("no isolated Codex trial role".into());
+        }
+        let approval: Value = serde_json::from_slice(
+            &std::fs::read(cfg.etc.join("codex-trial-approval.json"))
+                .map_err(|_| "trial approval is unavailable")?,
+        )
+        .map_err(|_| "invalid trial approval")?;
+        let now = crate::provider::now_unix();
+        let expires = approval["expires_unix"]
+            .as_u64()
+            .ok_or("missing approval expiry")?;
+        // These attestations must come from the approved isolated role's administrator.
+        // Account/rateLimits/read cannot attest an account's billing controls.
+        if expires <= now
+            || approval["max_dispatches"] != 1
+            || approval["additional_usd"] != 0
+            || approval["billing"]["auto_reload_disabled"] != true
+            || approval["billing"]["paid_paths_blocked"] != true
+            || approval["billing"]["api_fallback_blocked"] != true
+            || approval["billing"]["verified_unix"]
+                .as_u64()
+                .is_none_or(|t| t > now)
+        {
+            return Err("expired or unverified USD 0 controls for the assigned role".into());
+        }
+        let model = approval["model"]
+            .as_str()
+            .filter(|x| !x.is_empty())
+            .ok_or("missing trial model")?;
+        let limit_id = approval["limit_id"]
+            .as_str()
+            .filter(|x| !x.is_empty())
+            .ok_or("missing trial limit bucket")?;
+        let home = cfg.cred.join("codex-home");
+        if !matches!(std::fs::symlink_metadata(home.join("config.toml")),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound)
+        {
+            return Err("assigned Codex credential home contains unapproved configuration".into());
+        }
+        let auth = home.join("auth.json");
+        let auth_digest = || {
+            std::fs::read(&auth)
+                .map(|b| crate::central::sha256(&b))
+                .map_err(|_| "assigned subscription credential is unavailable")
+        };
+        let before = auth_digest()?;
+        if approval["auth_sha256"] != before {
+            return Err(
+                "assigned subscription credential did not match the approved account".into(),
+            );
+        }
+        let invocation = Command::new("/usr/bin/timeout")
+            .args(["--kill-after=1s", "8s"])
+            .arg(bridge)
+            .args([
+                "--preflight-only",
+                "--delivery-id",
+                "D-preflight",
+                "--attempt-id",
+                "preflight",
+                "--codex",
+                "/usr/bin/codex",
+                "--model",
+                model,
+                "--cwd",
+            ])
+            .arg(cfg.cwd())
+            .arg("--state")
+            .arg(cfg.state.join("codex-trial"))
+            .current_dir(cfg.cwd())
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("HOME", cfg.home())
+            .env("CODEX_HOME", home)
+            .stdin(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .map_err(|_| "could not run Codex read-only preflight")?;
+        if !invocation.status.success() || auth_digest()? != before {
+            return Err("Codex lookup failed or the role credential changed".into());
+        }
+        let observation: Value = serde_json::from_slice(&invocation.stdout)
+            .map_err(|_| "invalid Codex preflight response")?;
+        crate::codex_trial::check_subscription(&observation, limit_id, now)?;
+        Ok(
+            json!({"authorized": true, "assignment_id": approval["assignment_id"],
+            "generation": approval["generation"], "target_sha": approval["target_sha"],
+            "checkpoint_sha256": approval["checkpoint_sha256"], "expires_unix": expires}),
+        )
+    }
+
     pub fn handle(
         self: &Arc<Self>,
         method: &str,
@@ -607,6 +716,10 @@ impl Service {
         let segs: Vec<&str> = path.trim_matches('/').split('/').collect();
         match (method, segs.as_slice()) {
             ("GET", ["v0", "role", "status"]) => resp(200, self.status()),
+            ("GET", ["v0", "role", "codex-preflight"]) => match self.codex_preflight() {
+                Ok(v) => resp(200, v),
+                Err(e) => err(409, "CODEX_TRIAL_PREFLIGHT", &e),
+            },
             ("POST", ["v0", "role", "stop"]) => {
                 let st = self.state.lock().unwrap_or_else(|e| e.into_inner());
                 match &st.stop {
@@ -1124,6 +1237,13 @@ impl Service {
                 "trial requires a pinned, centrally admitted new read-only delivery within 120 seconds",
             );
         }
+        if codex_trial != (req["expected_runtime"] == "codex-trial") {
+            return err(
+                409,
+                "CODEX_TRIAL_SCOPE",
+                "delivery runtime changed or was not pinned",
+            );
+        }
         let mut codex_model = None;
         if codex_trial {
             let approved = self.cfg.etc.join("codex-trial-approval.json");
@@ -1162,6 +1282,9 @@ impl Service {
                             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
                 })
                 .map(str::to_owned);
+            if let Err(e) = self.codex_preflight() {
+                return err(409, "CODEX_TRIAL_PREFLIGHT", &e);
+            }
             if codex_model.is_none() {
                 return err(409, "CODEX_TRIAL_APPROVAL", "missing pinned trial model");
             }
