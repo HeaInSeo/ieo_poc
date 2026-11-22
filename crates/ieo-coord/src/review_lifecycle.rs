@@ -78,6 +78,12 @@ impl ReviewLifecycle {
         )
     }
 
+    pub(crate) fn review_delivery_allowed(&self, head: &str, generation: u64) -> bool {
+        self.phase == ReviewPhase::Pending
+            && self.candidate.as_deref() == Some(head)
+            && self.generation == Some(generation)
+    }
+
     pub fn unauthorized_head_change(&self) -> bool {
         self.unauthorized_head_change
     }
@@ -85,6 +91,9 @@ impl ReviewLifecycle {
     pub fn submit(&mut self, head: &str, generation: u64) -> Result<(), ReviewError> {
         if !self.developer_push_allowed() {
             return Err(ReviewError::WrongPhase);
+        }
+        if self.candidate.as_deref() == Some(head) {
+            return Err(ReviewError::WrongCandidate);
         }
         self.start_review(head, generation)
     }

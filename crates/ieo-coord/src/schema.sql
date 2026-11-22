@@ -598,3 +598,20 @@ CREATE OR REPLACE TRIGGER role_recovery_uses_append_only BEFORE UPDATE OR DELETE
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;
+
+-- Review transitions are serialized under both role locks. Keep every recorded
+-- request, including late results, so restart cannot reset review counters.
+CREATE TABLE IF NOT EXISTS review_transitions (
+    seq bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    repo_id text NOT NULL,
+    sprint_id text NOT NULL,
+    task_id text NOT NULL,
+    event_id text NOT NULL,
+    principal text NOT NULL,
+    request jsonb NOT NULL,
+    response jsonb NOT NULL,
+    UNIQUE (repo_id, sprint_id, task_id, event_id)
+);
+
+CREATE OR REPLACE TRIGGER review_transitions_append_only BEFORE UPDATE OR DELETE ON review_transitions
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();

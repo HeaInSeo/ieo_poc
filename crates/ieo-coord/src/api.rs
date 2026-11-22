@@ -347,6 +347,7 @@ pub enum Operation<'a> {
         generation: &'a str,
     },
     Ingest,
+    ReviewTransition,
     Judge,
     ListOutbox,
     Deliver {
@@ -456,6 +457,7 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
             generation,
         },
         ("POST", ["v0", "coordinator", "evidence"]) => Operation::Ingest,
+        ("POST", ["v0", "coordinator", "review-transitions"]) => Operation::ReviewTransition,
         ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
         ("GET", ["v0", "coordinator", "outbox"]) => Operation::ListOutbox,
         ("POST", ["v0", "coordinator", "outbox", id, "delivery"]) => Operation::Deliver { id },
@@ -750,6 +752,9 @@ pub fn dispatch(
             crate::chain::assignment_chain(tx, who, &ctx.roles, assignment_id, generation)
         }),
         Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
+        Operation::ReviewTransition => {
+            run(db, &|tx| crate::review_store::record(tx, who, req.body))
+        }
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
         Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
         Operation::Deliver { id } => run(db, &|tx| deliver(tx, who, id, req)),
@@ -3585,9 +3590,12 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     )? {
         reviews.push((r.get(0), "approve".to_string()));
     }
-    let blocked = reviews
-        .iter()
-        .any(|(s, v)| *s == head_sha && (v == "reject" || v == "needs_confirmation"));
+    let lifecycle_blocked = crate::review_store::load(tx, &repo, &sprint_id, &task_id)?
+        .is_some_and(|lifecycle| lifecycle.approved_head() != Some(head_sha.as_str()));
+    let blocked = lifecycle_blocked
+        || reviews
+            .iter()
+            .any(|(s, v)| *s == head_sha && (v == "reject" || v == "needs_confirmation"));
     let review = if blocked {
         // keep the note about earlier-SHA approvals (review 1e98f17 F9)
         let mut stale: Vec<String> = reviews
