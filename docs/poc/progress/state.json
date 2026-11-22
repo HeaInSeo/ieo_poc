@@ -3851,7 +3851,7 @@
       "User_Decisions_2026-11-13_x02.md (X-02 예산·조건)",
       "이전 결정은 docs/poc/User_Decisions_*.md 전체"
     ],
-    "restart_procedure": "압축·세션 재시작 뒤 대화 요약보다 이 기록을 먼저 다시 읽는다: (1) git fetch 후 origin/main·gh pr list·main CI를 resume.branch_sha·running과 대조 (2) state.json의 current_task·next_task·resume(current_work·blocking·budget·user_decisions·next_action)과 STATUS를 읽음 (3) user_decisions의 최신 결정 문서와 담당 작업 unresolved를 읽음 (4) 차이가 있으면 최신 근거를 적용하고, 이미 병합된 PR·게시된 검토·완료된 실행을 다시 하지 않음 (5) blocking·budget을 다시 확인한 뒤 next_action을 이어감. 승인 범위 안의 재개는 재승인을 기다리지 않음. 근거: 재발 방지 대응표 §1.11 · 위임 작업 대기 중 완료 인수: 재발 방지 대응표 §1.12"
+    "restart_procedure": "압축·세션 재시작 뒤 대화 요약보다 이 기록을 먼저 다시 읽는다: (1) git fetch 후 origin/main·gh pr list·main CI를 resume.branch_sha·running과 대조 (2) state.json의 current_task·next_task·resume(current_work·blocking·budget·user_decisions·next_action)과 STATUS를 읽음 (3) user_decisions의 최신 결정 문서와 담당 작업 unresolved를 읽음 (4) 차이가 있으면 최신 근거를 적용하고, 이미 병합된 PR·게시된 검토·완료된 실행을 다시 하지 않음 (5) blocking·budget을 다시 확인한 뒤 next_action을 이어감. 승인 범위 안의 재개는 재승인을 기다리지 않음. 근거: 재발 방지 대응표 §1.11 · 위임 작업 대기 중 완료 인수: 재발 방지 대응표 §1.12 본계획은 최종 결과 인계와 본 개발 스프린트 확정까지 기존 순서에서 선행 조건을 충족한 작업을 한 번에 하나씩 진행한다. 시험과 독립 검토 결과를 확인하고, 허용 범위의 교정·재검증, 승인 SHA 조건 병합, 병합 SHA의 main CI 및 원장 반영을 마친 뒤 다음 작업에 착수한다. 중간 진척은 진행 메시지와 원장에 남긴다. 사용자 결정·권한이나 선행 조건이 필요하면 막힌 조건과 사용자 조치만 알린다. 02-05 단계 8의 계정 재확인, 해당 Claude Code 세션의 권한 규칙과 R1b는 기존 승인안 순서에 따른다. 별도 Claude → Codex 전환 실측은 조건 대기다."
   },
   "baseline_history": [
     {
