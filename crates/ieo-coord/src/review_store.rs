@@ -193,7 +193,7 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             ));
         }
     } else {
-        if !current {
+        if !current && action != "invalidate" {
             return Err(problem(
                 409,
                 "REVIEW_ASSIGNMENT_MISMATCH",

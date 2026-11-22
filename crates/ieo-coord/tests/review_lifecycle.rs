@@ -36,15 +36,6 @@ fn review_transitions_use_current_assignments_and_preserve_late_reports() {
         .0,
         201
     );
-    let mut invalidation = first.clone();
-    invalidation["event_id"] = json!("invalidate-02");
-    invalidation["head_sha"] = json!(SHA2);
-    invalidation["action"] = json!("invalidate");
-    let (status, invalidated) = e.post("assigner", path, &invalidation);
-    assert_eq!(status, 201, "{invalidated}");
-    assert_eq!(invalidated["phase"], "Blocked");
-    assert_eq!(invalidated["unauthorized_head_change"], true);
-
     assert_eq!(
         assign(
             &e,
@@ -58,6 +49,15 @@ fn review_transitions_use_current_assignments_and_preserve_late_reports() {
         .0,
         201
     );
+    let mut invalidation = first.clone();
+    invalidation["event_id"] = json!("invalidate-02");
+    invalidation["head_sha"] = json!(SHA2);
+    invalidation["action"] = json!("invalidate");
+    let (status, invalidated) = e.post("assigner", path, &invalidation);
+    assert_eq!(status, 201, "{invalidated}");
+    assert_eq!(invalidated["phase"], "Blocked");
+    assert_eq!(invalidated["unauthorized_head_change"], true);
+
     let changed = json!({"event_id":"head-02","repo_id":"repo-a","sprint_id":"POC-01",
         "task_id":"01-01","head_sha":SHA2,"assignment_id":"G2","generation":0,"action":"reassign"});
     let (status, result) = e.post("assigner", path, &changed);
