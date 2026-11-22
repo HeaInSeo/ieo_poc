@@ -14,4 +14,5 @@ pub mod http;
 pub mod limits;
 pub mod policy;
 pub mod recovery;
+pub mod review_lifecycle;
 pub mod roles;
