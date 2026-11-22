@@ -480,7 +480,7 @@ fn record_request(
         role,
         &json!({
             "sprint_id": h.get::<_, String>(4), "task_id": h.get::<_, String>(2),
-            "target_sha": h.get::<_, String>(3), "generation": generation
+            "target_sha": h.get::<_, String>(3), "generation": generation, "assignment_id": aid
         }),
     )?;
     let attempt = body["attempt_id"].as_str().unwrap_or_default();
@@ -1014,7 +1014,7 @@ pub fn deliver(
             role,
             &json!({
                 "sprint_id": rec["sprint_id"], "task_id": rec["task_id"],
-                "target_sha": d["target_sha"], "generation": generation
+                "target_sha": d["target_sha"], "generation": generation, "assignment_id": aid
             }),
         )?;
         fence.batch_execute("SAVEPOINT checkpoint_snapshot")?;

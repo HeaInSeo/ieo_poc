@@ -3590,8 +3590,8 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     )? {
         reviews.push((r.get(0), "approve".to_string()));
     }
-    let lifecycle_blocked = crate::review_store::load(tx, &repo, &sprint_id, &task_id)?
-        .is_some_and(|lifecycle| lifecycle.approved_head() != Some(head_sha.as_str()));
+    let lifecycle_blocked =
+        crate::review_store::blocks_judgment(tx, &repo, &sprint_id, &task_id, &head_sha)?;
     let blocked = lifecycle_blocked
         || reviews
             .iter()

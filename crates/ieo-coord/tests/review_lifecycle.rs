@@ -36,12 +36,21 @@ fn review_transitions_use_current_assignments_and_preserve_late_reports() {
         .0,
         201
     );
+    let mut invalidation = first.clone();
+    invalidation["event_id"] = json!("invalidate-02");
+    invalidation["head_sha"] = json!(SHA2);
+    invalidation["action"] = json!("invalidate");
+    let (status, invalidated) = e.post("assigner", path, &invalidation);
+    assert_eq!(status, 201, "{invalidated}");
+    assert_eq!(invalidated["phase"], "Blocked");
+    assert_eq!(invalidated["unauthorized_head_change"], true);
+
     assert_eq!(
         assign(
             &e,
             "guardrail",
-            "G1",
-            1,
+            "G2",
+            0,
             "01-01",
             SHA2,
             json!({"assignment_id":"G1","generation":0})
@@ -50,9 +59,10 @@ fn review_transitions_use_current_assignments_and_preserve_late_reports() {
         201
     );
     let changed = json!({"event_id":"head-02","repo_id":"repo-a","sprint_id":"POC-01",
-        "task_id":"01-01","head_sha":SHA2,"assignment_id":"G1","generation":1,"action":"head_changed"});
+        "task_id":"01-01","head_sha":SHA2,"assignment_id":"G2","generation":0,"action":"reassign"});
     let (status, result) = e.post("assigner", path, &changed);
     assert_eq!(status, 201, "{result}");
+    assert_eq!(result["phase"], "Pending");
     assert_eq!(result["unauthorized_head_change"], true);
 
     let old = report("guardrail", "old-report", "G1", 0, "01-01", SHA1);
@@ -61,6 +71,7 @@ fn review_transitions_use_current_assignments_and_preserve_late_reports() {
     late["event_id"] = json!("late-verdict");
     late["action"] = json!("approve");
     late["report_id"] = json!("old-report");
+    late["report_revision"] = json!(1);
     let (status, result) = e.post("assigner", path, &late);
     assert_eq!(status, 201, "{result}");
     assert_eq!(result["outcome"], "preserved_late");
@@ -89,6 +100,7 @@ fn pending_review_blocks_judgment_until_the_current_guardrail_report_is_recorded
     transition["event_id"] = json!("approve-01");
     transition["action"] = json!("approve");
     transition["report_id"] = json!("current-report");
+    transition["report_revision"] = json!(1);
     assert_eq!(e.post("assigner", path, &transition).0, 409);
     let claim = report("guardrail", "current-report", "G1", 0, "01-01", SHA1);
     assert_eq!(e.post("gr-a", "/v0/agent/reports", &claim).0, 202);

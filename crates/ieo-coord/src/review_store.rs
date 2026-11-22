@@ -8,14 +8,14 @@ use serde_json::{Value, json};
 
 fn apply(state: &mut ReviewLifecycle, event: &Value) -> Result<(), ReviewError> {
     let sha = event["head_sha"].as_str().unwrap_or_default();
-    let generation = event["generation"]
-        .as_u64()
-        .ok_or(ReviewError::InvalidGeneration)?;
+    let round = state.review_round();
     match event["action"].as_str() {
-        Some("submit") => state.submit(sha, generation),
-        Some("head_changed") => state.observe_head_change(sha, generation),
-        Some("approve") => state.resolve(sha, generation, ReviewVerdict::Approve),
-        Some("reject") => state.resolve(sha, generation, ReviewVerdict::Reject),
+        Some("submit") => state.submit(sha, round + 1),
+        Some("head_changed") => state.observe_head_change(sha, round + 1),
+        Some("invalidate") => state.invalidate_head(sha),
+        Some("reassign") => state.reassign_invalidated(sha, round + 1),
+        Some("approve") => state.resolve(sha, round, ReviewVerdict::Approve),
+        Some("reject") => state.resolve(sha, round, ReviewVerdict::Reject),
         _ => Err(ReviewError::WrongPhase),
     }
 }
@@ -43,7 +43,26 @@ pub(crate) fn load(
         }
         // A head change can invalidate the previous approval even at the limit.
         // A stale verdict is deliberately replayed as a no-op.
-        let _ = apply(&mut state, &request);
+        let replay = apply(&mut state, &request);
+        let valid = match response["outcome"].as_str() {
+            Some("recorded") => replay.is_ok(),
+            Some("blocked") => matches!(
+                replay,
+                Err(ReviewError::ReviewLimit | ReviewError::InvalidGeneration)
+            ),
+            _ => false,
+        };
+        if !valid
+            || response["phase"] != format!("{:?}", state.phase())
+            || response["approved_head"] != json!(state.approved_head())
+            || response["unauthorized_head_change"] != state.unauthorized_head_change()
+        {
+            return Err(problem(
+                500,
+                "REVIEW_LEDGER_INCONSISTENT",
+                "stored transition could not be replayed",
+            ));
+        }
     }
     Ok(Some(state))
 }
@@ -70,6 +89,7 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             "generation",
             "action",
             "report_id",
+            "report_revision",
         ],
     )?;
     let repo = str_field(&request, "repo_id", 256)?;
@@ -94,7 +114,10 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             "expected a valid head SHA and generation",
         ));
     };
-    if !matches!(action, "submit" | "head_changed" | "approve" | "reject") {
+    if !matches!(
+        action,
+        "submit" | "head_changed" | "invalidate" | "reassign" | "approve" | "reject"
+    ) {
         return Err(problem(400, "SCHEMA_VIOLATION", "unknown review action"));
     }
     lock(tx, &format!("scope:{repo}:development"))?;
@@ -119,8 +142,17 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
           WHERE h.repo_id=a.repo_id AND h.role=a.role AND h.assignment_id=a.assignment_id
             AND h.generation=a.generation)
          FROM assignments a WHERE a.repo_id=$1 AND a.role='guardrail' AND a.sprint_id=$2
-          AND a.task_id=$3 AND a.assignment_id=$4 AND a.generation=$5 AND a.target_sha=$6",
-        &[&repo, &sprint, &task, &assignment, &generation, &head],
+          AND a.task_id=$3 AND a.assignment_id=$4 AND a.generation=$5
+          AND (a.target_sha=$6 OR $7='invalidate')",
+        &[
+            &repo,
+            &sprint,
+            &task,
+            &assignment,
+            &generation,
+            &head,
+            &action,
+        ],
     )?
     else {
         return Err(problem(
@@ -133,12 +165,24 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
     let verdict = matches!(action, "approve" | "reject");
     if verdict {
         let report = str_field(&request, "report_id", 128)?;
+        let revision = request["report_revision"]
+            .as_i64()
+            .filter(|r| *r > 0)
+            .ok_or_else(|| {
+                problem(
+                    400,
+                    "SCHEMA_VIOLATION",
+                    "a positive report_revision is required",
+                )
+            })?;
         let matched: bool = tx
             .query_one(
                 "SELECT EXISTS (SELECT 1 FROM events WHERE scope_repo=$1 AND scope_role='guardrail'
               AND assignment_id=$2 AND generation=$3 AND event_id=$4 AND attributed_sha=$5
-              AND report_type='guardrail_review' AND report->'body'->>'verdict'=$6)",
-                &[&repo, &assignment, &generation, &report, &head, &action],
+              AND report_type='guardrail_review' AND report->'body'->>'verdict'=$6
+              AND event_revision=$7 AND event_revision = (SELECT max(later.event_revision) FROM events later
+                WHERE later.scope_repo=$1 AND later.scope_role='guardrail' AND later.event_id=$4))",
+                &[&repo, &assignment, &generation, &report, &head, &action, &revision],
             )?
             .get(0);
         if !matched {
@@ -174,16 +218,21 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
         }
     }
     let mut state = load(tx, repo, sprint, task)?.unwrap_or_default();
-    let active_assignment = tx
-        .query_opt(
-            "SELECT request->>'assignment_id' FROM review_transitions
-         WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3
-           AND request->>'action' IN ('submit','head_changed')
-           AND response->>'outcome'='recorded' ORDER BY seq DESC LIMIT 1",
-            &[&repo, &sprint, &task],
-        )?
-        .map(|r| r.get::<_, String>(0));
-    let current = current && (!verdict || active_assignment.as_deref() == Some(assignment));
+    if action == "invalidate"
+        && !active_assignment(tx, repo, sprint, task)?
+            .is_some_and(|(id, prior)| id == assignment && prior == generation)
+    {
+        return Err(problem(
+            409,
+            "REVIEW_ASSIGNMENT_MISMATCH",
+            "invalidation must reference the active review",
+        ));
+    }
+    let current = current
+        && (!verdict
+            || active_assignment(tx, repo, sprint, task)?.is_some_and(|(id, prior_generation)| {
+                id == assignment && prior_generation == generation
+            }));
     let result = if verdict && !current {
         if state.phase() == ReviewPhase::Development {
             return Err(problem(
@@ -234,6 +283,44 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
     ok(201, response)
 }
 
+fn active_assignment(
+    tx: &mut Transaction,
+    repo: &str,
+    sprint: &str,
+    task: &str,
+) -> Result<Option<(String, i64)>, crate::api::Resp> {
+    Ok(tx.query_opt(
+        "SELECT request->>'assignment_id', (request->>'generation')::bigint FROM review_transitions
+         WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3
+           AND request->>'action' IN ('submit','head_changed','reassign')
+           AND response->>'outcome'='recorded' ORDER BY seq DESC LIMIT 1",
+        &[&repo, &sprint, &task],
+    )?.map(|r| (r.get(0), r.get(1))))
+}
+
+pub(crate) fn blocks_judgment(
+    tx: &mut Transaction,
+    repo: &str,
+    sprint: &str,
+    task: &str,
+    sha: &str,
+) -> Result<bool, crate::api::Resp> {
+    let Some(state) = load(tx, repo, sprint, task)? else {
+        return Ok(false);
+    };
+    let Some((id, generation)) = active_assignment(tx, repo, sprint, task)? else {
+        return Ok(true);
+    };
+    let current: bool = tx
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM assignment_heads WHERE repo_id=$1
+          AND role='guardrail' AND assignment_id=$2 AND generation=$3)",
+            &[&repo, &id, &generation],
+        )?
+        .get(0);
+    Ok(!current || state.approved_head() != Some(sha))
+}
+
 pub(crate) fn check_delivery(
     tx: &mut Transaction,
     repo: &str,
@@ -246,12 +333,15 @@ pub(crate) fn check_delivery(
         let allowed = if role == "development" {
             state.developer_push_allowed()
         } else {
-            state.review_delivery_allowed(
-                str_field(target, "target_sha", 64)?,
-                target["generation"].as_u64().ok_or_else(|| {
-                    problem(409, "REVIEW_DELIVERY_DENIED", "missing review generation")
-                })?,
-            )
+            let id = str_field(target, "assignment_id", 128)?;
+            let active = active_assignment(tx, repo, sprint, task)?.is_some_and(
+                |(candidate, generation)| candidate == id && target["generation"] == generation,
+            );
+            active
+                && state.review_delivery_allowed(
+                    str_field(target, "target_sha", 64)?,
+                    state.review_round(),
+                )
         };
         if !allowed {
             return Err(problem(

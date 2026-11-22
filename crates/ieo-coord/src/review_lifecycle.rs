@@ -100,6 +100,11 @@ impl ReviewLifecycle {
 
     /// Invalidate the old review even when the new candidate cannot be assigned.
     pub fn observe_head_change(&mut self, head: &str, generation: u64) -> Result<(), ReviewError> {
+        self.invalidate_head(head)?;
+        self.reassign_invalidated(head, generation)
+    }
+
+    pub(crate) fn invalidate_head(&mut self, head: &str) -> Result<(), ReviewError> {
         if !matches!(self.phase, ReviewPhase::Pending | ReviewPhase::Approved) {
             return Err(ReviewError::WrongPhase);
         }
@@ -108,7 +113,25 @@ impl ReviewLifecycle {
         }
         self.unauthorized_head_change = true;
         self.phase = ReviewPhase::Blocked;
+        Ok(())
+    }
+
+    pub(crate) fn reassign_invalidated(
+        &mut self,
+        head: &str,
+        generation: u64,
+    ) -> Result<(), ReviewError> {
+        if self.phase != ReviewPhase::Blocked || !self.unauthorized_head_change {
+            return Err(ReviewError::WrongPhase);
+        }
+        if self.candidate.as_deref() == Some(head) {
+            return Err(ReviewError::WrongCandidate);
+        }
         self.start_review(head, generation)
+    }
+
+    pub(crate) fn review_round(&self) -> u64 {
+        self.reviews.into()
     }
 
     pub fn resolve(
