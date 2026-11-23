@@ -300,6 +300,11 @@ pub enum Operation<'a> {
     SubmitRepro,
     GetRepro {
         id: &'a str,
+        receipt: bool,
+    },
+    ReproLog {
+        key: &'a str,
+        stream: &'a str,
     },
     Assign,
     ReportCheckpoint {
@@ -411,7 +416,13 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         ("GET", ["v0", "sprints", id, "events"]) => Operation::ListEvents { id },
         ("POST", ["v0", "agent", "reports"]) => Operation::SubmitReport,
         ("POST", ["v0", "agent", "repro-requests"]) => Operation::SubmitRepro,
-        ("GET", ["v0", "agent", "repro-requests", id]) => Operation::GetRepro { id },
+        ("GET", ["v0", "agent", "repro-requests", id]) => {
+            Operation::GetRepro { id, receipt: false }
+        }
+        ("GET", ["v0", "agent", "repro-requests", id, "receipt"]) => {
+            Operation::GetRepro { id, receipt: true }
+        }
+        ("GET", ["v0", "agent", "repro-logs", key, stream]) => Operation::ReproLog { key, stream },
         ("POST", ["v0", "coordinator", "assignments"]) => Operation::Assign,
         // central checkpoint record (runtime contract §2.1, §5-2; 02-04 decision item 9)
         ("POST", ["v0", "repos", repo, "roles", role, "checkpoints"]) => {
@@ -717,7 +728,8 @@ pub fn dispatch(
         Operation::ListEvents { id } => run(db, &|tx| list_events(tx, who, id, req)),
         Operation::SubmitReport => run(db, &|tx| submit_report(tx, who, req)),
         Operation::SubmitRepro => run(db, &|tx| submit_repro(tx, who, req)),
-        Operation::GetRepro { id } => run(db, &|tx| get_repro(tx, who, id)),
+        Operation::GetRepro { id, receipt } => run(db, &|tx| get_repro(tx, who, id, receipt)),
+        Operation::ReproLog { key, stream } => run(db, &|tx| repro_log(tx, who, key, stream)),
         Operation::Assign => run(db, &|tx| assign(tx, ctx, who, req)),
         Operation::ReportCheckpoint { repo, role } => {
             run(db, &|tx| report_checkpoint(tx, who, repo, role, req))
@@ -2568,9 +2580,19 @@ fn validate_repro(v: &Value) -> Result<(), Resp> {
 }
 
 fn repro_status(row: &postgres::Row) -> Value {
+    let result: Option<Value> = row.get("result");
+    let result = result.unwrap_or(Value::Null);
+    let key: Option<String> = row.get("run_key");
+    let logs: Vec<_> = ["stdout", "stderr"]
+        .into_iter()
+        .filter_map(|stream| {
+            result[stream].as_str()?;
+            Some(format!("/v0/agent/repro-logs/{}/{stream}", key.as_deref()?))
+        })
+        .collect();
     json!({"request_id": row.get::<_, String>("request_id"), "state": row.get::<_, String>("state"),
-           "target_sha": row.get::<_, String>("target_sha"), "runner_image_digest": null,
-           "exit_code": null, "raw_log_refs": [], "finished_at": null})
+           "target_sha": row.get::<_, String>("target_sha"), "runner_image_digest": result["runner_image_digest"],
+           "exit_code": result["exit_code"], "raw_log_refs": logs, "finished_at": result["finished_at"]})
 }
 
 fn submit_repro(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
@@ -2580,7 +2602,7 @@ fn submit_repro(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
     let book = load_book(tx, &repo, &role)?;
     let stored = match body["request_id"].as_str() {
         Some(id) => tx.query_opt(
-            "SELECT request_id, state, target_sha, body FROM repro_requests WHERE repo_id = $1 AND request_id = $2",
+            "SELECT request_id, state, target_sha, body, result, run_key FROM repro_requests WHERE repo_id = $1 AND request_id = $2",
             &[&repo, &id],
         )?,
         None => None,
@@ -2610,7 +2632,7 @@ fn submit_repro(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
                 &json!({"request_id": id, "target_sha": target_sha}),
             )?;
             let row = tx.query_one(
-                "SELECT request_id, state, target_sha FROM repro_requests WHERE repo_id = $1 AND request_id = $2",
+                "SELECT request_id, state, target_sha, result, run_key FROM repro_requests WHERE repo_id = $1 AND request_id = $2",
                 &[&repo, &id],
             )?;
             ok(202, repro_status(&row))
@@ -2618,7 +2640,7 @@ fn submit_repro(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
     }
 }
 
-fn get_repro(tx: &mut Transaction, who: &Caller, id: &str) -> R {
+fn get_repro(tx: &mut Transaction, who: &Caller, id: &str, receipt: bool) -> R {
     match (who.kind, who.role.as_deref()) {
         (Kind::Agent, Some("guardrail")) if who.has("agent:repro") => {}
         (Kind::Agent, _) => {
@@ -2634,11 +2656,38 @@ fn get_repro(tx: &mut Transaction, who: &Caller, id: &str) -> R {
     }
     let repo = who.repos.iter().next().cloned().unwrap_or_default();
     match tx.query_opt(
-        "SELECT request_id, state, target_sha FROM repro_requests WHERE repo_id = $1 AND request_id = $2",
+        "SELECT request_id, state, target_sha, result, run_key, body FROM repro_requests WHERE repo_id = $1 AND request_id = $2",
         &[&repo, &id],
     )? {
-        Some(row) => ok(200, repro_status(&row)),
+        Some(row) => {
+            let mut status = repro_status(&row);
+            if receipt {
+                let request: Value = row.get("body");
+                status["request_sha256"] = json!(ieo_supervisor::central::sha256(
+                    &serde_json::to_vec(&request).expect("valid stored JSON"),
+                ));
+            }
+            ok(200, status)
+        },
         None => Err(problem(404, "NOT_FOUND", "unknown request")),
+    }
+}
+
+fn repro_log(tx: &mut Transaction, who: &Caller, key: &str, stream: &str) -> R {
+    let (repo, role) = agent_identity(who, "agent:repro")?;
+    if role != "guardrail" {
+        return Err(problem(403, "ROLE_MISMATCH", "guardrail credentials only"));
+    }
+    if !matches!(stream, "stdout" | "stderr") {
+        return Err(problem(404, "NOT_FOUND", "unknown log stream"));
+    }
+    let row = tx.query_opt(
+        "SELECT result->>$3 FROM repro_requests WHERE repo_id=$1 AND run_key=$2",
+        &[&repo, &key, &stream],
+    )?;
+    match row.and_then(|row| row.get::<_, Option<String>>(0)) {
+        Some(log) => ok(200, json!({"encoding":"hex","content":log})),
+        None => Err(problem(404, "NOT_FOUND", "unknown log stream")),
     }
 }
 
@@ -3325,6 +3374,38 @@ fn validate_evidence(v: &Value) -> Result<(String, String), Resp> {
                     "state",
                     "unknown review state",
                     "use a GitHub review state",
+                ));
+            }
+            sha_of("sha")?
+        }
+        "pr_review_state" => {
+            only_keys(
+                v,
+                &keys(&["sha", "pull_request", "decision", "reviewers", "source_ref"]),
+            )?;
+            if v.get("pull_request").is_none() {
+                return Err(problem(400, "SCHEMA_VIOLATION", "pull_request is required"));
+            }
+            str_field(v, "source_ref", 512)?;
+            let decision = str_field(v, "decision", 32)?;
+            let reviewers = v["reviewers"]
+                .as_array()
+                .filter(|list| {
+                    list.len() <= 128
+                        && list.iter().all(|reviewer| {
+                            reviewer
+                                .as_str()
+                                .is_some_and(|name| !name.is_empty() && name.len() <= 256)
+                        })
+                })
+                .ok_or_else(|| problem(400, "SCHEMA_VIOLATION", "invalid PR reviewers"))?;
+            if !["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"].contains(&decision)
+                || (decision == "CHANGES_REQUESTED") == reviewers.is_empty()
+            {
+                return Err(problem(
+                    400,
+                    "SCHEMA_VIOLATION",
+                    "inconsistent PR review decision",
                 ));
             }
             sha_of("sha")?

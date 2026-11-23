@@ -243,7 +243,7 @@ impl Rpc {
         match self {
             Rpc::SubmitReport { .. } => Operation::SubmitReport,
             Rpc::SubmitRepro { .. } => Operation::SubmitRepro,
-            Rpc::GetRepro { id } => Operation::GetRepro { id },
+            Rpc::GetRepro { id } => Operation::GetRepro { id, receipt: false },
             Rpc::ReportCheckpoint { repo, role, .. } => Operation::ReportCheckpoint { repo, role },
             Rpc::LatestCheckpoint { repo, role } => Operation::LatestCheckpoint { repo, role },
             Rpc::OwnAssignment { repo, role } => Operation::OwnAssignment { repo, role },

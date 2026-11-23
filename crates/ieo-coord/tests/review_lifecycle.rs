@@ -613,6 +613,35 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
         .0,
         201
     );
+    let pr_state = |id, target, pr, decision, reviewers| {
+        evidence(
+            &e,
+            id,
+            "pr_review_state",
+            json!({
+                "sha":target,"pull_request":pr,"decision":decision,"reviewers":reviewers,
+                "source_ref":"fixture/pr-review"
+            }),
+        )
+        .0
+    };
+    assert_eq!(
+        pr_state(
+            "pr-old-change",
+            &old,
+            7,
+            "CHANGES_REQUESTED",
+            json!(["reviewer"])
+        ),
+        201
+    );
+    assert_eq!(pr_state("other-pr-ok", &sha, 8, "APPROVED", json!([])), 201);
+    let (status, blocked) = e.post_k("judge", merge, "older-head-blocks-pr", &write);
+    assert_eq!(status, 409);
+    assert!(blocked.to_string().contains("GITHUB_MERGE_DENIED"));
+    assert_eq!(pr_state("stale-clear", &old, 7, "APPROVED", json!([])), 201);
+    assert_eq!(e.post_k("judge", merge, "stale-clear-hold", &write).0, 409);
+    assert_eq!(pr_state("exact-clear", &sha, 7, "APPROVED", json!([])), 201);
     let (status, refused) = e.post_k("judge", merge, "merge-raced", &write);
     assert_eq!(status, 409, "{refused}");
     assert_eq!(refused["github_status"], 409, "{refused}");
