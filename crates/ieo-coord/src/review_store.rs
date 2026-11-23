@@ -2,11 +2,13 @@ use crate::api::{
     R, is_sha, lock, need_client_scope, ok, only_keys, parse_body, problem, str_field,
 };
 use crate::auth::{Caller, Kind};
-use crate::review_lifecycle::{ReviewError, ReviewLifecycle, ReviewPhase, ReviewVerdict};
+use crate::review_lifecycle::{
+    ReviewActivity, ReviewError, ReviewLifecycle, ReviewPhase, ReviewTimeout, ReviewVerdict,
+};
 use postgres::Transaction;
 use serde_json::{Value, json};
 
-fn apply(state: &mut ReviewLifecycle, event: &Value) -> Result<(), ReviewError> {
+fn apply(state: &mut ReviewLifecycle, event: &Value, can_replace: bool) -> Result<(), ReviewError> {
     let sha = event["head_sha"].as_str().unwrap_or_default();
     let round = state.review_round();
     match event["action"].as_str() {
@@ -14,6 +16,8 @@ fn apply(state: &mut ReviewLifecycle, event: &Value) -> Result<(), ReviewError> 
         Some("head_changed") => state.observe_head_change(sha, round + 1),
         Some("invalidate") => state.invalidate_head(sha),
         Some("reassign") => state.reassign_invalidated(sha, round + 1),
+        Some("timeout") => state.expire(sha, can_replace),
+        Some("replace") => state.replace_expired(sha, round + 1),
         Some("approve") => state.resolve(sha, round, ReviewVerdict::Approve),
         Some("reject") => state.resolve(sha, round, ReviewVerdict::Reject),
         _ => Err(ReviewError::WrongPhase),
@@ -43,7 +47,11 @@ pub(crate) fn load(
         }
         // A head change can invalidate the previous approval even at the limit.
         // A stale verdict is deliberately replayed as a no-op.
-        let replay = apply(&mut state, &request);
+        let replay = apply(
+            &mut state,
+            &request,
+            response["replacement_candidate"] == true,
+        );
         let valid = match response["outcome"].as_str() {
             Some("recorded") => replay.is_ok(),
             Some("blocked") => matches!(
@@ -85,6 +93,7 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             "sprint_id",
             "task_id",
             "head_sha",
+            "pull_request",
             "assignment_id",
             "generation",
             "action",
@@ -104,6 +113,16 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
     let task = str_field(&request, "task_id", 32)?;
     let event_id = str_field(&request, "event_id", 128)?;
     let head = str_field(&request, "head_sha", 64)?;
+    let pull_request = request["pull_request"]
+        .as_i64()
+        .filter(|n| *n > 0)
+        .ok_or_else(|| {
+            problem(
+                400,
+                "SCHEMA_VIOLATION",
+                "a positive pull_request number is required",
+            )
+        })?;
     let assignment = str_field(&request, "assignment_id", 128)?;
     let action = str_field(&request, "action", 24)?;
     let generation = request["generation"].as_i64().filter(|n| *n >= 0);
@@ -116,12 +135,26 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
     };
     if !matches!(
         action,
-        "submit" | "head_changed" | "invalidate" | "reassign" | "approve" | "reject"
+        "submit"
+            | "head_changed"
+            | "invalidate"
+            | "reassign"
+            | "timeout"
+            | "replace"
+            | "approve"
+            | "reject"
     ) {
         return Err(problem(400, "SCHEMA_VIOLATION", "unknown review action"));
     }
     lock(tx, &format!("scope:{repo}:development"))?;
     lock(tx, &format!("scope:{repo}:guardrail"))?;
+    if action == "timeout" {
+        // Use the same row-before-evidence order as the final delivery fence.
+        tx.query_opt(
+            "SELECT 1 FROM assignment_heads WHERE repo_id=$1 AND role='guardrail' FOR UPDATE",
+            &[&repo],
+        )?;
+    }
     lock(tx, &format!("delivery-evidence:{repo}"))?;
     if let Some(row) = tx.query_opt(
         "SELECT request, response, principal FROM review_transitions
@@ -135,6 +168,18 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             409,
             "EVENT_CONTENT_CONFLICT",
             "review event already recorded",
+        ));
+    }
+    if let Some(row) = tx.query_opt(
+        "SELECT (request->>'pull_request')::bigint FROM review_transitions
+         WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3 ORDER BY seq LIMIT 1",
+        &[&repo, &sprint, &task],
+    )? && row.get::<_, Option<i64>>(0) != Some(pull_request)
+    {
+        return Err(problem(
+            409,
+            "REVIEW_PR_MISMATCH",
+            "the task is already bound to another pull request",
         ));
     }
     let Some(row) = tx.query_opt(
@@ -233,6 +278,59 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             || active_assignment(tx, repo, sprint, task)?.is_some_and(|(id, prior_generation)| {
                 id == assignment && prior_generation == generation
             }));
+    let mut replacement_candidate = false;
+    if action == "timeout" {
+        if !active_assignment(tx, repo, sprint, task)?
+            .is_some_and(|(id, prior)| id == assignment && prior == generation)
+        {
+            return Err(problem(
+                409,
+                "REVIEW_ASSIGNMENT_MISMATCH",
+                "timeout must reference the active review",
+            ));
+        }
+        let time_and_budget = tx.query_one(
+            "SELECT coalesce(extract(epoch FROM clock_timestamp() - max(recorded_at))::double precision, 0),
+                    EXISTS (SELECT 1 FROM review_transitions WHERE repo_id=$1 AND sprint_id=$2
+                      AND task_id=$3 AND request->>'head_sha'=$4 AND request->>'action'='replace')
+             FROM review_transitions WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3
+               AND response->>'outcome'='recorded'
+               AND request->>'action' IN ('submit','head_changed','reassign','replace')",
+            &[&repo, &sprint, &task, &head],
+        )?;
+        let activity = ReviewActivity::Unclaimed;
+        let elapsed = time_and_budget.get::<_, f64>(0).max(0.0) as u64;
+        match state.timeout(elapsed, 1800, 3600, activity, time_and_budget.get(1)) {
+            Some(ReviewTimeout::ReplacementCandidate(_)) => replacement_candidate = true,
+            Some(ReviewTimeout::Blocked(_)) => {}
+            _ => {
+                return Err(problem(
+                    409,
+                    "REVIEW_TIMEOUT_NOT_DUE",
+                    "the pending review has not reached the timeout",
+                ));
+            }
+        }
+        if !crate::api::pending_deliveries(tx, repo)?.is_empty() {
+            return Err(problem(
+                409,
+                "REVIEW_RECONCILIATION_REQUIRED",
+                "resolve outstanding deliveries before fencing the review",
+            ));
+        }
+        let revoked = tx.execute(
+            "DELETE FROM assignment_heads WHERE repo_id=$1 AND role='guardrail'
+               AND assignment_id=$2 AND generation=$3",
+            &[&repo, &assignment, &generation],
+        )?;
+        if revoked != 1 {
+            return Err(problem(
+                409,
+                "REVIEW_ASSIGNMENT_MISMATCH",
+                "active review authority changed",
+            ));
+        }
+    }
     let result = if verdict && !current {
         if state.phase() == ReviewPhase::Development {
             return Err(problem(
@@ -243,7 +341,7 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
         }
         Err(ReviewError::StaleGeneration)
     } else {
-        apply(&mut state, &request)
+        apply(&mut state, &request, replacement_candidate)
     };
     if let Err(error) = result
         && !(action == "head_changed"
@@ -270,6 +368,8 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             Err(ReviewError::StaleGeneration | ReviewError::WrongCandidate) if verdict => "preserved_late",
             Err(_) => "blocked",
         },
+        "replacement_candidate": replacement_candidate,
+        "pull_request": pull_request,
         "phase": format!("{:?}", state.phase()),
         "developer_push_allowed": state.developer_push_allowed(),
         "approved_head": state.approved_head(),
@@ -292,7 +392,7 @@ fn active_assignment(
     Ok(tx.query_opt(
         "SELECT request->>'assignment_id', (request->>'generation')::bigint FROM review_transitions
          WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3
-           AND request->>'action' IN ('submit','head_changed','reassign')
+           AND request->>'action' IN ('submit','head_changed','reassign','replace')
            AND response->>'outcome'='recorded' ORDER BY seq DESC LIMIT 1",
         &[&repo, &sprint, &task],
     )?.map(|r| (r.get(0), r.get(1))))

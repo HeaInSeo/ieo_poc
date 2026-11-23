@@ -610,6 +610,7 @@ CREATE TABLE IF NOT EXISTS review_transitions (
     principal text NOT NULL,
     request jsonb NOT NULL,
     response jsonb NOT NULL,
+    recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     UNIQUE (repo_id, sprint_id, task_id, event_id)
 );
 

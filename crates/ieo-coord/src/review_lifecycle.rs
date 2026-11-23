@@ -8,6 +8,7 @@ pub enum ReviewPhase {
     Correction,
     Approved,
     Blocked,
+    TimedOut,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -132,6 +133,31 @@ impl ReviewLifecycle {
 
     pub(crate) fn review_round(&self) -> u64 {
         self.reviews.into()
+    }
+
+    pub(crate) fn expire(&mut self, head: &str, can_replace: bool) -> Result<(), ReviewError> {
+        if self.phase != ReviewPhase::Pending {
+            return Err(ReviewError::WrongPhase);
+        }
+        if self.candidate.as_deref() != Some(head) {
+            return Err(ReviewError::WrongCandidate);
+        }
+        self.phase = if can_replace {
+            ReviewPhase::TimedOut
+        } else {
+            ReviewPhase::Blocked
+        };
+        Ok(())
+    }
+
+    pub(crate) fn replace_expired(&mut self, head: &str, round: u64) -> Result<(), ReviewError> {
+        if self.phase != ReviewPhase::TimedOut {
+            return Err(ReviewError::WrongPhase);
+        }
+        if self.candidate.as_deref() != Some(head) {
+            return Err(ReviewError::WrongCandidate);
+        }
+        self.start_review(head, round)
     }
 
     pub fn resolve(
