@@ -328,7 +328,8 @@ fn execute_remote(
             |bundle| push_commit(config, slug, token, branch, sha, bundle),
         );
     }
-    let sent = request("PUT", &format!("/pulls/{pr}/merge")).send_json(json!({"sha":sha}));
+    let sent = request("PUT", &format!("/pulls/{pr}/merge"))
+        .send_json(json!({"sha":sha,"merge_method":"merge"}));
     match sent {
         Ok(reply) => match reply.into_json::<Value>() {
             Ok(reply)
@@ -502,12 +503,18 @@ pub(crate) fn execute(
             return ok(200, existing.get::<_, Option<Value>>(2).unwrap_or(json!({"outcome":"unknown"})));
         }
         if let Some(already) = tx.query_opt(
-            "SELECT result FROM github_write_intents WHERE repo_id=$1 AND pull_request=$2
+            "SELECT principal, request, result FROM github_write_intents WHERE repo_id=$1 AND pull_request=$2
              AND request->'candidate'->>'head_sha'=$3 AND request->'merge'=to_jsonb($4::boolean)
              AND result->>'outcome' IN ('pushed','merged') ORDER BY request_id LIMIT 1",
             &[&repo, &candidate.pr, &candidate.sha, &merging],
         )? {
-            return ok(200, already.get(0));
+            if already.get::<_, &str>(0) != who.name
+                || already.get::<_, Value>(1)["candidate"] != request
+            {
+                return Err(problem(409, "GITHUB_WRITE_RECEIPT_MISMATCH",
+                    "confirmed GitHub write belongs to a different principal or assignment"));
+            }
+            return ok(200, already.get(2));
         }
         let pending = has_unresolved(tx, repo, candidate.pr)?;
         if pending {
@@ -676,6 +683,21 @@ pub(crate) fn reconcile(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req
         };
         if comparison["base_commit"]["sha"] != merged
             || !matches!(comparison["status"].as_str(), Some("identical" | "ahead"))
+        {
+            return unresolved();
+        }
+        // The PR identifies the merge commit. Its second parent identifies the
+        // head actually merged, independently of the PR's current head.
+        let Some(commit) = read(&format!("/git/commits/{merged}")) else {
+            return unresolved();
+        };
+        if commit["sha"] != merged
+            || !commit["parents"].as_array().is_some_and(|parents| {
+                parents.len() == 2
+                    && parents[0]["sha"].as_str().is_some_and(is_sha)
+                    && parents[0]["sha"] != sha
+                    && parents[1]["sha"] == sha
+            })
         {
             return unresolved();
         }

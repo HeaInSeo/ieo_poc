@@ -390,7 +390,8 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
     let old_fixture_head = old.clone();
     let worker = std::thread::spawn(move || {
         let mut merge_calls = 0;
-        for index in 0..10 {
+        let mut commit_reads = 0;
+        for index in 0..17 {
             let mut req = fixture
                 .recv_timeout(std::time::Duration::from_secs(12))
                 .unwrap()
@@ -421,6 +422,20 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
                     "GET",
                     "/repos/example/fixture/compare/4444444444444444444444444444444444444444...main",
                 ) => (200, json!({"status":"ahead","base_commit":{"sha":MERGE}})),
+                (
+                    "GET",
+                    "/repos/example/fixture/git/commits/4444444444444444444444444444444444444444",
+                ) => {
+                    commit_reads += 1;
+                    match commit_reads {
+                        1 => (404, json!({})),
+                        _ => (
+                            200,
+                            json!({"sha":MERGE,"parents":[{"sha":"5555555555555555555555555555555555555555"},
+                                {"sha":if commit_reads == 2 { &old_fixture_head } else { &current }}]}),
+                        ),
+                    }
+                }
                 ("PUT", "/repos/example/fixture/pulls/7/merge") => {
                     merge_calls += 1;
                     if merge_calls == 1 {
@@ -523,6 +538,28 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
         confirmed
     );
 
+    for (caller, key, body) in [
+        ("dev-a-other", "different-principal", write.clone()),
+        ("dev-a", "different-assignment", {
+            let mut body = write.clone();
+            body["assignment_id"] = json!("other-assignment");
+            body
+        }),
+        ("dev-a", "different-generation", {
+            let mut body = write.clone();
+            body["generation"] = json!(1);
+            body
+        }),
+    ] {
+        let (status, rejected) = e.post_k(caller, push, key, &body);
+        assert_eq!(status, 409, "{rejected}");
+        assert!(
+            rejected
+                .to_string()
+                .contains("GITHUB_WRITE_RECEIPT_MISMATCH")
+        );
+    }
+
     assert_eq!(
         development(&e, 1, &sha, json!({"assignment_id":"D1","generation":0})).0,
         201
@@ -548,7 +585,7 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
     event.as_object_mut().unwrap().remove("report_id");
     event.as_object_mut().unwrap().remove("report_revision");
     assert_eq!(e.post("assigner", transition, &event).0, 201);
-    assert_eq!(e.post_k("dev-a", push, "pending-new", &write).1, confirmed);
+    assert_eq!(e.post_k("dev-a", push, "pending-new", &write).0, 409);
     assert_eq!(e.post_k("judge", merge, "before-approval", &write).0, 409);
     assert_eq!(
         e.post(
@@ -587,6 +624,19 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
     assert_eq!(e.post_k("judge", merge, "merge-another-key", &write).0, 409);
     e.reopen_github_server(config);
     let merge_intent = json!({"repo_id":"repo-a","request_id":"merge-lost"});
+    for _ in 0..2 {
+        let (status, pending) = e.post("judge", reconcile, &merge_intent);
+        assert_eq!(status, 202, "{pending}");
+        assert_eq!(pending["outcome"], "unknown");
+        assert_eq!(
+            e.post_k("judge", merge, "merge-still-blocked", &write).0,
+            409
+        );
+        assert_eq!(
+            e.post_k("judge", merge, "merge-lost", &write).1["outcome"],
+            "unknown"
+        );
+    }
     let (status, reconciled) = e.post("judge", reconcile, &merge_intent);
     assert_eq!(status, 200, "{reconciled}");
     assert_eq!(reconciled["merged_sha"], MERGE);
@@ -608,5 +658,8 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
         .filter(|(method, _, _)| method == "PUT")
         .collect();
     assert_eq!(puts.len(), 2);
-    assert!(puts.iter().all(|entry| entry.2 == json!({"sha":sha})));
+    assert!(
+        puts.iter()
+            .all(|entry| entry.2 == json!({"sha":sha,"merge_method":"merge"}))
+    );
 }

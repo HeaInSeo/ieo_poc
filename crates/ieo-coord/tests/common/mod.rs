@@ -89,7 +89,7 @@ pub type PrincipalRow = (
     Option<&'static str>,
 );
 
-pub const PRINCIPALS: [PrincipalRow; 19] = [
+pub const PRINCIPALS: [PrincipalRow; 20] = [
     // role supervisors' checkpoint report credentials (02-04 decision item 9)
     (
         "sup-dev-a",
@@ -176,6 +176,13 @@ pub const PRINCIPALS: [PrincipalRow; 19] = [
         &["judge:verify", "github:merge"],
         &["repo-a", "repo-b"],
         None,
+    ),
+    (
+        "dev-a-other",
+        "agent",
+        &["github:push"],
+        &["repo-a"],
+        Some("development"),
     ),
     ("courier", "service", &["outbox:deliver"], &["repo-a"], None),
     (
