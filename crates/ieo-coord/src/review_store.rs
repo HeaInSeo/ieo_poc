@@ -76,6 +76,10 @@ pub(crate) fn load(
 }
 
 pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
+    record_inner(tx, who, parse_body(body)?, false)
+}
+
+fn record_inner(tx: &mut Transaction, who: &Caller, request: Value, issuing_assignment: bool) -> R {
     need_client_scope(who, "coordinator:assign", false)?;
     if who.kind != Kind::Service {
         return Err(problem(
@@ -84,7 +88,6 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             "review transitions require a service principal",
         ));
     }
-    let request = parse_body(body)?;
     only_keys(
         &request,
         &[
@@ -145,6 +148,13 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
             | "reject"
     ) {
         return Err(problem(400, "SCHEMA_VIOLATION", "unknown review action"));
+    }
+    if action == "replace" && !issuing_assignment {
+        return Err(problem(
+            409,
+            "REVIEW_REPLACEMENT_REQUIRES_ASSIGNMENT",
+            "issue the replacement through the assignment endpoint",
+        ));
     }
     lock(tx, &format!("scope:{repo}:development"))?;
     lock(tx, &format!("scope:{repo}:guardrail"))?;
@@ -383,6 +393,45 @@ pub(crate) fn record(tx: &mut Transaction, who: &Caller, body: &[u8]) -> R {
     ok(201, response)
 }
 
+/// A replacement becomes current and spends its allowance in the same transaction.
+/// The caller already holds the development and Guardrail scope locks.
+pub(crate) fn reserve_replacement(
+    tx: &mut Transaction,
+    who: &Caller,
+    assignment: &Value,
+) -> Result<(), crate::api::Resp> {
+    let repo = str_field(assignment, "repo_id", 256)?;
+    let sprint = str_field(assignment, "sprint_id", 256)?;
+    let task = str_field(assignment, "task_id", 32)?;
+    let Some(state) = load(tx, repo, sprint, task)? else {
+        return Ok(());
+    };
+    if state.phase() != ReviewPhase::TimedOut {
+        return Ok(());
+    }
+    let row = tx.query_one(
+        "SELECT request->'pull_request', seq FROM review_transitions
+         WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3 AND request->>'action'='timeout'
+         ORDER BY seq DESC LIMIT 1",
+        &[&repo, &sprint, &task],
+    )?;
+    let pr: Value = row.get(0);
+    let seq: i64 = row.get(1);
+    record_inner(
+        tx,
+        who,
+        json!({
+            "event_id": format!("replacement-for-timeout-{seq}"),
+            "repo_id": repo, "sprint_id": sprint, "task_id": task,
+            "head_sha": assignment["target_sha"], "pull_request": pr,
+            "assignment_id": assignment["assignment_id"], "generation": assignment["generation"],
+            "action": "replace"
+        }),
+        true,
+    )?;
+    Ok(())
+}
+
 fn active_assignment(
     tx: &mut Transaction,
     repo: &str,
@@ -396,6 +445,21 @@ fn active_assignment(
            AND response->>'outcome'='recorded' ORDER BY seq DESC LIMIT 1",
         &[&repo, &sprint, &task],
     )?.map(|r| (r.get(0), r.get(1))))
+}
+
+pub(crate) fn pull_request(
+    tx: &mut Transaction,
+    repo: &str,
+    sprint: &str,
+    task: &str,
+) -> Result<Option<i64>, crate::api::Resp> {
+    tx.query_opt(
+        "SELECT (request->>'pull_request')::bigint FROM review_transitions
+         WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3 ORDER BY seq LIMIT 1",
+        &[&repo, &sprint, &task],
+    )?
+    .map(|row| row.try_get::<_, i64>(0).map_err(Into::into))
+    .transpose()
 }
 
 pub(crate) fn blocks_judgment(

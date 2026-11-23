@@ -114,7 +114,25 @@ fn pending_review_blocks_judgment_until_the_current_guardrail_report_is_recorded
     let (status, result) = e.post("assigner", path, &transition);
     assert_eq!(status, 201, "{result}");
     assert_eq!(result["approved_head"], SHA1);
-    assert_eq!(judge(&e, "approved", "01-01").1["outcome"], "accepted");
+    assert_eq!(
+        judge(&e, "without-pr-evidence", "01-01").1["outcome"],
+        "not_accepted"
+    );
+    for number in [8, 7] {
+        assert_eq!(evidence(&e, &format!("pr-{number}-ci"), "ci_run",
+            json!({"sha":SHA1,"source_ref":"actions/pr-check","conclusion":"success","pull_request":number})).0, 201);
+        assert_eq!(evidence(&e, &format!("pr-{number}-merge"), "merge",
+            json!({"head_sha":SHA1,"merged_sha":MERGE,"source_ref":"pull/merge","pull_request":number})).0, 201);
+        let expected = if number == 7 {
+            "accepted"
+        } else {
+            "not_accepted"
+        };
+        assert_eq!(
+            judge(&e, &format!("judge-pr-{number}"), "01-01").1["outcome"],
+            expected
+        );
+    }
 }
 
 #[test]
@@ -162,6 +180,17 @@ fn timeout_fences_the_old_assignment_and_replacement_is_spent_once() {
         0
     );
 
+    let (status, wrong) = assign(&e, "guardrail", "WRONG", 0, "01-01", SHA2, json!(null));
+    assert_eq!(status, 409, "{wrong}");
+    let active = e
+        .db()
+        .query_one(
+            "SELECT count(*) FROM assignment_heads WHERE role='guardrail'",
+            &[],
+        )
+        .unwrap()
+        .get::<_, i64>(0);
+    assert_eq!(active, 0);
     assert_eq!(
         assign(&e, "guardrail", "G2", 0, "01-01", SHA1, json!(null)).0,
         201
@@ -170,8 +199,8 @@ fn timeout_fences_the_old_assignment_and_replacement_is_spent_once() {
     event["assignment_id"] = json!("G2");
     event["action"] = json!("replace");
     let (status, replaced) = e.post("assigner", path, &event);
-    assert_eq!(status, 201, "{replaced}");
-    assert_eq!(replaced["phase"], "Pending");
+    assert_eq!(status, 409, "{replaced}");
+    assert_eq!(replaced["code"], "REVIEW_REPLACEMENT_REQUIRES_ASSIGNMENT");
     age();
     event["event_id"] = json!("timeout-2");
     event["action"] = json!("timeout");

@@ -2769,6 +2769,9 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             ));
         }
     };
+    if role == "guardrail" {
+        lock(tx, &format!("scope:{repo}:development"))?;
+    }
     lock(tx, &format!("scope:{repo}:{role}"))?;
     // the registry lock keeps the revision checks below stable until commit (review 1e98f17 F5)
     // and serializes all assignments, so one assignment_id raced by two roles (F6) cannot
@@ -3070,6 +3073,9 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
          ON CONFLICT (sprint_id, task_id, role) DO UPDATE SET issued = task_attempts.issued + 1",
         &[&sprint_id, &task_id, &role],
     )?;
+    if role == "guardrail" {
+        crate::review_store::reserve_replacement(tx, who, &body)?;
+    }
     history(
         tx,
         &who.name,
@@ -3213,6 +3219,15 @@ pub(crate) fn branch_ref_of<'a>(v: &'a Value, field: &str) -> Result<&'a str, Re
 
 fn validate_evidence(v: &Value) -> Result<(String, String), Resp> {
     let kind = str_field(v, "kind", 32)?.to_string();
+    if let Some(pr) = v.get("pull_request")
+        && !pr.as_i64().is_some_and(|number| number > 0)
+    {
+        return Err(problem(
+            400,
+            "SCHEMA_VIOLATION",
+            "pull_request must be a positive integer",
+        ));
+    }
     let sha_of = |k: &str| -> Result<String, Resp> {
         let s = str_field(v, k, 64)?;
         if is_sha(s) {
@@ -3250,13 +3265,16 @@ fn validate_evidence(v: &Value) -> Result<(String, String), Resp> {
     }
     let sha = match kind.as_str() {
         "ci_run" | "main_ci" => {
-            only_keys(v, &keys(&["sha", "conclusion", "source_ref"]))?;
+            only_keys(
+                v,
+                &keys(&["sha", "conclusion", "source_ref", "pull_request"]),
+            )?;
             conclusion()?;
             str_field(v, "source_ref", 512)?;
             sha_of("sha")?
         }
         "run_record" => {
-            only_keys(v, &keys(&["sha", "source_ref", "record"]))?;
+            only_keys(v, &keys(&["sha", "source_ref", "record", "pull_request"]))?;
             str_field(v, "source_ref", 512)?;
             if !v["record"]["judgment"]["counts_as_success"].is_boolean()
                 || v["record"]["format"].as_str().is_none()
@@ -3274,7 +3292,14 @@ fn validate_evidence(v: &Value) -> Result<(String, String), Resp> {
         "review" => {
             only_keys(
                 v,
-                &keys(&["sha", "reviewer", "author", "state", "source_ref"]),
+                &keys(&[
+                    "sha",
+                    "reviewer",
+                    "author",
+                    "state",
+                    "source_ref",
+                    "pull_request",
+                ]),
             )?;
             str_field(v, "reviewer", 256)?;
             str_field(v, "author", 256)?;
@@ -3292,7 +3317,10 @@ fn validate_evidence(v: &Value) -> Result<(String, String), Resp> {
             sha_of("sha")?
         }
         "merge" => {
-            only_keys(v, &keys(&["head_sha", "merged_sha", "source_ref"]))?;
+            only_keys(
+                v,
+                &keys(&["head_sha", "merged_sha", "source_ref", "pull_request"]),
+            )?;
             str_field(v, "source_ref", 512)?;
             sha_of("merged_sha")?;
             sha_of("head_sha")?
@@ -3403,14 +3431,16 @@ fn ci_ok(
     repo: &str,
     kinds: &[&str],
     sha: &str,
+    pull_request: Option<i64>,
     used: &mut Vec<String>,
 ) -> Result<bool, Resp> {
     let kinds: Vec<String> = kinds.iter().map(|s| s.to_string()).collect();
     let rows = tx.query(
         "SELECT DISTINCT ON (body->>'source_ref') evidence_id, kind, body FROM evidence
          WHERE repo_id = $1 AND kind = ANY($2) AND sha = $3
+           AND ($4::bigint IS NULL OR body->>'pull_request' = $4::bigint::text)
          ORDER BY body->>'source_ref', seq DESC",
-        &[&repo, &kinds, &sha],
+        &[&repo, &kinds, &sha, &pull_request],
     )?;
     let mut all = !rows.is_empty();
     for r in &rows {
@@ -3540,7 +3570,15 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         ));
     };
     let mut used = Vec::new();
-    let ci = ci_ok(tx, &repo, &["ci_run", "run_record"], &head_sha, &mut used)?;
+    let pull_request = crate::review_store::pull_request(tx, &repo, &sprint_id, &task_id)?;
+    let ci = ci_ok(
+        tx,
+        &repo,
+        &["ci_run", "run_record"],
+        &head_sha,
+        pull_request,
+        &mut used,
+    )?;
     // G3 review inputs (N4): the guardrail claim must be the *current* guardrail
     // (assignment, generation) at judgment time and for this task
     let mut reviews: Vec<(String, String)> = Vec::new();
@@ -3566,8 +3604,9 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         "SELECT DISTINCT ON (body->>'reviewer') evidence_id, body->>'state' FROM evidence
          WHERE repo_id = $1 AND kind = 'review' AND sha = $2 AND body->>'reviewer' <> body->>'author'
            AND body->>'state' IN ('approved', 'changes_requested', 'dismissed')
+           AND ($3::bigint IS NULL OR body->>'pull_request' = $3::bigint::text)
          ORDER BY body->>'reviewer', seq DESC",
-        &[&repo, &head_sha],
+        &[&repo, &head_sha, &pull_request],
     )? {
         let state: String = r.get(1);
         let verdict = match state.as_str() {
@@ -3613,15 +3652,16 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     let merged: Option<String> = tx
         .query_opt(
             "SELECT body->>'merged_sha', evidence_id FROM evidence WHERE repo_id = $1 AND kind = 'merge' AND sha = $2
+               AND ($3::bigint IS NULL OR body->>'pull_request' = $3::bigint::text)
              ORDER BY seq DESC LIMIT 1",
-            &[&repo, &head_sha],
+            &[&repo, &head_sha, &pull_request],
         )?
         .map(|r| {
             used.push(format!("evidence:{}", r.get::<_, String>(1)));
             r.get(0)
         });
     let main_ci = match &merged {
-        Some(m) => ci_ok(tx, &repo, &["main_ci"], m, &mut used)?,
+        Some(m) => ci_ok(tx, &repo, &["main_ci"], m, None, &mut used)?,
         None => false,
     };
     // G7: only required outputs are judged
