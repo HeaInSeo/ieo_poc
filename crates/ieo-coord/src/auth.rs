@@ -53,10 +53,16 @@ pub fn token_digest(token: &str) -> String {
 
 // `checkpoint:report`: a role supervisor's report credential (runtime contract §2.1, §5-1); bound
 // to one repo and role like the agent credentials, held by the supervisor (not the model)
-const AGENT_SCOPES: [&str; 3] = ["agent:report", "agent:repro", "checkpoint:report"];
-const CLIENT_SCOPES: [&str; 10] = [
+const AGENT_SCOPES: [&str; 4] = [
+    "agent:report",
+    "agent:repro",
+    "checkpoint:report",
+    "github:push",
+];
+const CLIENT_SCOPES: [&str; 11] = [
     // repo-scope status/stop of the role supervisors (runtime contract §7, 02-04)
     "roles:control",
+    "github:merge",
     "sprints:register",
     "sprints:read",
     "review:semantic",
@@ -124,7 +130,10 @@ impl Credentials {
                         return Err(format!("{name}: an agent needs role development|guardrail"));
                     }
                     if scopes.iter().any(|x| !AGENT_SCOPES.contains(&x.as_str())) {
-                        return Err(format!("{name}: agents carry only agent:* scopes"));
+                        return Err(format!("{name}: unknown agent scope"));
+                    }
+                    if scopes.contains("github:push") && role.as_deref() != Some("development") {
+                        return Err(format!("{name}: github:push is for development only"));
                     }
                     if scopes.contains("agent:repro") && role.as_deref() != Some("guardrail") {
                         return Err(format!("{name}: agent:repro is for guardrail only"));

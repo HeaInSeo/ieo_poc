@@ -31,6 +31,7 @@ pub struct Ctx {
     pub bindings: Value,
     /// Role supervisors per repo (`--roles`, runtime contract §7), for repo-scope status/stop.
     pub roles: Value,
+    pub github_writes: Option<crate::github_write::Config>,
 }
 
 pub struct Req<'a> {
@@ -348,6 +349,8 @@ pub enum Operation<'a> {
     },
     Ingest,
     ReviewTransition,
+    GithubPush,
+    GithubMerge,
     Judge,
     ListOutbox,
     Deliver {
@@ -458,6 +461,8 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         },
         ("POST", ["v0", "coordinator", "evidence"]) => Operation::Ingest,
         ("POST", ["v0", "coordinator", "review-transitions"]) => Operation::ReviewTransition,
+        ("POST", ["v0", "coordinator", "github", "push"]) => Operation::GithubPush,
+        ("POST", ["v0", "coordinator", "github", "merge"]) => Operation::GithubMerge,
         ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
         ("GET", ["v0", "coordinator", "outbox"]) => Operation::ListOutbox,
         ("POST", ["v0", "coordinator", "outbox", id, "delivery"]) => Operation::Deliver { id },
@@ -754,6 +759,9 @@ pub fn dispatch(
         Operation::Ingest => run(db, &|tx| ingest(tx, who, req)),
         Operation::ReviewTransition => {
             run(db, &|tx| crate::review_store::record(tx, who, req.body))
+        }
+        Operation::GithubPush | Operation::GithubMerge => {
+            crate::github_write::execute(db, ctx, who, req, guard, op == Operation::GithubMerge)
         }
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
         Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
@@ -3381,7 +3389,10 @@ fn ingest(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
     }
     let id = str_field(&body, "evidence_id", 256)?.to_string();
     let (kind, sha) = validate_evidence(&body)?;
-    if matches!(kind.as_str(), "branch_head" | "ci_run") {
+    if matches!(
+        kind.as_str(),
+        "branch_head" | "ci_run" | "run_record" | "review"
+    ) {
         lock(tx, &format!("delivery-evidence:{repo}"))?;
     }
     lock(tx, &format!("evidence:{repo}:{id}"))?;
@@ -3426,7 +3437,7 @@ fn ingest(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
 // ---------------------------------------------------------------------------
 
 /// Latest row per `source_ref` among (kinds) at `sha`; true when non-empty and all succeed.
-fn ci_ok(
+pub(crate) fn ci_ok(
     tx: &mut Transaction,
     repo: &str,
     kinds: &[&str],

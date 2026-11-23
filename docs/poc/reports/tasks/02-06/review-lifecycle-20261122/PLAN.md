@@ -25,3 +25,11 @@
 - 내부 `POST /v0/coordinator/review-transitions`는 repo 범위의 서비스 배정 권한과 해당 Guardrail 배정을 요구한다. 판정은 같은 배정·세대·SHA의 기존 Guardrail 보고를 참조한다. 별도 이벤트 ID로 멱등 조회하며 늦은 판정은 현재 상태에 반영하지 않는다.
 - 전이는 PostgreSQL에 추가 전용으로 기록하며 각 요청에서 순서대로 재구성한다. 검토 경로가 등록된 작업의 coordinator 전달과 최종 판정이 이 상태를 읽는다. 기존 배정은 검토 전이 등록 전의 계약을 따른다.
 - timeout 분류의 단위 시험은 기존 판정 정책만 검증한다. timeout 대체 회차를 원장에 원자적으로 예약하고 이전 역할 권한을 회수하는 연결, PR 식별자·GitHub push/조건부 병합 어댑터, 재현 요청 실행 경로와 역할 경계의 시험은 전체 수용 전에 남아 있다.
+
+## 통합 구현과 검증 경계
+
+코디네이터는 timeout에서 Guardrail 현재 배정 포인터를 회수하고, 같은 SHA 대체 배정의 활성화와 회차 차감을 같은 트랜잭션으로 기록한다. 새 head가 관측되면 종료된 기존 검토의 무효화를 먼저 기록해 새 후보를 배정할 수 있다. 이전 배정의 결과는 현재 판정에 쓰지 않는다.
+
+내부 GitHub 쓰기 경로는 기본 비활성이다. `--github-writes`는 repo ID별 `repository` 및 별도 `push_token_file`, `merge_token_file` 경로와 병합에 필요한 CI 증거 출처 목록 `required_checks`를 받는다. 토큰은 코디네이터가 읽는다. `POST /v0/coordinator/github/push`는 현재 개발 배정과 해당 PR, 현재 개발/교정 단계를 확인해 GitHub에 존재하는 커밋의 topic branch ref를 fast-forward 갱신한다. `POST /v0/coordinator/github/merge`는 병합 서비스의 범위, 승인·필수 검사 증거, PR과 정확한 SHA를 대조한 뒤 승인 SHA를 GitHub 요청 본문에 넣는다. 쓰기 의도는 전송 전에 기록하고 결과가 불명확하면 같은 PR의 후속 쓰기를 차단한다. 배정과 운영 브랜치의 기존 설정은 변경하지 않았다.
+
+격리 시험은 실제 coordinator HTTP 서버, PostgreSQL과 로컬 GitHub HTTP fixture를 사용한다. 보호된 실제 GitHub에서 자격 회수·head 경쟁·역할 격리를 실증하는 담당은 04-07/P07이다. 보호 규칙·App 설정 대조와 권한 변경 수용은 05-03/P23에 남긴다.

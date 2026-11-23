@@ -12,6 +12,7 @@ fn apply(state: &mut ReviewLifecycle, event: &Value, can_replace: bool) -> Resul
     let sha = event["head_sha"].as_str().unwrap_or_default();
     let round = state.review_round();
     match event["action"].as_str() {
+        Some("open") if state.phase() == ReviewPhase::Development => Ok(()),
         Some("submit") => state.submit(sha, round + 1),
         Some("head_changed") => state.observe_head_change(sha, round + 1),
         Some("invalidate") => state.invalidate_head(sha),
@@ -138,7 +139,8 @@ fn record_inner(tx: &mut Transaction, who: &Caller, request: Value, issuing_assi
     };
     if !matches!(
         action,
-        "submit"
+        "open"
+            | "submit"
             | "head_changed"
             | "invalidate"
             | "reassign"
@@ -192,11 +194,18 @@ fn record_inner(tx: &mut Transaction, who: &Caller, request: Value, issuing_assi
             "the task is already bound to another pull request",
         ));
     }
+    if action == "open" && pull_request_recorded(tx, repo, sprint, task)? {
+        return Err(problem(
+            409,
+            "REVIEW_ALREADY_OPEN",
+            "the pull request is already bound",
+        ));
+    }
     let Some(row) = tx.query_opt(
         "SELECT EXISTS (SELECT 1 FROM assignment_heads h
           WHERE h.repo_id=a.repo_id AND h.role=a.role AND h.assignment_id=a.assignment_id
             AND h.generation=a.generation)
-         FROM assignments a WHERE a.repo_id=$1 AND a.role='guardrail' AND a.sprint_id=$2
+         FROM assignments a WHERE a.repo_id=$1 AND a.role=CASE WHEN $7='open' THEN 'development' ELSE 'guardrail' END AND a.sprint_id=$2
           AND a.task_id=$3 AND a.assignment_id=$4 AND a.generation=$5
           AND (a.target_sha=$6 OR $7='invalidate')",
         &[
@@ -445,6 +454,15 @@ fn active_assignment(
            AND response->>'outcome'='recorded' ORDER BY seq DESC LIMIT 1",
         &[&repo, &sprint, &task],
     )?.map(|r| (r.get(0), r.get(1))))
+}
+
+fn pull_request_recorded(
+    tx: &mut Transaction,
+    repo: &str,
+    sprint: &str,
+    task: &str,
+) -> Result<bool, crate::api::Resp> {
+    Ok(pull_request(tx, repo, sprint, task)?.is_some())
 }
 
 pub(crate) fn pull_request(

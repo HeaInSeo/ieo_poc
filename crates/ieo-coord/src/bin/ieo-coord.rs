@@ -95,6 +95,9 @@ fn run() -> Result<(), String> {
                     manifest,
                     bindings,
                     roles,
+                    github_writes: arg(&args, "--github-writes")
+                        .map(|path| read_json(&path).and_then(ieo_coord::github_write::Config::github))
+                        .transpose()? ,
                 },
                 creds,
             };

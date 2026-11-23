@@ -49,6 +49,7 @@ pub struct ReviewLifecycle {
     reviews: u8,
     corrections: u8,
     unauthorized_head_change: bool,
+    expired: bool,
 }
 
 impl Default for ReviewLifecycle {
@@ -60,6 +61,7 @@ impl Default for ReviewLifecycle {
             reviews: 0,
             corrections: 0,
             unauthorized_head_change: false,
+            expired: false,
         }
     }
 }
@@ -106,13 +108,14 @@ impl ReviewLifecycle {
     }
 
     pub(crate) fn invalidate_head(&mut self, head: &str) -> Result<(), ReviewError> {
-        if !matches!(self.phase, ReviewPhase::Pending | ReviewPhase::Approved) {
+        if !self.expired && !matches!(self.phase, ReviewPhase::Pending | ReviewPhase::Approved) {
             return Err(ReviewError::WrongPhase);
         }
         if self.candidate.as_deref() == Some(head) {
             return Err(ReviewError::WrongCandidate);
         }
         self.unauthorized_head_change = true;
+        self.expired = false;
         self.phase = ReviewPhase::Blocked;
         Ok(())
     }
@@ -142,6 +145,7 @@ impl ReviewLifecycle {
         if self.candidate.as_deref() != Some(head) {
             return Err(ReviewError::WrongCandidate);
         }
+        self.expired = true;
         self.phase = if can_replace {
             ReviewPhase::TimedOut
         } else {
@@ -234,6 +238,7 @@ impl ReviewLifecycle {
             return Err(ReviewError::InvalidGeneration);
         }
         self.reviews += 1;
+        self.expired = false;
         self.candidate = Some(head.to_owned());
         self.generation = Some(generation);
         self.phase = ReviewPhase::Pending;

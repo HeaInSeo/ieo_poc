@@ -616,3 +616,18 @@ CREATE TABLE IF NOT EXISTS review_transitions (
 
 CREATE OR REPLACE TRIGGER review_transitions_append_only BEFORE UPDATE OR DELETE ON review_transitions
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
+-- Durable intent before an external write. A missing result is unresolved and
+-- blocks further writes on that PR until the original effect can be reconciled.
+CREATE TABLE IF NOT EXISTS github_write_intents (
+    repo_id text NOT NULL,
+    request_id text NOT NULL,
+    pull_request bigint NOT NULL,
+    principal text NOT NULL,
+    request jsonb NOT NULL,
+    result jsonb,
+    PRIMARY KEY (repo_id, request_id)
+);
+
+ALTER TABLE review_transitions ADD COLUMN IF NOT EXISTS recorded_at timestamptz
+    NOT NULL DEFAULT clock_timestamp();
