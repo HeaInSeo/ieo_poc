@@ -3546,16 +3546,26 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "fix task_id",
         ));
     }
-    // G2: the head SHA is the coordinator's record for the current development assignment
-    let dev = load_book(tx, &repo, "development")?;
-    let head = match &dev.current {
-        Some((a, g)) => tx.query_opt(
-            "SELECT target_sha, assignment_id, generation, sprint_revision FROM assignments
-             WHERE assignment_id = $1 AND generation = $2 AND sprint_id = $3 AND task_id = $4",
-            &[a, &i64_of(*g), &sprint_id, &task_id],
-        )?,
-        None => None,
-    };
+    // G2: use the active development assignment for this task when present.
+    // After development moves on, the task's last durable assignment is the
+    // head for judgment only. Its history sequence reflects assignment order
+    // under the role lock, even when request timestamps arrive out of order.
+    let head = tx.query_opt(
+        "SELECT a.target_sha, a.assignment_id, a.generation, a.sprint_revision
+         FROM assignments a
+         LEFT JOIN assignment_heads active ON
+             (active.repo_id, active.role, active.assignment_id, active.generation) =
+             (a.repo_id, a.role, a.assignment_id, a.generation)
+         LEFT JOIN history h ON h.action='assignment.issued'
+             AND h.subject->>'repo_id'=a.repo_id AND h.subject->>'role'=a.role
+             AND h.subject->>'assignment_id'=a.assignment_id
+             AND h.subject->>'generation'=a.generation::text
+         WHERE a.repo_id=$1 AND a.role='development' AND a.sprint_id=$2 AND a.task_id=$3
+           AND (active.assignment_id IS NOT NULL OR h.seq IS NOT NULL)
+         ORDER BY (active.assignment_id IS NOT NULL) DESC, h.seq DESC NULLS LAST
+         LIMIT 1",
+        &[&repo, &sprint_id, &task_id],
+    )?;
     let Some(head) = head else {
         return Err(one(
             409,

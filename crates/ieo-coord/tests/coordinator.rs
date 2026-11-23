@@ -4868,6 +4868,72 @@ fn the_assignment_chain_is_read_by_clients_of_its_repo_only() {
     }
 }
 
+#[test]
+fn completed_evidence_stays_with_its_task_after_development_moves_on() {
+    let Some(e) = start() else { return };
+    let mut s = spec("repo-a", 5, 3);
+    // Make the next fixture task independent so switching does not require
+    // first judging the task whose evidence is under test.
+    s["tasks"][1]["prerequisites"] = json!([]);
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    assert_eq!(
+        e.post_k(
+            "alice",
+            "/v0/sprints?mode=executable",
+            "reg-independent",
+            &s
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/5/semantic-review",
+            &json!({"decision":"passed","reason":"fixture","digest":s["digest"]})
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    full_evidence(&e, SHA1, "earlier-task");
+    assert_eq!(
+        evidence(
+            &e,
+            "earlier-reviewed",
+            "review",
+            json!({"sha": SHA1, "reviewer": "rev", "author": "dev",
+                   "state": "approved", "source_ref": "pull/1#r2"})
+        )
+        .0,
+        201
+    );
+    let (status, next) = assign(
+        &e,
+        "development",
+        "A2",
+        0,
+        "01-02",
+        SHA2,
+        json!({"assignment_id":"A1","generation":0}),
+    );
+    assert_eq!(status, 201, "{next}");
+    let (status, verdict) = judge(&e, "judge-earlier-task", "01-01");
+    assert_eq!(
+        (
+            status,
+            verdict["head_sha"].as_str(),
+            verdict["outcome"].as_str()
+        ),
+        (201, Some(SHA1), Some("accepted")),
+        "{verdict}"
+    );
+    assert_eq!(judge(&e, "judge-earlier-task", "01-01").0, 200);
+}
+
 /// PLAN §3.2 step 4: with no agent report, no takeover and no first action the chain and the
 /// completion judgment proceed; claims that arrive later are stored as claims and change no
 /// judgment.
