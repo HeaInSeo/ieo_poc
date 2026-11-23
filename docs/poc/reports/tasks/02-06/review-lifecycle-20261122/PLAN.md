@@ -1,0 +1,37 @@
+# 02-06 현재 SHA 검토·교정·timeout 연결
+
+02-05 수용 원장 #120의 병합 `ae0a8435744690e4eb68460633cfeda3c8567b46`를 기준으로 착수했다. [병합 SHA CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45023429176) · [02-05 증거](../../02-05/stage9-20261122/REPORT.md)
+
+적용 기준은 `02-06.accept`, [검증 계획 §1.9와 P07](../../../../Console_Coordinator_PoC_Validation_Plan.md), [사용자 결정 D3](../../../../User_Decisions_2026-11-12_0103.md)이다. 작업당 검토 4회·교정 3회를 유지한다. timeout의 시험 후보는 경고 30분·초과 60분·대체 1회이며, 시험에서는 주입한 시계와 합성 입력을 사용한다. 이 값은 운영 프로파일 채택을 뜻하지 않는다.
+
+## 작업 순서와 확인 기준
+
+| 범위 | 기대 증거 |
+| --- | --- |
+| 검토 배정 | 작업·PR·후보 SHA·배정 세대에 검토를 귀속한다. 개발과 검토의 권한 주체를 구분한다. 제출 즉시 검토 대기를 기록하고 교정 권한이 생긴 동안에만 해당 작업의 push를 허용한다. |
+| 교정과 새 head | 반려·교정 한도를 원자적으로 누적한다. 대기 중 head 변경은 기존 검토를 무효화하고 위반을 보존한다. 새 SHA의 독립 검토와 해당 SHA의 CI가 필요하다. |
+| timeout과 대체 후보 | 미인수·무응답·진행 중 초과를 구분한다. 기존 세대의 쓰기 권한 회수와 새 세대 배정을 대조한다. 대체 한도는 재시작과 ID 변경에도 유지한다. 늦은 결과는 이전 계보에 보존한다. |
+| 병합과 후속 | 필수 검사·승인 철회·현재 프로파일을 대조한다. 병합 어댑터는 승인된 head를 서버의 조건 값으로 요구한다. 완료한 같은 병합 SHA의 main CI가 없으면 의존 작업은 진행하지 않는다. |
+| 역할 경계·재현 요청 | 기존 체크포인트·할당·권한을 재사용한다. 개발/Guardrail의 세션·worktree·자격 경계를 P07 시험으로 인계한다. 재현 실행의 supervisor 경유와 추적 항목은 02-05 단계 6의 이월을 확인한다. |
+
+## 기존 구현과 경계
+
+- PostgreSQL의 `assignment_heads`, `assignments`, `task_attempts`가 현재 세대와 누적 시도 제한을 집행한다. `assign`은 같은 요청의 역사 조회를 지원하고 이전 세대를 다시 활성화하지 않는다. 검토 전이는 이 잠금 및 세대 제약을 재사용할 후보가 된다.
+- 판정 경로는 현재 배정·SHA의 독립 검토, 정확한 병합 SHA 및 그 SHA의 main CI를 별도로 읽는다. 현재 SHA 판정의 선행 조건으로 활용한다.
+- 실제 GitHub 신원과 PR 상태 수집은 기존 1b 범위다. 구현 검증은 격리 DB와 고정 증거 입력에서 시작한다. 실제 보호 저장소 권한, 실행 중단, 파일·자격 격리는 P07의 검증 범위다.
+
+## 구현 체크포인트
+
+- 내부 `POST /v0/coordinator/review-transitions`는 repo 범위의 서비스 배정 권한과 해당 Guardrail 배정을 요구한다. 판정은 같은 배정·세대·SHA의 기존 Guardrail 보고를 참조한다. 별도 이벤트 ID로 멱등 조회하며 늦은 판정은 현재 상태에 반영하지 않는다.
+- 전이는 PostgreSQL에 추가 전용으로 기록하며 각 요청에서 순서대로 재구성한다. 검토 경로가 등록된 작업의 coordinator 전달과 최종 판정이 이 상태를 읽는다. 기존 배정은 검토 전이 등록 전의 계약을 따른다.
+- timeout 분류의 단위 시험은 기존 판정 정책만 검증한다. timeout 대체 회차를 원장에 원자적으로 예약하고 이전 역할 권한을 회수하는 연결, PR 식별자·GitHub push/조건부 병합 어댑터, 재현 요청 실행 경로와 역할 경계의 시험은 전체 수용 전에 남아 있다.
+
+## 통합 구현과 검증 경계
+
+코디네이터는 timeout에서 Guardrail 현재 배정 포인터를 회수하고, 같은 SHA 대체 배정의 활성화와 회차 차감을 같은 트랜잭션으로 기록한다. 새 head가 관측되면 종료된 기존 검토의 무효화를 먼저 기록해 새 후보를 배정할 수 있다. 이전 배정의 결과는 현재 판정에 쓰지 않는다.
+
+내부 GitHub 쓰기 경로는 기본 비활성이다. `--github-writes`는 repo ID별 `repository` 및 별도 `push_token_file`, `merge_token_file` 경로, 검토 대상 개발 작업공간에서 만든 Git bundle의 고정 경로 `push_bundle_file`, 병합에 필요한 CI 증거 출처 목록 `required_checks`를 받는다. 토큰은 코디네이터가 읽는다. `POST /v0/coordinator/github/push`는 현재 개발 배정과 해당 PR, 현재 개발/교정 단계를 확인해 Git bundle을 코디네이터의 임시 bare 저장소에 읽어 커밋 객체를 전송하고 해당 PR의 topic branch ref를 fast-forward 갱신한다. `POST /v0/coordinator/github/merge`는 병합 서비스의 범위, 승인·필수 검사 증거, PR과 정확한 SHA를 대조한 뒤 승인 SHA와 merge commit 방식을 GitHub 요청 본문에 넣는다. 쓰기 의도는 전송 전에 기록하고 결과가 불명확하면 같은 PR의 후속 쓰기를 차단한다. 배정과 운영 브랜치의 기존 설정은 변경하지 않았다.
+
+격리 시험은 실제 coordinator HTTP 서버, PostgreSQL과 로컬 GitHub HTTP fixture를 사용한다. 보호된 실제 GitHub에서 자격 회수·head 경쟁·역할 격리를 실증하는 담당은 04-07/P07이다. 보호 규칙·App 설정 대조와 권한 변경 수용은 05-03/P23에 남긴다.
+
+새 교정 커밋의 bundle은 허가된 개발 작업공간에서 `git bundle create <승인된 경로> HEAD`로 생성한다. 서버에서는 repo별로 구성한 파일만 읽고 실제 전송용 자격은 격리한 coordinator Git 프로세스에만 제공한다. 중단 뒤 `POST /v0/coordinator/github/reconcile`의 `repo_id`와 원래 `request_id`로 대조한다. Push는 PR head SHA와 브랜치 ref, 병합은 PR의 병합 SHA, main 이력, Git 커밋의 두 번째 부모가 승인 SHA인지 확인한다. 증거가 부족하면 unknown을 유지하고 해당 PR의 후속 쓰기를 차단한다. 읽기 결과만으로 재전송하지 않는다. 같은 PR·SHA·작업의 확인된 결과는 원 요청 주체와 전체 배정 요청이 일치할 때 새 키에서도 재사용한다. 대체 예산은 PR당 1회이고 새 head의 정상 검토는 별도 검토 회차로 센다.

@@ -474,6 +474,15 @@ fn record_request(
             "re-read the current assignment and deliver it",
         ));
     }
+    crate::review_store::check_delivery(
+        tx,
+        repo,
+        role,
+        &json!({
+            "sprint_id": h.get::<_, String>(4), "task_id": h.get::<_, String>(2),
+            "target_sha": h.get::<_, String>(3), "generation": generation, "assignment_id": aid
+        }),
+    )?;
     let attempt = body["attempt_id"].as_str().unwrap_or_default();
     if tx
         .query_opt(
@@ -999,6 +1008,15 @@ pub fn deliver(
             ));
         }
         lock(fence, &format!("delivery-evidence:{repo}"))?;
+        crate::review_store::check_delivery(
+            fence,
+            repo,
+            role,
+            &json!({
+                "sprint_id": rec["sprint_id"], "task_id": rec["task_id"],
+                "target_sha": d["target_sha"], "generation": generation, "assignment_id": aid
+            }),
+        )?;
         fence.batch_execute("SAVEPOINT checkpoint_snapshot")?;
         let final_judgment = compare_checkpoint(fence, repo, role, &local)?;
         let matches = final_judgment.body["central"] == again.body["central"]

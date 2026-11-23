@@ -598,3 +598,36 @@ CREATE OR REPLACE TRIGGER role_recovery_uses_append_only BEFORE UPDATE OR DELETE
     FOR EACH ROW EXECUTE FUNCTION forbid_change();
 
 INSERT INTO schema_meta (k, v) VALUES ('schema_version', 'ieo-coord-v0') ON CONFLICT (k) DO NOTHING;
+
+-- Review transitions are serialized under both role locks. Keep every recorded
+-- request, including late results, so restart cannot reset review counters.
+CREATE TABLE IF NOT EXISTS review_transitions (
+    seq bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    repo_id text NOT NULL,
+    sprint_id text NOT NULL,
+    task_id text NOT NULL,
+    event_id text NOT NULL,
+    principal text NOT NULL,
+    request jsonb NOT NULL,
+    response jsonb NOT NULL,
+    recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    UNIQUE (repo_id, sprint_id, task_id, event_id)
+);
+
+CREATE OR REPLACE TRIGGER review_transitions_append_only BEFORE UPDATE OR DELETE ON review_transitions
+    FOR EACH ROW EXECUTE FUNCTION forbid_change();
+
+-- Durable intent before an external write. A missing result is unresolved and
+-- blocks further writes on that PR until the original effect can be reconciled.
+CREATE TABLE IF NOT EXISTS github_write_intents (
+    repo_id text NOT NULL,
+    request_id text NOT NULL,
+    pull_request bigint NOT NULL,
+    principal text NOT NULL,
+    request jsonb NOT NULL,
+    result jsonb,
+    PRIMARY KEY (repo_id, request_id)
+);
+
+ALTER TABLE review_transitions ADD COLUMN IF NOT EXISTS recorded_at timestamptz
+    NOT NULL DEFAULT clock_timestamp();

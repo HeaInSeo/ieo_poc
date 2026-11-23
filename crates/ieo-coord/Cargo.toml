@@ -20,7 +20,8 @@ serde_json = "1.0.154"
 sha2 = "0.11.1"
 tiny_http = "0.12"
 signal-hook = "0.3"
-ureq = { version = "2", default-features = false, features = ["json"] }
+tempfile = "3"
+ureq = { version = "2", default-features = false, features = ["json", "tls"] }
 # X-04 gRPC adapter (contracts/ieo-internal-v0.md)
 ieo-proto = { path = "../ieo-proto" }
 tonic = "0.14"

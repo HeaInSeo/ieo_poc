@@ -89,7 +89,7 @@ pub type PrincipalRow = (
     Option<&'static str>,
 );
 
-pub const PRINCIPALS: [PrincipalRow; 19] = [
+pub const PRINCIPALS: [PrincipalRow; 20] = [
     // role supervisors' checkpoint report credentials (02-04 decision item 9)
     (
         "sup-dev-a",
@@ -173,15 +173,22 @@ pub const PRINCIPALS: [PrincipalRow; 19] = [
     (
         "judge",
         "service",
-        &["judge:verify"],
+        &["judge:verify", "github:merge"],
         &["repo-a", "repo-b"],
         None,
+    ),
+    (
+        "dev-a-other",
+        "agent",
+        &["github:push"],
+        &["repo-a"],
+        Some("development"),
     ),
     ("courier", "service", &["outbox:deliver"], &["repo-a"], None),
     (
         "dev-a",
         "agent",
-        &["agent:report"],
+        &["agent:report", "github:push"],
         &["repo-a"],
         Some("development"),
     ),
@@ -246,6 +253,7 @@ pub fn fixture(cfg: &Config, suffix: &str) -> (App, FixtureTokens, Value) {
             policy: policy::load(POLICY).expect("policy"),
             manifest,
             bindings,
+            github_writes: None,
             // repo-a's supervisors on a closed port: the report says unreachable, never "stopped"
             roles: json!({"repo-a": {
                 "development": {"url": "http://127.0.0.1:9", "adapter_token_file": "/nonexistent"},
@@ -257,6 +265,10 @@ pub fn fixture(cfg: &Config, suffix: &str) -> (App, FixtureTokens, Value) {
 }
 
 pub fn start() -> Option<Env> {
+    start_with_github(None)
+}
+
+pub fn start_with_github(github: Option<ieo_coord::github_write::Config>) -> Option<Env> {
     let base = base_config()?;
     let permit = Permit::acquire();
     let n = COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -273,7 +285,8 @@ pub fn start() -> Option<Env> {
     cfg.dbname(&dbname);
     let mut db = cfg.connect(NoTls).expect("connect test db");
     migrate(&mut db).expect("migrate");
-    let (app, tokens, _) = fixture(&cfg, &format!("{n}-{nanos}"));
+    let (mut app, tokens, _) = fixture(&cfg, &format!("{n}-{nanos}"));
+    app.ctx.github_writes = github;
     let server = tiny_http::Server::http("127.0.0.1:0").expect("bind");
     let addr = server
         .server_addr()
@@ -403,6 +416,20 @@ impl Env {
     pub fn get(&self, who: &str, path: &str) -> (u16, Value) {
         self.call(Some(who), "GET", path, None, None)
     }
+    pub fn reopen_github_server(&mut self, config: ieo_coord::github_write::Config) {
+        let (mut app, tokens, _) = fixture(&self.cfg, "github-reopened");
+        app.ctx.github_writes = Some(config);
+        let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
+        self.addr = server.server_addr().to_ip().unwrap().to_string();
+        self.app = std::sync::Arc::new(app);
+        self.tokens = tokens;
+        let app = std::sync::Arc::clone(&self.app);
+        let cfg = self.cfg.clone();
+        std::thread::spawn(move || {
+            let _ = serve(server, app, &cfg, 3);
+        });
+    }
+
     pub fn db(&self) -> Client {
         self.cfg.connect(NoTls).expect("db")
     }
