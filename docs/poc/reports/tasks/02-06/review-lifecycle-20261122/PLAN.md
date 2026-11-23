@@ -30,6 +30,8 @@
 
 코디네이터는 timeout에서 Guardrail 현재 배정 포인터를 회수하고, 같은 SHA 대체 배정의 활성화와 회차 차감을 같은 트랜잭션으로 기록한다. 새 head가 관측되면 종료된 기존 검토의 무효화를 먼저 기록해 새 후보를 배정할 수 있다. 이전 배정의 결과는 현재 판정에 쓰지 않는다.
 
-내부 GitHub 쓰기 경로는 기본 비활성이다. `--github-writes`는 repo ID별 `repository` 및 별도 `push_token_file`, `merge_token_file` 경로와 병합에 필요한 CI 증거 출처 목록 `required_checks`를 받는다. 토큰은 코디네이터가 읽는다. `POST /v0/coordinator/github/push`는 현재 개발 배정과 해당 PR, 현재 개발/교정 단계를 확인해 GitHub에 존재하는 커밋의 topic branch ref를 fast-forward 갱신한다. `POST /v0/coordinator/github/merge`는 병합 서비스의 범위, 승인·필수 검사 증거, PR과 정확한 SHA를 대조한 뒤 승인 SHA를 GitHub 요청 본문에 넣는다. 쓰기 의도는 전송 전에 기록하고 결과가 불명확하면 같은 PR의 후속 쓰기를 차단한다. 배정과 운영 브랜치의 기존 설정은 변경하지 않았다.
+내부 GitHub 쓰기 경로는 기본 비활성이다. `--github-writes`는 repo ID별 `repository` 및 별도 `push_token_file`, `merge_token_file` 경로, 검토 대상 개발 작업공간에서 만든 Git bundle의 고정 경로 `push_bundle_file`, 병합에 필요한 CI 증거 출처 목록 `required_checks`를 받는다. 토큰은 코디네이터가 읽는다. `POST /v0/coordinator/github/push`는 현재 개발 배정과 해당 PR, 현재 개발/교정 단계를 확인해 Git bundle을 코디네이터의 임시 bare 저장소에 읽어 커밋 객체를 전송하고 해당 PR의 topic branch ref를 fast-forward 갱신한다. `POST /v0/coordinator/github/merge`는 병합 서비스의 범위, 승인·필수 검사 증거, PR과 정확한 SHA를 대조한 뒤 승인 SHA를 GitHub 요청 본문에 넣는다. 쓰기 의도는 전송 전에 기록하고 결과가 불명확하면 같은 PR의 후속 쓰기를 차단한다. 배정과 운영 브랜치의 기존 설정은 변경하지 않았다.
 
 격리 시험은 실제 coordinator HTTP 서버, PostgreSQL과 로컬 GitHub HTTP fixture를 사용한다. 보호된 실제 GitHub에서 자격 회수·head 경쟁·역할 격리를 실증하는 담당은 04-07/P07이다. 보호 규칙·App 설정 대조와 권한 변경 수용은 05-03/P23에 남긴다.
+
+새 교정 커밋의 bundle은 허가된 개발 작업공간에서 `git bundle create <승인된 경로> HEAD`로 생성한다. 서버에서는 repo별로 구성한 파일만 읽고 실제 전송용 자격은 격리한 coordinator Git 프로세스에만 제공한다. 중단 뒤 `POST /v0/coordinator/github/reconcile`의 `repo_id`와 원래 `request_id`로 대조한다. Push는 PR head SHA와 브랜치 ref, 병합은 PR의 병합 SHA와 main 이력을 확인하며 읽기 결과만으로 재전송하지 않는다. 같은 PR·SHA·작업의 확인된 결과는 새 키에서도 재사용한다. 대체 예산은 PR당 1회이고 새 head의 정상 검토는 별도 검토 회차로 센다.

@@ -409,6 +409,20 @@ impl Env {
     pub fn get(&self, who: &str, path: &str) -> (u16, Value) {
         self.call(Some(who), "GET", path, None, None)
     }
+    pub fn reopen_github_server(&mut self, config: ieo_coord::github_write::Config) {
+        let (mut app, tokens, _) = fixture(&self.cfg, "github-reopened");
+        app.ctx.github_writes = Some(config);
+        let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
+        self.addr = server.server_addr().to_ip().unwrap().to_string();
+        self.app = std::sync::Arc::new(app);
+        self.tokens = tokens;
+        let app = std::sync::Arc::clone(&self.app);
+        let cfg = self.cfg.clone();
+        std::thread::spawn(move || {
+            let _ = serve(server, app, &cfg, 3);
+        });
+    }
+
     pub fn db(&self) -> Client {
         self.cfg.connect(NoTls).expect("db")
     }

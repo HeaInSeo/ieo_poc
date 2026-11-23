@@ -351,6 +351,7 @@ pub enum Operation<'a> {
     ReviewTransition,
     GithubPush,
     GithubMerge,
+    GithubReconcile,
     Judge,
     ListOutbox,
     Deliver {
@@ -463,6 +464,7 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         ("POST", ["v0", "coordinator", "review-transitions"]) => Operation::ReviewTransition,
         ("POST", ["v0", "coordinator", "github", "push"]) => Operation::GithubPush,
         ("POST", ["v0", "coordinator", "github", "merge"]) => Operation::GithubMerge,
+        ("POST", ["v0", "coordinator", "github", "reconcile"]) => Operation::GithubReconcile,
         ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
         ("GET", ["v0", "coordinator", "outbox"]) => Operation::ListOutbox,
         ("POST", ["v0", "coordinator", "outbox", id, "delivery"]) => Operation::Deliver { id },
@@ -762,6 +764,9 @@ pub fn dispatch(
         }
         Operation::GithubPush | Operation::GithubMerge => {
             crate::github_write::execute(db, ctx, who, req, guard, op == Operation::GithubMerge)
+        }
+        Operation::GithubReconcile => {
+            run(db, &|tx| crate::github_write::reconcile(tx, ctx, who, req))
         }
         Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
         Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
@@ -3642,7 +3647,12 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     }
     let lifecycle_blocked =
         crate::review_store::blocks_judgment(tx, &repo, &sprint_id, &task_id, &head_sha)?;
+    let write_unresolved = match pull_request {
+        Some(pr) => crate::github_write::has_unresolved(tx, &repo, pr)?,
+        None => false,
+    };
     let blocked = lifecycle_blocked
+        || write_unresolved
         || reviews
             .iter()
             .any(|(s, v)| *s == head_sha && (v == "reject" || v == "needs_confirmation"));
@@ -3660,7 +3670,18 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
     } else {
         review_currency(&head_sha, &reviews)
     };
-    let merged: Option<String> = tx
+    let merge_receipt = tx.query_opt(
+        "SELECT result->>'merged_sha', request_id FROM github_write_intents
+         WHERE repo_id=$1 AND pull_request=$2 AND request->'candidate'->>'head_sha'=$3
+           AND request->'candidate'->>'sprint_id'=$4 AND request->'candidate'->>'task_id'=$5
+           AND result->>'outcome'='merged'",
+        &[&repo, &pull_request, &head_sha, &sprint_id, &task_id],
+    )?;
+    let merged: Option<String> = if let Some(row) = merge_receipt {
+        used.push(format!("github-write:{}", row.get::<_, String>(1)));
+        row.get(0)
+    } else {
+        tx
         .query_opt(
             "SELECT body->>'merged_sha', evidence_id FROM evidence WHERE repo_id = $1 AND kind = 'merge' AND sha = $2
                AND ($3::bigint IS NULL OR body->>'pull_request' = $3::bigint::text)
@@ -3670,7 +3691,8 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         .map(|r| {
             used.push(format!("evidence:{}", r.get::<_, String>(1)));
             r.get(0)
-        });
+        })
+    };
     let main_ci = match &merged {
         Some(m) => ci_ok(tx, &repo, &["main_ci"], m, None, &mut used)?,
         None => false,

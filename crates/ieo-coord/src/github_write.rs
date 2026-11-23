@@ -6,11 +6,15 @@ use crate::api::{
 use crate::auth::{Caller, Kind};
 use postgres::{Client, Transaction};
 use serde_json::{Value, json};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
+#[derive(Clone)]
 pub struct Config {
     endpoint: String,
     repos: Value,
+    fixture_remote: Option<PathBuf>,
 }
 
 fn name(value: &str) -> bool {
@@ -28,14 +32,16 @@ impl Config {
         Ok(Self {
             endpoint: "https://api.github.com".into(),
             repos,
+            fixture_remote: None,
         })
     }
 
     /// Test transport targets a disposable loopback HTTP fixture.
-    pub fn loopback(port: u16, repos: Value) -> Self {
+    pub fn loopback(port: u16, repos: Value, remote: PathBuf) -> Self {
         Self {
             endpoint: format!("http://127.0.0.1:{port}"),
             repos,
+            fixture_remote: Some(remote),
         }
     }
 }
@@ -174,28 +180,122 @@ fn authorize(
     Ok(branch.to_owned())
 }
 
-fn execute_remote(
+fn git(directory: &Path) -> Command {
+    let mut command = Command::new("/usr/bin/timeout");
+    command
+        .args(["--kill-after=2s", "12s", "/usr/bin/git"])
+        .current_dir(directory)
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ALLOW_PROTOCOL", "file:https")
+        .args([
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "http.followRedirects=false",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    command
+}
+
+fn push_commit(
     config: &Config,
     slug: &str,
     token: &str,
     branch: &str,
-    pr: i64,
     sha: &str,
-    merging: bool,
+    bundle: &Path,
 ) -> (u16, Value) {
+    let Ok(stage) = tempfile::tempdir() else {
+        return (
+            409,
+            json!({"outcome":"refused","reason":"staging_unavailable"}),
+        );
+    };
+    let dir = stage.path();
+    if !git(dir)
+        .args(["init", "--bare", "."])
+        .status()
+        .is_ok_and(|s| s.success())
+        || !bundle.is_absolute()
+        || !git(dir)
+            .args(["bundle", "unbundle", "--"])
+            .arg(bundle)
+            .status()
+            .is_ok_and(|s| s.success())
+        || !git(dir)
+            .args(["cat-file", "-e", &format!("{sha}^{{commit}}")])
+            .status()
+            .is_ok_and(|s| s.success())
+    {
+        return (
+            409,
+            json!({"outcome":"refused","reason":"candidate_bundle_unavailable"}),
+        );
+    }
+    let remote = format!("https://github.com/{slug}.git");
+    let mut command = git(dir);
+    // Only the isolated Git push process receives the coordinator credential.
+    command
+        .env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "http.https://github.com/.extraheader")
+        .env(
+            "GIT_CONFIG_VALUE_0",
+            format!("Authorization: Bearer {token}"),
+        );
+    let target = config
+        .fixture_remote
+        .as_deref()
+        .unwrap_or_else(|| Path::new(&remote));
+    let result = command
+        .arg("push")
+        .arg("--")
+        .arg(target)
+        .arg(format!("{sha}:refs/heads/{branch}"))
+        .status();
+    if result.is_ok_and(|status| status.success()) {
+        (200, json!({"outcome":"pushed","head_sha":sha}))
+    } else {
+        // A failed Git client can have lost its response after updating the ref.
+        (502, json!({"outcome":"unknown"}))
+    }
+}
+
+fn github_api<'a>(
+    config: &Config,
+    slug: &str,
+    token: &'a str,
+) -> impl Fn(&str, &str) -> ureq::Request + 'a {
     let agent = ureq::AgentBuilder::new()
         .redirects(0)
         .timeout(Duration::from_secs(5))
         .build();
     let root = format!("{}/repos/{slug}", config.endpoint);
-    let request = |method, path: &str| {
+    move |method, path: &str| {
         agent
             .request(method, &format!("{root}{path}"))
             .set("Authorization", &format!("Bearer {token}"))
             .set("Accept", "application/vnd.github+json")
             .set("X-GitHub-Api-Version", "2022-11-28")
             .set("User-Agent", "ieo-coordinator")
-    };
+    }
+}
+fn execute_remote(
+    config: &Config,
+    slug: &str,
+    token: &str,
+    branch: &str,
+    candidate: Candidate<'_>,
+    merging: bool,
+    bundle: Option<&Path>,
+) -> (u16, Value) {
+    let Candidate { pr, sha, .. } = candidate;
+    let request = github_api(config, slug, token);
     let Ok(current) = request("GET", &format!("/pulls/{pr}")).call() else {
         return (
             409,
@@ -219,12 +319,16 @@ fn execute_remote(
             json!({"outcome":"refused", "reason":"pull_request_binding_mismatch"}),
         );
     }
-    let sent = if merging {
-        request("PUT", &format!("/pulls/{pr}/merge")).send_json(json!({"sha":sha}))
-    } else {
-        request("PATCH", &format!("/git/refs/heads/{branch}"))
-            .send_json(json!({"sha":sha,"force":false}))
-    };
+    if !merging {
+        return bundle.map_or(
+            (
+                409,
+                json!({"outcome":"refused","reason":"candidate_bundle_unavailable"}),
+            ),
+            |bundle| push_commit(config, slug, token, branch, sha, bundle),
+        );
+    }
+    let sent = request("PUT", &format!("/pulls/{pr}/merge")).send_json(json!({"sha":sha}));
     match sent {
         Ok(reply) => match reply.into_json::<Value>() {
             Ok(reply)
@@ -386,23 +490,26 @@ pub(crate) fn execute(
         Err(r) => return Ok(r),
     };
     let repo = candidate.repo;
-    let persisted = json!({"merge":merging,"candidate":request});
     let intent = run_tx(db, guard, &|tx| {
         lock(tx, &format!("github-write:{repo}"))?;
         if let Some(existing) = tx.query_opt(
             "SELECT principal, request, result FROM github_write_intents WHERE repo_id=$1 AND request_id=$2",
             &[&repo, &key],
         )? {
-            if existing.get::<_, &str>(0) != who.name || existing.get::<_, Value>(1) != persisted {
+            if existing.get::<_, &str>(0) != who.name || (existing.get::<_, Value>(1)["candidate"] != request || existing.get::<_, Value>(1)["merge"] != merging) {
                 return Err(problem(409, "EVENT_CONTENT_CONFLICT", "GitHub write key already used"));
             }
             return ok(200, existing.get::<_, Option<Value>>(2).unwrap_or(json!({"outcome":"unknown"})));
         }
-        let pending: bool = tx.query_one(
-            "SELECT EXISTS(SELECT 1 FROM github_write_intents WHERE repo_id=$1 AND pull_request=$2
-             AND (result IS NULL OR result->>'outcome'='unknown'))",
-            &[&repo, &candidate.pr],
-        )?.get(0);
+        if let Some(already) = tx.query_opt(
+            "SELECT result FROM github_write_intents WHERE repo_id=$1 AND pull_request=$2
+             AND request->'candidate'->>'head_sha'=$3 AND request->'merge'=to_jsonb($4::boolean)
+             AND result->>'outcome' IN ('pushed','merged') ORDER BY request_id LIMIT 1",
+            &[&repo, &candidate.pr, &candidate.sha, &merging],
+        )? {
+            return ok(200, already.get(0));
+        }
+        let pending = has_unresolved(tx, repo, candidate.pr)?;
         if pending {
             return Err(problem(
                 409,
@@ -410,7 +517,9 @@ pub(crate) fn execute(
                 "reconcile the prior GitHub write",
             ));
         }
-        authorize(tx, candidate, merging, &ctx.policy.digest, &required_checks)?;
+        let branch = authorize(tx, candidate, merging, &ctx.policy.digest, &required_checks)?;
+        let persisted =
+            json!({"merge":merging,"candidate":request,"branch":branch,"repository":slug});
         tx.execute(
             "INSERT INTO github_write_intents (repo_id,request_id,pull_request,principal,request)
              VALUES ($1,$2,$3,$4,$5)",
@@ -423,18 +532,30 @@ pub(crate) fn execute(
     }
     run_tx(db, guard, &|tx| {
         lock(tx, &format!("github-write:{repo}"))?;
+        let row = tx.query_one(
+            "SELECT request, result FROM github_write_intents WHERE repo_id=$1 AND request_id=$2",
+            &[&repo, &key],
+        )?;
+        if let Some(result) = row.get::<_, Option<Value>>(1) {
+            return ok(200, result);
+        }
+        let reserved: Value = row.get(0);
         let (status, result) =
             match authorize(tx, candidate, merging, &ctx.policy.digest, &required_checks) {
-                Ok(branch) => execute_remote(
-                    config,
-                    slug,
-                    &token,
-                    &branch,
-                    candidate.pr,
-                    candidate.sha,
-                    merging,
-                ),
-                Err(_) => (
+                Ok(branch) if reserved["branch"] == branch && reserved["repository"] == slug => {
+                    execute_remote(
+                        config,
+                        slug,
+                        &token,
+                        &branch,
+                        candidate,
+                        merging,
+                        config.repos[repo]["push_bundle_file"]
+                            .as_str()
+                            .map(Path::new),
+                    )
+                }
+                _ => (
                     409,
                     json!({"outcome":"refused","reason":"authorization_changed"}),
                 ),
@@ -445,4 +566,133 @@ pub(crate) fn execute(
         )?;
         ok(status, result)
     })
+}
+
+pub(crate) fn has_unresolved(tx: &mut Transaction, repo: &str, pr: i64) -> Result<bool, Resp> {
+    Ok(tx
+        .query_one(
+            "SELECT EXISTS(SELECT 1 FROM github_write_intents WHERE repo_id=$1 AND pull_request=$2
+         AND (result IS NULL OR result->>'outcome'='unknown'))",
+            &[&repo, &pr],
+        )?
+        .get(0))
+}
+
+/// No mutation is sent to GitHub. A definite result is attached once to the
+/// original intent. Negative or incomplete observations never re-enable writes.
+pub(crate) fn reconcile(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> crate::api::R {
+    if who.kind != Kind::Service || !who.has("github:merge") {
+        return Err(problem(
+            403,
+            "SCOPE_DENIED",
+            "GitHub reconciliation requires a service principal",
+        ));
+    }
+    let body = parse_body(req.body)?;
+    only_keys(&body, &["repo_id", "request_id"])?;
+    let repo = str_field(&body, "repo_id", 256)?;
+    let key = str_field(&body, "request_id", 128)?;
+    if !who.in_repo(repo) {
+        return Err(problem(
+            403,
+            "REPO_SCOPE_DENIED",
+            "repo not in credential scope",
+        ));
+    }
+    lock(tx, &format!("github-write:{repo}"))?;
+    let row = tx.query_opt(
+        "SELECT pull_request, request, result FROM github_write_intents WHERE repo_id=$1 AND request_id=$2",
+        &[&repo, &key],
+    )?.ok_or_else(|| problem(404, "GITHUB_WRITE_UNKNOWN", "no such GitHub write intent"))?;
+    if let Some(result) = row.get::<_, Option<Value>>(2)
+        && result["outcome"] != "unknown"
+    {
+        return ok(200, result);
+    }
+    let pr: i64 = row.get(0);
+    let intent: Value = row.get(1);
+    let unresolved = || ok(202, json!({"outcome":"unknown","request_id":key}));
+    let config = ctx
+        .github_writes
+        .as_ref()
+        .ok_or_else(|| problem(503, "GITHUB_WRITE_DISABLED", "no configured GitHub writer"))?;
+    let settings = &config.repos[repo];
+    let Some(slug) = intent["repository"]
+        .as_str()
+        .filter(|slug| settings["repository"] == *slug)
+    else {
+        return unresolved();
+    };
+    let Some(branch) = intent["branch"].as_str() else {
+        return unresolved();
+    };
+    let Some(sha) = intent["candidate"]["head_sha"]
+        .as_str()
+        .filter(|sha| is_sha(sha))
+    else {
+        return unresolved();
+    };
+    let merging = intent["merge"] == true;
+    let token_file = if merging {
+        "merge_token_file"
+    } else {
+        "push_token_file"
+    };
+    let Some(token) = settings[token_file]
+        .as_str()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+    else {
+        return unresolved();
+    };
+    let token = token.trim();
+    if token.is_empty() || !token.bytes().all(|byte| byte.is_ascii_graphic()) {
+        return unresolved();
+    }
+    let api = github_api(config, slug, token);
+    let read = |path: &str| api("GET", path).call().ok()?.into_json::<Value>().ok();
+    let Some(remote) = read(&format!("/pulls/{pr}")) else {
+        return unresolved();
+    };
+    if remote["head"]["repo"]["full_name"] != slug
+        || remote["base"]["repo"]["full_name"] != slug
+        || remote["head"]["ref"] != branch
+        || remote["head"]["sha"] != sha
+        || remote["base"]["ref"] != "main"
+    {
+        return unresolved();
+    }
+    let result = if merging {
+        let Some(merged) = remote["merge_commit_sha"]
+            .as_str()
+            .filter(|sha| is_sha(sha))
+        else {
+            return unresolved();
+        };
+        if remote["merged"] != true {
+            return unresolved();
+        }
+        let Some(comparison) = read(&format!("/compare/{merged}...main")) else {
+            return unresolved();
+        };
+        if comparison["base_commit"]["sha"] != merged
+            || !matches!(comparison["status"].as_str(), Some("identical" | "ahead"))
+        {
+            return unresolved();
+        }
+        json!({"outcome":"merged","head_sha":sha,"merged_sha":merged,"reconciled":true})
+    } else {
+        let Some(reference) = read(&format!("/git/ref/heads/{branch}")) else {
+            return unresolved();
+        };
+        if reference["ref"] != format!("refs/heads/{branch}") || reference["object"]["sha"] != sha {
+            return unresolved();
+        }
+        json!({"outcome":"pushed","head_sha":sha,"reconciled":true})
+    };
+    tx.execute(
+        "UPDATE github_write_intents SET result=$3 WHERE repo_id=$1 AND request_id=$2
+           AND (result IS NULL OR result->>'outcome'='unknown')",
+        &[&repo, &key, &result],
+    )?;
+    ok(200, result)
 }

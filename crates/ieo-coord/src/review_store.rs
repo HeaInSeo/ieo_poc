@@ -194,6 +194,15 @@ fn record_inner(tx: &mut Transaction, who: &Caller, request: Value, issuing_assi
             "the task is already bound to another pull request",
         ));
     }
+    if matches!(action, "submit" | "head_changed" | "reassign")
+        && crate::github_write::has_unresolved(tx, repo, pull_request)?
+    {
+        return Err(problem(
+            409,
+            "GITHUB_WRITE_UNRESOLVED",
+            "reconcile the prior GitHub write",
+        ));
+    }
     if action == "open" && pull_request_recorded(tx, repo, sprint, task)? {
         return Err(problem(
             409,
@@ -310,12 +319,12 @@ fn record_inner(tx: &mut Transaction, who: &Caller, request: Value, issuing_assi
         }
         let time_and_budget = tx.query_one(
             "SELECT coalesce(extract(epoch FROM clock_timestamp() - max(recorded_at))::double precision, 0),
-                    EXISTS (SELECT 1 FROM review_transitions WHERE repo_id=$1 AND sprint_id=$2
-                      AND task_id=$3 AND request->>'head_sha'=$4 AND request->>'action'='replace')
+                    EXISTS (SELECT 1 FROM review_transitions WHERE repo_id=$1
+                      AND request->>'pull_request'=$4::bigint::text AND request->>'action'='replace')
              FROM review_transitions WHERE repo_id=$1 AND sprint_id=$2 AND task_id=$3
                AND response->>'outcome'='recorded'
                AND request->>'action' IN ('submit','head_changed','reassign','replace')",
-            &[&repo, &sprint, &task, &head],
+            &[&repo, &sprint, &task, &pull_request],
         )?;
         let activity = ReviewActivity::Unclaimed;
         let elapsed = time_and_budget.get::<_, f64>(0).max(0.0) as u64;
