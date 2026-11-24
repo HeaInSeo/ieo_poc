@@ -650,6 +650,29 @@ fn verdict_uses_github_and_run_evidence_for_the_recorded_sha_only() {
         .and_then(|a| a.last())
         .and_then(|i| i["outbox_id"].as_i64())
         .unwrap_or_default();
+    let delivery = format!("/v0/coordinator/outbox/{id}/delivery");
+    assert_eq!(
+        e.post("courier", &delivery, &json!({"state":"unknown"})).0,
+        200
+    );
+    assert_eq!(
+        e.get("alice", "/v0/sprints/POC-01/state").1["delivery"],
+        "unknown"
+    );
+    let contains = |state| {
+        e.get("courier", &format!("/v0/coordinator/outbox?state={state}"))
+            .1["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["outbox_id"] == id)
+    };
+    assert!(!contains("pending"));
+    assert!(contains("unknown"));
+    assert_eq!(
+        e.post("courier", &delivery, &json!({"state":"unknown"})).1["changed"],
+        false
+    );
     assert_eq!(
         e.post(
             "courier",
@@ -1572,6 +1595,39 @@ fn label_and_estimate_changes_keep_a_prerequisite_verdict_but_definition_changes
         "expected_current": {"assignment_id": "A2", "generation": 0}});
     let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &a3);
     assert_eq!((st, code(&b)), (409, "PREREQUISITE_UNMET".into()), "{b}");
+    for (offset, field, value) in [
+        (
+            0,
+            "acceptance",
+            json!({"profile_id":s6["tasks"][0]["acceptance"]["profile_id"],
+             "profile_revision":s6["tasks"][0]["acceptance"]["profile_revision"],
+             "item_ids":s6["tasks"][0]["acceptance"]["item_ids"],"criteria":"개정 수용 기준"}),
+        ),
+        (1, "exit_condition", json!("개정 종료 기준")),
+        (2, "requirement_ids", json!(["POC-REQ-01-02"])),
+    ] {
+        let rev = 8 + offset;
+        let mut changed = s6.clone();
+        changed["revision"] = json!(rev);
+        changed["tasks"][0][field] = value;
+        changed["digest"] = json!(ieo_spec::spec_digest(&changed));
+        let (status, response) = e.post_k(
+            "alice",
+            "/v0/sprints?mode=executable",
+            &format!("reg-g1-{rev}"),
+            &changed,
+        );
+        assert_eq!(status, 201, "{field}: {response}");
+        assert_eq!(review(rev, &changed), 201, "{field}");
+        let mut next = a2(rev, "A3");
+        next["expected_current"] = json!({"assignment_id":"A2","generation":0});
+        let (status, response) = e.post("assigner", "/v0/coordinator/assignments", &next);
+        assert_eq!(
+            (status, code(&response)),
+            (409, "PREREQUISITE_UNMET".into()),
+            "{field}: {response}"
+        );
+    }
 }
 
 // --- X-01 Notion import ---
@@ -4866,6 +4922,72 @@ fn the_assignment_chain_is_read_by_clients_of_its_repo_only() {
         }
         assert!(b["session_status"].is_null());
     }
+}
+
+#[test]
+fn completed_evidence_stays_with_its_task_after_development_moves_on() {
+    let Some(e) = start() else { return };
+    let mut s = spec("repo-a", 5, 3);
+    // Make the next fixture task independent so switching does not require
+    // first judging the task whose evidence is under test.
+    s["tasks"][1]["prerequisites"] = json!([]);
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    assert_eq!(
+        e.post_k(
+            "alice",
+            "/v0/sprints?mode=executable",
+            "reg-independent",
+            &s
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/5/semantic-review",
+            &json!({"decision":"passed","reason":"fixture","digest":s["digest"]})
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        assign(&e, "development", "A1", 0, "01-01", SHA1, Value::Null).0,
+        201
+    );
+    full_evidence(&e, SHA1, "earlier-task");
+    assert_eq!(
+        evidence(
+            &e,
+            "earlier-reviewed",
+            "review",
+            json!({"sha": SHA1, "reviewer": "rev", "author": "dev",
+                   "state": "approved", "source_ref": "pull/1#r2"})
+        )
+        .0,
+        201
+    );
+    let (status, next) = assign(
+        &e,
+        "development",
+        "A2",
+        0,
+        "01-02",
+        SHA2,
+        json!({"assignment_id":"A1","generation":0}),
+    );
+    assert_eq!(status, 201, "{next}");
+    let (status, verdict) = judge(&e, "judge-earlier-task", "01-01");
+    assert_eq!(
+        (
+            status,
+            verdict["head_sha"].as_str(),
+            verdict["outcome"].as_str()
+        ),
+        (201, Some(SHA1), Some("accepted")),
+        "{verdict}"
+    );
+    assert_eq!(judge(&e, "judge-earlier-task", "01-01").0, 200);
 }
 
 /// PLAN §3.2 step 4: with no agent report, no takeover and no first action the chain and the

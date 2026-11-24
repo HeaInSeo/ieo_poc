@@ -738,6 +738,50 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
     assert_eq!(status, 201, "{judgment}");
     assert_eq!(judgment["merged_sha"], MERGE);
     assert_eq!(judgment["outcome"], "not_accepted");
+    assert_eq!(
+        evidence(
+            &e,
+            "external-change",
+            "pr_review_state",
+            json!({"sha":old,"pull_request":7,"decision":"CHANGES_REQUESTED",
+               "reviewers":["reviewer"],"source_ref":"fixture/pr-review"})
+        )
+        .0,
+        201
+    );
+    for (id, kind, body) in [
+        (
+            "n5-main",
+            "main_ci",
+            json!({"sha":MERGE,"conclusion":"success","source_ref":"fixture/main"}),
+        ),
+        (
+            "n5-output",
+            "output",
+            json!({"sha":sha,"task_id":"01-01","artifact_id":"01-01-output","ref":"fixture/output"}),
+        ),
+        (
+            "n5-followups",
+            "followups",
+            json!({"sha":MERGE,"task_id":"01-01","accepted":true,"ref":"fixture/followups"}),
+        ),
+    ] {
+        assert_eq!(evidence(&e, id, kind, body).0, 201);
+    }
+    let (status, verdict) = judge(&e, "n5-outside-merge", "01-01");
+    assert_eq!(status, 201, "{verdict}");
+    assert_eq!(verdict["outcome"], "accepted", "{verdict}");
+    assert!(
+        verdict["summary"]
+            .as_str()
+            .unwrap()
+            .contains("외부 상태 불일치")
+    );
+    assert!(
+        verdict["facts"]["inputs"]
+            .to_string()
+            .contains("external-change")
+    );
     worker.join().unwrap();
     let seen = seen.lock().unwrap();
     let puts: Vec<_> = seen
@@ -749,4 +793,138 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
         puts.iter()
             .all(|entry| entry.2 == json!({"sha":sha,"merge_method":"merge"}))
     );
+}
+
+#[test]
+fn historical_judgment_uses_the_latest_assignment_and_its_review_lifecycle() {
+    let Some(e) = start() else { return };
+    let mut s = spec("repo-a", 5, 3);
+    s["tasks"][1]["prerequisites"] = json!([]);
+    s["digest"] = json!(ieo_spec::spec_digest(&s));
+    assert_eq!(
+        e.post_k(
+            "alice",
+            "/v0/sprints?mode=executable",
+            "historical-registration",
+            &s
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/5/semantic-review",
+            &json!({"decision":"passed","reason":"fixture","digest":s["digest"]})
+        )
+        .0,
+        201
+    );
+    let previous = |id, generation| json!({"assignment_id":id,"generation":generation});
+    let transition = |event, action, head, aid, report_id: Option<&str>| {
+        let mut body = json!({"event_id":event,"repo_id":"repo-a","sprint_id":"POC-01",
+            "task_id":"01-01","pull_request":7,"head_sha":head,"assignment_id":aid,"generation":0,"action":action});
+        if let Some(report_id) = report_id {
+            body["report_id"] = json!(report_id);
+            body["report_revision"] = json!(1);
+        }
+        let (status, reply) = e.post("assigner", "/v0/coordinator/review-transitions", &body);
+        assert_eq!(status, 201, "{reply}");
+        reply
+    };
+    let approve = |head, aid, event, report_id| {
+        assert_eq!(
+            e.post(
+                "gr-a",
+                "/v0/agent/reports",
+                &report("guardrail", report_id, aid, 0, "01-01", head)
+            )
+            .0,
+            202
+        );
+        assert_eq!(
+            transition(event, "approve", head, aid, Some(report_id))["phase"],
+            "Approved"
+        );
+    };
+    let record = |prefix, head, merged| {
+        for (tag, kind, body) in [
+            (
+                "ci",
+                "ci_run",
+                json!({"sha":head,"conclusion":"success","pull_request":7,"source_ref":"fixture/ci"}),
+            ),
+            (
+                "merge",
+                "merge",
+                json!({"head_sha":head,"merged_sha":merged,"pull_request":7,"source_ref":"fixture/pr"}),
+            ),
+            (
+                "main",
+                "main_ci",
+                json!({"sha":merged,"conclusion":"success","source_ref":"fixture/main"}),
+            ),
+            (
+                "output",
+                "output",
+                json!({"sha":head,"task_id":"01-01","artifact_id":"01-01-output","ref":"fixture/output"}),
+            ),
+            (
+                "followups",
+                "followups",
+                json!({"sha":merged,"task_id":"01-01","accepted":true,"ref":"fixture/followups"}),
+            ),
+        ] {
+            assert_eq!(evidence(&e, &format!("{prefix}-{tag}"), kind, body).0, 201);
+        }
+    };
+    assert_eq!(
+        assign(&e, "development", "D1", 0, "01-01", SHA1, json!(null)).0,
+        201
+    );
+    assert_eq!(
+        evidence(
+            &e,
+            "old-approved",
+            "review",
+            json!({"sha":SHA1,"pull_request":7,"reviewer":"independent","author":"developer",
+               "state":"approved","source_ref":"fixture/old-review"})
+        )
+        .0,
+        201
+    );
+    record("old", SHA1, SHA3);
+    assert_eq!(judge(&e, "old-complete", "01-01").1["outcome"], "accepted");
+
+    assert_eq!(
+        assign(&e, "development", "D1", 1, "01-01", SHA2, previous("D1", 0)).0,
+        201
+    );
+    assert_eq!(
+        assign(&e, "guardrail", "G2", 0, "01-01", SHA2, json!(null)).0,
+        201
+    );
+    assert_eq!(
+        transition("submit-new", "submit", SHA2, "G2", None)["phase"],
+        "Pending"
+    );
+    assert_eq!(
+        assign(&e, "development", "D2", 0, "01-02", SHA3, previous("D1", 1)).0,
+        201
+    );
+    let (status, missing) = judge(&e, "historical-missing", "01-01");
+    assert_eq!(status, 201, "{missing}");
+    assert_eq!(missing["head_sha"], SHA2);
+    assert_eq!(missing["outcome"], "not_accepted");
+    record("new", SHA2, MERGE);
+    assert_eq!(
+        judge(&e, "historical-pending", "01-01").1["outcome"],
+        "not_accepted"
+    );
+    approve(SHA2, "G2", "approve-new", "guardrail-new");
+    let (status, accepted) = judge(&e, "historical-accepted", "01-01");
+    assert_eq!(status, 201, "{accepted}");
+    assert_eq!(accepted["head_sha"], SHA2);
+    assert_eq!(accepted["merged_sha"], MERGE);
+    assert_eq!(accepted["outcome"], "accepted", "{accepted}");
 }
