@@ -20,3 +20,7 @@
 #122 병합 SHA `73311eced06176a162b90ebd6168fe22f792b5f3`의 [main CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45388024845)와 원장 26/73건을 확인한 뒤 `aea9f0a`를 통합했다. #124는 재현 worker의 원 이미지 대조와 supervisor 로그 GET만 바꾼다. 02-07 변경 파일과 겹치는 곳 없이 연결했고, 판정·보고·outbox 관련 통합 시험 88/88을 최신 코드에서 다시 통과했다. 필드별 변이 3종과 M27 검출 근거를 재사용했다. 외부 수신기의 실제 수신·응답 유실 시험은 04-08/P13에서 수행한다.
 
 독립 검토의 F3 보강 요청을 반영했다. 앞 작업에 두 세대의 개발 배정을 남긴 뒤 다음 작업으로 이동했다. 앞 작업의 옛 SHA만 완료된 상태에서 판정은 최신 이력 SHA를 선택해 미수용으로 기록했다. 최신 SHA의 실행·GitHub 증거를 모두 채워도 검토가 대기 중일 때는 미수용을 유지했다. 별도 Guardrail의 해당 SHA 승인 전이 이후에만 같은 이력 SHA와 병합 SHA를 수용했다. 코디네이터와 검토 수명주기 시험 89/89 및 Clippy를 통과했다.
+
+## 최종 수용
+
+[PR #125](https://github.com/HeaInSeo/ieo_poc/pull/125)의 `1acf3b84f1799941cc1a07332b71ccfc2ec6762c`에서 독립 승인과 [필수 CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45390006378)를 확인했다. 병합 `26745e13ac0b522600e2c8cc090c7dcb6dafcdc4`에서 [main CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45391316544)를 확인했다. 판정·사건·outbox 원자성, 복수 배정 F3, 외부 상태 표시 N5, G1 변이 및 보고 스냅샷을 수용했다. 실제 GitHub 증거 수집은 1b이며, 외부 수신·응답 유실 시험은 04-08/P13이다.
