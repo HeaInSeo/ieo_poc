@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS repro_requests (
 CREATE TABLE IF NOT EXISTS evidence (
     repo_id     text        NOT NULL,
     evidence_id text        NOT NULL,
-    kind        text        NOT NULL CHECK (kind IN ('ci_run', 'run_record', 'review', 'merge', 'main_ci', 'output', 'followups', 'branch_head')),
+    kind        text        NOT NULL CHECK (kind IN ('ci_run', 'run_record', 'review', 'merge', 'main_ci', 'output', 'followups', 'branch_head', 'pr_review_state')),
     sha         text        NOT NULL CHECK (sha ~ '^[a-f0-9]{40,64}$'),
     body        jsonb       NOT NULL,
     ingested_by text        NOT NULL,
@@ -538,10 +538,10 @@ CREATE OR REPLACE TRIGGER assignment_limit_events_append_only BEFORE UPDATE OR D
 -- the resume judgment's final basis. Databases created before it get the wider CHECK.
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'evidence_kind_check'
-                   AND pg_get_constraintdef(oid) LIKE '%branch_head%') THEN
+                   AND pg_get_constraintdef(oid) LIKE '%pr_review_state%') THEN
     ALTER TABLE evidence DROP CONSTRAINT IF EXISTS evidence_kind_check;
     ALTER TABLE evidence ADD CONSTRAINT evidence_kind_check CHECK (kind IN ('ci_run', 'run_record',
-        'review', 'merge', 'main_ci', 'output', 'followups', 'branch_head'));
+        'review', 'merge', 'main_ci', 'output', 'followups', 'branch_head', 'pr_review_state'));
   END IF;
 END $$;
 -- the GitHub comparison a delivery's judgment made (head, CI at the head, CI claim), as compare
@@ -631,3 +631,8 @@ CREATE TABLE IF NOT EXISTS github_write_intents (
 
 ALTER TABLE review_transitions ADD COLUMN IF NOT EXISTS recorded_at timestamptz
     NOT NULL DEFAULT clock_timestamp();
+
+-- 02-06: additive migration, preserving older queued requests and their IDs.
+ALTER TABLE repro_requests ADD COLUMN IF NOT EXISTS run_key text;
+ALTER TABLE repro_requests ADD COLUMN IF NOT EXISTS runner_image text;
+ALTER TABLE repro_requests ADD COLUMN IF NOT EXISTS result jsonb;

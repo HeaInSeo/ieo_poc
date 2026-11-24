@@ -28,6 +28,7 @@ pub mod gitref;
 pub mod lock;
 pub mod pending;
 pub mod provider;
+pub mod repro;
 pub mod run;
 pub mod serve;
 pub mod settlement;
