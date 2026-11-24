@@ -21,3 +21,11 @@
 ## 이월
 
 실제 GitHub 권한 회수·head 경쟁·역할 격리는 04-07/P07, 보호 규칙·App 설정은 05-03/P23에서 검증한다. 별도 Claude → Codex 실측은 조건 대기다. 02-06 수용 뒤 다음 본계획 작업은 02-07이다.
+
+## 최종 수용
+
+[재현 실행기와 02-06.accept 전체 대조](REPRO_RUNNER.md)의 구현을 `022bd4164f993cd29fe7ea15b78d11667f50bdb5`에서 독립 승인했다. 기존 후보의 회귀 166건과 최종 SHA의 표적 시험 35건에 실제 로컬 Podman 일회성 실행, 준비·명령 실패, DB 결과 반영 실패 복원, supervisor 재시작 후 GET 대조, 같은 SHA의 N5 갱신 경쟁에서 병합 전송 0건, rootless 확인 실패 시 시작 차단, 기본 60초와 301·3,600초의 실효 설정 확인이 포함된다.
+
+[PR #123](https://github.com/HeaInSeo/ieo_poc/pull/123) · [PR CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45377454250) · 병합 `744e0a2f93ca197a81c03195f2482c0dafb4c480` · [동일 SHA main CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45378776886)
+
+실제 권한 회수·head 경쟁·역할 Pod 격리는 04-07/P07, 보호 규칙·App 설정은 05-03/P23, N5 실제 수집과 F4는 1b, 외부 상태 표시 문구는 02-07이다. 별도 Claude → Codex 전환 시험은 조건 대기를 유지한다.
