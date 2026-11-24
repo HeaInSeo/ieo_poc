@@ -475,7 +475,7 @@
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/45384251719"
       ],
       "next_action": "보존한 aea9f0a를 최신 main과 대조해 02-07을 이어간다.",
-      "unresolved": "04-07/P07 실제 역할·권한 격리와 head 경쟁 · 05-03/P23 보호 규칙·App 설정 · 1b 실제 상태 수집·F4 · 02-07 N5 외부 상태 불일치 표시."
+      "unresolved": "04-07/P07 실제 역할·권한 격리와 head 경쟁 · 05-03/P23 보호 규칙·App 설정 · 1b 실제 상태 수집·F4."
     },
     {
       "task_id": "02-07",
