@@ -22,3 +22,9 @@ Guardrail supervisor는 기존 adapter 인증과 외부 요청 목록을 재사�
 | 02-03 재현 실행기·02-05 단계 6 외부 요청 추적 이월 | `repro_worker.rs`에서 로컬 일회성 실행·비영 종료·준비 실패·저장 실패 후 복원·불명확 요청의 0회 재전송·낡은 세대를 검증한다. supervisor의 `reproduction_receipt_after_restart_only_reads_the_original_request`는 응답 유실과 재시작 뒤 GET만 검증한다. |
 
 실제 GitHub/역할 Pod 이월과 별도 Claude → Codex 전환 실측 조건 대기를 유지한다. 실제 모델 요청과 운영 자격을 사용하지 않았다.
+
+## 로그 조회와 이미지 교체 후 복구
+
+Guardrail은 supervisor 상태 응답의 로그 URL을 그대로 사용한다. supervisor 인증과 코디네이터의 기존 repo·역할 검사가 GET에 적용된다. 다른 repo에는 404를 반환하고 범위 밖 역할은 403을 반환한다.
+
+실행기 설정 이미지가 바뀌면 대기 요청은 새 이미지를 사용한다. 이미 예약한 요청은 DB에 기록한 run_key와 원래 이미지 digest로만 조회한다. 종료와 로그가 확인되면 결과를 한 번 저장한다. 원래 컨테이너를 확인할 수 없으면 running으로 보류한다. 격리 시험은 두 로컬 이미지 ID와 `IEO_TEST_REPRO_IMAGE` 및 `IEO_TEST_REPRO_IMAGE_B`를 사용한다.
