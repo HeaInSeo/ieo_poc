@@ -772,7 +772,7 @@ impl Service {
             ("GET", ["v0", "role", "repro-requests", id]) if safe_id(id) => {
                 self.query_repro(id, false)
             }
-            ("GET", ["v0", "role", "repro-logs", key, stream])
+            ("GET", ["v0", "role" | "agent", "repro-logs", key, stream])
                 if safe_id(key) && matches!(*stream, "stdout" | "stderr") =>
             {
                 self.call_repro("GET", &format!("/v0/agent/repro-logs/{key}/{stream}"), None)
