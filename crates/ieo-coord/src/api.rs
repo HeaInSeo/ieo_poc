@@ -3833,7 +3833,20 @@ fn judge(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         required_outputs_present: outputs_ok,
         followups_accepted: followups,
     };
-    let summary = completion_summary(&facts);
+    let mut summary = completion_summary(&facts);
+    if matches!(review, ReviewCurrency::ApprovedAtCurrentSha)
+        && let Some(pr) = pull_request
+        && let Some(observation) = tx.query_opt(
+            "SELECT evidence_id, body->>'decision' FROM evidence
+             WHERE repo_id=$1 AND kind='pr_review_state'
+               AND body->>'pull_request'=$2::bigint::text ORDER BY seq DESC LIMIT 1",
+            &[&repo, &pr],
+        )?
+        && observation.get::<_, String>(1) == "CHANGES_REQUESTED"
+    {
+        used.push(format!("evidence:{}", observation.get::<_, String>(0)));
+        summary.push_str(" · 외부 상태 불일치(PR 수준 변경 요청 미해결)");
+    }
     let accepted = ci
         && matches!(review, ReviewCurrency::ApprovedAtCurrentSha)
         && merged.is_some()

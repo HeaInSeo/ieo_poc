@@ -738,6 +738,50 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
     assert_eq!(status, 201, "{judgment}");
     assert_eq!(judgment["merged_sha"], MERGE);
     assert_eq!(judgment["outcome"], "not_accepted");
+    assert_eq!(
+        evidence(
+            &e,
+            "external-change",
+            "pr_review_state",
+            json!({"sha":old,"pull_request":7,"decision":"CHANGES_REQUESTED",
+               "reviewers":["reviewer"],"source_ref":"fixture/pr-review"})
+        )
+        .0,
+        201
+    );
+    for (id, kind, body) in [
+        (
+            "n5-main",
+            "main_ci",
+            json!({"sha":MERGE,"conclusion":"success","source_ref":"fixture/main"}),
+        ),
+        (
+            "n5-output",
+            "output",
+            json!({"sha":sha,"task_id":"01-01","artifact_id":"01-01-output","ref":"fixture/output"}),
+        ),
+        (
+            "n5-followups",
+            "followups",
+            json!({"sha":MERGE,"task_id":"01-01","accepted":true,"ref":"fixture/followups"}),
+        ),
+    ] {
+        assert_eq!(evidence(&e, id, kind, body).0, 201);
+    }
+    let (status, verdict) = judge(&e, "n5-outside-merge", "01-01");
+    assert_eq!(status, 201, "{verdict}");
+    assert_eq!(verdict["outcome"], "accepted", "{verdict}");
+    assert!(
+        verdict["summary"]
+            .as_str()
+            .unwrap()
+            .contains("외부 상태 불일치")
+    );
+    assert!(
+        verdict["facts"]["inputs"]
+            .to_string()
+            .contains("external-change")
+    );
     worker.join().unwrap();
     let seen = seen.lock().unwrap();
     let puts: Vec<_> = seen

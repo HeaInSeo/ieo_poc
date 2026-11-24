@@ -650,6 +650,29 @@ fn verdict_uses_github_and_run_evidence_for_the_recorded_sha_only() {
         .and_then(|a| a.last())
         .and_then(|i| i["outbox_id"].as_i64())
         .unwrap_or_default();
+    let delivery = format!("/v0/coordinator/outbox/{id}/delivery");
+    assert_eq!(
+        e.post("courier", &delivery, &json!({"state":"unknown"})).0,
+        200
+    );
+    assert_eq!(
+        e.get("alice", "/v0/sprints/POC-01/state").1["delivery"],
+        "unknown"
+    );
+    let contains = |state| {
+        e.get("courier", &format!("/v0/coordinator/outbox?state={state}"))
+            .1["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["outbox_id"] == id)
+    };
+    assert!(!contains("pending"));
+    assert!(contains("unknown"));
+    assert_eq!(
+        e.post("courier", &delivery, &json!({"state":"unknown"})).1["changed"],
+        false
+    );
     assert_eq!(
         e.post(
             "courier",
@@ -1572,6 +1595,39 @@ fn label_and_estimate_changes_keep_a_prerequisite_verdict_but_definition_changes
         "expected_current": {"assignment_id": "A2", "generation": 0}});
     let (st, b) = e.post("assigner", "/v0/coordinator/assignments", &a3);
     assert_eq!((st, code(&b)), (409, "PREREQUISITE_UNMET".into()), "{b}");
+    for (offset, field, value) in [
+        (
+            0,
+            "acceptance",
+            json!({"profile_id":s6["tasks"][0]["acceptance"]["profile_id"],
+             "profile_revision":s6["tasks"][0]["acceptance"]["profile_revision"],
+             "item_ids":s6["tasks"][0]["acceptance"]["item_ids"],"criteria":"개정 수용 기준"}),
+        ),
+        (1, "exit_condition", json!("개정 종료 기준")),
+        (2, "requirement_ids", json!(["POC-REQ-01-02"])),
+    ] {
+        let rev = 8 + offset;
+        let mut changed = s6.clone();
+        changed["revision"] = json!(rev);
+        changed["tasks"][0][field] = value;
+        changed["digest"] = json!(ieo_spec::spec_digest(&changed));
+        let (status, response) = e.post_k(
+            "alice",
+            "/v0/sprints?mode=executable",
+            &format!("reg-g1-{rev}"),
+            &changed,
+        );
+        assert_eq!(status, 201, "{field}: {response}");
+        assert_eq!(review(rev, &changed), 201, "{field}");
+        let mut next = a2(rev, "A3");
+        next["expected_current"] = json!({"assignment_id":"A2","generation":0});
+        let (status, response) = e.post("assigner", "/v0/coordinator/assignments", &next);
+        assert_eq!(
+            (status, code(&response)),
+            (409, "PREREQUISITE_UNMET".into()),
+            "{field}: {response}"
+        );
+    }
 }
 
 // --- X-01 Notion import ---
