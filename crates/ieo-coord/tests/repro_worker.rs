@@ -80,12 +80,12 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
             .unwrap()
             .get::<_, String>(0)
     };
-    let check_finished = |id| {
+    let check_finished = |id, runner: &Runner| {
         let start = Instant::now();
         loop {
             // A new DB connection represents a restarted worker process. Only
             // the durable container and database carry the original run forward.
-            tick(&mut e.db(), "repo-a", &runner).unwrap();
+            tick(&mut e.db(), "repo-a", runner).unwrap();
             let view = status(id);
             if view["state"] != "running" {
                 break view;
@@ -100,7 +100,7 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
         &[
             "/bin/sh",
             "-ec",
-            "test \"$(cat test-marker)\" = candidate; test \"$(cat \"$REPRO_BUNDLE\")\" = bundle-fixture; test ! -e /run/secrets/oauth_token; test ! -e /run/ieo/cred; test ! -e /inputs/../opt/rust; test \"$(ls /sys/class/net)\" = lo; printf ok",
+            "test \"$(cat test-marker)\" = candidate; test \"$(cat \"$REPRO_BUNDLE\")\" = bundle-fixture; test ! -e /run/secrets/oauth_token; test ! -e /run/ieo/cred; test ! -e /inputs/../opt/rust; test \"$(ls /sys/class/net)\" = lo; printf ok; printf proof >&2",
         ],
         &digest,
     );
@@ -132,7 +132,30 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
     e.db()
         .batch_execute("DROP TRIGGER lose_repro_result ON repro_requests")
         .unwrap();
-    let finished = check_finished("repro-success");
+    let image_b = std::env::var("IEO_TEST_REPRO_IMAGE_B").expect("second local image ID");
+    assert_ne!(image, image_b);
+    let restarted = Runner::new(&repo.join(".git"), &bundles, &state, image_b).unwrap();
+    e.db()
+        .batch_execute(
+            "CREATE TABLE recovered_count (key text PRIMARY KEY);
+         CREATE FUNCTION count_recovery() RETURNS trigger LANGUAGE plpgsql AS
+         $$ BEGIN INSERT INTO recovered_count VALUES (NEW.run_key); RETURN NEW; END; $$;
+         CREATE TRIGGER count_recovery AFTER UPDATE ON repro_requests
+         FOR EACH ROW WHEN (OLD.request_id='repro-success' AND NEW.state='finished')
+           EXECUTE FUNCTION count_recovery();",
+        )
+        .unwrap();
+    let finished = check_finished("repro-success", &restarted);
+    tick(&mut e.db(), "repo-a", &restarted).unwrap();
+    assert_eq!(
+        e.db()
+            .query_one("SELECT key FROM recovered_count", &[])
+            .unwrap()
+            .get::<_, String>(0),
+        key
+    );
+    assert_eq!(status("repro-success"), finished);
+    assert_eq!(fs::read_dir(&state).unwrap().count(), 0);
     assert_eq!(finished["state"], "finished", "{finished}");
     let stderr = finished["raw_log_refs"][1].as_str().unwrap();
     let trace = e.get("gr-a", stderr).1["content"]
@@ -148,6 +171,57 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
     assert_eq!(finished["runner_image_digest"], image);
     let refs = finished["raw_log_refs"].as_array().unwrap();
     let stdout = refs[0].as_str().unwrap();
+    let proxy = |role: &str, token: &str| {
+        let root = dir.path().join(format!("proxy-{role}-{token}"));
+        let cred = root.join("cred");
+        fs::create_dir_all(&cred).unwrap();
+        fs::write(
+            cred.join("adapter.sha256"),
+            ieo_supervisor::central::sha256(b"adapter"),
+        )
+        .unwrap();
+        fs::write(cred.join("repro"), &e.tokens[token]).unwrap();
+        let config = ieo_supervisor::serve::Config::from_json(&json!({
+            "role":role,"repo":"repo-a","state":root.join("state"),"etc":root.join("etc"),
+            "cred":cred,"claude":"/bin/false","quota_group_id":"fixture",
+            "checkpoint_central":"local_only","budget":"02-04",
+            "share":{"max_runs":4,"total_seconds":4800,"billable_tokens":500000,"cache_read_tokens":5000000},
+            "repro_central":{"url":format!("http://{}",e.addr),"token_file":cred.join("repro")}
+        })).unwrap();
+        std::sync::Arc::new(ieo_supervisor::serve::Service::new(config))
+    };
+    let supervisor = proxy("guardrail", "gr-a");
+    let reply = supervisor.handle(
+        "GET",
+        "/v0/role/repro-requests/repro-success",
+        Some("adapter"),
+        b"",
+    );
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    for (url, expected) in reply.body["raw_log_refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip(["6f6b", "70726f6f66"])
+    {
+        let url = url.as_str().unwrap();
+        let log = supervisor.handle("GET", url, Some("adapter"), b"");
+        assert_eq!(log.status, 200, "{}", log.body);
+        assert_eq!(log.body["content"], expected);
+        assert_eq!(supervisor.handle("GET", url, None, b"").status, 401);
+        assert_eq!(
+            proxy("guardrail", "gr-b")
+                .handle("GET", url, Some("adapter"), b"")
+                .status,
+            404
+        );
+        assert_eq!(
+            proxy("guardrail", "dev-a")
+                .handle("GET", url, Some("adapter"), b"")
+                .status,
+            403
+        );
+    }
     assert_eq!(e.get("gr-a", stdout).1["content"], "6f6b");
     assert_eq!(e.get("gr-b", stdout).0, 404);
     assert_eq!(submit(&good), (200, finished));
@@ -179,7 +253,7 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
             String::from_utf8_lossy(&result.stdout).trim(),
             applied.to_string()
         );
-        assert_eq!(check_finished(id)["exit_code"], 0);
+        assert_eq!(check_finished(id, &runner)["exit_code"], 0);
     }
     for seconds in [0, 3601] {
         let mut body = request("repro-time-invalid", 0, &["/bin/true"], &digest);
@@ -195,7 +269,7 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
     );
     assert_eq!(submit(&failed).0, 202);
     tick(&mut e.db(), "repo-a", &runner).unwrap();
-    let result = check_finished("repro-nonzero");
+    let result = check_finished("repro-nonzero", &runner);
     assert_eq!(result["state"], "finished");
     assert_eq!(result["exit_code"], 7);
     let stderr = result["raw_log_refs"][1].as_str().unwrap();
