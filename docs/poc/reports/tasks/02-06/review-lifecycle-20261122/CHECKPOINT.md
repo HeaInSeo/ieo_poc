@@ -29,3 +29,9 @@
 [PR #123](https://github.com/HeaInSeo/ieo_poc/pull/123) · [PR CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45377454250) · 병합 `744e0a2f93ca197a81c03195f2482c0dafb4c480` · [동일 SHA main CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45378776886)
 
 실제 권한 회수·head 경쟁·역할 Pod 격리는 04-07/P07, 보호 규칙·App 설정은 05-03/P23, N5 실제 수집과 F4는 1b, 외부 상태 표시 문구는 02-07이다. 별도 Claude → Codex 전환 시험은 조건 대기를 유지한다.
+
+## 최종 수용 근거 보강
+
+#122 초안의 독립 검토에서 확인한 supervisor 로그 경로와 설정 이미지 교체 복구를 교정했다. 로컬 두 이미지와 격리 DB에서 응답의 stdout·stderr URL을 그대로 조회했다. 로그를 같은 repo·Guardrail 권한으로 제한했다. 이미지 A 실행의 결과 저장을 실패시킨 다음 B 설정에서 원 run_key와 A 이미지 digest로 복구했고, 저장은 한 건으로 유지됐다. 별도 격리 시험에서 이미지 A의 종료 컨테이너와 예약 행을 준비하고 B 설정의 실제 worker 프로세스를 두 번 새로 기동해 같은 A 결과와 양쪽 로그의 저장 한 건을 확인했다.
+
+[PR #124](https://github.com/HeaInSeo/ieo_poc/pull/124)의 `d6c97eaf43954b2075b3e60ee3b930755d7e0d5c` 독립 승인 · [필수 CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45382943599) · 병합 `f8022573631c478ef6dc845d64dc0d82dee8f027` · [동일 SHA main CI 4/4](https://github.com/HeaInSeo/ieo_poc/actions/runs/45384251719)
