@@ -259,10 +259,10 @@ impl Runner {
 
     /// Inspect only the original isolated run. Absence or ambiguous status
     /// never authorizes a new start, even after coordinator restart.
-    pub fn observe(&self, key: &str) -> Option<Value> {
+    pub fn observe(&self, key: &str, image: &str) -> Option<Value> {
         let container = Self::inspect(key)?;
         let state = &container["State"];
-        if container["Image"] != self.image.trim_start_matches("sha256:")
+        if container["Image"] != image.trim_start_matches("sha256:")
             || state["Status"] != "exited"
             || state["StartedAt"].as_str()?.starts_with("0001-")
             || state["FinishedAt"].as_str()?.starts_with("0001-")
@@ -274,7 +274,7 @@ impl Runner {
         let encode = |bytes: &[u8]| hex::encode(&bytes[..bytes.len().min(LOG_LIMIT)]);
         Some(json!({
             "state": if state["OOMKilled"] == true { "runner_failed" } else { "finished" },
-            "runner_image_digest": self.image,
+            "runner_image_digest": image,
             "exit_code": code,
             "finished_at": state["FinishedAt"],
             "stdout": encode(&out.stdout),

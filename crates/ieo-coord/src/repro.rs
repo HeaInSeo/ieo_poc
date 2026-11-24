@@ -95,14 +95,14 @@ fn finish(
 /// read-only reconciled by the original container ID and never dispatched again.
 pub fn tick(db: &mut Client, repo: &str, runner: &Runner) -> Result<(), postgres::Error> {
     let pending = db.query(
-        "SELECT request_id, run_key FROM repro_requests
-         WHERE repo_id=$1 AND state='running' AND runner_image=$2 AND run_key IS NOT NULL",
-        &[&repo, &runner.image],
+        "SELECT request_id, run_key, runner_image FROM repro_requests
+         WHERE repo_id=$1 AND state='running' AND runner_image IS NOT NULL AND run_key IS NOT NULL",
+        &[&repo],
     )?;
     for row in pending {
         let id: &str = row.get(0);
         let key: &str = row.get(1);
-        if let Some(result) = runner.observe(key)
+        if let Some(result) = runner.observe(key, row.get(2))
             && finish(db, repo, id, key, &result)?
         {
             runner.cleanup(key);
