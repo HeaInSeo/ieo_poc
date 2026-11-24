@@ -140,6 +140,18 @@ fn authorize(
              ) latest WHERE state='changes_requested')",
             &[&repo, &sha, &pr],
         )?.get(0);
+        // N5: a PR-level request for changes is an independent merge gate.
+        // It can survive a new head and does not contribute to G3 approval.
+        let pr_changes_requested = tx
+            .query_opt(
+                "SELECT body->>'decision', sha FROM evidence
+             WHERE repo_id=$1 AND kind='pr_review_state' AND body->>'pull_request'=$2::bigint::text
+             ORDER BY seq DESC LIMIT 1",
+                &[&repo, &pr],
+            )?
+            .is_some_and(|row| {
+                row.get::<_, &str>(0) == "CHANGES_REQUESTED" || row.get::<_, &str>(1) != sha
+            });
         let live_claim = tx.query_opt(
             "SELECT e.report->'body'->>'verdict' FROM events e
              JOIN assignment_heads h ON h.repo_id=e.scope_repo AND h.role=e.scope_role
@@ -158,6 +170,7 @@ fn authorize(
             &[&repo, &sha, &pr, &required_checks],
         )?.get(0);
         if target != sha
+            || pr_changes_requested
             || rejected
             || !live_claim
             || !required_pass
