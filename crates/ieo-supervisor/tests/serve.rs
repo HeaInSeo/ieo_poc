@@ -3151,3 +3151,74 @@ fn a_checkpoint_changed_during_central_comparison_cannot_be_accepted() {
     );
     assert!(!t.0.join("state/runs/pinned").exists());
 }
+
+#[test]
+fn reproduction_receipt_after_restart_only_reads_the_original_request() {
+    let (vol, _) = setup("repro-receipt");
+    let root = &vol.0;
+    let token_file = root.join("cred/repro-token");
+    std::fs::write(&token_file, "fixture-repro-token").unwrap();
+    let coordinator = tiny_http::Server::http("127.0.0.1:0").unwrap();
+    let addr = coordinator.server_addr().to_ip().unwrap();
+    let body = json!({"repo_id":"sori","request_id":"repro-lost","target_sha":"candidate"});
+    let request = serde_json::to_vec(&body).unwrap();
+    let digest = ieo_supervisor::central::sha256(&request);
+    let remote = std::thread::spawn(move || {
+        for (method, status) in [("POST", 502), ("GET", 404), ("GET", 200)] {
+            let req = coordinator
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap()
+                .unwrap();
+            assert_eq!(req.method().as_str(), method);
+            assert_eq!(
+                req.url(),
+                if method == "POST" {
+                    "/v0/agent/repro-requests"
+                } else {
+                    "/v0/agent/repro-requests/repro-lost/receipt"
+                }
+            );
+            let reply = if status == 200 {
+                json!({"request_id":"repro-lost","request_sha256":digest,"state":"finished"})
+            } else {
+                json!({})
+            };
+            req.respond(
+                tiny_http::Response::from_string(reply.to_string()).with_status_code(status),
+            )
+            .unwrap();
+        }
+    });
+    let config = json!({"role":"guardrail","repo":"sori","state":root.join("state"),
+        "etc":root.join("etc"),"cred":root.join("cred"),"claude":root.join("fake-claude"),
+        "quota_group_id":"fixture","checkpoint_central":"local_only","budget":"02-04",
+        "share":{"max_runs":4,"total_seconds":4800,"billable_tokens":500000,"cache_read_tokens":5000000},
+        "repro_central":{"url":format!("http://{addr}"),"token_file":token_file}});
+    let start = || Arc::new(Service::new(Config::from_json(&config).unwrap()));
+    let service = start();
+    let path = "/v0/role/repro-requests";
+    assert_eq!(call(&service, "POST", path, &request).0, 502);
+    drop(service);
+    let restored = start();
+    let mut different = body;
+    different["target_sha"] = json!("different");
+    assert_eq!(
+        call(
+            &restored,
+            "POST",
+            path,
+            &serde_json::to_vec(&different).unwrap()
+        )
+        .0,
+        409
+    );
+    assert_eq!(call(&restored, "POST", path, &request).0, 409);
+    let (status, saved) = call(&restored, "POST", path, &request);
+    assert_eq!(status, 200, "{saved}");
+    assert_eq!(saved["state"], "finished");
+    remote.join().unwrap();
+    assert_eq!(
+        restored.status()["safe_shutdown"]["pending_external_requests"],
+        json!([])
+    );
+}

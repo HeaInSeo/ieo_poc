@@ -49,6 +49,24 @@ fn run() -> Result<(), String> {
             let mut db = cfg.connect(NoTls).map_err(|e| format!("db connect: {e}"))?;
             migrate(&mut db).map_err(|e| format!("migrate: {e}"))
         }
+        Some("repro-worker") => {
+            let config = arg(&args, "--config").ok_or("repro-worker requires --config")?;
+            let runners = ieo_coord::repro::configure(&read_json(&config)?)?;
+            if runners.is_empty() {
+                return Err("repro-worker requires at least one configured repository".into());
+            }
+            let mut db = cfg.connect(NoTls).map_err(|e| format!("db connect: {e}"))?;
+            migrate(&mut db).map_err(|e| e.to_string())?;
+            loop {
+                for (repo, runner) in &runners {
+                    ieo_coord::repro::tick(&mut db, repo, runner).map_err(|e| e.to_string())?;
+                }
+                if args.iter().any(|arg| arg == "--once") {
+                    return Ok(());
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+        }
         Some("serve") => {
             let need = |n: &str| arg(&args, n).ok_or(format!("{n} is required"));
             let policy_path = need("--policy")?;
@@ -176,7 +194,7 @@ fn run() -> Result<(), String> {
             eprintln!("ieo-coord: stopped");
             Ok(())
         }
-        _ => Err("usage: ieo-coord migrate | serve --listen ADDR --tokens FILE --manifest FILE --policy FILE [--bindings FILE] [--profiles FILE] [--workers N] [--grpc-listen ADDR [--grpc-workers N]]".into()),
+        _ => Err("usage: ieo-coord migrate | repro-worker --config FILE [--once] | serve --listen ADDR --tokens FILE --manifest FILE --policy FILE [--bindings FILE] [--profiles FILE] [--workers N] [--grpc-listen ADDR [--grpc-workers N]]".into()),
     }
 }
 

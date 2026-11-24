@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ieo coordinator API v0
-  version: 0.17.1
+  version: 0.18.0
   summary: Registration, state and event read model for the Console Coordinator PoC (task 01-08)
   description: |
     Contract bound in task 01-08 (plan v1.3.3 §1.4–§1.6, contract_revision 4); implemented in 02-03/02-05/02-07.
@@ -590,6 +590,61 @@ paths:
               schema: { $ref: '#/components/schemas/ReproStatus' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '500': { $ref: '#/components/responses/Internal' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v0/agent/repro-requests/{request_id}/receipt:
+    get:
+      tags: [agent]
+      operationId: getReproReceipt
+      summary: Reproduction status with the original request digest
+      description: Read-only reconciliation for the same repo's Guardrail supervisor.
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: ReproStatus fields and the SHA-256 of the stored JSON request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request_id, target_sha, state, request_sha256]
+                properties:
+                  request_id: { type: string }
+                  target_sha: { type: string }
+                  state: { type: string }
+                  request_sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v0/agent/repro-logs/{run_key}/{stream}:
+    get:
+      tags: [agent]
+      operationId: getReproLog
+      summary: Stored raw reproduction log for the same repo's Guardrail
+      parameters:
+        - name: run_key
+          in: path
+          required: true
+          schema: { type: string }
+        - name: stream
+          in: path
+          required: true
+          schema: { type: string, enum: [stdout, stderr] }
+      responses:
+        '200':
+          description: Bounded log transcript, hex encoded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [encoding, content]
+                properties:
+                  encoding: { const: hex }
+                  content: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /v0/repos/{repo_id}/roles:
@@ -1484,6 +1539,7 @@ paths:
         `run_record` {sha, source_ref, record = ieo-evidence record; passes only when
         `record.judgment.counts_as_success` is true, never on exit status alone}, `review` {sha, reviewer, author,
         state, source_ref}, `merge` {head_sha, merged_sha, source_ref}, `output` {sha, task_id, artifact_id, ref},
+        `pr_review_state` {sha, pull_request, decision, reviewers, source_ref} is trusted PR-level merge evidence.
         `followups` {sha, task_id, accepted, ref}, `branch_head` {sha, ref = `refs/heads/<name>`, source_ref} (0.15.0:
         the head of one GitHub branch, the input of the resume judgment's final basis). `(repo_id, evidence_id)` is the
         idempotency key: same body → 200,
@@ -1498,7 +1554,8 @@ paths:
               properties:
                 evidence_id: { type: string, minLength: 1 }
                 repo_id: { type: string, minLength: 1 }
-                kind: { type: string, enum: [ci_run, run_record, review, merge, main_ci, output, followups, branch_head] }
+                kind: { type: string, enum: [ci_run, run_record, review, merge, main_ci, output, followups, branch_head, pr_review_state] }
+                decision: { type: string, enum: [APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED] }
       responses:
         '201': { $ref: '#/components/responses/CoordinatorResult' }
         '200': { $ref: '#/components/responses/CoordinatorResult' }

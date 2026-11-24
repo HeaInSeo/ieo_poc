@@ -56,7 +56,10 @@ fn routes_resolve_to_their_operations_and_shapes() {
         (
             "GET",
             "/v0/agent/repro-requests/abc",
-            Some(Operation::GetRepro { id: "abc" }),
+            Some(Operation::GetRepro {
+                id: "abc",
+                receipt: false,
+            }),
         ),
         // the trailing empty segment is trimmed: no request id, no operation (X-03 review P-1)
         ("GET", "/v0/agent/repro-requests/", None),

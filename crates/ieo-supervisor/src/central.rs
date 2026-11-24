@@ -124,7 +124,7 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
-    fn call(&self, method: &str, path: &str, body: Option<&Value>) -> Reply {
+    pub(crate) fn call(&self, method: &str, path: &str, body: Option<&Value>) -> Reply {
         let token = match read_token(&self.token_file) {
             Ok(t) => t,
             Err(e) => return Reply::NoAnswer(e),

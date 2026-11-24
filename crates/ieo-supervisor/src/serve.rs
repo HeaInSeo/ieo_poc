@@ -47,6 +47,7 @@ pub struct Config {
     pub provider_max_age: u64,
     /// The central checkpoint record (§2.1, §5-2): the coordinator, or `local_only` for tests.
     pub central: crate::central::Central,
+    repro_central: Option<Arc<crate::central::HttpClient>>,
     /// The approved budget this role's runs belong to (user decision 2026-11-13 ①): the service
     /// refuses runs beyond its caps on its own (a backstop; exact accounting is the caller's).
     pub budget: crate::budget::Budget,
@@ -125,6 +126,17 @@ impl Config {
                 .as_u64()
                 .unwrap_or(crate::provider::DEFAULT_MAX_AGE_SECONDS),
             central: crate::central::Central::from_json(&v["checkpoint_central"])?,
+            repro_central: match &v["repro_central"] {
+                Value::Null => None,
+                Value::Object(_) if v["role"] == "guardrail" => {
+                    let cfg = &v["repro_central"];
+                    Some(Arc::new(crate::central::HttpClient {
+                        url: cfg["url"].as_str().ok_or("config.repro_central.url missing")?.trim_end_matches('/').into(),
+                        token_file: cfg["token_file"].as_str().ok_or("config.repro_central.token_file missing")?.into(),
+                    }))
+                }
+                _ => return Err("config.repro_central is only available to Guardrail".into()),
+            },
             budget: match v["budget"].as_str().and_then(crate::budget::named) {
                 Some(b) => b,
                 None => {
@@ -751,6 +763,20 @@ impl Service {
                     Err(_) => err(404, "NOT_FOUND", "no accepted attempt with this id"),
                 }
             }
+            ("POST", ["v0", "role", "repro-requests"]) => {
+                let Ok(body) = serde_json::from_slice::<Value>(body) else {
+                    return err(400, "SCHEMA_VIOLATION", "body is not JSON");
+                };
+                self.submit_repro(&body)
+            }
+            ("GET", ["v0", "role", "repro-requests", id]) if safe_id(id) => {
+                self.query_repro(id, false)
+            }
+            ("GET", ["v0", "role", "repro-logs", key, stream])
+                if safe_id(key) && matches!(*stream, "stdout" | "stderr") =>
+            {
+                self.call_repro("GET", &format!("/v0/agent/repro-logs/{key}/{stream}"), None)
+            }
             ("POST", ["v0", "role", op @ ("start" | "reconnect")]) => {
                 let Ok(req) = serde_json::from_slice::<Value>(body) else {
                     return err(400, "SCHEMA_VIOLATION", "body is not JSON");
@@ -759,6 +785,102 @@ impl Service {
             }
             _ => err(404, "NOT_FOUND", "no such operation"),
         }
+    }
+
+    fn call_repro(&self, method: &str, path: &str, body: Option<&Value>) -> Response {
+        let Some(client) = &self.cfg.repro_central else {
+            return err(
+                403,
+                "REPRO_DISABLED",
+                "Guardrail reproduction is not configured",
+            );
+        };
+        match client.call(method, path, body) {
+            crate::central::Reply::Answered(status, body) => resp(status, body),
+            crate::central::Reply::NoAnswer(_) => {
+                err(502, "REPRO_UNCONFIRMED", "coordinator response unavailable")
+            }
+        }
+    }
+
+    fn query_repro(&self, id: &str, receipt: bool) -> Response {
+        let suffix = if receipt { "/receipt" } else { "" };
+        self.call_repro(
+            "GET",
+            &format!("/v0/agent/repro-requests/{id}{suffix}"),
+            None,
+        )
+    }
+
+    fn reconcile_repro(&self, id: &str, expected: &Value) -> Response {
+        let mut result = self.query_repro(id, true);
+        if result.status != 200 || result.body["request_sha256"] != *expected {
+            return err(
+                409,
+                "REPRO_UNCONFIRMED",
+                "original request is not confirmed",
+            );
+        }
+        let _ = self.pending.remove(&format!("repro:{id}"));
+        if let Some(body) = result.body.as_object_mut() {
+            body.remove("request_sha256");
+        }
+        result
+    }
+
+    fn submit_repro(&self, body: &Value) -> Response {
+        let _gate = self.launch_gate.lock().unwrap_or_else(|e| e.into_inner());
+        if self.cfg.repro_central.is_none() || body["repo_id"] != self.cfg.repo {
+            return err(
+                403,
+                "REPO_SCOPE_DENIED",
+                "reproduction is outside the role scope",
+            );
+        }
+        let Some(id) = body["request_id"].as_str().filter(|id| safe_id(id)) else {
+            return err(400, "SCHEMA_VIOLATION", "invalid reproduction request id");
+        };
+        let digest = json!(crate::central::sha256(
+            &serde_json::to_vec(body).expect("valid request JSON"),
+        ));
+        let key = format!("repro:{id}");
+        let not_tracked = || {
+            err(
+                503,
+                "EXTERNAL_REQUEST_NOT_TRACKED",
+                "pending file unavailable",
+            )
+        };
+        let Ok(pending) = self.pending.list() else {
+            return not_tracked();
+        };
+        if let Some(previous) = pending.iter().find(|entry| entry["request_id"] == key) {
+            if previous["detail"]["digest"] != digest {
+                return err(
+                    409,
+                    "EVENT_CONTENT_CONFLICT",
+                    "request id already has different content",
+                );
+            }
+            return self.reconcile_repro(id, &digest);
+        }
+        if self
+            .pending
+            .add(crate::pending::entry(
+                &key,
+                "repro_request",
+                "coordinator submitReproRequest",
+                json!({"id":id,"digest":digest}),
+            ))
+            .is_err()
+        {
+            return not_tracked();
+        }
+        let reply = self.call_repro("POST", "/v0/agent/repro-requests", Some(body));
+        if (200..500).contains(&reply.status) {
+            let _ = self.pending.remove(&key);
+        }
+        reply
     }
 
     fn launch(self: &Arc<Self>, op: &str, req: &Value) -> Response {
@@ -2198,6 +2320,10 @@ impl Service {
         for e in self.pending.list()? {
             if e["kind"] == "first_action_report" {
                 let _ = self.first_action_tracked(&e["detail"]["body"]);
+            } else if e["kind"] == "repro_request"
+                && let Some(id) = e["detail"]["id"].as_str().filter(|id| safe_id(id))
+            {
+                let _ = self.reconcile_repro(id, &e["detail"]["digest"]);
             }
         }
         self.pending.list()
