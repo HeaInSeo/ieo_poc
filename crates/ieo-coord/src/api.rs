@@ -3477,7 +3477,7 @@ fn ingest(tx: &mut Transaction, who: &Caller, req: &Req) -> R {
     let (kind, sha) = validate_evidence(&body)?;
     if matches!(
         kind.as_str(),
-        "branch_head" | "ci_run" | "run_record" | "review"
+        "branch_head" | "ci_run" | "run_record" | "review" | "pr_review_state"
     ) {
         lock(tx, &format!("delivery-evidence:{repo}"))?;
     }

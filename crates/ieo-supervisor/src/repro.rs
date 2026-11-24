@@ -51,6 +51,15 @@ fn run(command: &mut Command) -> Result<Output, String> {
     Ok(out)
 }
 
+fn start_if_rootless(probe: Result<Output, String>, start: impl FnOnce()) -> Result<(), String> {
+    let observed = probe?;
+    if observed.stdout.trim_ascii() != b"true" {
+        return Err("Podman rootless mode was not confirmed".into());
+    }
+    start();
+    Ok(())
+}
+
 impl Runner {
     pub fn new(
         repository: &Path,
@@ -239,8 +248,13 @@ impl Runner {
     }
 
     /// The only start. A missing response remains subject to read-only observation.
-    pub fn start(&self, key: &str) {
-        let _ = run(podman().args(["start", key]));
+    pub fn start(&self, key: &str) -> Result<(), String> {
+        start_if_rootless(
+            run(podman().args(["info", "--format", "{{.Host.Security.Rootless}}"])),
+            || {
+                let _ = run(podman().args(["start", key]));
+            },
+        )
     }
 
     /// Inspect only the original isolated run. Absence or ambiguous status
@@ -278,4 +292,28 @@ pub fn sha256(s: &str) -> bool {
     s.len() == 64
         && s.bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::process::ExitStatusExt;
+
+    #[test]
+    fn starts_only_after_confirmed_rootless_probe() {
+        let report = |stdout: &[u8]| {
+            Ok(Output {
+                status: std::process::ExitStatus::from_raw(0),
+                stdout: stdout.to_vec(),
+                stderr: vec![],
+            })
+        };
+        let starts = std::cell::Cell::new(0);
+        for probe in [report(b"false\n"), report(b""), Err("probe failed".into())] {
+            assert!(start_if_rootless(probe, || starts.set(starts.get() + 1)).is_err());
+        }
+        assert_eq!(starts.get(), 0);
+        assert!(start_if_rootless(report(b"true\n"), || starts.set(starts.get() + 1)).is_ok());
+        assert_eq!(starts.get(), 1);
+    }
 }

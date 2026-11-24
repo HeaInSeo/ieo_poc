@@ -153,6 +153,40 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
     assert_eq!(submit(&good), (200, finished));
     assert_eq!(run_key("repro-success"), key);
 
+    for (id, requested, applied) in [
+        ("repro-time-default", None, 60),
+        ("repro-time-over300", Some(301), 301),
+        ("repro-time-max", Some(3600), 3600),
+    ] {
+        let mut body = request(id, 0, &["/bin/true"], &digest);
+        if let Some(seconds) = requested {
+            body["timeout_seconds"] = json!(seconds);
+        } else {
+            body.as_object_mut().unwrap().remove("timeout_seconds");
+        }
+        assert_eq!(submit(&body).0, 202);
+        tick(&mut e.db(), "repo-a", &runner).unwrap();
+        let result = Command::new("podman")
+            .args(["inspect", "--format", "{{.Config.Timeout}}", &run_key(id)])
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&result.stdout).trim(),
+            applied.to_string()
+        );
+        assert_eq!(check_finished(id)["exit_code"], 0);
+    }
+    for seconds in [0, 3601] {
+        let mut body = request("repro-time-invalid", 0, &["/bin/true"], &digest);
+        body["timeout_seconds"] = json!(seconds);
+        assert_eq!(submit(&body).0, 400);
+    }
+
     let failed = request(
         "repro-nonzero",
         0,
@@ -203,4 +237,26 @@ fn queued_reproduction_is_isolated_and_reconciled_without_another_start() {
     tick(&mut e.db(), "repo-a", &runner).unwrap();
     assert_eq!(status("repro-stale")["state"], "rejected_stale_generation");
     assert_eq!(fs::read_dir(&state).unwrap().count(), 0);
+    // The host can exhaust a one-second deadline during container startup.
+    // Verify exact minimum configuration separately from process completion.
+    let mut minimum = request("repro-time-min", 1, &["/bin/true"], &digest);
+    minimum["timeout_seconds"] = json!(1);
+    assert_eq!(submit(&minimum).0, 202);
+    let key = "ieo-repro-11111111-1111-4111-8111-222222222222";
+    runner
+        .prepare(&ieo_supervisor::repro::Job {
+            key,
+            sha: &sha,
+            bundle: &digest,
+            command: minimum["command"].as_array().unwrap(),
+            timeout: 1,
+        })
+        .unwrap();
+    let configured = Command::new("podman")
+        .args(["inspect", "--format", "{{.Config.Timeout}}", key])
+        .output()
+        .unwrap();
+    runner.cleanup(key);
+    assert!(configured.status.success());
+    assert_eq!(String::from_utf8_lossy(&configured.stdout).trim(), "1");
 }

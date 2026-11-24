@@ -642,6 +642,64 @@ fn github_correction_transfers_new_objects_and_reconciles_lost_push_and_merge() 
     assert_eq!(pr_state("stale-clear", &old, 7, "APPROVED", json!([])), 201);
     assert_eq!(e.post_k("judge", merge, "stale-clear-hold", &write).0, 409);
     assert_eq!(pr_state("exact-clear", &sha, 7, "APPROVED", json!([])), 201);
+    // Hold the evidence transaction after insertion, while the same-head
+    // merge competes for its delivery-evidence lock.
+    let mut barrier = e.db();
+    barrier
+        .batch_execute(
+            "CREATE FUNCTION pause_n5_ingest() RETURNS trigger LANGUAGE plpgsql AS
+         $$ BEGIN PERFORM pg_advisory_xact_lock(1230626); RETURN NEW; END; $$;
+         CREATE TRIGGER pause_n5_ingest AFTER INSERT ON evidence
+         FOR EACH ROW WHEN (NEW.evidence_id='same-head-changes')
+         EXECUTE FUNCTION pause_n5_ingest();",
+        )
+        .unwrap();
+    barrier
+        .query_one("SELECT pg_advisory_lock(1230626)", &[])
+        .unwrap();
+    std::thread::scope(|scope| {
+        let ingest = scope.spawn(|| {
+            pr_state(
+                "same-head-changes",
+                &sha,
+                7,
+                "CHANGES_REQUESTED",
+                json!(["reviewer"]),
+            )
+        });
+        let wait_for_lock = |sql: &str| {
+            let start = std::time::Instant::now();
+            let mut observer = e.db();
+            while !observer.query_one(sql, &[]).unwrap().get::<_, bool>(0) {
+                assert!(start.elapsed() < std::time::Duration::from_secs(3));
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        };
+        wait_for_lock(
+            "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND objid=1230626 AND NOT granted)",
+        );
+        let merge = scope.spawn(|| e.post_k("judge", merge, "same-head-blocked", &write));
+        wait_for_lock(
+            "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND objid<>1230626 AND NOT granted AND database=(SELECT oid FROM pg_database WHERE datname=current_database()))",
+        );
+        barrier
+            .query_one("SELECT pg_advisory_unlock(1230626)", &[])
+            .unwrap();
+        assert_eq!(ingest.join().unwrap(), 201);
+        let (status, blocked) = merge.join().unwrap();
+        assert_eq!(status, 409, "{blocked}");
+        assert!(blocked.to_string().contains("GITHUB_MERGE_DENIED"));
+    });
+    assert!(
+        seen.lock()
+            .unwrap()
+            .iter()
+            .all(|(method, _, _)| method != "PUT")
+    );
+    assert_eq!(
+        pr_state("clear-same-head", &sha, 7, "APPROVED", json!([])),
+        201
+    );
     let (status, refused) = e.post_k("judge", merge, "merge-raced", &write);
     assert_eq!(status, 409, "{refused}");
     assert_eq!(refused["github_status"], 409, "{refused}");

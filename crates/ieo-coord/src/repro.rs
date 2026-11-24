@@ -119,7 +119,7 @@ pub fn tick(db: &mut Client, repo: &str, runner: &Runner) -> Result<(), postgres
             .as_array()
             .map(Vec::as_slice)
             .unwrap_or_default(),
-        timeout: body["timeout_seconds"].as_u64().unwrap_or(60).min(300),
+        timeout: body["timeout_seconds"].as_u64().unwrap_or(60),
     };
     if let Err(reason) = runner.prepare(&job) {
         let mut tx = db.transaction()?;
@@ -142,7 +142,18 @@ pub fn tick(db: &mut Client, repo: &str, runner: &Runner) -> Result<(), postgres
         &[&format!("scope:{repo}:guardrail")],
     )?;
     if current(&mut tx, repo, &body)? {
-        runner.start(&key);
+        if let Err(reason) = runner.start(&key) {
+            let result = json!({"state":"runner_failed","runner_image_digest":runner.image,
+                "finished_at": time_now(&mut tx)?, "reason":reason});
+            tx.execute(
+                "UPDATE repro_requests SET state='runner_failed', result=$4
+                 WHERE repo_id=$1 AND request_id=$2 AND run_key=$3 AND state='running'",
+                &[&repo, &id, &key, &result],
+            )?;
+            tx.commit()?;
+            runner.cleanup(&key);
+            return Ok(());
+        }
         tx.commit()
     } else {
         tx.execute(

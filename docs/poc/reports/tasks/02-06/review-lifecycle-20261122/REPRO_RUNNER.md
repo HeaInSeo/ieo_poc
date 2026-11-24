@@ -6,7 +6,7 @@ Guardrail supervisor는 기존 adapter 인증과 외부 요청 목록을 재사�
 
 코디네이터 소유 별도 프로세스 `ieo-coord repro-worker --config FILE`이 repo별 대기열을 처리한다. 설정의 repo ID마다 `repository`(코디네이터가 관리하는 Git 객체 저장소), `bundles`(파일 이름이 SHA-256인 입력 묶음 디렉터리), `state`(로컬 작업 디렉터리), `image`(로컬 승인 이미지의 전체 sha256 ID)를 지정한다. `--once`는 격리 점검에 쓸 한 회차 옵션이다. 기본 `serve`가 실행기를 시작하지는 않는다.
 
-선택한 요청은 현재 Guardrail 배정·세대·SHA를 확인한 뒤 DB에 한 번만 `running`과 컨테이너 ID를 기록한다. supervisor의 재현 어댑터는 대상 commit과 묶음 digest를 확인하고 한 번만 시작한다. rootless Podman에서 승인 이미지, 비루트 UID, 네트워크 없음, capability 제거, 읽기 전용 루트, 제한된 작업용 tmpfs를 사용한다. 컨테이너가 받는 호스트 마운트는 준비한 입력 폴더 하나로 제한한다. 요청 기한은 기본 60초·최대 300초다. 프로세스 16개, 파일 디스크립터 128개, 출력 파일 32 MiB, 프로세스별 주소 공간 128 MiB를 제한한다. 컨테이너 로그는 상한이 있는 stdout·stderr 원본 바이트로 보존한다.
+선택한 요청은 현재 Guardrail 배정·세대·SHA를 확인한 뒤 DB에 한 번만 `running`과 컨테이너 ID를 기록한다. supervisor의 재현 어댑터는 대상 commit과 묶음 digest를 확인하고 한 번만 시작한다. 시작 직전에 로컬 Podman의 rootless 상태를 확인한다. rootful·조회 실패·불명확 응답이면 시작을 거부한다. rootless Podman에서 승인 이미지, 비루트 UID, 네트워크 없음, capability 제거, 읽기 전용 루트, 제한된 작업용 tmpfs를 사용한다. 컨테이너가 받는 호스트 마운트는 준비한 입력 폴더 하나로 제한한다. 요청 기한은 1~3,600초이며 접수한 값을 그대로 적용한다. 생략 시 기본 60초다. 프로세스 16개, 파일 디스크립터 128개, 출력 파일 32 MiB, 프로세스별 주소 공간 128 MiB를 제한한다. 컨테이너 로그는 상한이 있는 stdout·stderr 원본 바이트로 보존한다.
 
 종료를 관측하면 같은 ID로 exit code·이미지·시각·로그를 원장에 옮긴다. 명령의 0·비영 종료는 각각 `finished`의 exit code로 구분한다. 실행기 준비 실패는 `runner_failed`, 낡은 배정은 `rejected_stale_generation`이다. 시작·종료 여부를 증명하지 못한 ID는 `running`으로 남기며 새 실행을 보내지 않는다. 원장 업데이트가 실패해도 컨테이너 증거를 유지하여 재시작 뒤 같은 ID를 확인한다. 외부 관리자가 직접 격리 컨테이너를 삭제하기 전에 원장과 대조해야 한다.
 
