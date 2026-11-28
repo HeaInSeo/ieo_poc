@@ -96,5 +96,12 @@
       "requirement": "AC-14",
       "reason": "Dispatch observation, a silent gateway deadline, full raw result controls and archive parser rejection vectors are missing."
     }
+  },
+  "correction-9": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Normal-run egress completeness, forged verifier evidence, ordinary-envelope parser rejection, and commit past acquisition expiry remain untested."
+    }
   }
 }
