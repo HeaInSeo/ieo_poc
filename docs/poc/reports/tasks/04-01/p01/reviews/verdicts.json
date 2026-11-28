@@ -82,5 +82,12 @@
       "requirement": "AC-14",
       "reason": "Canonical hash bytes, gateway failure response, and a varying-count control remain unspecified."
     }
+  },
+  "correction-7": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Verifier rejection, invalid and stale gateway results, commit-before-response evidence, and exact persisted record fields remain untested."
+    }
   }
 }
