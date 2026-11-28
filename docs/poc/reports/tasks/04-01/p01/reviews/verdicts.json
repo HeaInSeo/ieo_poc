@@ -61,5 +61,12 @@
       "requirement": "AC-14",
       "reason": "Storage observed only at end of run can miss transient writes on rejection."
     }
+  },
+  "correction-4": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "AC-14 does not observe all source reads (REQ-11) or deny an authenticated principal with neither role (REQ-13)."
+    }
   }
 }
