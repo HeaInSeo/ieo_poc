@@ -103,5 +103,12 @@
       "requirement": "AC-14",
       "reason": "Normal-run egress completeness, forged verifier evidence, ordinary-envelope parser rejection, and commit past acquisition expiry remain untested."
     }
+  },
+  "correction-10": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Issuer-label-only outcome and receipt-before-deadline versus delayed processing are ambiguous or untested."
+    }
   }
 }
