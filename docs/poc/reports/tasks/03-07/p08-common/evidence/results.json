@@ -1,0 +1,306 @@
+{
+  "image_id": "f264d6d0ba1e8d3a8877a78819275d6ef4a830b4f1ae08fd7ab88666a4ca016a",
+  "digest": "sha256:6ab2fe6cfe05744c636e3ed1459fd23b2c80af807aeee29088843e13f371f784",
+  "approval": {
+    "head": "6e39c42c8b2e4afc33e63881467827d875399988",
+    "merge": "ed15dabafc2c2cb55eb5ac7bbb3afa09a2263dae",
+    "profile_version": "0.1.0",
+    "catalog_version": "0.2.2"
+  },
+  "cases": [
+    {
+      "case": "tools-1",
+      "container": "cd9a6e2dd3048cec5699679557f53af042003968139511ef5bdb6989402d27b6",
+      "rc": 0,
+      "inputs": {},
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "info"
+      ]
+    },
+    {
+      "case": "go-normal-1",
+      "container": "b3e7f6623f7c0bd7191bfeebc7f7af6d5180d9dec8afa108814fdd54d37d4724",
+      "rc": 0,
+      "inputs": {
+        "double.go": "a62df8e1773cfa8711fbe383fc9d6c4b1da48f2e3924a29001fafe012e14aad0",
+        "double_test.go": "7e0378c2156468c69f8ecd13dd32b70b2bec7e3984793c7ae67ca9d423c43015",
+        "go.mod": "9bb92bf9958289fcbbbd20f37e8ac0d4900349f971aed1f29af06159c5c7b53d"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "go"
+      ],
+      "pass_fail_skip": [
+        1,
+        0,
+        0
+      ],
+      "required": "TestDouble",
+      "checks": [
+        "+ gofmt -l .",
+        "+ go vet -mod=readonly ./...",
+        "+ go test -mod=readonly -count=1 -json ./..."
+      ]
+    },
+    {
+      "case": "go-protected-1",
+      "container": "0a93f718483760f57a8e1e89d77a4bcf2790a6c4ac2dc23cb02ab5f0ef80e739",
+      "rc": 1,
+      "inputs": {
+        "candidate-profile.json": "142c6ac1fc90bc708b6427c7ef6a29b3642fb122f85267027d5ac9ea930ae9fb",
+        "double.go": "3e4253ae442f9ac8df6531a7b9f564989c6c67ec09e244cb1b9cc14ad816099d",
+        "double_test.go": "f10ff9d9d94c99559e8b838e1ed6f57eb84ece0c69d481c7cedf56b5c5a54f67",
+        "go.mod": "9bb92bf9958289fcbbbd20f37e8ac0d4900349f971aed1f29af06159c5c7b53d"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "go"
+      ],
+      "pass_fail_skip": [
+        1,
+        1,
+        0
+      ],
+      "required": "TestDouble",
+      "checks": [
+        "+ gofmt -l .",
+        "+ go vet -mod=readonly ./...",
+        "+ go test -mod=readonly -count=1 -json ./..."
+      ]
+    },
+    {
+      "case": "go-candidate",
+      "container": "b74a56752c1b4f9eacdb508b9ec1e5e75ddb5281c944dc243c5e6e5633e5005c",
+      "rc": 0,
+      "inputs": {
+        "candidate-profile.json": "142c6ac1fc90bc708b6427c7ef6a29b3642fb122f85267027d5ac9ea930ae9fb",
+        "double.go": "3e4253ae442f9ac8df6531a7b9f564989c6c67ec09e244cb1b9cc14ad816099d",
+        "double_test.go": "f10ff9d9d94c99559e8b838e1ed6f57eb84ece0c69d481c7cedf56b5c5a54f67",
+        "go.mod": "9bb92bf9958289fcbbbd20f37e8ac0d4900349f971aed1f29af06159c5c7b53d"
+      },
+      "command": [
+        "/usr/bin/env",
+        "PATH=/opt/ieo-tools/go/bin:/opt/ieo-tools/rust/bin:/usr/bin:/bin",
+        "HOME=/tmp",
+        "GOCACHE=/tmp/go-cache",
+        "GOTOOLCHAIN=local",
+        "CARGO_TARGET_DIR=/tmp/target",
+        "CARGO_HOME=/tmp/cargo",
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-run",
+        "^TestCandidateSmoke$",
+        "./..."
+      ],
+      "pass_fail_skip": [
+        1,
+        0,
+        0
+      ],
+      "omitted_required": [
+        "TestDouble"
+      ]
+    },
+    {
+      "case": "rust-normal-1",
+      "container": "4c06f68648fc506fde6972dfad17c9867b7d10f3ff159b948f3b98d9c7aecfac",
+      "rc": 0,
+      "inputs": {
+        "Cargo.lock": "83b72aeb2ec0c30882076bcd9efb174393e615b9a5380283191f3197481c1834",
+        "Cargo.toml": "e529985ec9d8248bc85d2f340d01f4fdae6e428fac035ccf5d1c4f50c9b38751",
+        "src/lib.rs": "aab9c3fa8b154d409ab655dd3f52526588db4043220eff96d57f5d4a237bb9bd"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "rust"
+      ],
+      "pass_fail_skip": [
+        1,
+        0,
+        0
+      ],
+      "required": "tests::doubles_three",
+      "checks": [
+        "+ cargo fmt --all -- --check",
+        "+ cargo clippy --offline --locked --all-targets -- -D warnings",
+        "+ cargo test --offline --locked --all-targets"
+      ]
+    },
+    {
+      "case": "rust-protected-1",
+      "container": "43c4a4e5662e512eba2abcd3e3844b1015499afafb44259754129d6e9b86b209",
+      "rc": 101,
+      "inputs": {
+        "Cargo.lock": "83b72aeb2ec0c30882076bcd9efb174393e615b9a5380283191f3197481c1834",
+        "Cargo.toml": "e529985ec9d8248bc85d2f340d01f4fdae6e428fac035ccf5d1c4f50c9b38751",
+        "candidate-profile.json": "6d0b1b18b038ba39dced0e29209a1e767dfd9eb582d99fe94984884d08c04c70",
+        "src/lib.rs": "b957a58fa686375cec02558dfecea399a69e1f72e884cae36dfb7851ebeac0ac"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "rust"
+      ],
+      "pass_fail_skip": [
+        1,
+        1,
+        0
+      ],
+      "required": "tests::doubles_three",
+      "checks": [
+        "+ cargo fmt --all -- --check",
+        "+ cargo clippy --offline --locked --all-targets -- -D warnings",
+        "+ cargo test --offline --locked --all-targets"
+      ]
+    },
+    {
+      "case": "rust-candidate",
+      "container": "a28e6e4d32dc8f20804713d9de2511c12fac435d7a30e2e16baae51445d0764c",
+      "rc": 0,
+      "inputs": {
+        "Cargo.lock": "83b72aeb2ec0c30882076bcd9efb174393e615b9a5380283191f3197481c1834",
+        "Cargo.toml": "e529985ec9d8248bc85d2f340d01f4fdae6e428fac035ccf5d1c4f50c9b38751",
+        "candidate-profile.json": "6d0b1b18b038ba39dced0e29209a1e767dfd9eb582d99fe94984884d08c04c70",
+        "src/lib.rs": "b957a58fa686375cec02558dfecea399a69e1f72e884cae36dfb7851ebeac0ac"
+      },
+      "command": [
+        "/usr/bin/env",
+        "PATH=/opt/ieo-tools/go/bin:/opt/ieo-tools/rust/bin:/usr/bin:/bin",
+        "HOME=/tmp",
+        "GOCACHE=/tmp/go-cache",
+        "GOTOOLCHAIN=local",
+        "CARGO_TARGET_DIR=/tmp/target",
+        "CARGO_HOME=/tmp/cargo",
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "tests::candidate_smoke",
+        "--",
+        "--exact"
+      ],
+      "pass_fail_skip": [
+        1,
+        0,
+        0
+      ],
+      "omitted_required": [
+        "tests::doubles_three"
+      ]
+    },
+    {
+      "case": "tools-2",
+      "container": "7679157a11e2c6d3112e3ac6aa31e4876ce61c192284a8b56b25507512305c9f",
+      "rc": 0,
+      "inputs": {},
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "info"
+      ]
+    },
+    {
+      "case": "go-normal-2",
+      "container": "da8a76c6136e5372de8ad95bfa1265ea26f1cb68ce0bf745b4440f7659c22284",
+      "rc": 0,
+      "inputs": {
+        "double.go": "a62df8e1773cfa8711fbe383fc9d6c4b1da48f2e3924a29001fafe012e14aad0",
+        "double_test.go": "7e0378c2156468c69f8ecd13dd32b70b2bec7e3984793c7ae67ca9d423c43015",
+        "go.mod": "9bb92bf9958289fcbbbd20f37e8ac0d4900349f971aed1f29af06159c5c7b53d"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "go"
+      ],
+      "pass_fail_skip": [
+        1,
+        0,
+        0
+      ],
+      "required": "TestDouble",
+      "checks": [
+        "+ gofmt -l .",
+        "+ go vet -mod=readonly ./...",
+        "+ go test -mod=readonly -count=1 -json ./..."
+      ]
+    },
+    {
+      "case": "go-protected-2",
+      "container": "67bd33d6392edc7f5ad5cbe10f2a273e88febf48c374e91a3844de01331c5d71",
+      "rc": 1,
+      "inputs": {
+        "candidate-profile.json": "142c6ac1fc90bc708b6427c7ef6a29b3642fb122f85267027d5ac9ea930ae9fb",
+        "double.go": "3e4253ae442f9ac8df6531a7b9f564989c6c67ec09e244cb1b9cc14ad816099d",
+        "double_test.go": "f10ff9d9d94c99559e8b838e1ed6f57eb84ece0c69d481c7cedf56b5c5a54f67",
+        "go.mod": "9bb92bf9958289fcbbbd20f37e8ac0d4900349f971aed1f29af06159c5c7b53d"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "go"
+      ],
+      "pass_fail_skip": [
+        1,
+        1,
+        0
+      ],
+      "required": "TestDouble",
+      "checks": [
+        "+ gofmt -l .",
+        "+ go vet -mod=readonly ./...",
+        "+ go test -mod=readonly -count=1 -json ./..."
+      ]
+    },
+    {
+      "case": "rust-normal-2",
+      "container": "6308080507d3bd318a101eae2d51d59c9d7741c77b795c1ba9dccfeed6b82b12",
+      "rc": 0,
+      "inputs": {
+        "Cargo.lock": "83b72aeb2ec0c30882076bcd9efb174393e615b9a5380283191f3197481c1834",
+        "Cargo.toml": "e529985ec9d8248bc85d2f340d01f4fdae6e428fac035ccf5d1c4f50c9b38751",
+        "src/lib.rs": "aab9c3fa8b154d409ab655dd3f52526588db4043220eff96d57f5d4a237bb9bd"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "rust"
+      ],
+      "pass_fail_skip": [
+        1,
+        0,
+        0
+      ],
+      "required": "tests::doubles_three",
+      "checks": [
+        "+ cargo fmt --all -- --check",
+        "+ cargo clippy --offline --locked --all-targets -- -D warnings",
+        "+ cargo test --offline --locked --all-targets"
+      ]
+    },
+    {
+      "case": "rust-protected-2",
+      "container": "08fafbc99f4a488810e6802e9ab0f7ce00cd54376956d6d2fcd20cbe9f43d071",
+      "rc": 101,
+      "inputs": {
+        "Cargo.lock": "83b72aeb2ec0c30882076bcd9efb174393e615b9a5380283191f3197481c1834",
+        "Cargo.toml": "e529985ec9d8248bc85d2f340d01f4fdae6e428fac035ccf5d1c4f50c9b38751",
+        "candidate-profile.json": "6d0b1b18b038ba39dced0e29209a1e767dfd9eb582d99fe94984884d08c04c70",
+        "src/lib.rs": "b957a58fa686375cec02558dfecea399a69e1f72e884cae36dfb7851ebeac0ac"
+      },
+      "command": [
+        "/usr/local/bin/ieo-policy-verify",
+        "rust"
+      ],
+      "pass_fail_skip": [
+        1,
+        1,
+        0
+      ],
+      "required": "tests::doubles_three",
+      "checks": [
+        "+ cargo fmt --all -- --check",
+        "+ cargo clippy --offline --locked --all-targets -- -D warnings",
+        "+ cargo test --offline --locked --all-targets"
+      ]
+    }
+  ]
+}
