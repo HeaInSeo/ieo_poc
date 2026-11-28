@@ -117,5 +117,12 @@
       "requirement": "AC-14",
       "reason": "Reordered eligible frame callbacks and tied mailbox timestamps are not exercised."
     }
+  },
+  "correction-12": {
+    "F03": {
+      "verdict": "pass",
+      "requirement": null,
+      "reason": "Bounded fixture satisfies consistency, authority, and measurable receipt-order controls."
+    }
   }
 }

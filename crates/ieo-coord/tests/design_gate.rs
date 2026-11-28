@@ -156,6 +156,7 @@ fn p01_independent_design_verdicts_gate_implementation_assignments() {
                 "correction-9",
                 "correction-10",
                 "correction-11",
+                "correction-12",
             ]
             .iter()
             .enumerate()
@@ -171,10 +172,11 @@ fn p01_independent_design_verdicts_gate_implementation_assignments() {
                 };
                 revision_case(&env, stage, &case, 6 + index as u64, verdict, expected);
             }
-            let expected_terminal = if case == "F03" { 0 } else { 1 };
             assert_eq!(
                 assignment_count(&env),
-                expected_terminal,
+                corrected[2]
+                    .as_i64()
+                    .expect("frozen terminal assignment count"),
                 "{case}: observed terminal state"
             );
         }
