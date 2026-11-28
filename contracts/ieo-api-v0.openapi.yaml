@@ -1421,7 +1421,7 @@ paths:
       tags: [coordinator]
       operationId: reconcileDevelopmentFollowups
       summary: Check waiting successors after missed verdict dispatches
-      description: Required service scope followups:reconcile. Uses approved plans only. Waiting is a normal result and does not issue a role delivery.
+      description: Required service scope followups:reconcile. Uses approved plans only. Waiting is normal. The stalled list observes accepted deliveries that passed the first-action deadline.
       requestBody:
         required: true
         content:
@@ -1432,6 +1432,7 @@ paths:
               required: [repo_id]
               properties:
                 repo_id: { type: string }
+                stall_seconds: { type: integer, minimum: 1, maximum: 86400, default: 60 }
       responses:
         '200': { $ref: '#/components/responses/CoordinatorResult' }
         '400': { $ref: '#/components/responses/Rejected' }

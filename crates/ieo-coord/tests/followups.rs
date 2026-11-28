@@ -8,8 +8,12 @@ const RECONCILE: &str = "/v0/coordinator/followups/reconcile";
 
 fn setup(e: &Env) -> Value {
     ready_sprint(e, 3);
+    plan(e, Value::Null)
+}
+
+fn plan(e: &Env, previous: Value) -> Value {
     assert_eq!(
-        assign(e, "development", "D1", 0, "01-01", SHA1, Value::Null).0,
+        assign(e, "development", "D1", 0, "01-01", SHA1, previous).0,
         201
     );
     assert_eq!(
@@ -52,7 +56,7 @@ fn count(e: &Env) -> i64 {
         .get(0)
 }
 
-fn run_watcher(e: &Env) {
+fn run_watcher(e: &Env) -> String {
     let dir = tempfile::tempdir().unwrap();
     let token = dir.path().join("token");
     std::fs::write(&token, &e.tokens["watcher"]).unwrap();
@@ -67,6 +71,7 @@ fn run_watcher(e: &Env) {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+    String::from_utf8(output.stderr).unwrap()
 }
 
 #[test]
@@ -199,4 +204,152 @@ fn verdict_and_watcher_compete_on_one_durable_assignment() {
     run_watcher(&e);
     assert_eq!(disposition(&e), assigned);
     assert_eq!(count(&e), 1);
+}
+
+#[test]
+fn the_last_required_verdict_wakes_a_waiting_plan_without_a_watcher() {
+    let Some(e) = start() else { return };
+    let mut spec = spec("repo-a", 5, 3);
+    let tasks = spec["tasks"].as_array_mut().unwrap();
+    let other = tasks
+        .iter_mut()
+        .find(|task| task["task_id"] == "01-07")
+        .unwrap();
+    other["prerequisites"] = json!([]);
+    let outputs = other["outputs"].as_array().unwrap().clone();
+    tasks[1]["prerequisites"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"task_id":"01-07","plan_version":"v1.3.3","required_state":"accepted"}));
+    spec["digest"] = json!(ieo_spec::spec_digest(&spec));
+    assert_eq!(
+        e.post_k(
+            "alice",
+            "/v0/sprints?mode=executable",
+            "two-prerequisites",
+            &spec
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "bob",
+            "/v0/sprints/POC-01/revisions/5/semantic-review",
+            &json!({"decision":"passed","reason":"fixture","digest":spec["digest"]})
+        )
+        .0,
+        201
+    );
+    assert_eq!(
+        assign(&e, "development", "old", 0, "01-07", SHA3, Value::Null).0,
+        201
+    );
+    assert_eq!(
+        e.post(
+            "assigner",
+            PLANS,
+            &plan(&e, json!({"assignment_id":"old","generation":0}))
+        )
+        .0,
+        201
+    );
+    full_evidence(&e, SHA1, "trigger-complete");
+    assert_eq!(judge(&e, "trigger-ready", "01-01").1["outcome"], "accepted");
+    assert_eq!(count(&e), 0);
+    assert_eq!(
+        disposition(&e)["reason"]["rejections"][0]["code"],
+        "PREREQUISITE_UNMET"
+    );
+
+    for (id, kind, body) in [
+        (
+            "other-ci",
+            "ci_run",
+            json!({"sha":SHA3,"conclusion":"success","source_ref":"fixture/ci"}),
+        ),
+        (
+            "other-review",
+            "review",
+            json!({"sha":SHA3,"reviewer":"independent","author":"developer","state":"approved","source_ref":"fixture/review"}),
+        ),
+        (
+            "other-merge",
+            "merge",
+            json!({"head_sha":SHA3,"merged_sha":MERGE,"source_ref":"fixture/pr"}),
+        ),
+        (
+            "other-followups",
+            "followups",
+            json!({"sha":MERGE,"task_id":"01-07","accepted":true,"ref":"fixture/followups"}),
+        ),
+    ] {
+        assert_eq!(evidence(&e, id, kind, body).0, 201);
+    }
+    for (index, output) in outputs.iter().filter(|o| o["required"] == true).enumerate() {
+        assert_eq!(evidence(&e, &format!("other-output-{index}"), "output",
+            json!({"sha":SHA3,"task_id":"01-07","artifact_id":output["artifact_id"],"ref":"fixture/output"})).0, 201);
+    }
+    let last = judge(&e, "other-ready", "01-07").1;
+    assert_eq!(last["outcome"], "accepted", "{last}");
+    assert_eq!(count(&e), 1);
+    assert_eq!(disposition(&e)["event_id"], last["event_id"]);
+}
+
+#[test]
+fn attempt_ceiling_stays_waiting_with_one_durable_decision_request() {
+    let Some(mut e) = start() else { return };
+    assert_eq!(e.post("assigner", PLANS, &setup(&e)).0, 201);
+    e.db().execute("INSERT INTO task_attempts (sprint_id, task_id, role, issued) VALUES('POC-01','01-02','development',4)", &[]).unwrap();
+    full_evidence(&e, SHA1, "limit");
+    assert_eq!(judge(&e, "at-limit", "01-01").1["outcome"], "accepted");
+    let state = disposition(&e);
+    assert_eq!(state["state"], "waiting");
+    let id = state["reason"]["decision_event_id"].as_str().unwrap();
+    e.reopen_server(None);
+    run_watcher(&e);
+    run_watcher(&e);
+    assert_eq!(disposition(&e), state);
+    assert_eq!(count(&e), 0);
+    assert_eq!(e.db().query_one(
+        "SELECT count(*) FROM events e JOIN outbox o ON o.sprint_id=e.sprint_id AND o.sprint_seq=e.sprint_seq WHERE e.event_id=$1",
+        &[&id],
+    ).unwrap().get::<_,i64>(0), 1);
+}
+
+#[test]
+fn responsive_watcher_distinguishes_stalled_delivery_from_waiting() {
+    let Some(e) = start() else { return };
+    assert_eq!(e.post("assigner", PLANS, &setup(&e)).0, 201);
+    assert!(run_watcher(&e).is_empty());
+    full_evidence(&e, SHA1, "observe");
+    assert_eq!(judge(&e, "observe", "01-01").1["outcome"], "accepted");
+    assert!(run_watcher(&e).is_empty());
+    ensure_delivery(
+        &e,
+        &serde_json::to_vec(&json!({
+            "delivery_id":"D-t-followup","phase":"takeover","repo_id":"repo-a","role":"development",
+            "assignment_id":"D2","generation":0,"session_id":"fixture"
+        }))
+        .unwrap(),
+    );
+    let mut db = e.db();
+    db.execute(
+        "INSERT INTO role_delivery_results(delivery_id,n,reasons,outcome,recorded_at)
+       VALUES('D-t-followup',1,'[]','budget_refused',now()-interval '2 minutes')",
+        &[],
+    )
+    .unwrap();
+    assert!(run_watcher(&e).is_empty());
+    db.execute(
+        "INSERT INTO role_delivery_results(delivery_id,n,reasons,outcome,recorded_at)
+       VALUES('D-t-followup',2,'[]','accepted',now()-interval '2 minutes')",
+        &[],
+    )
+    .unwrap();
+    assert!(run_watcher(&e).contains("followup stalled before first action: D-t-followup"));
+    db.execute("INSERT INTO role_first_actions(repo_id,role,assignment_id,generation,attempt_id,session_id,
+       event_offset,observed_at,kind,body,current_assignment,reported_by)
+       VALUES('repo-a','development','D2',0,'D-t-followup','fixture',1,now(),'text','{}',true,'fixture')", &[]).unwrap();
+    assert!(run_watcher(&e).is_empty());
 }

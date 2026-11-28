@@ -1,7 +1,7 @@
 //! Separate-lifetime periodic recovery client. It holds a repo-scoped watcher
 //! token rather than a coordinator DB credential.
 use serde_json::json;
-use std::{path::Path, time::Duration};
+use std::{collections::BTreeSet, path::Path, time::Duration};
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args().skip(1).collect();
@@ -30,12 +30,21 @@ fn run() -> Result<(), String> {
         .timeout(Duration::from_secs(15))
         .build();
     let mut last_error = None;
+    let mut last_stalled = BTreeSet::new();
     loop {
-        let result = poll(&client, &url, Path::new(token_file), repo);
+        let error = match poll(&client, &url, Path::new(token_file), repo) {
+            Ok(stalled) => {
+                for id in stalled.difference(&last_stalled) {
+                    eprintln!("followup stalled before first action: {id}");
+                }
+                last_stalled = stalled;
+                None
+            }
+            Err(error) => Some(error),
+        };
         if once {
-            return result;
+            return error.map_or(Ok(()), Err);
         }
-        let error = result.err();
         if error != last_error {
             match &error {
                 Some(error) => eprintln!("followup watcher unavailable: {error}"),
@@ -47,7 +56,12 @@ fn run() -> Result<(), String> {
     }
 }
 
-fn poll(client: &ureq::Agent, url: &str, file: &Path, repo: &str) -> Result<(), String> {
+fn poll(
+    client: &ureq::Agent,
+    url: &str,
+    file: &Path,
+    repo: &str,
+) -> Result<BTreeSet<String>, String> {
     let raw =
         std::fs::read_to_string(file).map_err(|e| format!("credential file: {}", e.kind()))?;
     let token = raw.trim();
@@ -59,7 +73,22 @@ fn poll(client: &ureq::Agent, url: &str, file: &Path, repo: &str) -> Result<(), 
         .set("Authorization", &format!("Bearer {token}"))
         .send_json(json!({"repo_id":repo}))
     {
-        Ok(response) if response.status() == 200 => Ok(()),
+        Ok(response) if response.status() == 200 => {
+            let body: serde_json::Value = response
+                .into_json()
+                .map_err(|_| "invalid watcher response")?;
+            body["stalled"]
+                .as_array()
+                .ok_or("missing stall observations")?
+                .iter()
+                .map(|row| {
+                    row["delivery_id"]
+                        .as_str()
+                        .map(str::to_owned)
+                        .ok_or_else(|| "invalid delivery identity".into())
+                })
+                .collect()
+        }
         Ok(response) => Err(format!(
             "unexpected coordinator status {}",
             response.status()
