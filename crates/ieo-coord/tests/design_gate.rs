@@ -144,9 +144,15 @@ fn p01_independent_design_verdicts_gate_implementation_assignments() {
             &expected,
         );
         if let Some(corrected) = expectations["corrected"].get(&case) {
-            for (index, stage) in ["correction-1", "correction-2", "corrected", "correction-4"]
-                .iter()
-                .enumerate()
+            for (index, stage) in [
+                "correction-1",
+                "correction-2",
+                "corrected",
+                "correction-4",
+                "correction-5",
+            ]
+            .iter()
+            .enumerate()
             {
                 let Some(verdict) = observed[*stage].get(&case) else {
                     continue;

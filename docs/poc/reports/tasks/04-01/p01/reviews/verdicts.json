@@ -68,5 +68,12 @@
       "requirement": "AC-14",
       "reason": "AC-14 does not observe all source reads (REQ-11) or deny an authenticated principal with neither role (REQ-13)."
     }
+  },
+  "correction-5": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Backend exclusivity and registered unauthorized source are untested; verification authority and non-publisher denial precedence are incomplete."
+    }
   }
 }
