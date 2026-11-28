@@ -1391,6 +1391,51 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/followups:
+    post:
+      tags: [coordinator]
+      operationId: planDevelopmentFollowup
+      summary: Register an approved one-time development successor
+      description: Required scope coordinator:assign. Binds the successor, exact predecessor assignment and accepted prerequisite from the registered sprint revision.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [plan_id, trigger_task, assignment]
+              properties:
+                plan_id: { type: string }
+                trigger_task: { type: string }
+                assignment: { type: object, description: Exact issueAssignment request for generation zero. }
+      responses:
+        '201': { $ref: '#/components/responses/CoordinatorResult' }
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Rejected' }
+        '422': { $ref: '#/components/responses/Rejected' }
+  /v0/coordinator/followups/reconcile:
+    post:
+      tags: [coordinator]
+      operationId: reconcileDevelopmentFollowups
+      summary: Check waiting successors after missed verdict dispatches
+      description: Required service scope followups:reconcile. Uses approved plans only. Waiting is a normal result and does not issue a role delivery.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [repo_id]
+              properties:
+                repo_id: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/CoordinatorResult' }
+        '400': { $ref: '#/components/responses/Rejected' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v0/coordinator/assignments:
     post:
       tags: [coordinator]

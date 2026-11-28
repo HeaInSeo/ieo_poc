@@ -59,7 +59,7 @@ const AGENT_SCOPES: [&str; 4] = [
     "checkpoint:report",
     "github:push",
 ];
-const CLIENT_SCOPES: [&str; 11] = [
+const CLIENT_SCOPES: [&str; 12] = [
     // repo-scope status/stop of the role supervisors (runtime contract §7, 02-04)
     "roles:control",
     "github:merge",
@@ -67,6 +67,7 @@ const CLIENT_SCOPES: [&str; 11] = [
     "sprints:read",
     "review:semantic",
     "coordinator:assign",
+    "followups:reconcile",
     "evidence:ingest",
     "judge:verify",
     "outbox:deliver",
@@ -145,6 +146,9 @@ impl Credentials {
                     }
                     if scopes.iter().any(|x| !CLIENT_SCOPES.contains(&x.as_str())) {
                         return Err(format!("{name}: unknown or agent scope"));
+                    }
+                    if scopes.contains("followups:reconcile") && kind != Kind::Service {
+                        return Err(format!("{name}: followups:reconcile is for services only"));
                     }
                     if scopes.contains("judge:verify") && kind != Kind::Service {
                         return Err(format!("{name}: judge:verify is for services only"));

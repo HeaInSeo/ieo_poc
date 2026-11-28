@@ -358,6 +358,8 @@ pub enum Operation<'a> {
     GithubMerge,
     GithubReconcile,
     Judge,
+    PlanFollowup,
+    ReconcileFollowups,
     ListOutbox,
     Deliver {
         id: &'a str,
@@ -477,6 +479,8 @@ pub fn route<'a>(method: &str, path: &'a str) -> Option<Operation<'a>> {
         ("POST", ["v0", "coordinator", "github", "merge"]) => Operation::GithubMerge,
         ("POST", ["v0", "coordinator", "github", "reconcile"]) => Operation::GithubReconcile,
         ("POST", ["v0", "coordinator", "judgments"]) => Operation::Judge,
+        ("POST", ["v0", "coordinator", "followups"]) => Operation::PlanFollowup,
+        ("POST", ["v0", "coordinator", "followups", "reconcile"]) => Operation::ReconcileFollowups,
         ("GET", ["v0", "coordinator", "outbox"]) => Operation::ListOutbox,
         ("POST", ["v0", "coordinator", "outbox", id, "delivery"]) => Operation::Deliver { id },
         _ => return None,
@@ -780,7 +784,29 @@ pub fn dispatch(
         Operation::GithubReconcile => {
             run(db, &|tx| crate::github_write::reconcile(tx, ctx, who, req))
         }
-        Operation::Judge => run(db, &|tx| judge(tx, ctx, who, req)),
+        Operation::Judge => {
+            let reply = run(db, &|tx| judge(tx, ctx, who, req))?;
+            if reply.status == 201
+                && reply.body["outcome"] == "accepted"
+                && let Ok(body) = parse_body(req.body)
+                && let (Some(repo), Some(task), Some(event)) = (
+                    body["repo_id"].as_str(),
+                    body["task_id"].as_str(),
+                    reply.body["event_id"].as_str(),
+                )
+            {
+                // The original judgment is already committed. Missing or failed
+                // dispatch is recoverable by the separately scoped watcher.
+                if !crate::followups::process(db, ctx, repo, Some((task, event)), guard)
+                    .is_ok_and(|response| response.status == 200)
+                {
+                    eprintln!("followup event dispatch deferred to periodic reconciliation");
+                }
+            }
+            Ok(reply)
+        }
+        Operation::PlanFollowup => run(db, &|tx| crate::followups::plan(tx, ctx, who, req)),
+        Operation::ReconcileFollowups => crate::followups::reconcile(db, ctx, who, req, guard),
         Operation::ListOutbox => run(db, &|tx| list_outbox(tx, who, req)),
         Operation::Deliver { id } => run(db, &|tx| deliver(tx, who, id, req)),
     }
@@ -2695,7 +2721,7 @@ fn repro_log(tx: &mut Transaction, who: &Caller, key: &str, stream: &str) -> R {
 // Assignments: ownership head, permission generation, prerequisites, attempts
 // ---------------------------------------------------------------------------
 
-fn find_task<'a>(spec: &'a Value, task_id: &str) -> Option<&'a Value> {
+pub(crate) fn find_task<'a>(spec: &'a Value, task_id: &str) -> Option<&'a Value> {
     spec["tasks"]
         .as_array()?
         .iter()
@@ -2768,6 +2794,17 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             "repo not in this credential's scope",
         ));
     }
+    issue_assignment(tx, ctx, &who.name, Some(who), body)
+}
+
+pub(crate) fn issue_assignment(
+    tx: &mut Transaction,
+    ctx: &Ctx,
+    issuer: &str,
+    guardrail_actor: Option<&Caller>,
+    body: Value,
+) -> R {
+    let repo = str_field(&body, "repo_id", 256)?.to_owned();
     only_keys(
         &body,
         &[
@@ -3107,7 +3144,7 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         )?;
         history(
             tx,
-            &who.name,
+            issuer,
             "task.limit_reached",
             &json!({"sprint_id": sprint_id, "task_id": task_id, "role": role, "issued": issued,
                         "ceiling": ceiling}),
@@ -3123,7 +3160,7 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
             task_id, target_sha, issued_by, policy_digest, request, limits)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
         &[&aid, &i64_of(generation), &repo, &role, &sprint_id, &sprint_rev, &task_id, &sha,
-          &who.name, &ctx.policy.digest, &body, &limits],
+          &issuer, &ctx.policy.digest, &body, &limits],
     )?;
     tx.execute(
         "INSERT INTO assignment_heads (repo_id, role, assignment_id, generation) VALUES ($1,$2,$3,$4)
@@ -3136,11 +3173,18 @@ fn assign(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> R {
         &[&sprint_id, &task_id, &role],
     )?;
     if role == "guardrail" {
-        crate::review_store::reserve_replacement(tx, who, &body)?;
+        let actor = guardrail_actor.ok_or_else(|| {
+            problem(
+                403,
+                "SCOPE_DENIED",
+                "Guardrail assignment requires an explicit caller",
+            )
+        })?;
+        crate::review_store::reserve_replacement(tx, actor, &body)?;
     }
     history(
         tx,
-        &who.name,
+        issuer,
         "assignment.issued",
         &json!({"assignment_id": aid, "generation": generation, "repo_id": repo, "role": role,
                     "sprint_id": sprint_id, "task_id": task_id, "target_sha": sha,
