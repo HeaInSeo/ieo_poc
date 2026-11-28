@@ -75,5 +75,12 @@
       "requirement": "AC-14",
       "reason": "Backend exclusivity and registered unauthorized source are untested; verification authority and non-publisher denial precedence are incomplete."
     }
+  },
+  "correction-6": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Canonical hash bytes, gateway failure response, and a varying-count control remain unspecified."
+    }
   }
 }

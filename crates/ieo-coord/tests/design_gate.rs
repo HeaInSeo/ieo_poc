@@ -150,6 +150,7 @@ fn p01_independent_design_verdicts_gate_implementation_assignments() {
                 "corrected",
                 "correction-4",
                 "correction-5",
+                "correction-6",
             ]
             .iter()
             .enumerate()
