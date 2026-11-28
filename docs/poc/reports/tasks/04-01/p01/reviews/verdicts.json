@@ -89,5 +89,12 @@
       "requirement": "AC-14",
       "reason": "Verifier rejection, invalid and stale gateway results, commit-before-response evidence, and exact persisted record fields remain untested."
     }
+  },
+  "correction-8": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Dispatch observation, a silent gateway deadline, full raw result controls and archive parser rejection vectors are missing."
+    }
   }
 }
