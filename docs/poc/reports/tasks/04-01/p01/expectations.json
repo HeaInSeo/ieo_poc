@@ -1,0 +1,41 @@
+{
+  "initial": {
+    "B17": [
+      "fail",
+      "REQ-13",
+      0
+    ],
+    "D42": [
+      "pass",
+      null,
+      1
+    ],
+    "F03": [
+      "fail",
+      "AC-14",
+      0
+    ],
+    "H26": [
+      "fail",
+      "REQ-12",
+      0
+    ]
+  },
+  "corrected": {
+    "B17": [
+      "pass",
+      null,
+      1
+    ],
+    "F03": [
+      "pass",
+      null,
+      1
+    ],
+    "H26": [
+      "pass",
+      null,
+      1
+    ]
+  }
+}

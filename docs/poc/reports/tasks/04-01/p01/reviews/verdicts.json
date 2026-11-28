@@ -1,0 +1,65 @@
+{
+  "initial": {
+    "B17": {
+      "verdict": "fail",
+      "requirement": "REQ-13",
+      "reason": "Publication principal missing; publisher-only authority is not specified."
+    },
+    "D42": {
+      "verdict": "pass",
+      "requirement": null,
+      "reason": "Publication permissions and outcomes are consistent and measurable; REQ-11 coverage noted."
+    },
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "No measurable outcomes for the publication and authorization checks."
+    },
+    "H26": {
+      "verdict": "fail",
+      "requirement": "REQ-12",
+      "reason": "The same verified publisher submission is permitted and forbidden."
+    }
+  },
+  "correction-1": {
+    "B17": {
+      "verdict": "fail",
+      "requirement": "REQ-11",
+      "reason": "Equal numeric values do not prove synthetic-source provenance."
+    },
+    "F03": {
+      "verdict": "fail",
+      "requirement": "REQ-11",
+      "reason": "Equal numeric values do not prove synthetic-source provenance."
+    },
+    "H26": {
+      "verdict": "fail",
+      "requirement": "REQ-11",
+      "reason": "Equal numeric values do not prove synthetic-source provenance."
+    }
+  },
+  "correction-2": {
+    "B17": {
+      "verdict": "pass",
+      "requirement": null,
+      "reason": "Authority and rejection tested, and source provenance is observable."
+    },
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Synthetic-read counter boundary across repeated runs is ambiguous."
+    },
+    "H26": {
+      "verdict": "pass",
+      "requirement": null,
+      "reason": "Publication contract is consistent and stored status and provenance are observable."
+    }
+  },
+  "corrected": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Storage observed only at end of run can miss transient writes on rejection."
+    }
+  }
+}

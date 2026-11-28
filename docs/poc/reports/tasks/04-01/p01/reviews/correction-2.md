@@ -1,0 +1,7 @@
+| Card | Verdict | Basis |
+|---|---|---|
+| B17 | **Pass** | REQ-12 and REQ-13 agree with the expected outcomes for the publisher, reader, and non-publisher administrator. For REQ-11, independent read counters distinguish the two sources even though both return `42`, and the stored value and source identifier are directly checkable. |
+| F03 | **Fail** | The publication rules and role authority are consistent. AC-14 leaves the scope of the source counters ambiguous across the initial run and the repeat. A correct implementation can register two synthetic reads if the counters span both runs, or one if they reset before the repeat. |
+| H26 | **Pass** | The publication rules, role authority, and expected responses agree. AC-14 checks that the sole stored archive is verified and uses independent counters and stored provenance to test REQ-11. |
+
+**F03 blocker — AC-14, for REQ-11.** Suppose each run starts with an empty archive database and performs one synthetic read for its successful verified submission. An implementation that behaves correctly on both runs fails the one-read assertion if the counters are initialized only once. Specify that the database is emptied and both counters are reset before **each** run. At the end of each run, assert response codes `201`, `422`, `403` in order, exactly one stored archive containing `42` with source identifier `synthetic-fixture`, one synthetic read, and zero production-probe reads.
