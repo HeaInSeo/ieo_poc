@@ -110,5 +110,12 @@
       "requirement": "AC-14",
       "reason": "Issuer-label-only outcome and receipt-before-deadline versus delayed processing are ambiguous or untested."
     }
+  },
+  "correction-11": {
+    "F03": {
+      "verdict": "fail",
+      "requirement": "AC-14",
+      "reason": "Reordered eligible frame callbacks and tied mailbox timestamps are not exercised."
+    }
   }
 }
