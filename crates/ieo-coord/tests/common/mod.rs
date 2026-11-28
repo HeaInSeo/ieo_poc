@@ -89,7 +89,7 @@ pub type PrincipalRow = (
     Option<&'static str>,
 );
 
-pub const PRINCIPALS: [PrincipalRow; 20] = [
+pub const PRINCIPALS: [PrincipalRow; 21] = [
     // role supervisors' checkpoint report credentials (02-04 decision item 9)
     (
         "sup-dev-a",
@@ -183,6 +183,13 @@ pub const PRINCIPALS: [PrincipalRow; 20] = [
         &["github:push"],
         &["repo-a"],
         Some("development"),
+    ),
+    (
+        "watcher",
+        "service",
+        &["followups:reconcile"],
+        &["repo-a"],
+        None,
     ),
     ("courier", "service", &["outbox:deliver"], &["repo-a"], None),
     (
@@ -417,8 +424,12 @@ impl Env {
         self.call(Some(who), "GET", path, None, None)
     }
     pub fn reopen_github_server(&mut self, config: ieo_coord::github_write::Config) {
-        let (mut app, tokens, _) = fixture(&self.cfg, "github-reopened");
-        app.ctx.github_writes = Some(config);
+        self.reopen_server(Some(config));
+    }
+
+    pub fn reopen_server(&mut self, config: Option<ieo_coord::github_write::Config>) {
+        let (mut app, tokens, _) = fixture(&self.cfg, "reopened");
+        app.ctx.github_writes = config;
         let server = std::sync::Arc::new(tiny_http::Server::http("127.0.0.1:0").unwrap());
         self.addr = server.server_addr().to_ip().unwrap().to_string();
         self.app = std::sync::Arc::new(app);

@@ -636,3 +636,21 @@ ALTER TABLE review_transitions ADD COLUMN IF NOT EXISTS recorded_at timestamptz
 ALTER TABLE repro_requests ADD COLUMN IF NOT EXISTS run_key text;
 ALTER TABLE repro_requests ADD COLUMN IF NOT EXISTS runner_image text;
 ALTER TABLE repro_requests ADD COLUMN IF NOT EXISTS result jsonb;
+
+-- 02-08: a registered approval binds one successor assignment to an exact spec revision.
+CREATE TABLE IF NOT EXISTS followup_plans (
+    repo_id text NOT NULL,
+    plan_id text NOT NULL,
+    trigger_task text NOT NULL,
+    sprint_id text NOT NULL,
+    sprint_revision bigint NOT NULL,
+    task_id text NOT NULL,
+    approved_by text NOT NULL,
+    policy_digest text NOT NULL,
+    assignment jsonb NOT NULL,
+    disposition jsonb NOT NULL DEFAULT '{"state":"waiting"}',
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    assigned_at timestamptz,
+    PRIMARY KEY (repo_id, plan_id),
+    UNIQUE (repo_id, sprint_id, sprint_revision, task_id)
+);

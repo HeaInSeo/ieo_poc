@@ -9,6 +9,7 @@ pub mod auth;
 pub mod chain;
 pub mod delivery;
 pub mod failover;
+mod followups;
 pub mod github_write;
 pub mod grpc;
 pub mod http;
