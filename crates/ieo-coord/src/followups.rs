@@ -106,7 +106,13 @@ pub(crate) fn plan(tx: &mut Transaction, ctx: &Ctx, who: &Caller, req: &Req) -> 
     ok(201, json!({"state":"waiting"}))
 }
 
-fn evaluate(tx: &mut Transaction, ctx: &Ctx, repo: &str, id: &str, event: Option<&str>) -> R {
+fn evaluate(
+    tx: &mut Transaction,
+    ctx: &Ctx,
+    repo: &str,
+    id: &str,
+    event: Option<(&str, &str)>,
+) -> R {
     let row = tx.query_one(
         "SELECT assignment, approved_by, disposition, assigned_at IS NOT NULL, trigger_task, policy_digest
          FROM followup_plans WHERE repo_id=$1 AND plan_id=$2 FOR UPDATE",
@@ -137,7 +143,6 @@ fn evaluate(tx: &mut Transaction, ctx: &Ctx, repo: &str, id: &str, event: Option
         ],
     )?;
     let accepted = accepted.filter(|row| row.get::<_, &str>(1) == "accepted");
-    let observed: String = tx.query_one("SELECT clock_timestamp()::text", &[])?.get(0);
     let disposition = if row.get::<_, &str>(5) != ctx.policy.digest {
         json!({"state":"waiting","reason":"policy_changed"})
     } else if let Some(evidence) = accepted {
@@ -148,8 +153,9 @@ fn evaluate(tx: &mut Transaction, ctx: &Ctx, repo: &str, id: &str, event: Option
                 attempt.commit()?;
                 json!({"state":"assigned","assignment_id":body["assignment_id"],"generation":0,
                     "cause":if event.is_some() {"event"} else {"reconcile"},
-                    "event_id":event,"prerequisite_event":evidence.get::<_, &str>(0),
-                    "prerequisite_at":evidence.get::<_, &str>(2),"observed_at":observed})
+                    "event_id":event.map(|(id,_)|id),"event_received_at":event.map(|(_,time)|time),
+                    "prerequisite_event":evidence.get::<_, &str>(0),
+                    "prerequisite_at":evidence.get::<_, &str>(2),"eligible_at":r.body["eligible_at"]})
             }
             Ok(r) if r.status == 202 && r.body["outcome"] == "limit_reached" => {
                 attempt.commit()?;
@@ -196,6 +202,16 @@ pub(crate) fn process(
     guard: &dyn TxGuard,
 ) -> Result<Resp, Abort> {
     let task = trigger.map(|(task, _)| task);
+    let received = if trigger.is_some() {
+        match db.query_one("SELECT iso(clock_timestamp())", &[]) {
+            Ok(row) => Some(row.get::<_, String>(0)),
+            Err(err) => return Ok(err.into()),
+        }
+    } else {
+        None
+    };
+    let event = trigger.map(|(_, event)| event).zip(received.as_deref());
+
     let queries = db.query(
         "SELECT p.plan_id FROM followup_plans p
          JOIN sprint_revisions r ON (r.sprint_id,r.revision)=(p.sprint_id,p.sprint_revision)
@@ -213,9 +229,7 @@ pub(crate) fn process(
     let mut plans = Vec::with_capacity(rows.len());
     for row in rows {
         let id: &str = row.get(0);
-        let response = run_tx(db, guard, &|tx| {
-            evaluate(tx, ctx, repo, id, trigger.map(|(_, event)| event))
-        })?;
+        let response = run_tx(db, guard, &|tx| evaluate(tx, ctx, repo, id, event))?;
         if response.status != 200 {
             return Ok(response);
         }

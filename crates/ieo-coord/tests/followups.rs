@@ -208,6 +208,15 @@ fn verdict_and_watcher_compete_on_one_durable_assignment() {
 
 #[test]
 fn the_last_required_verdict_wakes_a_waiting_plan_without_a_watcher() {
+    last_verdict("accepted");
+}
+
+#[test]
+fn recorded_but_not_accepted_last_result_also_wakes_the_plan() {
+    last_verdict("result_recorded");
+}
+
+fn last_verdict(required: &str) {
     let Some(e) = start() else { return };
     let mut spec = spec("repo-a", 5, 3);
     let tasks = spec["tasks"].as_array_mut().unwrap();
@@ -220,7 +229,7 @@ fn the_last_required_verdict_wakes_a_waiting_plan_without_a_watcher() {
     tasks[1]["prerequisites"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"task_id":"01-07","plan_version":"v1.3.3","required_state":"accepted"}));
+        .push(json!({"task_id":"01-07","plan_version":"v1.3.3","required_state":required}));
     spec["digest"] = json!(ieo_spec::spec_digest(&spec));
     assert_eq!(
         e.post_k(
@@ -262,38 +271,57 @@ fn the_last_required_verdict_wakes_a_waiting_plan_without_a_watcher() {
         "PREREQUISITE_UNMET"
     );
 
-    for (id, kind, body) in [
-        (
-            "other-ci",
-            "ci_run",
-            json!({"sha":SHA3,"conclusion":"success","source_ref":"fixture/ci"}),
-        ),
-        (
-            "other-review",
-            "review",
-            json!({"sha":SHA3,"reviewer":"independent","author":"developer","state":"approved","source_ref":"fixture/review"}),
-        ),
-        (
-            "other-merge",
-            "merge",
-            json!({"head_sha":SHA3,"merged_sha":MERGE,"source_ref":"fixture/pr"}),
-        ),
-        (
-            "other-followups",
-            "followups",
-            json!({"sha":MERGE,"task_id":"01-07","accepted":true,"ref":"fixture/followups"}),
-        ),
-    ] {
-        assert_eq!(evidence(&e, id, kind, body).0, 201);
-    }
-    for (index, output) in outputs.iter().filter(|o| o["required"] == true).enumerate() {
-        assert_eq!(evidence(&e, &format!("other-output-{index}"), "output",
+    if required == "accepted" {
+        for (id, kind, body) in [
+            (
+                "other-ci",
+                "ci_run",
+                json!({"sha":SHA3,"conclusion":"success","source_ref":"fixture/ci"}),
+            ),
+            (
+                "other-review",
+                "review",
+                json!({"sha":SHA3,"reviewer":"independent","author":"developer","state":"approved","source_ref":"fixture/review"}),
+            ),
+            (
+                "other-merge",
+                "merge",
+                json!({"head_sha":SHA3,"merged_sha":MERGE,"source_ref":"fixture/pr"}),
+            ),
+            (
+                "other-followups",
+                "followups",
+                json!({"sha":MERGE,"task_id":"01-07","accepted":true,"ref":"fixture/followups"}),
+            ),
+        ] {
+            assert_eq!(evidence(&e, id, kind, body).0, 201);
+        }
+        for (index, output) in outputs.iter().filter(|o| o["required"] == true).enumerate() {
+            assert_eq!(evidence(&e, &format!("other-output-{index}"), "output",
             json!({"sha":SHA3,"task_id":"01-07","artifact_id":output["artifact_id"],"ref":"fixture/output"})).0, 201);
+        }
     }
     let last = judge(&e, "other-ready", "01-07").1;
-    assert_eq!(last["outcome"], "accepted", "{last}");
+    assert_eq!(
+        last["outcome"],
+        if required == "accepted" {
+            "accepted"
+        } else {
+            "not_accepted"
+        },
+        "{last}"
+    );
     assert_eq!(count(&e), 1);
     assert_eq!(disposition(&e)["event_id"], last["event_id"]);
+    assert!(e.db().query_one(
+        "SELECT (p.disposition->>'prerequisite_at')::timestamptz <= e.stored_at
+           AND e.stored_at <= (p.disposition->>'event_received_at')::timestamptz
+           AND (p.disposition->>'event_received_at')::timestamptz <= (p.disposition->>'eligible_at')::timestamptz
+           AND (p.disposition->>'eligible_at')::timestamptz <= p.assigned_at
+         FROM followup_plans p JOIN events e ON e.event_id=p.disposition->>'event_id'
+         WHERE p.plan_id='successor'",
+        &[],
+    ).unwrap().get::<_, bool>(0));
 }
 
 #[test]

@@ -787,7 +787,6 @@ pub fn dispatch(
         Operation::Judge => {
             let reply = run(db, &|tx| judge(tx, ctx, who, req))?;
             if reply.status == 201
-                && reply.body["outcome"] == "accepted"
                 && let Ok(body) = parse_body(req.body)
                 && let (Some(repo), Some(task), Some(event)) = (
                     body["repo_id"].as_str(),
@@ -3155,6 +3154,14 @@ pub(crate) fn issue_assignment(
                               "attempts_issued": issued, "ceiling": ceiling}),
         );
     }
+    let eligible_at = if guardrail_actor.is_none() {
+        Some(
+            tx.query_one("SELECT iso(clock_timestamp())", &[])?
+                .get::<_, String>(0),
+        )
+    } else {
+        None
+    };
     tx.execute(
         "INSERT INTO assignments (assignment_id, generation, repo_id, role, sprint_id, sprint_revision,
             task_id, target_sha, issued_by, policy_digest, request, limits)
@@ -3190,14 +3197,15 @@ pub(crate) fn issue_assignment(
                     "sprint_id": sprint_id, "task_id": task_id, "target_sha": sha,
                     "replaced": book.current}),
     )?;
-    ok(
-        201,
-        json!({"outcome": "issued", "assignment_id": aid, "generation": generation,
+    let mut issued = json!({"outcome": "issued", "assignment_id": aid, "generation": generation,
                    "repo_id": repo, "role": role, "sprint_id": sprint_id,
                    "sprint_revision": sprint_rev, "task_id": task_id, "target_sha": sha,
                    "policy_digest": ctx.policy.digest, "attempts_issued": issued + 1,
-                   "ceiling": ceiling}),
-    )
+                   "ceiling": ceiling});
+    if let Some(time) = eligible_at {
+        issued["eligible_at"] = json!(time);
+    }
+    ok(201, issued)
 }
 
 fn base_report(
