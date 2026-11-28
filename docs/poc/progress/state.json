@@ -1,11 +1,11 @@
 {
   "schema_version": "console.poc.progress.v1",
   "plan_version": "v1.3.3",
-  "snapshot_id": "02-08-final-20261128",
-  "snapshot_created_at": "2026-11-28T19:09:33+09:00",
-  "last_actual_work_observed_at": "2026-11-28T19:09:33+09:00",
+  "snapshot_id": "03-07-final-20261128",
+  "snapshot_created_at": "2026-11-28T19:52:02+09:00",
+  "last_actual_work_observed_at": "2026-11-28T19:52:02+09:00",
   "reporting_owner": "개발 에이전트 (Codex)",
-  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 검수 완료(fcf1060 main CI 4/4) · 03-02 검수 완료(#99, 28c8b40 main CI 4/4) · X-06 검수 완료(#100, 298053b main CI 4/4) · 03-03 첫 반려 교정·격리 19/19 · 03-03 교정 후보 독립 승인(98503f0), 원장 통합 head 재검토 대기 · 03-03 검수 완료(#101, ad7628c main CI 4/4) · 03-04 검수 완료(#102, 0d8d74b main CI 4/4) · 03-05 로컬 후보 이미지 3개·격리 13/13 · 검수 중 · 03-05 검수 완료(#103, ed15dab main CI 4/4) · 09-02 교정 코드 독립 승인 및 통합 검수 중 · 09-02 검수 완료(#105, 72347b6 main CI 4/4) · 03-06 P22-B 격리 40/40 · 통합 head 검토 대기 · 03-06 검수 완료(#106, 9e220a4 main CI 4/4) · 03-08 P22-C 비용 로컬 비교 · 03-08 검수 완료(#107, 7920687 main CI 4/4) · 08-02 검수 완료(#109, 4508bcb main CI 4/4) · 08-03 관측 검증 준비 착수 · PR #121의 926d1fb 독립 승인·PR CI 4/4, 병합 9dc4f51의 main CI 4/4를 확인했다. 02-06 전체 수용은 재현 요청 실행기·영속 상태 전이 확인 대기. · 02-06 검수 완료. PR #121과 #123의 승인 SHA 및 필수 CI 확인. #123 병합 744e0a2의 main CI 4/4. · 02-06 최종 수용. #124의 d6c97ea 독립 승인 및 필수 CI 4/4, 병합 f802257 동일 SHA main CI 4/4로 로그 조회와 이미지 교체 복구를 확인했다. · 02-07 검수 완료. #125 1acf3b8 독립 승인 및 필수 CI 4/4, 병합 26745e1 동일 SHA main CI 4/4. · 02-08 검수 완료. #127 d4e75a8 독립 승인·필수 CI 4/4, 병합 82f6951 동일 SHA main CI 4/4.",
+  "phase": "02-03 검수 완료 · X-01 검수 완료(후속 교정 병합) · 02-04 검수 완료(사용자 결정 (나): 항목 4·9 병합 PR #57 12bf34f·#58 31cfd5b) · 다음 순서 X-03 → X-04 → 02-05(승인) · gRPC 계획 개정 A4(X-03~X-07) · P28 개정 A5 · X-03 검수 완료(계약 0c243ee) · X-04 검수 완료(84c9668) · 02-05 진행(계획 병합 fda0f2b, 사용자 결정 2026-11-15로 착수) · X-08 검수 완료(1c21177) · 개정 A6(X-08: 02-04 항목 8 호출자 이월의 담당 작업, X-02·후속 실제 호출의 차단 조건) · 03-01 계약·색인·원본 대응표 작성 및 2차 교정 후 표적 시험 13/13, 검수 중 · 03-01 검수 완료(PR #96, main CI 4/4) · 03-02 준비 · 03-02 공통·저장소 전용 기준 작성, 격리 표적 9/9, 검토 후보 · 03-02 최초 독립 반려 교정 및 격리 재시험 10/10 · 03-02 로컬 교정 후보 독립 승인 · X-05 검수 완료(d27fa96 main CI 4/4) · 09-01 검수 완료(fcf1060 main CI 4/4) · 03-02 검수 완료(#99, 28c8b40 main CI 4/4) · X-06 검수 완료(#100, 298053b main CI 4/4) · 03-03 첫 반려 교정·격리 19/19 · 03-03 교정 후보 독립 승인(98503f0), 원장 통합 head 재검토 대기 · 03-03 검수 완료(#101, ad7628c main CI 4/4) · 03-04 검수 완료(#102, 0d8d74b main CI 4/4) · 03-05 로컬 후보 이미지 3개·격리 13/13 · 검수 중 · 03-05 검수 완료(#103, ed15dab main CI 4/4) · 09-02 교정 코드 독립 승인 및 통합 검수 중 · 09-02 검수 완료(#105, 72347b6 main CI 4/4) · 03-06 P22-B 격리 40/40 · 통합 head 검토 대기 · 03-06 검수 완료(#106, 9e220a4 main CI 4/4) · 03-08 P22-C 비용 로컬 비교 · 03-08 검수 완료(#107, 7920687 main CI 4/4) · 08-02 검수 완료(#109, 4508bcb main CI 4/4) · 08-03 관측 검증 준비 착수 · PR #121의 926d1fb 독립 승인·PR CI 4/4, 병합 9dc4f51의 main CI 4/4를 확인했다. 02-06 전체 수용은 재현 요청 실행기·영속 상태 전이 확인 대기. · 02-06 검수 완료. PR #121과 #123의 승인 SHA 및 필수 CI 확인. #123 병합 744e0a2의 main CI 4/4. · 02-06 최종 수용. #124의 d6c97ea 독립 승인 및 필수 CI 4/4, 병합 f802257 동일 SHA main CI 4/4로 로그 조회와 이미지 교체 복구를 확인했다. · 02-07 검수 완료. #125 1acf3b8 독립 승인 및 필수 CI 4/4, 병합 26745e1 동일 SHA main CI 4/4. · 02-08 검수 완료. #127 d4e75a8 독립 승인·필수 CI 4/4, 병합 82f6951 동일 SHA main CI 4/4. · 03-07 검수 완료. P08-COMMON 격리 12/12, #129 391390f 독립 승인·필수 CI 4/4, 병합 4427e28 동일 SHA main CI 4/4.",
   "visibility": "GITHUB_PUBLIC · 익명 HTTP 200 확인(main 병합 기준 화면)",
   "baselines": {
     "main_tasks": 73,
@@ -14,7 +14,7 @@
     "followup_candidates": 5
   },
   "current_task": null,
-  "next_task": "03-07",
+  "next_task": "04-01",
   "tasks": [
     {
       "task_id": "01-01",
@@ -693,13 +693,26 @@
       "track": "main",
       "group": "핵심",
       "kind": "검증",
-      "status": "미착수",
-      "last_observed_at": null,
-      "latest_report": null,
-      "result_state": "미실행",
-      "verification_level": "unverified",
-      "evidence": [],
-      "next_action": null
+      "status": "검수 완료",
+      "last_observed_at": "2026-11-28T19:52:02+09:00",
+      "latest_report": "reports/tasks/03-07/p08-common/ACCEPTANCE.md",
+      "result_state": "03-07 검수 완료. P08-COMMON 격리 12/12, #129 391390f 독립 승인·필수 CI 4/4, 병합 4427e28 동일 SHA main CI 4/4.",
+      "verification_level": "verified",
+      "evidence": [
+        "reports/tasks/03-07/p08-common/ACCEPTANCE.md",
+        "reports/tasks/03-07/p08-common/REPORT.md",
+        "reports/tasks/03-07/p08-common/EXPECTATIONS.md",
+        "reports/tasks/03-07/p08-common/evidence/results.json",
+        "reports/tasks/03-07/p08-common/evidence/raw-streams.tar.gz",
+        "reports/tasks/03-07/p08-common/artifacts.sha256",
+        "https://github.com/HeaInSeo/ieo_poc/pull/129",
+        "https://github.com/HeaInSeo/ieo_poc/commit/391390f53c41d11def0413d370e7e6f41eacbbfa",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/46136476132",
+        "https://github.com/HeaInSeo/ieo_poc/commit/4427e28a515ab6b2abb728256841d58e81571745",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/46137142551"
+      ],
+      "next_action": "순서상 04-01 착수. 공통 프로파일 증거는 후속 P20·P24에 인계.",
+      "unresolved": "04-07/P07 역할 격리와 head 경쟁, 05-03/P23 실제 GitHub 보호와 설정. P08-SEED·P08-PRODUCT는 각자 검증."
     },
     {
       "task_id": "03-08",
@@ -3871,14 +3884,34 @@
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/46132557263",
         "https://github.com/HeaInSeo/ieo_poc/actions/runs/46133192405"
       ]
+    },
+    {
+      "event_id": "03-07-FINAL-20261128",
+      "event_revision": 1,
+      "task_id": "03-07",
+      "observed_at": "2026-11-28T19:52:02+09:00",
+      "state": "03-07 검수 완료. P08-COMMON 격리 12/12, #129 391390f 독립 승인·필수 CI 4/4, 병합 4427e28 동일 SHA main CI 4/4.",
+      "evidence": [
+        "reports/tasks/03-07/p08-common/ACCEPTANCE.md",
+        "reports/tasks/03-07/p08-common/REPORT.md",
+        "reports/tasks/03-07/p08-common/EXPECTATIONS.md",
+        "reports/tasks/03-07/p08-common/evidence/results.json",
+        "reports/tasks/03-07/p08-common/evidence/raw-streams.tar.gz",
+        "reports/tasks/03-07/p08-common/artifacts.sha256",
+        "https://github.com/HeaInSeo/ieo_poc/pull/129",
+        "https://github.com/HeaInSeo/ieo_poc/commit/391390f53c41d11def0413d370e7e6f41eacbbfa",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/46136476132",
+        "https://github.com/HeaInSeo/ieo_poc/commit/4427e28a515ab6b2abb728256841d58e81571745",
+        "https://github.com/HeaInSeo/ieo_poc/actions/runs/46137142551"
+      ]
     }
   ],
   "resume": {
-    "last_verified_stage": "02-08 검수 완료. #127 d4e75a8 독립 승인·필수 CI 4/4, 병합 82f6951 동일 SHA main CI 4/4.",
-    "workspace": "/tmp/ieo-0208-acceptance",
-    "branch_sha": "docs/0208-acceptance · base 82f6951cb8d61dd6bb1d017f7af1ec42f43ad248",
+    "last_verified_stage": "03-07 검수 완료. P08-COMMON 격리 12/12, #129 391390f 독립 승인·필수 CI 4/4, 병합 4427e28 동일 SHA main CI 4/4.",
+    "workspace": "/tmp/ieo-0307-acceptance",
+    "branch_sha": "docs/0307-acceptance · base 4427e28a515ab6b2abb728256841d58e81571745",
     "plan_and_spec": "v1.3.3-A1·A2·A3·A4·A5·A6·A7 · 명세 9개 중 6개 rev 5 · POC-02 rev 7 · POC-04 rev 6 · POC-07 rev 6 · 프로파일 poc-acceptance-v1.3.3 rev 7(02-08·04-11·07-05)·rev 6(02-02)·rev 5 · contract_revision 4 · package sha256 122b031dd8ba5f7ff8b57545fb96f61acd4d79ad787057edf5780d92f7e494e9 · 런타임 계약 revision 18(단계 8 전 PR, 이 PR) · OpenAPI 0.17.1(이 PR)",
-    "running": "02-08 검증 종료.",
+    "running": "03-07 검증 종료.",
     "unresolved_external_effects": [],
     "saved_reports": [
       "reports/tasks/01-02/runtime-contract-20261112/REPORT.md",
@@ -3956,12 +3989,13 @@
       "reports/tasks/02-06/review-lifecycle-20261122/CHECKPOINT.md",
       "reports/tasks/02-06/review-lifecycle-20261122/REPRO_RUNNER.md",
       "reports/tasks/02-07/judgment-outbox-20261123/CHECKPOINT.md",
-      "reports/tasks/02-08/followup-watch-20261124/CHECKPOINT.md"
+      "reports/tasks/02-08/followup-watch-20261124/CHECKPOINT.md",
+      "reports/tasks/03-07/p08-common/ACCEPTANCE.md"
     ],
-    "pending_index_updates": "02-08 수용과 다음 순서 갱신.",
-    "next_action": "계획 순서의 03-07 선행 근거를 대조한다.",
+    "pending_index_updates": "03-07 수용과 다음 순서 갱신.",
+    "next_action": "04-01 선행 02-05·02-02 수용을 확인했다. 04-01 계약과 기존 증거를 대조한다.",
     "resume_check": "git log origin/main, gh pr list, state.json SHA, reports/ 파일을 대조. 이미 병합된 PR·게시된 검토 댓글을 재발행하지 않는다.",
-    "current_work": "03-07 착수 대조.",
+    "current_work": "03-07 수용 기록.",
     "blocking": "X-08 검수 완료(이 기록) 뒤에도 실제 모델 호출은 각자의 남은 전제 뒤에만: 02-05 단계 8은 승인된 02-05 예산·예산 이름·상한 코드 PR·단계 3·4 병합(완료)·1c21177 이후 빌드로 재배치, X-02는 executable 등록·의미 검토 등. 모델 호출 없는 작업은 막지 않음. gRPC(X-03·X-04) 미완료는 02-05를 막지 않음(X-04가 늦으면 02-05는 HTTP). 실제 GitHub 수집(1b)은 GH1~GH5 뒤 04-07·05-01~05-03·EARLY-01. 실제 중간 정지는 04-05의 결정안 승인 전 금지 · 단계 4부터 코디네이터 중앙 기록 supervisor는 전달 없는 takeover를 거부하므로 실제 회차(단계 8)는 deliverAssignment 경로로 한다 · 02-05 단계 8과 단계 9 수용 완료. 02-06 선행 조건 충족. 실제 failover 첫 시험은 WAITING_FOR_PREREQUISITE. · 실제 GitHub 권한 회수·head 경쟁·역할 격리는 04-07/P07, 보호 규칙·App 설정은 05-03/P23에서 검증한다.",
     "budget": "02-04: 7/12회 사용(40.666초, billable 33,948, cache_read 121,189), 예비 개발 2·Guardrail 3 미사용 유지. 추가 청구 허용 USD 0, 유료 API 전환·추가 결제·크레딧 구매 금지, 예산 초기화·전용 금지(종료된 01-04 예산 포함), 미계측 사용량을 0으로 두거나 자동 재시도하지 않음. X-02 예산(6회·회당 3,600초·총 14,400초·3M·cache_read 30M)은 X-08 검수 완료와 X-02 남은 조건 뒤에만 · 02-05 실제 회차 예산(사용자 결정 2026-11-15 (나)): 계획 3회(개발 R1·R2, Guardrail G1) + 개발 전용 예비 1회, 역할 몫 개발 3회·1,800초·150,000·1,500,000 / Guardrail 1회·600초·50,000·500,000, 회당 600초·총 2,400초, 합산 토큰 200,000, cache_read 2,000,000, USD 0, 예산 검사는 컨테이너 밖. 단계 8에만, X-08 검수 완료와 예산 코드 PR 뒤 · 02-05 예산 코드(BUDGET_0205)와 예비 표식 규칙(사용자 결정 2026-11-17)은 이 PR. 코드에 있어도 실제 호출은 단계 8 전제 뒤에만",
     "user_decisions": [
